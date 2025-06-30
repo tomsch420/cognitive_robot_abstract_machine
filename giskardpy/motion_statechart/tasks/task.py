@@ -43,17 +43,18 @@ class Task(MotionStatechartNode):
         self.linear_weight_gains = []
 
         symbols_name = f'{self.name}_observation_state'
-        self.obs_symbol = symbol_manager.register_symbol_provider(symbols_name, lambda n=self.name: god_map.motion_statechart_manager.task_state.get_observation_state(n))
+        self.obs_symbol = symbol_manager.register_symbol_provider(symbols_name, lambda
+            n=self.name: god_map.motion_statechart_manager.task_state.get_observation_state(n))
 
         symbols_name = f'{self.name}_life_cycle_state'
-        self.life_symbol = symbol_manager.register_symbol_provider(symbols_name, lambda n=self.name: god_map.motion_statechart_manager.task_state.get_life_cycle_state(n))
+        self.life_symbol = symbol_manager.register_symbol_provider(symbols_name, lambda
+            n=self.name: god_map.motion_statechart_manager.task_state.get_life_cycle_state(n))
 
     def get_observation_state_expression(self):
         return self.obs_symbol
 
     def get_life_cycle_state_expression(self):
         return self.life_symbol
-
 
     @property
     def ref_str(self) -> str:
@@ -299,6 +300,25 @@ class Task(MotionStatechartNode):
                                      weight=weight,
                                      task_expression=expr_current,
                                      name=name)
+
+    def add_position_range_constraint(self,
+                                      expr_current: Union[cas.symbol_expr, float],
+                                      expr_min: Union[cas.symbol_expr_float, float],
+                                      expr_max: Union[cas.symbol_expr_float, float],
+                                      reference_velocity: Union[cas.symbol_expr_float, float],
+                                      weight: Union[cas.symbol_expr_float, float] = WEIGHT_BELOW_CA,
+                                      name: str = ''):
+        """
+        A wrapper around add_constraint. Will add a constraint that tries to move expr_current to expr_goal.
+        """
+        error_min = expr_min - expr_current
+        error_max = expr_max - expr_current
+        self.add_inequality_constraint(reference_velocity=reference_velocity,
+                                       lower_error=error_min,
+                                       upper_error=error_max,
+                                       weight=weight,
+                                       task_expression=expr_current,
+                                       name=name)
 
     def add_vector_goal_constraints(self,
                                     frame_V_current: cas.Vector3,

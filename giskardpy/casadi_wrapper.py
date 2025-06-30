@@ -299,14 +299,10 @@ class Symbol(Symbol_):
         return Expression(self.s.__ge__(other))
 
     def __eq__(self, other):
-        if isinstance(other, Symbol_):
-            other = other.s
-        return Expression(self.s.__eq__(other))
+        return hash(self) == hash(other)
 
     def __ne__(self, other):
-        if isinstance(other, Symbol_):
-            other = other.s
-        return Expression(self.s.__ne__(other))
+        return hash(self) != hash(other)
 
     def __neg__(self):
         return Expression(self.s.__neg__())
@@ -632,6 +628,12 @@ class TransMatrix(Symbol_, GeometricType):
                 return result
         raise _operation_type_error(self, 'dot', other)
 
+    def __matmul__(self, other):
+        return self.dot(other)
+
+    def __rmatmul__(self, other):
+        return other.dot(self)
+
     def inverse(self):
         inv = TransMatrix(child_frame=self.reference_frame, reference_frame=self.child_frame)
         inv[:3, :3] = self[:3, :3].T
@@ -776,6 +778,12 @@ class RotationMatrix(Symbol_, GeometricType):
             result.reference_frame = self.reference_frame
             return result
         raise _operation_type_error(self, 'dot', other)
+
+    def __matmul__(self, other):
+        return self.dot(other)
+
+    def __rmatmul__(self, other):
+        return other.dot(self)
 
     def to_axis_angle(self):
         return self.to_quaternion().to_axis_angle()

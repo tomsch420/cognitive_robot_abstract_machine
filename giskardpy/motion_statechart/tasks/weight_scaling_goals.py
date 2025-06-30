@@ -6,6 +6,7 @@ from giskardpy.data_types.data_types import Derivatives
 from collections import defaultdict
 
 from giskardpy.motion_statechart.tasks.task import Task
+from giskardpy.symbol_manager import symbol_manager
 
 
 class BaseArmWeightScaling(Task):
@@ -234,10 +235,10 @@ class MaxManipulabilityAsEq3(Task):
             name = f'{self.__class__.__name__}/{self.root_link}/{self.tip_link}'
         super().__init__(name=name)
 
-        results = god_map.world.compute_split_chain(self.root_link, self.tip_link, True, True, False, False)
-        for joint in results[2]:
-            if 'joint' in joint and not god_map.world.is_joint_rotational(joint):
-                raise Exception('Non rotational joint in kinematic chain of Maximize Manipulability Goal')
+        # results = god_map.world.compute_split_chain(self.root_link, self.tip_link, True, True, False, False)
+        # for joint in results[2]:
+        #     if 'joint' in joint and not god_map.world.is_joint_rotational(joint):
+        #         raise Exception('Non rotational joint in kinematic chain of Maximize Manipulability Goal')
 
         root_P_tip = god_map.world.compose_fk_expression(self.root_link, self.tip_link).to_position()[:3]
 
@@ -254,15 +255,17 @@ class MaxManipulabilityAsEq3(Task):
         m = cas.sqrt(cas.det(JJT))
 
         self.add_position_constraint(reference_velocity=1,
-                                     expr_goal=m_threshold-m,
+                                     expr_goal=m_threshold,
                                      weight=0.1,
                                      expr_current=m,
                                      name=self.name)
 
-        god_map.debug_expression_manager.add_debug_expression(f'mIndex{tip_link}', m, derivatives_to_plot=[0,1])
+        god_map.debug_expression_manager.add_debug_expression(f'mIndex {tip_link}', m, derivatives_to_plot=[0,1])
+        god_map.debug_expression_manager.add_debug_expression(f'mIndex {tip_link} threshold', m_threshold, derivatives_to_plot=[0,1])
         # god_map.debug_expression_manager.add_debug_expression(f'mIndex{tip_link}_dot',
         #                                                       cas.jacobian_with_dict([md], symbols).dot(cas.Expression(symbols)),
         #                                                       derivative=1,
         #                                                       derivatives_to_plot=[0,1])
+        self.observation_expression = cas.less_equal(cas.abs(m_threshold - m), 0.0005)
 
 

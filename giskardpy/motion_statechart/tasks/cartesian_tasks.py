@@ -14,7 +14,7 @@ class MoveBase(Task):
     def __init__(self,
                  drive_link: PrefixName,
                  tip_links: List[PrefixName],
-                 radius: float,
+                 xyz: List[float],
                  name: Optional[str] = None, plot: bool = True):
         super().__init__(name=name, plot=plot)
         self.drive_link = drive_link
@@ -26,24 +26,24 @@ class MoveBase(Task):
             map_T_drive = god_map.world.compose_fk_expression(self.map, self.drive_link)
             map_T_drive_eval = god_map.world.compose_fk_evaluated_expression(self.map, self.drive_link)
             drive_P_tip_projected = cas.project_to_plane(cas.Vector3([1, 0, 0], self.drive_link),
-                                                        cas.Vector3([0, 1, 0], self.drive_link),
-                                                        drive_T_tip.to_position())
-            map_P_tip_projected = map_T_drive_eval.dot(drive_P_tip_projected)
-            error = map_P_tip_projected - map_T_drive.to_position()
-            god_map.debug_expression_manager.add_debug_expression(f'map_P_tip_projected', map_P_tip_projected)
-            god_map.debug_expression_manager.add_debug_expression(f'map_T_tip', map_T_drive.to_position())
-            self.add_inequality_constraint(reference_velocity=CartesianPosition.default_reference_velocity,
-                                           lower_error=-np.inf,
-                                           upper_error=radius - error.x,
-                                           weight=WEIGHT_ABOVE_CA,
-                                           task_expression=error.x,
-                                           name=f'keep {tip_link} in circle/x')
-            self.add_inequality_constraint(reference_velocity=CartesianPosition.default_reference_velocity,
-                                           lower_error=-radius - error.y,
-                                           upper_error=radius - error.y,
-                                           weight=WEIGHT_ABOVE_CA,
-                                           task_expression=error.y,
-                                           name=f'keep {tip_link} in circle/y')
+                                                         cas.Vector3([0, 1, 0], self.drive_link),
+                                                         drive_T_tip.to_position())
+
+            map_P_tip_projected = map_T_drive_eval @ drive_P_tip_projected
+            error = map_T_drive.to_position() - map_P_tip_projected
+            error.vis_frame = self.drive_link
+            self.add_position_range_constraint(reference_velocity=CartesianPosition.default_reference_velocity,
+                                               expr_min=-xyz[0],
+                                               expr_max=xyz[0],
+                                               weight=WEIGHT_ABOVE_CA,
+                                               expr_current=error.x,
+                                               name=f'keep {tip_link} in circle/x')
+            self.add_position_range_constraint(reference_velocity=CartesianPosition.default_reference_velocity,
+                                               expr_min=-xyz[1],
+                                               expr_max=xyz[1],
+                                               weight=WEIGHT_ABOVE_CA,
+                                               expr_current=error.y,
+                                               name=f'keep {tip_link} in circle/y')
 
 
 class CartesianPosition(Task):

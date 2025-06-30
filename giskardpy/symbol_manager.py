@@ -82,6 +82,8 @@ class SymbolManager(metaclass=SingletonMeta):
     def resolve_symbols(self, symbols: Union[List[cas.Symbol], List[List[cas.Symbol]]]) \
             -> Union[np.ndarray, List[np.ndarray]]:
         try:
+            if len(symbols) == 0:
+                return np.array([])
             if isinstance(symbols[0], list):
                 return [np.array([self.symbol_to_provider[s]() for s in param], dtype=float) for param in symbols]
             else:
