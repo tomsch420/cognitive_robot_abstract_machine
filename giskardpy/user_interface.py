@@ -446,7 +446,7 @@ class GiskardWrapper:
         collision_time = time.time() - collision_time
 
         total_time = time.time() - total_time_start
-        self.traj.set(god_map.control_cycle_counter, god_map.world.state)
+        self.traj.append(god_map.world.state)
         god_map.time += god_map.qp_controller.config.control_dt
         god_map.control_cycle_counter += 1
 

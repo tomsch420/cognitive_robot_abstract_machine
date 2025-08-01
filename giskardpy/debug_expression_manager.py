@@ -75,7 +75,7 @@ class DebugExpressionManager:
         debug_trajectory = Trajectory()
         for control_cycle_counter, evaluated_debug_expressions in enumerate(self._raw_debug_trajectory):
             if control_cycle_counter >= 1:
-                last_mjs = debug_trajectory.get_exact(control_cycle_counter - 1)
+                last_mjs = debug_trajectory[control_cycle_counter - 1]
                 js = deepcopy(last_mjs)
             else:
                 last_mjs = WorldState()
@@ -98,9 +98,9 @@ class DebugExpressionManager:
                 else:
                     self.evaluated_expr_to_js(name, last_mjs, js, float(value), control_dt,
                                               self.debug_expressions[name].debug_derivative, control_cycle_counter)
-            debug_trajectory.set(control_cycle_counter, js)
+            debug_trajectory.append(js)
         for control_cycle_counter, evaluated_debug_expressions in enumerate(self._raw_debug_trajectory):
-            js = debug_trajectory.get_exact(control_cycle_counter)
+            js = debug_trajectory[control_cycle_counter]
             for name in self.debug_expressions:
                 for d in Derivatives.range(Derivatives.position, Derivatives.jerk):
                     if d not in self.debug_expressions[name].debug_derivatives_to_plot:

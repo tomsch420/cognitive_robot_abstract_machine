@@ -762,19 +762,19 @@ class CollisionWorldSynchronizer:
                                    file_name: Optional[str] = None):
         # Create the root element
         root = etree.Element('robot')
-        root.set('name', group.name)
+        root.append('name', group.name)
 
         # %% disabled links
         for link_name in sorted(disabled_links):
             child = etree.SubElement(root, self.srdf_disable_all_collisions)
-            child.set('link', link_name.short_name)
+            child.append('link', link_name.short_name)
 
         # %% self collision matrix
         for (link_a, link_b), reason in sorted(self_collision_matrix.items()):
             child = etree.SubElement(root, self.srdf_disable_self_collision)
-            child.set('link1', link_a.short_name)
-            child.set('link2', link_b.short_name)
-            child.set('reason', reason.name)
+            child.append('link1', link_a.short_name)
+            child.append('link2', link_b.short_name)
+            child.append('reason', reason.name)
 
         # Create the XML tree
         tree = etree.ElementTree(root)

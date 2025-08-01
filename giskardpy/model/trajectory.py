@@ -3,9 +3,10 @@ from __future__ import annotations
 import os
 from collections import OrderedDict, defaultdict
 from copy import deepcopy
+from dataclasses import dataclass, field
 from itertools import product
 from threading import Lock
-from typing import Dict, Tuple, Optional
+from typing import Dict, Tuple, Optional, List
 
 import numpy as np
 from sortedcontainers import SortedDict
@@ -21,58 +22,29 @@ from semantic_world.world_state import WorldState
 plot_lock = Lock()
 
 
+@dataclass
 class Trajectory:
-    _points: Dict[int, WorldState]
-
-    def __init__(self):
-        self.clear()
+    _points: List[WorldState] = field(default_factory=list)
 
     def clear(self):
-        self._points = OrderedDict()
+        self._points = []
 
-    def get_exact(self, time: int) -> WorldState:
-        time = max(-len(self), min(len(self), time))
-        return list(self._points.values())[time]
+    def __getitem__(self, item: int) -> WorldState:
+        return self._points[item]
 
-    def set(self, time: int, point: WorldState):
-        if len(self._points) > 0 and list(self._points.keys())[-1] > time:
-            raise KeyError('Cannot append a trajectory point that is before the current end time of the trajectory.')
-        self._points[time] = deepcopy(point)
+    def append(self, point: WorldState):
+        self._points.append(deepcopy(point))
 
     def __len__(self) -> int:
         return len(self._points)
 
-    def get_joint_names(self):
-        if len(self) == 0:
-            raise IndexError(f'Trajectory is empty and therefore does not contain any joints.')
-        return list(self.get_exact(0).keys())
+    def __iter__(self):
+        return self._points.__iter__()
 
-    def delete(self, time):
-        del self._points[time]
-
-    def delete_last(self):
-        self.delete(list(self._points.keys())[-1])
-
-    def get_last(self):
-        return list(self._points.values())[-1]
-
-    def items(self):
-        return self._points.items()
-
-    def keys(self):
-        return self._points.keys()
-
-    def values(self):
-        return self._points.values()
-
-    @property
-    def length_in_seconds(self) -> float:
-        return len(self) * god_map.qp_controller.config.mpc_dt
-
-    def to_dict(self, normalize_position: Optional[bool] = None, filter_0_vel: bool = True, sort: bool = True)\
+    def to_dict(self, normalize_position: Optional[bool] = None, filter_0_vel: bool = True, sort: bool = True) \
             -> Dict[Derivatives, Dict[PrefixedName, np.ndarray]]:
         data = defaultdict(lambda: defaultdict(list))
-        for time, joint_states in self.items():
+        for time, joint_states in enumerate(self._points):
             for free_variable, joint_state in joint_states.items():
                 for derivative, state in enumerate(joint_state):
                     data[derivative][free_variable].append(state)
