@@ -227,7 +227,7 @@ class SelfCollisionMatrix:
         """
         Find connecting links and disable all adjacent link collisions
         """
-        disabled_pairs = self.collision_config.compute_uncontrolled_body_pairs()
+        disabled_pairs = self.collision_config.disable_collisions_for_adjacent_bodies()
         black_list = {pair: DisableCollisionReason.Adjacent for pair in disabled_pairs}
         remaining_pairs = body_combinations.difference(disabled_pairs)
         return remaining_pairs, black_list
