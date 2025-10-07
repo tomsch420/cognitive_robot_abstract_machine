@@ -13,22 +13,22 @@ class DebugGoal(Task):
         if name is None:
             name = self.__class__.__name__
         super().__init__(name=name)
-        q = cas.Quaternion(reference_frame=god_map.world.root_link_name)
+        q = cas.Quaternion(reference_frame=god_map.world.root.name)
         god_map.debug_expression_manager.add_debug_expression("q", q)
 
-        p = cas.Point3(1, 0, 0, reference_frame=god_map.world.root_link_name)
+        p = cas.Point3(1, 0, 0, reference_frame=god_map.world.root.name)
         god_map.debug_expression_manager.add_debug_expression("p", p)
 
         pose = cas.TransformationMatrix.from_xyz_rpy(
-            y=1, reference_frame=god_map.world.root_link_name
+            y=1, reference_frame=god_map.world.root.name
         )
         god_map.debug_expression_manager.add_debug_expression("pose", pose)
 
-        v = cas.Vector3(1, 0, 0, reference_frame=god_map.world.root_link_name)
+        v = cas.Vector3(1, 0, 0, reference_frame=god_map.world.root.name)
         god_map.debug_expression_manager.add_debug_expression("v", v)
 
         r = cas.Quaternion(
-            reference_frame=god_map.world.root_link_name
+            reference_frame=god_map.world.root.name
         ).to_rotation_matrix()
         god_map.debug_expression_manager.add_debug_expression("r", r)
 

@@ -66,7 +66,7 @@ class ExternalCA(Goal):
         map_P_pa = map_T_a.dot(a_P_pa)
 
         # the position distance is not accurate, but the derivative is still correct
-        dist = map_V_n.dot(map_P_pa)
+        dist = map_V_n.dot(cas.Vector3(map_P_pa[0], map_P_pa[1], map_P_pa[2]))
 
         qp_limits_for_lba = self.max_velocity * sample_period * self.control_horizon
 
@@ -144,12 +144,11 @@ class ExternalCA(Goal):
 
         # weight = cas.if_greater(actual_distance, 50, 0, WEIGHT_COLLISION_AVOIDANCE)
 
-        weight = cas.save_division(
-            WEIGHT_COLLISION_AVOIDANCE,  # divide by number of active repeller per link
-            cas.min(number_of_external_collisions, self.max_avoided_bodies),
+        weight = cas.Expression(data=WEIGHT_COLLISION_AVOIDANCE).safe_division(
+            cas.min(number_of_external_collisions, self.max_avoided_bodies)
         )
         distance_monitor = Monitor(name=f"collision distance {self.name}", _plot=False)
-        distance_monitor.observation_expression = cas.greater(actual_distance, 50)
+        distance_monitor.observation_expression = cas.if_greater(actual_distance, 50, cas.BinaryTrue, cas.BinaryFalse)
         self.add_monitor(distance_monitor)
         task = Task(name=self.name + "/task", _plot=False)
         self.add_task(task)
@@ -230,7 +229,7 @@ class SelfCA(Goal):
 
         pb_P_pa = pb_T_b.dot(b_T_a).dot(a_P_pa)
 
-        dist = pb_V_n.dot(pb_P_pa)
+        dist = pb_V_n.dot(cas.Vector3(pb_P_pa[0], pb_P_pa[1], pb_P_pa[2]))
 
         qp_limits_for_lba = self.max_velocity * sample_period * self.control_horizon
 
@@ -257,12 +256,11 @@ class SelfCA(Goal):
             cas.max(0, upper_slack),
         )
 
-        weight = cas.save_division(
-            WEIGHT_COLLISION_AVOIDANCE,  # divide by number of active repeller per link
-            cas.min(number_of_self_collisions, self.max_avoided_bodies),
+        weight = cas.Expression(data=WEIGHT_COLLISION_AVOIDANCE).safe_division(
+            cas.min(number_of_self_collisions, self.max_avoided_bodies)
         )
         distance_monitor = Monitor(name=f"collision distance {self.name}", _plot=False)
-        distance_monitor.observation_expression = cas.greater(actual_distance, 50)
+        distance_monitor.observation_expression = cas.if_greater(actual_distance, 50, cas.BinaryTrue, cas.BinaryFalse)
         self.add_monitor(distance_monitor)
         task = Task(name=self.name + "/task", _plot=False)
         self.add_task(task)

@@ -34,7 +34,7 @@ class CartesianPosition(Task):
         self.tip_link = tip_link
         if name is None:
             name = f"{self.__class__.__name__}/{self.root_link}/{self.tip_link}"
-        super().__init__(name=name, plot=plot)
+        super().__init__(name=name)
         if reference_velocity is None:
             reference_velocity = self.default_reference_velocity
         self.reference_velocity = reference_velocity
@@ -69,8 +69,8 @@ class CartesianPosition(Task):
 
         cap = (
             self.reference_velocity
-            * god_map.qp_controller.mpc_dt
-            * (god_map.qp_controller.prediction_horizon - 2)
+            * god_map.qp_controller.config.mpc_dt
+            * (god_map.qp_controller.config.prediction_horizon - 2)
         )
         god_map.debug_expression_manager.add_debug_expression(
             f"{self.name}/upper_cap",

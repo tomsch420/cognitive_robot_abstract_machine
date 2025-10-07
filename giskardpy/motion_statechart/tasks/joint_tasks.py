@@ -374,9 +374,8 @@ class UnlimitedJointGoal(Task):
         super().__init__(
             name=name,
         )
-        joint_name = god_map.world.search_for_joint_name(joint_name)
-        joint = god_map.world.joints[joint_name]
-        joint_symbol = joint.get_symbol(Derivatives.position)
+        joint = god_map.world.get_connection_by_name(joint_name)
+        joint_symbol = joint.dof.symbols.position
         self.add_position_constraint(
             expr_current=joint_symbol,
             expr_goal=goal_position,
