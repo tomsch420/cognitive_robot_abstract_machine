@@ -1,26 +1,29 @@
 from __future__ import division
 
+from dataclasses import dataclass
 from typing import Optional
 
 import semantic_world.spatial_types.spatial_types as cas
 from semantic_world.prefixed_name import PrefixedName
 from giskardpy.motion_statechart.tasks.task import WEIGHT_ABOVE_CA, Task
 from giskardpy.god_map import god_map
+from semantic_world.world_entity import Body
 
 
+@dataclass
 class GraspBar(Task):
-    def __init__(self,
-                 root_link: PrefixedName,
-                 tip_link: PrefixedName,
-                 tip_grasp_axis: cas.Vector3,
-                 bar_center: cas.Point3,
-                 bar_axis: cas.Vector3,
-                 bar_length: float,
-                 threshold: float = 0.01,
-                 reference_linear_velocity: float = 0.1,
-                 reference_angular_velocity: float = 0.5,
-                 weight: float = WEIGHT_ABOVE_CA,
-                 name: Optional[str] = None):
+    root_link: Body
+    tip_link: Body
+    tip_grasp_axis: cas.Vector3
+    bar_center: cas.Point3
+    bar_axis: cas.Vector3
+    bar_length: float
+    threshold: float = 0.01
+    reference_linear_velocity: float = 0.1
+    reference_angular_velocity: float = 0.5
+    weight: float = WEIGHT_ABOVE_CA
+
+    def __post_init__(self):
         """
         Like a CartesianPose but with more freedom.
         tip_link is allowed to be at any point along bar_axis, that is without bar_center +/- bar_length.
@@ -35,34 +38,24 @@ class GraspBar(Task):
         :param reference_angular_velocity: rad/s
         :param weight: 
         """
-        self.root = root_link
-        self.tip = tip_link
-        if name is None:
-            name = f'{self.__class__.__name__}/{self.root}/{self.tip}'
-        super().__init__(name=name)
+        bar_center = god_map.world.transform(target_frame=self.root_link, spatial_object=self.bar_center)
 
-        bar_center = god_map.world.transform(target_frame=self.root, spatial_object=bar_center)
-
-        tip_grasp_axis = god_map.world.transform(target_frame=self.tip, spatial_object=tip_grasp_axis)
+        tip_grasp_axis = god_map.world.transform(target_frame=self.tip_link, spatial_object=self.tip_grasp_axis)
         tip_grasp_axis.scale(1)
 
-        bar_axis = god_map.world.transform(target_frame=self.root, spatial_object=bar_axis)
+        bar_axis = god_map.world.transform(target_frame=self.root_link, spatial_object=self.bar_axis)
         bar_axis.scale(1)
 
         self.bar_axis = bar_axis
         self.tip_grasp_axis = tip_grasp_axis
         self.bar_center = bar_center
-        self.bar_length = bar_length
-        self.reference_linear_velocity = reference_linear_velocity
-        self.reference_angular_velocity = reference_angular_velocity
-        self.weight = weight
 
 
         root_V_bar_axis = self.bar_axis
         tip_V_tip_grasp_axis = self.tip_grasp_axis
         root_P_bar_center = self.bar_center
 
-        root_T_tip = god_map.world.compose_fk_expression(self.root, self.tip)
+        root_T_tip = god_map.world.compose_forward_kinematics_expression(self.root_link, self.tip_link)
         root_V_tip_normal = cas.dot(root_T_tip, tip_V_tip_grasp_axis)
 
         self.add_vector_goal_constraints(frame_V_current=root_V_tip_normal,
@@ -70,7 +63,7 @@ class GraspBar(Task):
                                          reference_velocity=self.reference_angular_velocity,
                                          weight=self.weight)
 
-        root_P_tip = god_map.world.compose_fk_expression(self.root, self.tip).to_position()
+        root_P_tip = god_map.world.compose_forward_kinematics_expression(self.root_link, self.tip_link).to_position()
 
         root_P_line_start = root_P_bar_center + root_V_bar_axis * self.bar_length / 2
         root_P_line_end = root_P_bar_center - root_V_bar_axis * self.bar_length / 2
@@ -82,4 +75,4 @@ class GraspBar(Task):
                                         reference_velocity=self.reference_linear_velocity,
                                         weight=self.weight)
 
-        self.observation_expression = cas.less_equal(dist, threshold)
+        self.observation_expression = cas.less_equal(dist, self.threshold)

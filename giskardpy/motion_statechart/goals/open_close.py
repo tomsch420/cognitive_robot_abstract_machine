@@ -1,7 +1,9 @@
 from __future__ import division
 
-from typing import Optional
+from dataclasses import dataclass
+from typing import Optional, Union
 
+from semantic_world.connections import Has1DOFState
 from semantic_world.prefixed_name import PrefixedName
 from giskardpy.motion_statechart.goals.goal import Goal
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
@@ -9,16 +11,18 @@ from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList
 from giskardpy.motion_statechart.tasks.task import WEIGHT_ABOVE_CA
 from giskardpy.god_map import god_map
 import semantic_world.spatial_types.spatial_types as cas
+from semantic_world.world_entity import Body, Connection
 
 
+@dataclass
 class Open(Goal):
-    def __init__(self,
-                 tip_link: PrefixedName,
-                 environment_link: PrefixedName,
-                 goal_joint_state: Optional[float] = None,
-                 max_velocity: float = 100,
-                 weight: float = WEIGHT_ABOVE_CA,
-                 name: Optional[str] = None):
+    tip_link: Body
+    environment_link: Body
+    goal_joint_state: Optional[float] = None
+    max_velocity: float = 100
+    weight: float = WEIGHT_ABOVE_CA
+
+    def __post_init__(self):
         """
         Open a container in an environment.
         Only works with the environment was added as urdf.
@@ -29,59 +33,53 @@ class Open(Goal):
         :param goal_joint_state: goal state for the container. default is maximum joint state.
         :param weight:
         """
-        self.weight = weight
-        self.tip_link = tip_link
-        self.handle_link = environment_link
-        self.joint_name = god_map.world.get_movable_parent_joint(self.handle_link)
-        if name is None:
-            name = f'{self.__class__.__name__}'
-        super().__init__(name=name)
+        self.handle_link = self.environment_link
+        self.connection: Union[Has1DOFState, Connection] = (
+            god_map.world.get_controlled_parent_connection(self.handle_link)
+        )
 
-        _, max_position = god_map.world.get_joint_position_limits(self.joint_name)
-        if goal_joint_state is None:
-            goal_joint_state = max_position
+        max_position = self.connection.dof.upper_limits.position
+        if self.goal_joint_state is None:
+            self.goal_joint_state = max_position
         else:
-            goal_joint_state = min(max_position, goal_joint_state)
+            self.goal_joint_state = min(max_position, self.goal_joint_state)
 
-        goal_state = {self.joint_name.short_name: goal_joint_state}
-        hinge_goal = JointPositionList(goal_state=goal_state,
-                                       name=f'{self.name}/hinge',
-                                       weight=self.weight)
+        goal_state = {self.connection.name: self.goal_joint_state}
+        hinge_goal = JointPositionList(
+            goal_state=goal_state, name=f"{self.name}/hinge", weight=self.weight
+        )
         self.add_task(hinge_goal)
 
-        handle_pose = cas.TransformationMatrix(reference_frame=self.tip_link, child_frame=self.tip_link)
+        handle_pose = cas.TransformationMatrix(
+            reference_frame=self.tip_link, child_frame=self.tip_link
+        )
 
-        hold_handle = CartesianPose(root_link=self.handle_link,
-                                    tip_link=self.tip_link,
-                                    name=f'{self.name}/hold handle',
-                                    goal_pose=handle_pose,
-                                    weight=self.weight)
+        hold_handle = CartesianPose(
+            root_link=self.handle_link,
+            tip_link=self.tip_link,
+            name=f"{self.name}/hold handle",
+            goal_pose=handle_pose,
+            weight=self.weight,
+        )
         self.add_task(hold_handle)
-        self.observation_expression = cas.logic_and(hinge_goal.observation_expression, hold_handle.observation_expression)
+        self.observation_expression = cas.logic_and(
+            hinge_goal.observation_expression, hold_handle.observation_expression
+        )
 
 
+@dataclass
 class Close(Open):
-    def __init__(self,
-                 tip_link: PrefixedName,
-                 environment_link: PrefixedName,
-                 goal_joint_state: Optional[float] = None,
-                 weight: float = WEIGHT_ABOVE_CA,
-                 name: Optional[str] = None):
+
+    def __post_init__(self):
         """
         Same as Open, but will use minimum value as default for goal_joint_state
         """
-        self.tip_link = tip_link
-        self.environment_link = environment_link
-        if name is None:
-            name = f'{self.__class__.__name__}'
-        joint_name = god_map.world.get_movable_parent_joint(self.environment_link)
-        min_position, _ = god_map.world.get_joint_position_limits(joint_name)
-        if goal_joint_state is None:
-            goal_joint_state = min_position
+        self.connection: Union[Has1DOFState, Connection] = (
+            god_map.world.get_controlled_parent_connection(self.handle_link)
+        )
+        min_position = self.connection.dof.lower_limits.position
+        if self.goal_joint_state is None:
+            self.goal_joint_state = min_position
         else:
-            goal_joint_state = max(min_position, goal_joint_state)
-        super().__init__(name=name,
-                         tip_link=tip_link,
-                         environment_link=environment_link,
-                         goal_joint_state=goal_joint_state,
-                         weight=weight)
+            self.goal_joint_state = max(min_position, self.goal_joint_state)
+        super().__post_init__()

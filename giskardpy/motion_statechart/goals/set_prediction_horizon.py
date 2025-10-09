@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import Union, Optional
 
 import semantic_world.spatial_types.spatial_types as cas
@@ -7,23 +8,12 @@ from giskardpy.motion_statechart.monitors.monitors import PayloadMonitor
 from giskardpy.qp.solvers.qp_solver_ids import SupportedQPSolver
 
 
-
-
+@dataclass
 class SetQPSolver(PayloadMonitor):
+    qp_solver_id: Union[SupportedQPSolver, int]
 
-    def __init__(self, qp_solver_id: Union[SupportedQPSolver, int], name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.BinaryTrue,
-                 pause_condition: cas.Expression = cas.BinaryFalse,
-                 end_condition: cas.Expression = cas.BinaryFalse):
-        if not cas.is_true_symbol(start_condition):
-            raise MonitorInitalizationException(f'{self.__class__.__name__}: start_condition must be True.')
-        if name is None:
-            name = self.__class__.__name__
-        super().__init__(run_call_in_thread=False, name=name,
-                         start_condition=start_condition,
-                         pause_condition=pause_condition,
-                         end_condition=end_condition)
-        qp_solver_id = SupportedQPSolver(qp_solver_id)
+    def __post_init__(self):
+        qp_solver_id = SupportedQPSolver(self.qp_solver_id)
         god_map.qp_controller.set_qp_solver(qp_solver_id)
 
     def __call__(self):

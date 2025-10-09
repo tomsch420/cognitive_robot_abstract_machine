@@ -18,23 +18,27 @@ from semantic_world.spatial_types.symbol_manager import symbol_manager
 
 @dataclass
 class Goal(MotionStatechartNode):
-    tasks: List[Task] = field(default_factory=list)
-    monitors: List[Monitor] = field(default_factory=list)
-    goals: List[Goal] = field(default_factory=list)
+    tasks: List[Task] = field(default_factory=list, init=False)
+    monitors: List[Monitor] = field(default_factory=list, init=False)
+    goals: List[Goal] = field(default_factory=list, init=False)
 
     @cached_property
     def observation_state_symbol(self) -> cas.Symbol:
-        return symbol_manager.register_symbol_provider(name=f'{self.name}.observation_state',
-                                                       provider=lambda
-                                                           n=self.name: god_map.motion_statechart_manager.goal_state.get_observation_state(
-                                                           n))
+        return symbol_manager.register_symbol_provider(
+            name=f"{self.name}.observation_state",
+            provider=lambda n=self.name: god_map.motion_statechart_manager.goal_state.get_observation_state(
+                n
+            ),
+        )
 
     @cached_property
     def life_cycle_state_symbol(self) -> cas.Symbol:
-        return symbol_manager.register_symbol_provider(name=f'{self.name}.life_cycle_state',
-                                                       provider=lambda
-                                                           n=self.name: god_map.motion_statechart_manager.goal_state.get_life_cycle_state(
-                                                           n))
+        return symbol_manager.register_symbol_provider(
+            name=f"{self.name}.life_cycle_state",
+            provider=lambda n=self.name: god_map.motion_statechart_manager.goal_state.get_life_cycle_state(
+                n
+            ),
+        )
 
     def has_tasks(self) -> bool:
         return len(self.tasks) > 0
@@ -47,42 +51,45 @@ class Goal(MotionStatechartNode):
             node.end_condition = node
             first_node = node
 
-    def get_joint_position_symbol(self, joint_name: PrefixedName) -> Union[cas.Symbol, float]:
+    def get_joint_position_symbol(
+        self, joint_name: PrefixedName
+    ) -> Union[cas.Symbol, float]:
         """
         returns a symbol that refers to the given joint
         """
         if not god_map.world.has_joint(joint_name):
-            raise KeyError(f'World doesn\'t have joint named: {joint_name}.')
+            raise KeyError(f"World doesn't have joint named: {joint_name}.")
         joint = god_map.world.joints[joint_name]
         if isinstance(joint, Has1DOFState):
             return joint.dof.symbols.position
-        raise TypeError(f'get_joint_position_symbol is only supported for OneDofJoint, not {type(joint)}')
+        raise TypeError(
+            f"get_joint_position_symbol is only supported for OneDofJoint, not {type(joint)}"
+        )
 
     def connect_start_condition_to_all_tasks(self, condition: str) -> None:
         for task in self.tasks:
-            if task.start_condition == 'True':
+            if task.start_condition == "True":
                 task.start_condition = condition
             else:
-                task.start_condition = f'{task.start_condition} and {condition}'
+                task.start_condition = f"{task.start_condition} and {condition}"
 
     def connect_pause_condition_to_all_tasks(self, condition: str) -> None:
         for task in self.tasks:
-            if task.pause_condition == 'False':
+            if task.pause_condition == "False":
                 task.pause_condition = condition
             else:
-                task.pause_condition = f'{task.pause_condition} or {condition}'
+                task.pause_condition = f"{task.pause_condition} or {condition}"
 
     def connect_end_condition_to_all_tasks(self, condition: str) -> None:
         for task in self.tasks:
-            if task.end_condition == 'False':
+            if task.end_condition == "False":
                 task.end_condition = condition
-            elif not condition == 'False':
-                task.end_condition = f'{task.end_condition} and {condition}'
+            elif not condition == "False":
+                task.end_condition = f"{task.end_condition} and {condition}"
 
-    def connect_monitors_to_all_tasks(self,
-                                      start_condition: str,
-                                      pause_condition: str,
-                                      end_condition: str):
+    def connect_monitors_to_all_tasks(
+        self, start_condition: str, pause_condition: str, end_condition: str
+    ):
         self.connect_start_condition_to_all_tasks(start_condition)
         self.connect_pause_condition_to_all_tasks(pause_condition)
         self.connect_end_condition_to_all_tasks(end_condition)
@@ -92,12 +99,12 @@ class Goal(MotionStatechartNode):
         """
         A string referring to self on the god_map. Used with symbol manager.
         """
-        return f'god_map.motion_statechart_manager.goal_state.get_node(\'{self.name}\')'
+        return f"god_map.motion_statechart_manager.goal_state.get_node('{self.name}')"
 
     def __add__(self, other: str) -> str:
         if isinstance(other, str):
             return self.ref_str + other
-        raise NotImplementedError('Goal can only be added with a string.')
+        raise NotImplementedError("Goal can only be added with a string.")
 
     # def get_expr_velocity(self, expr: cas.Expression) -> cas.Expression:
     #     """
@@ -130,14 +137,16 @@ class Goal(MotionStatechartNode):
 
     def _task_sanity_check(self):
         if not self.has_tasks():
-            raise GoalInitalizationException(f'Goal {str(self)} has no tasks.')
+            raise GoalInitalizationException(f"Goal {str(self)} has no tasks.")
 
     def add_constraints_of_goal(self, goal: Goal):
         for task in goal.tasks:
             if not [t for t in self.tasks if t.name == task.name]:
                 self.tasks.append(task)
             else:
-                raise GoalInitalizationException(f'Constraint with name {task.name} already exists.')
+                raise GoalInitalizationException(
+                    f"Constraint with name {task.name} already exists."
+                )
 
     def add_task(self, task: Task) -> None:
         self.tasks.append(task)

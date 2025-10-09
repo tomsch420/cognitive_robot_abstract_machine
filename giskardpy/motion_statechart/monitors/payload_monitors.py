@@ -1,3 +1,4 @@
+from dataclasses import dataclass, field
 from typing import Optional, Dict, Tuple
 
 import numpy as np
@@ -10,38 +11,29 @@ from giskardpy.middleware import get_middleware
 from giskardpy.motion_statechart.monitors.monitors import PayloadMonitor, Monitor
 
 
+@dataclass
 class CheckMaxTrajectoryLength(Monitor):
     length: float
 
-    def __init__(self,
-                 name: str,
-                 length: float):
-        super().__init__(name=name)
-        self.length = length
+    def __post_init__(self):
         self.observation_expression = cas.greater(god_map.time_symbol, self.length)
 
 
+@dataclass
 class Print(PayloadMonitor):
-    def __init__(self,
-                 message: str,
-                 name: Optional[str] = None):
-        self.message = message
-        super().__init__(name=name, run_call_in_thread=False)
+    message = str
 
     def __call__(self):
         get_middleware().loginfo(self.message)
         self.state = ObservationState.true
 
 
+@dataclass
 class Sleep(PayloadMonitor):
-    start_time: float
+    seconds: float
+    start_time: float = field(default=None, init=False)
 
-    def __init__(self,
-                 seconds: float,
-                 name: Optional[str] = None):
-        self.seconds = seconds
-        super().__init__(name=name,
-                         run_call_in_thread=False)
+    def __post_init__(self):
         self.start_time = None
 
     def __call__(self):
@@ -50,41 +42,29 @@ class Sleep(PayloadMonitor):
         self.state = god_map.time - self.start_time >= self.seconds
 
 
+@dataclass
 class CollisionMatrixUpdater(PayloadMonitor):
-    collision_matrix: Dict[Tuple[str, str], float]
-
-    def __init__(self,
-                 new_collision_matrix: Dict[Tuple[str, str], float],
-                 name: Optional[str] = None):
-        super().__init__(name=name,
-                         run_call_in_thread=False)
-        self.collision_matrix = new_collision_matrix
+    new_collision_matrix: Dict[Tuple[str, str], float]
 
     @profile
     def __call__(self):
-        god_map.collision_scene.set_collision_matrix(self.collision_matrix)
+        god_map.collision_scene.set_collision_matrix(self.new_collision_matrix)
         god_map.collision_scene.reset_cache()
         self.state = ObservationState.true
 
 
+@dataclass
 class PayloadAlternator(PayloadMonitor):
-
-    def __init__(self,
-                 mod: int = 2,
-                 name: Optional[str] = None):
-        super().__init__(name=name,
-                         run_call_in_thread=False)
-        self.mod = mod
+    mod: int = 2
 
     def __call__(self):
         self.state = np.floor(god_map.time) % self.mod == 0
 
 
+@dataclass
 class Counter(PayloadMonitor):
-    def __init__(self, name: str, number: int):
-        super().__init__(name=name, run_call_in_thread=False)
-        self.counter = 0
-        self.number = number
+    number: int
+    counter: int = field(default=0, init=False)
 
     def __call__(self):
         if self.state == ObservationState.unknown:
@@ -96,12 +76,11 @@ class Counter(PayloadMonitor):
         self.counter += 1
 
 
+@dataclass
 class Pulse(PayloadMonitor):
-    def __init__(self, name: str, after_ticks: int, true_for_ticks: int = 1):
-        super().__init__(name=name, run_call_in_thread=False)
-        self.after_ticks = after_ticks
-        self.true_for_ticks = true_for_ticks
-        self.ticks = 0
+    after_ticks: int
+    true_for_ticks: int = 1
+    ticks: int = field(default=0, init=False)
 
     def __call__(self):
         if self.state == ObservationState.unknown:

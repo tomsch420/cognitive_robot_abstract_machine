@@ -1,4 +1,5 @@
 import random
+from dataclasses import dataclass
 from typing import Optional
 
 import numpy as np
@@ -8,27 +9,27 @@ from semantic_world.prefixed_name import PrefixedName
 from giskardpy.god_map import god_map
 from giskardpy.motion_statechart.tasks.task import Task, WEIGHT_ABOVE_CA
 from semantic_world.spatial_types.symbol_manager import symbol_manager
+from semantic_world.world_entity import Body
 
 
+@dataclass
 class WiggleInsert(Task):
+    root_link: Body
+    tip_link: Body
+    hole_point: cas.Point3
+    noise_translation: float
+    noise_angle: float
+    down_velocity: float
+    hole_normal: Optional[cas.Vector3] = None
+    threshold: float = 0.01
+    random_walk: bool = True
+    vector_momentum_factor: float = 0.9
+    angular_momentum_factor: float = 0.9
+    center_pull_strength_angle: float = 0.1
+    center_pull_strength_vector: float = 0.25
+    weight: float = WEIGHT_ABOVE_CA
 
-    def __init__(self, *,
-                 root_link: PrefixedName,
-                 tip_link: PrefixedName,
-                 hole_point: cas.Point3,
-                 noise_translation: float,
-                 noise_angle: float,
-                 down_velocity: float,
-                 hole_normal: Optional[cas.Vector3] = None,
-                 threshold: float = 0.01,
-                 random_walk: bool = True,
-                 vector_momentum_factor: float = 0.9,
-                 angular_momentum_factor: float = 0.9,
-                 center_pull_strength_angle: float = 0.1,
-                 center_pull_strength_vector: float = 0.25,
-                 weight: float = WEIGHT_ABOVE_CA,
-                 name: Optional[str] = None,
-                 plot: bool = True):
+    def __post_init__(self):
         """
         Press down while wiggling the end effector.
         :param root_link:
@@ -48,23 +49,17 @@ class WiggleInsert(Task):
         :param center_pull_strength_vector: (only when random_walk=True) Forces translation movement faster back towards
                                                                          hole_point
         """
-        if hole_normal is None:
-            hole_normal = cas.Vector3().from_xyz(0, 0, -1, god_map.world.root_link_name)
-        self.root_link = root_link
-        self.tip_link = tip_link
-        self.hole_normal = hole_normal
-        self.noise_translation = noise_translation
-        self.noise_angle = noise_angle
-        super().__init__(name=name, plot=plot)
+        if self.hole_normal is None:
+            hole_normal = cas.Vector3(x=0, y=0, z=0, reference_frame=god_map.world.root)
 
         # Random-Sample works better with control_dt and Random-Walk with throttling using self.dt in my testing
-        if random_walk:
+        if self.random_walk:
             self.dt = god_map.qp_controller.control_dt
         else:
             self.dt = god_map.qp_controller.control_dt
         self.hz = 1 / self.dt
 
-        if random_walk:
+        if self.random_walk:
             vector_function = '.get_rand_walk_vector()'
             angle_function = '.get_rand_walk_angle()'
         else:
@@ -76,23 +71,19 @@ class WiggleInsert(Task):
         self.center_angle = 0
         self.angular_momentum = 0.0
         self.last_angular_change = 0
-        self.angular_momentum_factor = angular_momentum_factor
-        self.center_pull_strength_angle = center_pull_strength_angle
 
         # Init-Values for vector random walk
         self.current_vector = np.zeros(3)
         self.center_vector = np.zeros(3)
         self.vector_momentum = np.zeros(3)
         self.last_vector_change = 0
-        self.vector_momentum_factor = vector_momentum_factor
-        self.center_pull_strength_vector = center_pull_strength_vector
 
         v1, v2 = self.calculate_vectors(self.hole_normal.to_np()[:3])
-        self.v1 = cas.Vector3().from_xyz(*v1, reference_frame=hole_normal.reference_frame)
-        self.v2 = cas.Vector3().from_xyz(*v2, reference_frame=hole_normal.reference_frame)
+        self.v1 = cas.Vector3(*v1, reference_frame=self.hole_normal.reference_frame)
+        self.v2 = cas.Vector3(*v2, reference_frame=self.hole_normal.reference_frame)
 
         r_P_c = god_map.world.compose_fk_expression(self.root_link, self.tip_link).to_position()
-        r_P_g = god_map.world.transform(target_frame=self.root_link, spatial_object=hole_point)
+        r_P_g = god_map.world.transform(target_frame=self.root_link, spatial_object=self.hole_point)
 
         rand_v = symbol_manager.get_expr(self.ref_str +
                                          vector_function,
@@ -103,9 +94,9 @@ class WiggleInsert(Task):
 
         self.add_point_goal_constraints(frame_P_current=r_P_c,
                                         frame_P_goal=r_P_g_rand,
-                                        reference_velocity=down_velocity,
-                                        weight=weight,
-                                        name=f'{name}_point_goal')
+                                        reference_velocity=self.down_velocity,
+                                        weight=self.weight,
+                                        name=f'{self.name}_point_goal')
 
         angle = symbol_manager.get_expr(self.ref_str +
                                         angle_function,
@@ -122,8 +113,8 @@ class WiggleInsert(Task):
 
         self.add_rotation_goal_constraints(frame_R_current=r_R_c,
                                            frame_R_goal=root_R_hole_normal,
-                                           reference_velocity=down_velocity,
-                                           weight=weight + 1)
+                                           reference_velocity=self.down_velocity,
+                                           weight=self.weight + 1)
 
         god_map.debug_expression_manager.add_debug_expression(name='r_P_g',
                                                               expression=r_P_g)
@@ -135,7 +126,7 @@ class WiggleInsert(Task):
                                                               expression=tip_R_hole_normal)
 
         dist = cas.euclidean_distance(r_P_c, r_P_g)
-        end = cas.less_equal(dist, threshold)
+        end = cas.less_equal(dist, self.threshold)
 
         self.observation_expression = end
 

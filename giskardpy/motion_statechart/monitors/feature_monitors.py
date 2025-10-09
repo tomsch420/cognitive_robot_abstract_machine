@@ -1,110 +1,123 @@
+from dataclasses import dataclass
 from typing import Optional, Union
 
 import semantic_world.spatial_types.spatial_types as cas
 from semantic_world.prefixed_name import PrefixedName
 from giskardpy.motion_statechart.monitors.monitors import Monitor
 from giskardpy.god_map import god_map
+from semantic_world.world_entity import Body
 
 
+@dataclass
 class FeatureMonitor(Monitor):
-    def __init__(self,
-                 tip_link: PrefixedName,
-                 root_link: PrefixedName,
-                 reference_feature: Union[cas.Point3, cas.Vector3],
-                 controlled_feature: Union[cas.Point3, cas.Vector3],
-                 name: Optional[str] = None):
-        super().__init__(name=name)
-        self.root = root_link
-        self.tip = tip_link
+    tip_link: Body
+    root_link: Body
+    reference_feature: Union[cas.Point3, cas.Vector3]
+    controlled_feature: Union[cas.Point3, cas.Vector3]
 
-        root_reference_feature = god_map.world.transform(target_frame=self.root, spatial_object=reference_feature)
-        tip_controlled_feature = god_map.world.transform(target_frame=self.tip, spatial_object=controlled_feature)
+    def __post_init__(self):
+        root_reference_feature = god_map.world.transform(
+            target_frame=self.root_link, spatial_object=self.reference_feature
+        )
+        tip_controlled_feature = god_map.world.transform(
+            target_frame=self.tip_link, spatial_object=self.controlled_feature
+        )
 
-        root_T_tip = god_map.world.compose_fk_expression(self.root, self.tip)
-        if isinstance(controlled_feature, cas.Point3):
+        root_T_tip = god_map.world.compose_forward_kinematics_expression(
+            self.root_link, self.tip_link
+        )
+        if isinstance(self.controlled_feature, cas.Point3):
             self.root_P_controlled_feature = root_T_tip.dot(tip_controlled_feature)
-        elif isinstance(controlled_feature, cas.Vector3):
+        elif isinstance(self.controlled_feature, cas.Vector3):
             self.root_V_controlled_feature = root_T_tip.dot(tip_controlled_feature)
 
-        if isinstance(reference_feature, cas.Point3):
+        if isinstance(self.reference_feature, cas.Point3):
             self.root_P_reference_feature = root_reference_feature
-        if isinstance(reference_feature, cas.Vector3):
+        if isinstance(self.reference_feature, cas.Vector3):
             self.root_V_reference_feature = root_reference_feature
 
 
+@dataclass
 class HeightMonitor(FeatureMonitor):
-    def __init__(self,
-                 tip_link: PrefixedName,
-                 root_link: PrefixedName,
-                 reference_point: cas.Point3,
-                 tip_point: cas.Point3,
-                 lower_limit: float,
-                 upper_limit: float,
-                 name: Optional[str] = None):
-        super().__init__(tip_link=tip_link,
-                         root_link=root_link,
-                         reference_feature=reference_point,
-                         controlled_feature=tip_point,
-                         name=name)
+    reference_point: cas.Point3
+    tip_point: cas.Point3
+    lower_limit: float
+    upper_limit: float
 
-        distance = cas.distance_projected_on_vector(self.root_P_controlled_feature, self.root_P_reference_feature,
-                                                    cas.Vector3([0, 0, 1]))
-        expr = cas.logic_and(cas.greater_equal(distance, lower_limit), cas.less_equal(distance, upper_limit))
+    def __post_init__(self):
+        self.reference_feature = self.reference_point
+        self.controlled_feature = self.tip_point
+        super().__post_init__()
+
+        distance = cas.distance_projected_on_vector(
+            self.root_P_controlled_feature,
+            self.root_P_reference_feature,
+            cas.Vector3([0, 0, 1]),
+        )
+        expr = cas.logic_and(
+            cas.greater_equal(distance, self.lower_limit),
+            cas.less_equal(distance, self.upper_limit),
+        )
         self.observation_expression = expr
 
 
+@dataclass
 class PerpendicularMonitor(FeatureMonitor):
-    def __init__(self, tip_link: PrefixedName,
-                 root_link: PrefixedName,
-                 reference_normal: cas.Vector3,
-                 tip_normal: cas.Vector3,
-                 threshold: float = 0.01,
-                 name: Optional[str] = None):
-        super().__init__(tip_link=tip_link,
-                         root_link=root_link,
-                         reference_feature=reference_normal,
-                         controlled_feature=tip_normal,
-                         name=name)
+    reference_normal: cas.Vector3
+    tip_normal: cas.Vector3
+    threshold: float = 0.01
 
-        expr = cas.dot(self.root_V_reference_feature[:3], self.root_V_controlled_feature[:3])
-        self.observation_expression = cas.less_equal(cas.abs(expr), threshold)
+    def __post_init__(self):
+        self.reference_feature = self.reference_normal
+        self.controlled_feature = self.tip_normal
+        super().__post_init__()
+
+        expr = cas.dot(
+            self.root_V_reference_feature[:3], self.root_V_controlled_feature[:3]
+        )
+        self.observation_expression = cas.less_equal(cas.abs(expr), self.threshold)
 
 
+@dataclass
 class DistanceMonitor(FeatureMonitor):
-    def __init__(self,
-                 tip_link: PrefixedName,
-                 root_link: PrefixedName,
-                 reference_point: cas.Point3,
-                 tip_point: cas.Point3,
-                 lower_limit: float,
-                 upper_limit: float,
-                 name: Optional[str] = None):
-        super().__init__(tip_link=tip_link,
-                         root_link=root_link,
-                         reference_feature=reference_point,
-                         controlled_feature=tip_point,
-                         name=name)
+    reference_point: cas.Point3
+    tip_point: cas.Point3
+    lower_limit: float
+    upper_limit: float
 
-        distance = cas.norm(cas.distance_vector_projected_on_plane(self.root_P_controlled_feature,
-                                                                   self.root_P_reference_feature,
-                                                                   cas.Vector3([0, 0, 1])))
-        self.observation_expression = cas.logic_and(cas.greater_equal(distance, lower_limit), cas.less_equal(distance, upper_limit))
+    def __post_init__(self):
+        self.reference_feature = self.reference_point
+        self.controlled_feature = self.tip_point
+        super().__post_init__()
+
+        distance = cas.norm(
+            cas.distance_vector_projected_on_plane(
+                self.root_P_controlled_feature,
+                self.root_P_reference_feature,
+                cas.Vector3([0, 0, 1]),
+            )
+        )
+        self.observation_expression = cas.logic_and(
+            cas.greater_equal(distance, self.lower_limit),
+            cas.less_equal(distance, self.upper_limit),
+        )
 
 
+@dataclass
 class AngleMonitor(FeatureMonitor):
-    def __init__(self,
-                 tip_link: PrefixedName,
-                 root_link: PrefixedName,
-                 reference_vector: cas.Vector3,
-                 tip_vector: cas.Vector3,
-                 lower_angle: float,
-                 upper_angle: float,
-                 name: Optional[str] = None):
-        super().__init__(tip_link=tip_link,
-                         root_link=root_link,
-                         reference_feature=reference_vector,
-                         controlled_feature=tip_vector,
-                         name=name)
+    reference_vector: cas.Vector3
+    tip_vector: cas.Vector3
+    lower_angle: float
+    upper_angle: float
 
-        expr = cas.angle_between_vector(self.root_V_reference_feature, self.root_V_controlled_feature)
-        self.observation_expression = cas.logic_and(cas.greater(expr, lower_angle), cas.less(expr, upper_angle))
+    def __post_init__(self):
+        self.reference_feature = self.reference_vector
+        self.controlled_feature = self.tip_vector
+        super().__post_init__()
+
+        expr = cas.angle_between_vector(
+            self.root_V_reference_feature, self.root_V_controlled_feature
+        )
+        self.observation_expression = cas.logic_and(
+            cas.greater(expr, self.lower_angle), cas.less(expr, self.upper_angle)
+        )
