@@ -27,9 +27,9 @@ class FeatureMonitor(Monitor):
             self.root_link, self.tip_link
         )
         if isinstance(self.controlled_feature, cas.Point3):
-            self.root_P_controlled_feature = root_T_tip.dot(tip_controlled_feature)
+            self.root_P_controlled_feature = root_T_tip @ tip_controlled_feature
         elif isinstance(self.controlled_feature, cas.Vector3):
-            self.root_V_controlled_feature = root_T_tip.dot(tip_controlled_feature)
+            self.root_V_controlled_feature = root_T_tip @ tip_controlled_feature
 
         if isinstance(self.reference_feature, cas.Point3):
             self.root_P_reference_feature = root_reference_feature
@@ -49,7 +49,7 @@ class HeightMonitor(FeatureMonitor):
         self.controlled_feature = self.tip_point
         super().__post_init__()
 
-        distance = cas.dot(self.root_P_controlled_feature - self.root_P_reference_feature, cas.Vector3(0, 0, 1))
+        distance = (self.root_P_controlled_feature - self.root_P_reference_feature) @ cas.Vector3.Z()
         expr = cas.logic_and(
             distance >= self.lower_limit,
             distance <= self.upper_limit,
@@ -84,9 +84,9 @@ class DistanceMonitor(FeatureMonitor):
         self.controlled_feature = self.tip_point
         super().__post_init__()
 
-        diff = self.root_P_controlled_feature - self.root_P_reference_feature
-        diff[2] = 0.0
-        distance = diff.norm()
+        root_V_diff = self.root_P_controlled_feature - self.root_P_reference_feature
+        root_V_diff[2] = 0.0
+        distance = root_V_diff.norm()
         self.observation_expression = cas.logic_and(
             distance >= self.lower_limit,
             distance <= self.upper_limit,

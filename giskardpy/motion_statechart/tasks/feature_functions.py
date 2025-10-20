@@ -29,14 +29,14 @@ class FeatureFunctionGoal(Task):
             self.root_link, self.tip_link
         )
         if isinstance(self.controlled_feature, cas.Point3):
-            self.root_P_controlled_feature = root_T_tip.dot(tip_controlled_feature)
+            self.root_P_controlled_feature = root_T_tip @ tip_controlled_feature
             god_map.debug_expression_manager.add_debug_expression(
                 "root_P_controlled_feature",
                 self.root_P_controlled_feature,
                 color=Color(1, 0, 0, 1),
             )
         elif isinstance(self.controlled_feature, cas.Vector3):
-            self.root_V_controlled_feature = root_T_tip.dot(tip_controlled_feature)
+            self.root_V_controlled_feature = root_T_tip @ tip_controlled_feature
             self.root_V_controlled_feature.vis_frame = self.controlled_feature.vis_frame
             god_map.debug_expression_manager.add_debug_expression(
                 "root_V_controlled_feature",
@@ -118,7 +118,7 @@ class HeightGoal(FeatureFunctionGoal):
         self.controlled_feature = self.tip_point
         super().__post_init__()
 
-        expr = cas.dot(self.root_P_controlled_feature - self.root_P_reference_feature, cas.Vector3(0, 0, 1))
+        expr = (self.root_P_controlled_feature - self.root_P_reference_feature) @ cas.Vector3.Z()
 
         self.add_inequality_constraint(
             reference_velocity=self.max_vel,
@@ -156,9 +156,9 @@ class DistanceGoal(FeatureFunctionGoal):
         self.reference_feature = self.reference_point
         super().__post_init__()
 
-        diff = self.root_P_controlled_feature - self.root_P_reference_feature
-        diff[2] = 0.0
-        expr = diff.norm()
+        root_V_diff = self.root_P_controlled_feature - self.root_P_reference_feature
+        root_V_diff[2] = 0.0
+        expr = root_V_diff.norm()
 
         self.add_inequality_constraint(
             reference_velocity=self.max_vel,
@@ -174,7 +174,7 @@ class DistanceGoal(FeatureFunctionGoal):
             lower_errors=[0, 0, 0],
             upper_errors=[0, 0, 0],
             weights=[self.weight] * 3,
-            task_expression=diff[:3],
+            task_expression=root_V_diff[:3],
             names=[f"{self.name}_extra1", f"{self.name}_extra2", f"{self.name}_extra3"],
         )
         self.observation_expression = cas.logic_and(
