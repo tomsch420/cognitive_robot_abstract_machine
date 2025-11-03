@@ -105,6 +105,10 @@ class TrinaryCondition:
 
 @dataclass(repr=False, eq=False)
 class ObservationSymbol(cas.Symbol):
+    """
+    A symbol representing the observation state of a node.
+    """
+
     name: str = field(kw_only=True)
     motion_statechart_node: MotionStatechartNode
 
@@ -114,6 +118,10 @@ class ObservationSymbol(cas.Symbol):
 
 @dataclass(repr=False, eq=False)
 class LifeCycleSymbol(cas.Symbol):
+    """
+    A symbol representing the life cycle state of a node.
+    """
+
     name: str = field(kw_only=True)
     motion_statechart_node: MotionStatechartNode
 
@@ -124,6 +132,9 @@ class LifeCycleSymbol(cas.Symbol):
 @dataclass(repr=False, eq=False)
 class MotionStatechartNode(SubclassJSONSerializer):
     name: PrefixedName = field(kw_only=True)
+    """
+    A unique name for the node within a motion statechart.
+    """
 
     _motion_statechart: MotionStatechart = field(init=False)
     """
@@ -135,8 +146,14 @@ class MotionStatechartNode(SubclassJSONSerializer):
     """
 
     parent_node: MotionStatechartNode = field(default=None, init=False)
+    """
+    The parent node of this node, if None, it is on the top layer of a motion statechart.
+    """
 
     life_cycle_symbol: LifeCycleSymbol = field(init=False)
+    """
+    A symbol referring to the life cycle state of this node.
+    """
     observation_symbol: ObservationSymbol = field(init=False)
 
     _start_condition: TrinaryCondition = field(init=False)
