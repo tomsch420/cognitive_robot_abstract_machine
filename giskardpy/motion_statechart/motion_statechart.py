@@ -49,7 +49,7 @@ class State(MutableMapping[MotionStatechartNode, float]):
         self.data[node.index] = value
 
     def __delitem__(self, node: MotionStatechartNode) -> None:
-        self.data = np.delete(self.data, node.index, axis=1)
+        self.data = np.delete(self.data, node.index)
 
     def __iter__(self) -> iter:
         return iter(self.data)
@@ -347,6 +347,8 @@ class MotionStatechart:
         constraint_collection = self._combine_constraint_collections_of_nodes()
         if len(constraint_collection.constraints) == 0:
             self.qp_controller = None
+            # to not build controller, if there are no constraints
+            return
         self.qp_controller = QPController(
             config=controller_config,
             degrees_of_freedom=ordered_dofs,
@@ -365,7 +367,7 @@ class MotionStatechart:
         )
         for node in self.nodes:
             if self.life_cycle_state[node] == LifeCycleValues.RUNNING:
-                observation_overwrite = node.on_running()
+                observation_overwrite = node.on_tick()
                 if observation_overwrite is not None:
                     self.observation_state[node] = observation_overwrite
 
@@ -406,9 +408,5 @@ class MotionStatechart:
             if self.observation_state[node] == ObservationState.TrinaryTrue:
                 raise node.exception
 
-    def draw(self):
-        graph = MotionStatechartGraphviz(self).to_dot_graph()
-        file_name = "muh.pdf"
-        # create_path(file_name)
-        graph.write_pdf(file_name)
-        print(f"Saved task graph at {file_name}.")
+    def draw(self, file_name: str):
+        MotionStatechartGraphviz(self).to_dot_graph_pdf(file_name=file_name)

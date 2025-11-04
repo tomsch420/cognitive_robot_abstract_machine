@@ -22,7 +22,7 @@ class CheckMaxTrajectoryLength(MotionStatechartNode):
 class Print(MotionStatechartNode):
     message: str = ""
 
-    def on_running(self) -> Union[
+    def on_tick(self) -> Union[
         ObservationState.TrinaryFalse,
         ObservationState.TrinaryTrue,
         ObservationState.TrinaryUnknown,
@@ -39,7 +39,7 @@ class Sleep(MotionStatechartNode):
     def on_start(self) -> Optional[float]:
         self.start_time = None
 
-    def on_running(self) -> Optional[float]:
+    def on_tick(self) -> Optional[float]:
         if self.start_time is None:
             self.start_time = god_map.time
         return god_map.time - self.start_time >= self.seconds

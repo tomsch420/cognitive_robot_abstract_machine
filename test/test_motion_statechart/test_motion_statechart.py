@@ -255,6 +255,7 @@ def test_cancel_motion():
     msc.tick()  # second tick, cancel goes into running
     with pytest.raises(Exception):
         msc.tick()  # third tick, cancel goes true and triggers
+    msc.draw("muh.pdf")
 
 
 def test_joint_goal():
@@ -288,10 +289,16 @@ def test_joint_goal():
     msc = MotionStatechart(world)
 
     task1 = JointPositionList(name=PrefixedName("task1"), goal_state={root_C_tip: 1})
+    always_true = TrueMonitor(name=PrefixedName("muh"))
+    msc.add_node(always_true)
     msc.add_node(task1)
     end = EndMotion(name=PrefixedName("done"))
     msc.add_node(end)
-    end.start_condition = task1.observation_variable
+
+    task1.start_condition = always_true.observation_variable
+    end.start_condition = cas.trinary_logic_and(
+        task1.observation_variable, always_true.observation_variable
+    )
 
     msc.compile(QPControllerConfig.create_default_with_50hz())
 
@@ -299,14 +306,14 @@ def test_joint_goal():
     assert end.observation_state == msc.observation_state.TrinaryUnknown
     assert task1.life_cycle_state == LifeCycleValues.NOT_STARTED
     assert end.life_cycle_state == LifeCycleValues.NOT_STARTED
-    msc.draw()
+    msc.draw("muh.pdf")
     for i in range(100):
         msc.tick()
         if msc.is_end_motion():
             break
     else:
         raise Exception("Did not finish motion")
-    msc.draw()
+    msc.draw("muh.pdf")
     assert task1.observation_state == msc.observation_state.TrinaryTrue
     assert end.observation_state == msc.observation_state.TrinaryTrue
     assert task1.life_cycle_state == LifeCycleValues.RUNNING
@@ -739,3 +746,4 @@ def test_goal():
     assert goal.life_cycle_state == LifeCycleValues.RUNNING
     assert end.life_cycle_state == LifeCycleValues.RUNNING
     assert msc.is_end_motion()
+    msc.draw("muh.pdf")

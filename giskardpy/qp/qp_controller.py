@@ -10,10 +10,10 @@ import pandas
 import pandas as pd
 from line_profiler import profile
 
+import semantic_digital_twin.spatial_types.spatial_types as cas
 from giskardpy.data_types.exceptions import (
     HardConstraintsViolatedException,
     InfeasibleException,
-    EmptyProblemException,
 )
 from giskardpy.god_map import god_map
 from giskardpy.middleware import get_middleware
@@ -22,7 +22,6 @@ from giskardpy.qp.constraint_collection import ConstraintCollection
 from giskardpy.qp.solvers.qp_solver import QPSolver
 from giskardpy.utils.utils import create_path
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
-import semantic_digital_twin.spatial_types.spatial_types as cas
 
 if TYPE_CHECKING:
     from giskardpy.qp.qp_controller_config import QPControllerConfig
@@ -50,11 +49,10 @@ class QPControllerDebugger:
         row_col_names = nan_entries[nan_entries].index.tolist()
         pass
 
-    def _are_hard_limits_violated(self, error_message):
-        self._create_debug_pandas()
+    def are_hard_limits_violated(self, error_message):
         try:
-            lower_violations = self.p_lb[self.qp_solver.lb_filter]
-            upper_violations = self.p_ub[self.qp_solver.ub_filter]
+            lower_violations = self.p_lb[self.qp_controller.qp_solver.lb_filter]
+            upper_violations = self.p_ub[self.qp_controller.qp_solver.ub_filter]
             if len(upper_violations) > 0 or len(lower_violations) > 0:
                 error_message += "\n"
                 if len(upper_violations) > 0:
@@ -80,7 +78,6 @@ class QPControllerDebugger:
                 print(array)
 
     def save_all_pandas(self, folder_name: Optional[str] = None):
-        self._create_debug_pandas()
         self.save_pandas(
             [
                 self.p_weights,
@@ -244,18 +241,22 @@ class QPControllerDebugger:
         if new_xdot_full is None:
             return
 
-        num_vel_constr = len(self.qp_controller.qp_adapter.derivative_constraints) * (
-            self.qp_controller.config.prediction_horizon - 2
-        )
-        num_eq_vel_constr = len(
-            self.qp_controller.qp_adapter.eq_derivative_constraints
+        num_vel_constr = len(
+            self.qp_controller.qp_adapter.constraint_collection.derivative_constraints
         ) * (self.qp_controller.config.prediction_horizon - 2)
-        num_neq_constr = len(self.qp_controller.qp_adapter.inequality_constraints)
-        num_eq_constr = len(self.qp_controller.qp_adapter.equality_constraints)
+        num_eq_vel_constr = len(
+            self.qp_controller.qp_adapter.constraint_collection.eq_derivative_constraints
+        ) * (self.qp_controller.config.prediction_horizon - 2)
+        num_neq_constr = len(
+            self.qp_controller.qp_adapter.constraint_collection.neq_constraints
+        )
+        num_eq_constr = len(
+            self.qp_controller.qp_adapter.constraint_collection.eq_constraints
+        )
         num_constr = num_vel_constr + num_neq_constr + num_eq_constr + num_eq_vel_constr
 
         xdot_full = np.ones(self.qp_data.zero_quadratic_weight_filter.shape) * np.nan
-        xdot_full[self.qp_data.zero_quadratic_weight_filter] = self.xdot_full
+        xdot_full[self.qp_data.zero_quadratic_weight_filter] = new_xdot_full
         self.p_xdot = pd.DataFrame(
             xdot_full, self.free_variable_names, ["data"], dtype=float
         )
@@ -294,7 +295,7 @@ class QPControllerDebugger:
 
     @property
     def free_variable_names(self):
-        return self.qp_controller.qp_adapter.free_variable_bounds.free_variable_names
+        return self.qp_controller.qp_adapter.free_variable_bounds.names.tolist()
 
     @property
     def equality_constr_names(self):
@@ -315,6 +316,46 @@ class QPControllerDebugger:
         self._update_inequality_matrix()
         self._update_xdot(new_xdot_full)
         self._update_debug_expressions()
+
+    def _print_iis(self):
+        import pandas as pd
+
+        def print_iis_matrix(
+            row_filter: np.ndarray,
+            column_filter: np.ndarray,
+            matrix: pd.DataFrame,
+            bounds: pd.DataFrame,
+        ):
+            if len(row_filter) == 0:
+                return
+            filtered_matrix = matrix.loc[row_filter, column_filter]
+            filtered_matrix["bounds"] = bounds.loc[row_filter]
+            print(filtered_matrix)
+
+        result = self.qp_controller.qp_solver.analyze_infeasibility()
+        if result is None:
+            get_middleware().loginfo(
+                f"Can only compute possible causes with gurobi, "
+                f"but current solver is {self.qp_controller.config.qp_solver_id.name}."
+            )
+            return
+        lb_ids, ub_ids, eq_ids, lbA_ids, ubA_ids = result
+        b_ids = lb_ids | ub_ids
+        with pd.option_context(
+            "display.max_rows", None, "display.max_columns", None, "display.width", None
+        ):
+            get_middleware().loginfo("Irreducible Infeasible Subsystem:")
+            get_middleware().loginfo("  Free variable bounds")
+            free_variables = self.p_lb[b_ids]
+            free_variables["ub"] = self.p_ub[b_ids]
+            free_variables = free_variables.rename(columns={"data": "lb"})
+            print(free_variables)
+            get_middleware().loginfo("  Equality constraints:")
+            print_iis_matrix(eq_ids, b_ids, self.p_E, self.p_bE)
+            get_middleware().loginfo("  Inequality constraint lower bounds:")
+            print_iis_matrix(lbA_ids, b_ids, self.p_A, self.p_lbA)
+            get_middleware().loginfo("  Inequality constraint upper bounds:")
+            print_iis_matrix(ubA_ids, b_ids, self.p_A, self.p_ubA)
 
 
 @dataclass
@@ -417,7 +458,7 @@ class QPController:
             if isinstance(e_original, HardConstraintsViolatedException):
                 raise
             self.xdot_full = None
-            self._are_hard_limits_violated(str(e_original))
+            self.debugger.are_hard_limits_violated(str(e_original))
             raise
 
     def xdot_to_control_commands(self, xdot: np.ndarray) -> np.ndarray:
@@ -428,43 +469,3 @@ class QPController:
         full_control_cmds = np.zeros(len(self.world_state_symbols) // 4)
         full_control_cmds[self.dof_filter] = control_cmds
         return full_control_cmds
-
-    def _print_iis(self):
-        import pandas as pd
-
-        def print_iis_matrix(
-            row_filter: np.ndarray,
-            column_filter: np.ndarray,
-            matrix: pd.DataFrame,
-            bounds: pd.DataFrame,
-        ):
-            if len(row_filter) == 0:
-                return
-            filtered_matrix = matrix.loc[row_filter, column_filter]
-            filtered_matrix["bounds"] = bounds.loc[row_filter]
-            print(filtered_matrix)
-
-        result = self.qp_solver.analyze_infeasibility()
-        if result is None:
-            get_middleware().loginfo(
-                f"Can only compute possible causes with gurobi, "
-                f"but current solver is {self.config.qp_solver_id.name}."
-            )
-            return
-        lb_ids, ub_ids, eq_ids, lbA_ids, ubA_ids = result
-        b_ids = lb_ids | ub_ids
-        with pd.option_context(
-            "display.max_rows", None, "display.max_columns", None, "display.width", None
-        ):
-            get_middleware().loginfo("Irreducible Infeasible Subsystem:")
-            get_middleware().loginfo("  Free variable bounds")
-            free_variables = self.p_lb[b_ids]
-            free_variables["ub"] = self.p_ub[b_ids]
-            free_variables = free_variables.rename(columns={"data": "lb"})
-            print(free_variables)
-            get_middleware().loginfo("  Equality constraints:")
-            print_iis_matrix(eq_ids, b_ids, self.p_E, self.p_bE)
-            get_middleware().loginfo("  Inequality constraint lower bounds:")
-            print_iis_matrix(lbA_ids, b_ids, self.p_A, self.p_lbA)
-            get_middleware().loginfo("  Inequality constraint upper bounds:")
-            print_iis_matrix(ubA_ids, b_ids, self.p_A, self.p_ubA)

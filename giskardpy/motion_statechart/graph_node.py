@@ -231,9 +231,10 @@ class MotionStatechartNode(SubclassJSONSerializer):
         :return: An optional observation state overwrite
         """
 
-    def on_running(self) -> Optional[float]:
+    def on_tick(self) -> Optional[float]:
         """
-        Triggered when the node is ticked while in state RUNNING.
+        Triggered when the node is ticked.
+        .. warning:: Only happens while the node is in state RUNNING.
         :return: An optional observation state overwrite
         """
 
@@ -328,7 +329,7 @@ class MotionStatechartNode(SubclassJSONSerializer):
             f"----end_condition----\n"
             f"{str(self._end_condition)}\n"
             f"----reset_condition----\n"
-            f"{str(self._end_condition)}"
+            f"{str(self._reset_condition)}"
         )
         if quoted:
             return '"' + result + '"'
@@ -373,10 +374,10 @@ class Goal(MotionStatechartNode):
 
     def arrange_in_sequence(self, nodes: List[MotionStatechartNode]) -> None:
         first_node = nodes[0]
-        first_node.end_condition = first_node
+        first_node.end_condition = first_node.observation_variable
         for node in nodes[1:]:
-            node.start_condition = first_node
-            node.end_condition = node
+            node.start_condition = first_node.observation_variable
+            node.end_condition = node.observation_variable
             first_node = node
 
     def apply_goal_conditions_to_children(self):
@@ -397,7 +398,7 @@ class Goal(MotionStatechartNode):
             node.pause_condition = self.pause_condition
         elif not cas.is_const_trinary_false(node.pause_condition):
             node.pause_condition = cas.trinary_logic_or(
-                node.pause_condition, node.pause_condition
+                node.pause_condition, self.pause_condition
             )
 
     def apply_end_condition_to_node(self, node: MotionStatechartNode):
@@ -413,7 +414,7 @@ class Goal(MotionStatechartNode):
             node.reset_condition = self.reset_condition
         elif not cas.is_const_trinary_false(node.pause_condition):
             node.reset_condition = cas.trinary_logic_or(
-                node.reset_condition, node.reset_condition
+                node.reset_condition, self.reset_condition
             )
 
 
@@ -505,5 +506,5 @@ class CancelMotion(MotionStatechartNode):
     def _create_observation_expression(self) -> cas.Expression:
         return cas.TrinaryTrue
 
-    def on_running(self) -> Optional[float]:
+    def on_tick(self) -> Optional[float]:
         raise self.exception
