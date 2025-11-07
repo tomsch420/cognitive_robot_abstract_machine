@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import ast
 import re
 import threading
 from abc import ABC
-from dataclasses import field, dataclass
+from dataclasses import field, dataclass, fields
 from enum import Enum
 
-from random_events.utils import SubclassJSONSerializer
+from krrood.adapters.json_serializer import SubclassJSONSerializer
 from typing_extensions import (
     Dict,
     Any,
@@ -37,8 +38,8 @@ class TransitionKind(Enum):
     RESET = 4
 
 
-@dataclass
-class TrinaryCondition:
+@dataclass(eq=False, repr=False)
+class TrinaryCondition(SubclassJSONSerializer):
     """
     Represents a trinary condition used to define transitions in a motion statechart model.
 
@@ -56,40 +57,53 @@ class TrinaryCondition:
     """
     The logical trinary condition to be evaluated.
     """
-    parents: List[MotionStatechartNode] = field(default_factory=list, init=False)
-    """
-    List of parent nodes involved in the condition, derived from the free symbols in the expression.
-    """
-    child: MotionStatechartNode = field(default=None, init=False)
-    """
-    The child node involved in the condition.
-    """
+
+    owner: Optional[MotionStatechartNode] = field(default=None)
+
+    def __hash__(self) -> int:
+        return hash((str(self), self.kind))
+
+    def __eq__(self, other):
+        return hash(self) == hash(other)
 
     @classmethod
-    def create_true(cls, kind: TransitionKind) -> Self:
-        return cls(expression=cas.TrinaryTrue, kind=kind)
+    def create_true(
+        cls, kind: TransitionKind, owner: Optional[MotionStatechartNode] = None
+    ) -> Self:
+        return cls(expression=cas.TrinaryTrue, kind=kind, owner=owner)
 
     @classmethod
-    def create_false(cls, kind: TransitionKind) -> Self:
-        return cls(expression=cas.TrinaryFalse, kind=kind)
+    def create_false(
+        cls, kind: TransitionKind, owner: Optional[MotionStatechartNode] = None
+    ) -> Self:
+        return cls(expression=cas.TrinaryFalse, kind=kind, owner=owner)
 
     @classmethod
-    def create_unknown(cls, kind: TransitionKind) -> Self:
+    def create_unknown(
+        cls, kind: TransitionKind, owner: Optional[MotionStatechartNode] = None
+    ) -> Self:
         return cls(
             expression=cas.TrinaryUnknown,
             kind=kind,
+            owner=owner,
         )
 
     def update_expression(
         self, new_expression: cas.Expression, child: MotionStatechartNode
     ) -> None:
         self.expression = new_expression
-        self.parents = [
+        self._child = child
+
+    @property
+    def variables(self) -> List[MotionStatechartNode]:
+        """
+        List of parent nodes involved in the condition, derived from the free symbols in the expression.
+        """
+        return [
             x.motion_statechart_node
-            for x in new_expression.free_symbols()
+            for x in self.expression.free_symbols()
             if isinstance(x, ObservationVariable)
         ]
-        self.child = child
 
     def __str__(self):
         """
@@ -108,6 +122,92 @@ class TrinaryCondition:
     def __repr__(self):
         return str(self)
 
+    def to_json(self) -> Dict[str, Any]:
+        json_data = super().to_json()
+        json_data["kind"] = self.kind.name
+        json_data["expression"] = str(self)
+        json_data["owner"] = self.owner.name.to_json() if self.owner else None
+        return json_data
+
+    @classmethod
+    def create_from_trinary_logic_str(
+        cls,
+        kind: TransitionKind,
+        trinary_logic_str: str,
+        observation_variables: List[ObservationVariable],
+        owner: Optional[MotionStatechartNode] = None,
+    ):
+        tree = ast.parse(trinary_logic_str, mode="eval")
+        return cls(
+            kind=kind,
+            expression=cls._parse_ast_expression(tree.body, observation_variables),
+            owner=owner,
+        )
+
+    @staticmethod
+    def _parse_ast_expression(
+        node: ast.expr, observation_variables: List[ObservationVariable]
+    ) -> cas.Expression:
+        match node:
+            case ast.BoolOp(op=ast.And()):
+                return TrinaryCondition._parse_ast_and(node, observation_variables)
+            case ast.BoolOp(op=ast.Or()):
+                return TrinaryCondition._parse_ast_or(node, observation_variables)
+            case ast.UnaryOp():
+                return TrinaryCondition._parse_ast_not(node, observation_variables)
+            case ast.Constant(value=str(val)):
+                variable_name = PrefixedName("observation", val)
+                for v in observation_variables:
+                    if variable_name == v.name:
+                        return v
+                raise KeyError(f"unknown observation variable: {val!r}")
+            case ast.Constant(value=True):
+                return cas.TrinaryTrue
+            case ast.Constant(value=False):
+                return cas.TrinaryFalse
+            case _:
+                raise TypeError(f"failed to parse {type(node).__name__}")
+
+    @staticmethod
+    def _parse_ast_and(node, observation_variables: List[ObservationVariable]):
+        return cas.trinary_logic_and(
+            *[
+                TrinaryCondition._parse_ast_expression(x, observation_variables)
+                for x in node.values
+            ]
+        )
+
+    @staticmethod
+    def _parse_ast_or(node, observation_variables: List[ObservationVariable]):
+        return cas.trinary_logic_or(
+            *[
+                TrinaryCondition._parse_ast_expression(x, observation_variables)
+                for x in node.values
+            ]
+        )
+
+    @staticmethod
+    def _parse_ast_not(node, observation_variables: List[ObservationVariable]):
+        if isinstance(node.op, ast.Not):
+            return cas.trinary_logic_not(
+                TrinaryCondition._parse_ast_expression(
+                    node.operand, observation_variables
+                )
+            )
+
+    @classmethod
+    def _from_json(
+        cls, data: Dict[str, Any], motion_statechart: MotionStatechart, **kwargs
+    ) -> Self:
+        return cls.create_from_trinary_logic_str(
+            kind=TransitionKind[data["kind"]],
+            trinary_logic_str=data["expression"],
+            observation_variables=motion_statechart.observation_state.observation_symbols(),
+            owner=motion_statechart.get_node_by_name(
+                PrefixedName.from_json(data["owner"])
+            ),
+        )
+
 
 @dataclass(repr=False, eq=False)
 class ObservationVariable(cas.FloatVariable):
@@ -115,7 +215,7 @@ class ObservationVariable(cas.FloatVariable):
     A symbol representing the observation state of a node.
     """
 
-    name: str = field(kw_only=True)
+    name: PrefixedName = field(kw_only=True)
     motion_statechart_node: MotionStatechartNode
 
     def resolve(self) -> float:
@@ -128,7 +228,7 @@ class LifeCycleVariable(cas.FloatVariable):
     A symbol representing the life cycle state of a node.
     """
 
-    name: str = field(kw_only=True)
+    name: PrefixedName = field(kw_only=True)
     motion_statechart_node: MotionStatechartNode
 
     def resolve(self) -> LifeCycleValues:
@@ -156,11 +256,11 @@ class MotionStatechartNode(SubclassJSONSerializer):
     The parent node of this node, if None, it is on the top layer of a motion statechart.
     """
 
-    life_cycle_variable: LifeCycleVariable = field(init=False)
+    _life_cycle_variable: LifeCycleVariable = field(init=False)
     """
     A symbol referring to the life cycle state of this node.
     """
-    observation_variable: ObservationVariable = field(init=False)
+    _observation_variable: ObservationVariable = field(init=False)
 
     _start_condition: TrinaryCondition = field(init=False)
     _pause_condition: TrinaryCondition = field(init=False)
@@ -173,18 +273,47 @@ class MotionStatechartNode(SubclassJSONSerializer):
     _plot_extra_boarder_styles: List[str] = field(default_factory=list, kw_only=True)
 
     def __post_init__(self):
-        self.observation_variable = ObservationVariable(
-            name=str(PrefixedName("observation", str(self.name))),
+        self._observation_variable = ObservationVariable(
+            name=PrefixedName("observation", str(self.name)),
             motion_statechart_node=self,
         )
-        self.life_cycle_variable = LifeCycleVariable(
-            name=str(PrefixedName("life_cycle", str(self.name))),
+        self._life_cycle_variable = LifeCycleVariable(
+            name=PrefixedName("life_cycle", str(self.name)),
             motion_statechart_node=self,
         )
-        self._start_condition = TrinaryCondition.create_true(kind=TransitionKind.START)
-        self._pause_condition = TrinaryCondition.create_false(kind=TransitionKind.PAUSE)
-        self._end_condition = TrinaryCondition.create_false(kind=TransitionKind.END)
-        self._reset_condition = TrinaryCondition.create_false(kind=TransitionKind.RESET)
+        self._start_condition = TrinaryCondition.create_true(
+            kind=TransitionKind.START, owner=self
+        )
+        self._pause_condition = TrinaryCondition.create_false(
+            kind=TransitionKind.PAUSE, owner=self
+        )
+        self._end_condition = TrinaryCondition.create_false(
+            kind=TransitionKind.END, owner=self
+        )
+        self._reset_condition = TrinaryCondition.create_false(
+            kind=TransitionKind.RESET, owner=self
+        )
+
+    def set_transition(self, transition: TrinaryCondition) -> None:
+        match transition.kind:
+            case TransitionKind.START:
+                self._start_condition = transition
+            case TransitionKind.PAUSE:
+                self._pause_condition = transition
+            case TransitionKind.END:
+                self._end_condition = transition
+            case TransitionKind.RESET:
+                self._reset_condition = transition
+            case _:
+                raise ValueError(f"Unknown transition kind: {transition.kind}")
+
+    @property
+    def life_cycle_variable(self) -> LifeCycleVariable:
+        return self._life_cycle_variable
+
+    @property
+    def observation_variable(self) -> ObservationVariable:
+        return self._observation_variable
 
     @property
     def motion_statechart(self) -> MotionStatechart:
@@ -312,11 +441,41 @@ class MotionStatechartNode(SubclassJSONSerializer):
         self._reset_condition.update_expression(expression, self)
 
     def to_json(self) -> Dict[str, Any]:
-        return {**super().to_json(), "name": self.name, "_plot": self._plot}
+        json_data = super().to_json()
+        for field_ in fields(self):
+            if not field_.name.startswith("_") and field_.init:
+                value = getattr(self, field_.name)
+                json_data[field_.name] = self._attribute_to_json(value)
+        return json_data
+
+    def _attribute_to_json(self, value: Any) -> Any:
+        if isinstance(value, dict):
+            return self._dict_to_json(value)
+        if isinstance(value, list):
+            return self._list_to_json(value)
+        if isinstance(value, SubclassJSONSerializer):
+            return value.to_json()
+        return value
+
+    def _list_to_json(self, list_attr: list) -> list:
+        return [self._attribute_to_json(value) for value in list_attr]
+
+    def _dict_to_json(self, dict_attr: Dict[Any, Any]) -> Dict[str, Any]:
+        result = {}
+        for key, value in dict_attr.items():
+            json_value = self._attribute_to_json(value)
+            result[key] = json_value
+        return result
 
     @classmethod
-    def _from_json(cls, data: Dict[str, Any]) -> Self:
-        return cls(name=data["name"], prefix=data["prefix"])
+    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+        node_kwargs = {}
+        del data["type"]
+        for field_name, field_data in data.items():
+            if isinstance(field_data, dict) and "type" in field_data:
+                field_data = SubclassJSONSerializer.from_json(field_data, **kwargs)
+            node_kwargs[field_name] = field_data
+        return cls(**node_kwargs)
 
     def formatted_name(self, quoted: bool = False) -> str:
         formatted_name = string_shortener(
@@ -336,6 +495,9 @@ class MotionStatechartNode(SubclassJSONSerializer):
         if quoted:
             return '"' + result + '"'
         return result
+
+    def __repr__(self) -> str:
+        return str(self.name)
 
 
 GenericMotionStatechartNode = TypeVar(

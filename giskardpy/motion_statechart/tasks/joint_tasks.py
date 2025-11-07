@@ -1,5 +1,8 @@
-from dataclasses import field, dataclass
-from typing import Optional, Dict, List, Tuple, Union
+from dataclasses import field, dataclass, InitVar
+from typing import Optional, Dict, List, Tuple, Union, Any
+
+from krrood.adapters.json_serializer import SubclassJSONSerializer
+from typing_extensions import Self
 
 import semantic_digital_twin.spatial_types.spatial_types as cas
 from giskardpy.data_types.exceptions import GoalInitalizationException
@@ -11,6 +14,7 @@ from giskardpy.qp.constraint_collection import ConstraintCollection
 from giskardpy.utils.decorators import validated_dataclass
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types.derivatives import Derivatives
+from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     RevoluteConnection,
     ActiveConnection,
@@ -19,9 +23,51 @@ from semantic_digital_twin.world_description.connections import (
 )
 
 
+@dataclass
+class JointState(SubclassJSONSerializer):
+    mapping: InitVar[Dict[Union[ActiveConnection1DOF, str], float]]
+
+    _connections: List[ActiveConnection1DOF] = field(init=False, default_factory=list)
+    _target_values: List[float] = field(init=False, default_factory=list)
+
+    def __post_init__(self, mapping: Dict[Union[ActiveConnection1DOF, str], float]):
+        for connection, target in mapping.items():
+            self._connections.append(connection)
+            self._target_values.append(target)
+
+    def __len__(self):
+        return len(self._connections)
+
+    def items(self):
+        return zip(self._connections, self._target_values)
+
+    @classmethod
+    def from_lists(cls, connections: List[ActiveConnection1DOF], targets: List[float]):
+        return cls(mapping=dict(zip(connections, targets)))
+
+    def to_json(self) -> Dict[str, Any]:
+        return {
+            **super().to_json(),
+            "_connections": [
+                connection.name.to_json() for connection in self._connections
+            ],
+            "_target_values": self._target_values,
+        }
+
+    @classmethod
+    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+        world: World = kwargs["world"]
+        connections = [
+            world.get_connection_by_name(PrefixedName.from_json(name, **kwargs))
+            for name in data["_connections"]
+        ]
+        target_values = data["_target_values"]
+        return cls.from_lists(connections, target_values)
+
+
 @dataclass(eq=False, repr=False)
 class JointPositionList(Task):
-    goal_state: Dict[ActiveConnection1DOF, Union[int, float]] = field(kw_only=True)
+    goal_state: JointState = field(kw_only=True)
     threshold: float = field(default=0.01, kw_only=True)
     weight: float = field(default=DefaultWeights.WEIGHT_BELOW_CA, kw_only=True)
     max_velocity: float = field(default=1.0, kw_only=True)

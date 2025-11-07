@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Dict, Any
 
 import numpy as np
 import rustworkx as rx
+from krrood.adapters.json_serializer import SubclassJSONSerializer
 from typing_extensions import List, MutableMapping, ClassVar, Self, Type, Optional
 
 import semantic_digital_twin.spatial_types.spatial_types as cas
@@ -213,7 +215,7 @@ class ObservationState(State):
 
 
 @dataclass
-class MotionStatechart:
+class MotionStatechart(SubclassJSONSerializer):
     """
     Represents a motion statechart.
     A motion statechart is a directed graph of nodes and edges.
@@ -287,8 +289,12 @@ class MotionStatechart:
     def edges(self) -> List[TrinaryCondition]:
         return self.rx_graph.edges()
 
+    @property
+    def unique_edges(self) -> List[TrinaryCondition]:
+        return list(set(self.edges))
+
     def add_node(self, node: MotionStatechartNode):
-        if self.get_node_by_name(node.name):
+        if self.has_node(node):
             raise ValueError(f"Node {node.name} already exists.")
         node.motion_statechart = self
         node.index = self.rx_graph.add_node(node)
@@ -296,21 +302,27 @@ class MotionStatechart:
         self.observation_state.grow()
 
     def has_node(self, node: MotionStatechartNode) -> bool:
-        return any(self.get_node_by_name(node.name))
+        try:
+            self.get_node_by_name(node.name)
+            return True
+        except Exception:
+            return False
 
-    def get_node_by_name(self, name: PrefixedName) -> List[MotionStatechartNode]:
-        return [node for node in self.nodes if node.name == name]
+    def get_node_by_name(self, name: PrefixedName) -> MotionStatechartNode:
+        return next(node for node in self.nodes if node.name == name)
 
     def _add_transitions(self):
         for node in self.nodes:
-            self._create_edge_for_condition(node._start_condition)
-            self._create_edge_for_condition(node._pause_condition)
-            self._create_edge_for_condition(node._end_condition)
-            self._create_edge_for_condition(node._reset_condition)
+            self._create_edge_for_condition(node, node._start_condition)
+            self._create_edge_for_condition(node, node._pause_condition)
+            self._create_edge_for_condition(node, node._end_condition)
+            self._create_edge_for_condition(node, node._reset_condition)
 
-    def _create_edge_for_condition(self, condition: TrinaryCondition):
-        for parent_node in condition.parents:
-            self.rx_graph.add_edge(condition.child.index, parent_node.index, condition)
+    def _create_edge_for_condition(
+        self, owner: MotionStatechartNode, condition: TrinaryCondition
+    ):
+        for parent_node in condition.variables:
+            self.rx_graph.add_edge(owner.index, parent_node.index, condition)
 
     def _build_commons_of_nodes(self):
         for node in self.nodes:
@@ -410,3 +422,26 @@ class MotionStatechart:
 
     def draw(self, file_name: str):
         MotionStatechartGraphviz(self).to_dot_graph_pdf(file_name=file_name)
+
+    def to_json(self) -> Dict[str, Any]:
+        self._add_transitions()
+        result = super().to_json()
+        result["world_name"] = self.world.name
+        result["nodes"] = [node.to_json() for node in self.nodes]
+        result["unique_edges"] = [edge.to_json() for edge in self.unique_edges]
+        return result
+
+    @classmethod
+    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+        world = kwargs["world"]
+        assert world.name == data["world_name"]
+        motion_statechart = cls(world=world)
+        for json_data in data["nodes"]:
+            node = MotionStatechartNode.from_json(json_data, **kwargs)
+            motion_statechart.add_node(node)
+        for json_data in data["unique_edges"]:
+            transition = TrinaryCondition.from_json(
+                json_data, motion_statechart=motion_statechart, **kwargs
+            )
+            transition.owner.set_transition(transition)
+        return motion_statechart
