@@ -20,10 +20,10 @@ class FloatEnum(float, Enum):
     """Enum where members are also (and must be) floats"""
 
 
-class ObservationState(FloatEnum):
-    false = cas.TrinaryFalse.to_np()[0]
-    unknown = cas.TrinaryUnknown.to_np()[0]
-    true = cas.TrinaryTrue.to_np()[0]
+class ObservationStateValues(FloatEnum):
+    FALSE = cas.TrinaryFalse.to_np()[0]
+    UNKNOWN = cas.TrinaryUnknown.to_np()[0]
+    TRUE = cas.TrinaryTrue.to_np()[0]
 
 
 class DefaultWeights(FloatEnum):

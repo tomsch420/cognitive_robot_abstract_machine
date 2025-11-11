@@ -5,6 +5,7 @@ import numpy as np
 from line_profiler import profile
 
 from giskardpy.god_map import god_map
+from giskardpy.motion_statechart.data_types import ObservationStateValues
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode
 from giskardpy.motion_statechart.motion_statechart import ObservationState
 
@@ -21,13 +22,9 @@ class CheckMaxTrajectoryLength(MotionStatechartNode):
 class Print(MotionStatechartNode):
     message: str = ""
 
-    def on_tick(self) -> Union[
-        ObservationState.TrinaryFalse,
-        ObservationState.TrinaryTrue,
-        ObservationState.TrinaryUnknown,
-    ]:
+    def on_tick(self) -> ObservationStateValues:
         print(self.message)
-        return ObservationState.TrinaryTrue
+        return ObservationStateValues.TRUE
 
 
 @dataclass
@@ -52,7 +49,7 @@ class CollisionMatrixUpdater(MotionStatechartNode):
     def __call__(self):
         god_map.collision_scene.set_collision_matrix(self.new_collision_matrix)
         god_map.collision_scene.reset_cache()
-        self.state = ObservationState.true
+        self.state = ObservationStateValues.TRUE
 
 
 @dataclass

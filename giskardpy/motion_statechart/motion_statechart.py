@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import Dict, Any
 
@@ -10,7 +11,10 @@ from typing_extensions import List, MutableMapping, ClassVar, Self, Type, Option
 
 import semantic_digital_twin.spatial_types.spatial_types as cas
 from giskardpy.data_types.exceptions import EmptyProblemException
-from giskardpy.motion_statechart.data_types import LifeCycleValues
+from giskardpy.motion_statechart.data_types import (
+    LifeCycleValues,
+    ObservationStateValues,
+)
 from giskardpy.motion_statechart.graph_node import (
     MotionStatechartNode,
     TrinaryCondition,
@@ -76,7 +80,7 @@ class State(MutableMapping[MotionStatechartNode, float], SubclassJSONSerializer)
         """
         Create a deep copy of the WorldState.
         """
-        return State(
+        return self.__class__(
             motion_statechart=self.motion_statechart,
             data=self.data.copy(),
         )
@@ -175,6 +179,9 @@ class LifeCycleState(State):
             sparse=False,
         )
 
+    def __getitem__(self, node: MotionStatechartNode) -> LifeCycleValues:
+        return LifeCycleValues(super().__getitem__(node))
+
     def update_state(self, observation_state: np.ndarray):
         self.data = self._compiled_updater(observation_state, self.data)
 
@@ -189,11 +196,7 @@ class LifeCycleState(State):
 
 @dataclass(repr=False, eq=False)
 class ObservationState(State):
-    TrinaryFalse: ClassVar[float] = float(cas.TrinaryFalse.to_np())
-    TrinaryUnknown: ClassVar[float] = float(cas.TrinaryUnknown.to_np())
-    TrinaryTrue: ClassVar[float] = float(cas.TrinaryTrue.to_np())
-
-    default_value: ClassVar[float] = float(cas.TrinaryUnknown.to_np())
+    default_value: ClassVar[ObservationStateValues] = ObservationStateValues.UNKNOWN
 
     _compiled_updater: cas.CompiledFunction = field(init=False)
 
@@ -226,6 +229,57 @@ class ObservationState(State):
 
     def update_state(self, life_cycle_state: np.ndarray, world_state: np.ndarray):
         self.data = self._compiled_updater(self.data, life_cycle_state, world_state)
+
+
+@dataclass(repr=False, eq=False)
+class StateHistoryItem:
+    control_cycle: int
+    life_cycle_state: LifeCycleState
+    observation_state: ObservationState
+
+    def __post_init__(self):
+        self.life_cycle_state = deepcopy(self.life_cycle_state)
+        self.observation_state = deepcopy(self.observation_state)
+
+    def __eq__(self, other: StateHistoryItem) -> bool:
+        has_life_cycle_changed = np.any(
+            other.life_cycle_state.data != self.life_cycle_state.data
+        )
+        has_observation_changed = np.any(
+            other.observation_state.data != self.observation_state.data
+        )
+        return not has_life_cycle_changed and not has_observation_changed
+
+    def __repr__(self) -> str:
+        merged = {
+            node.name.name: f"{self.observation_state[node]} | {life_cycle.name}"
+            for node, life_cycle in self.life_cycle_state.items()
+        }
+        return str(merged)
+
+
+@dataclass
+class StateHistory:
+    history: List[StateHistoryItem] = field(default_factory=list)
+
+    def append(self, next_item: StateHistoryItem):
+        if len(self.history) != 0:
+            if next_item == self.history[-1]:
+                return
+        self.history.append(next_item)
+
+    def get_life_cycle_history_of_node(
+        self, node: MotionStatechartNode
+    ) -> list[LifeCycleValues]:
+        return [history_item.life_cycle_state[node] for history_item in self.history]
+
+    def get_observation_history_of_node(
+        self, node: MotionStatechartNode
+    ) -> list[LifeCycleValues]:
+        return [history_item.observation_state[node] for history_item in self.history]
+
+    def __len__(self) -> int:
+        return len(self.history)
 
 
 @dataclass
@@ -290,6 +344,9 @@ class MotionStatechart(SubclassJSONSerializer):
     """
 
     qp_controller: Optional[QPController] = field(default=None, init=False)
+
+    _control_cycle_counter: int = field(default=0, init=False)
+    history: StateHistory = field(default_factory=StateHistory, init=False)
 
     def __post_init__(self):
         self.life_cycle_state = LifeCycleState(self)
@@ -363,6 +420,13 @@ class MotionStatechart(SubclassJSONSerializer):
         self.life_cycle_state.compile()
         if controller_config is not None:
             self._compile_qp_controller(controller_config)
+        self.history.append(
+            next_item=StateHistoryItem(
+                control_cycle=self._control_cycle_counter,
+                life_cycle_state=self.life_cycle_state,
+                observation_state=self.observation_state,
+            )
+        )
 
     def _combine_constraint_collections_of_nodes(self) -> ConstraintCollection:
         combined_constraint_collection = ConstraintCollection()
@@ -437,9 +501,17 @@ class MotionStatechart(SubclassJSONSerializer):
                     pass
 
     def tick(self):
+        self._control_cycle_counter += 1
         self._update_observation_state()
         self._update_life_cycle_state()
         self._raise_if_cancel_motion()
+        self.history.append(
+            next_item=StateHistoryItem(
+                control_cycle=self._control_cycle_counter,
+                life_cycle_state=self.life_cycle_state,
+                observation_state=self.observation_state,
+            )
+        )
         if self.qp_controller is None:
             return
         next_cmd = self.qp_controller.get_cmd(
@@ -472,13 +544,13 @@ class MotionStatechart(SubclassJSONSerializer):
 
     def is_end_motion(self) -> bool:
         return any(
-            self.observation_state[node] == ObservationState.TrinaryTrue
+            self.observation_state[node] == ObservationStateValues.TRUE
             for node in self.get_nodes_by_type(EndMotion)
         )
 
     def _raise_if_cancel_motion(self):
         for node in self.get_nodes_by_type(CancelMotion):
-            if self.observation_state[node] == ObservationState.TrinaryTrue:
+            if self.observation_state[node] == ObservationStateValues.TRUE:
                 raise node.exception
 
     def draw(self, file_name: str):

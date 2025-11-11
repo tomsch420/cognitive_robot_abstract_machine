@@ -105,13 +105,6 @@ class JointPositionList(Task):
                 task_expression=current,
             )
             errors.append(cas.abs(error) < self.threshold)
-            artifacts.debug_expressions[f"{connection.name}/cur"] = cas.Expression(
-                current
-            )
-            artifacts.debug_expressions[f"{connection.name}/goal"] = cas.Expression(
-                target
-            )
-            artifacts.debug_expressions[f"{connection.name}/error"] = error
         artifacts.observation = cas.logic_all(cas.Expression(errors))
         return artifacts
 

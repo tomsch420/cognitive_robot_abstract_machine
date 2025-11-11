@@ -19,7 +19,10 @@ from typing_extensions import (
 )
 
 import semantic_digital_twin.spatial_types.spatial_types as cas
-from giskardpy.motion_statechart.data_types import LifeCycleValues
+from giskardpy.motion_statechart.data_types import (
+    LifeCycleValues,
+    ObservationStateValues,
+)
 from giskardpy.qp.constraint_collection import ConstraintCollection
 from giskardpy.utils.utils import string_shortener
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -367,7 +370,7 @@ class MotionStatechartNode(SubclassJSONSerializer):
             observation=cas.Expression(self.observation_variable),
         )
 
-    def on_tick(self) -> Optional[float]:
+    def on_tick(self) -> Optional[ObservationStateValues]:
         """
         Triggered when the node is ticked.
         .. warning:: Only happens while the node is in state RUNNING.

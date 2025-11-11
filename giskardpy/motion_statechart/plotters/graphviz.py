@@ -6,7 +6,10 @@ from dataclasses import dataclass, field
 import pydot
 from typing_extensions import List, Dict, Optional, Union, Set, TYPE_CHECKING
 
-from giskardpy.motion_statechart.data_types import LifeCycleValues, ObservationState
+from giskardpy.motion_statechart.data_types import (
+    LifeCycleValues,
+    ObservationStateValues,
+)
 from giskardpy.motion_statechart.graph_node import (
     Goal,
     TransitionKind,
@@ -73,26 +76,26 @@ ConditionFont = "monospace"
 
 ResetSymbol = "⟲"
 
-ObservationStateToColor: Dict[ObservationState, str] = {
-    ObservationState.unknown: ResetCondColor,
-    ObservationState.true: MonitorTrueGreen,
-    ObservationState.false: MonitorFalseRed,
+ObservationStateToColor: Dict[ObservationStateValues, str] = {
+    ObservationStateValues.UNKNOWN: ResetCondColor,
+    ObservationStateValues.TRUE: MonitorTrueGreen,
+    ObservationStateValues.FALSE: MonitorFalseRed,
 }
 
-ObservationStateToSymbol: Dict[ObservationState, str] = {
-    ObservationState.unknown: "?",
-    ObservationState.true: "True",
-    ObservationState.false: "False",
+ObservationStateToSymbol: Dict[ObservationStateValues, str] = {
+    ObservationStateValues.UNKNOWN: "?",
+    ObservationStateValues.TRUE: "True",
+    ObservationStateValues.FALSE: "False",
 }
 
-ObservationStateToEdgeStyle: Dict[ObservationState, Dict[str, str]] = {
-    ObservationState.unknown: {
+ObservationStateToEdgeStyle: Dict[ObservationStateValues, Dict[str, str]] = {
+    ObservationStateValues.UNKNOWN: {
         "penwidth": (LineWidth * 1.5) / 2,
         # 'label': '<<FONT FACE="monospace"><B>?</B></FONT>>',
         "fontsize": Fontsize * 1.333,
     },
-    ObservationState.true: {"penwidth": LineWidth * 1.5},
-    ObservationState.false: {"style": "dashed", "penwidth": LineWidth * 1.5},
+    ObservationStateValues.TRUE: {"penwidth": LineWidth * 1.5},
+    ObservationStateValues.FALSE: {"style": "dashed", "penwidth": LineWidth * 1.5},
 }
 
 LiftCycleStateToColor: Dict[LifeCycleValues, str] = {

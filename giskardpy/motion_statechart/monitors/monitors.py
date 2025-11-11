@@ -6,7 +6,7 @@ from dataclasses import field
 
 import semantic_digital_twin.spatial_types.spatial_types as cas
 from giskardpy.god_map import god_map
-from giskardpy.motion_statechart.data_types import ObservationState
+from giskardpy.motion_statechart.data_types import ObservationStateValues
 from giskardpy.motion_statechart.graph_node import (
     MotionStatechartNode,
     BuildContext,
@@ -24,7 +24,9 @@ class ThreadedPayloadMonitor(MotionStatechartNode, ABC):
     Calls __call__ in a separate thread. Use for expensive operations
     """
 
-    state: ObservationState = field(init=False, default=ObservationState.unknown)
+    state: ObservationStateValues = field(
+        init=False, default=ObservationStateValues.UNKNOWN
+    )
 
     @abc.abstractmethod
     def __call__(self):
