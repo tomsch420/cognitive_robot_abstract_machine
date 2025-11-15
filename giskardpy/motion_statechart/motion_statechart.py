@@ -15,6 +15,7 @@ from giskardpy.motion_statechart.data_types import (
     LifeCycleValues,
     ObservationStateValues,
 )
+from giskardpy.motion_statechart.exceptions import NodeNotFoundError
 from giskardpy.motion_statechart.graph_node import (
     MotionStatechartNode,
     TrinaryCondition,
@@ -406,11 +407,14 @@ class MotionStatechart(SubclassJSONSerializer):
         try:
             self.get_node_by_name(node.name)
             return True
-        except Exception:
+        except NodeNotFoundError:
             return False
 
     def get_node_by_name(self, name: PrefixedName) -> MotionStatechartNode:
-        return next(node for node in self.nodes if node.name == name)
+        try:
+            return next(node for node in self.nodes if node.name == name)
+        except StopIteration:
+            raise NodeNotFoundError(name=name)
 
     def _add_transitions(self):
         for node in self.nodes:
@@ -433,6 +437,7 @@ class MotionStatechart(SubclassJSONSerializer):
         self, node: MotionStatechartNode, context: BuildContext
     ):
         if isinstance(node, Goal):
+            node.build(context=context)
             for child_node in node.nodes:
                 self._build_and_apply_artifacts(child_node, context=context)
         artifacts = node.build(context=context)

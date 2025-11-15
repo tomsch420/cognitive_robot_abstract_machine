@@ -152,7 +152,7 @@ class CollisionWorldSynchronizer:
     @lru_cache
     def external_contact_distance_symbol(
         self, body: Body, idx: Optional[int] = None, body_b: Optional[Body] = None
-    ) -> cas.FloatVariable:
+    ) -> AuxiliaryVariable:
         if body_b is None:
             assert idx is not None
             provider = (
@@ -182,7 +182,7 @@ class CollisionWorldSynchronizer:
     @lru_cache
     def external_link_b_hash_symbol(
         self, body: Body, idx: Optional[int] = None, body_b: Optional[Body] = None
-    ) -> cas.FloatVariable:
+    ) -> AuxiliaryVariable:
         if body_b is None:
             assert idx is not None
             provider = (
@@ -204,7 +204,7 @@ class CollisionWorldSynchronizer:
         )
 
     @lru_cache
-    def external_number_of_collisions_symbol(self, body: Body) -> cas.FloatVariable:
+    def external_number_of_collisions_symbol(self, body: Body) -> AuxiliaryVariable:
         provider = lambda n=body: self.closest_points.get_number_of_external_collisions(
             n
         )
@@ -256,6 +256,7 @@ class CollisionWorldSynchronizer:
             self.self_collision_data = np.zeros(len(symbols), dtype=float)
         return symbols
 
+    @lru_cache
     def self_new_b_V_n_symbol(
         self, link_a: Body, link_b: Body, idx: int
     ) -> cas.Vector3:
@@ -271,6 +272,7 @@ class CollisionWorldSynchronizer:
             provider=provider,
         )
 
+    @lru_cache
     def self_new_a_P_pa_symbol(
         self, link_a: Body, link_b: Body, idx: int
     ) -> cas.Point3:
@@ -286,6 +288,7 @@ class CollisionWorldSynchronizer:
             provider=provider,
         )
 
+    @lru_cache
     def self_new_b_P_pb_symbol(
         self, link_a: Body, link_b: Body, idx: int
     ) -> cas.Point3:
@@ -302,9 +305,10 @@ class CollisionWorldSynchronizer:
         )
         return p
 
+    @lru_cache
     def self_contact_distance_symbol(
         self, link_a: Body, link_b: Body, idx: int
-    ) -> cas.FloatVariable:
+    ) -> AuxiliaryVariable:
         provider = (
             lambda a=link_a, b=link_b, i=idx: self.closest_points.get_self_collisions(
                 a, b
@@ -317,9 +321,10 @@ class CollisionWorldSynchronizer:
             provider=provider,
         )
 
+    @lru_cache
     def self_number_of_collisions_symbol(
         self, link_a: Body, link_b: Body
-    ) -> cas.FloatVariable:
+    ) -> AuxiliaryVariable:
         provider = lambda a=link_a, b=link_b: self.closest_points.get_number_of_self_collisions(
             a, b
         )

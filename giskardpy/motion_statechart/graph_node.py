@@ -24,6 +24,7 @@ from giskardpy.motion_statechart.data_types import (
     LifeCycleValues,
     ObservationStateValues,
 )
+from giskardpy.motion_statechart.exceptions import NodeNotFoundError
 from giskardpy.qp.constraint_collection import ConstraintCollection
 from giskardpy.utils.utils import string_shortener
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -329,7 +330,7 @@ class MotionStatechartNode(SubclassJSONSerializer):
     def parent_node(self) -> Optional[MotionStatechartNode]:
         try:
             return self._motion_statechart.get_node_by_name(self.parent_node_name)
-        except StopIteration:
+        except NodeNotFoundError:
             return None
 
     @parent_node.setter
