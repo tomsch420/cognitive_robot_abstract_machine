@@ -80,6 +80,7 @@ class WorldWithOmniDriveRobot(WorldConfig):
     odom_body_name: PrefixedName = field(default=PrefixedName("odom"))
     urdf_view: AbstractRobot = field(kw_only=True, default=MinimalRobot)
     localization: Connection6DoF = field(init=False)
+    robot: AbstractRobot = field(init=False)
 
     def setup_world(self):
         map = Body(name=self.root_name)
@@ -91,7 +92,7 @@ class WorldWithOmniDriveRobot(WorldConfig):
 
         urdf_parser = URDFParser(urdf=self.urdf)
         world_with_robot = urdf_parser.parse()
-        self.urdf_view.from_world(world_with_robot)
+        self.robot = self.urdf_view.from_world(world_with_robot)
 
         odom = OmniDrive.create_with_dofs(
             parent=odom,
