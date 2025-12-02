@@ -51,8 +51,8 @@ def count(
     Count the number of elements satisfying the given entity description.
 
     :param entity_: An entity or a set expression to quantify over.
-    :return: A quantifier representing "an" element.
-    :rtype: The[T]
+    :return: A quantifier representing the count of elements, or an integer.
+    :rtype: Count[T]
     """
     return _quantify_entity(Count, entity_)
 
