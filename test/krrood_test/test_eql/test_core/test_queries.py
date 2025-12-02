@@ -853,3 +853,26 @@ def test_max_min_no_variable():
     min_query_result = list(min_query.evaluate())
     assert len(min_query_result) == 1
     assert min_query_result[0] == min(values)
+
+
+def test_order_by_key():
+    names = ["Handle1", "handle2", "Handle3", "container1", "Container2", "container3"]
+    body_name = let(str, domain=names)
+    key = lambda x: int(x[-1])
+    query = an(
+        entity(body_name).order_by(
+            variable=body_name,
+            key=key,
+            descending=True,
+        )
+    )
+    results = list(query.evaluate())
+    assert results == sorted(names, key=key, reverse=True)
+
+
+def test_distinct_with_order_by():
+    values = [5, 1, 1, 2, 1, 4, 3, 3, 5]
+    values_var = let(int, domain=values)
+    query = an(entity(values_var).distinct().order_by(variable=values_var, descending=False))
+    results = list(query.evaluate())
+    assert results == [1, 2, 3, 4, 5]
