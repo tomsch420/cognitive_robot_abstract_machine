@@ -62,7 +62,7 @@ class MeshDecomposer(Step, ABC):
         """
         ...
 
-    def apply_to_shape(self, shape: Shape) -> ShapeCollection:
+    def apply_to_shape(self, shape: Shape) -> List[TriangleMesh]:
         """
         Apply the mesh decomposition to a given shape.
         If the shape is a Mesh, it will be decomposed into multiple TriangleMesh objects.
@@ -74,7 +74,7 @@ class MeshDecomposer(Step, ABC):
         else:
             new_geometry.append(shape)
 
-        return ShapeCollection(new_geometry)
+        return new_geometry
 
     def apply_to_body(self, body: Body) -> Body:
         """
@@ -87,7 +87,7 @@ class MeshDecomposer(Step, ABC):
             decomposed_shapes = self.apply_to_shape(shape)
             new_geometry.extend(decomposed_shapes)
 
-        body.collision = new_geometry
+        body.collision = ShapeCollection(new_geometry)
         return body
 
     def _apply(self, world: World) -> World:
