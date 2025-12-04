@@ -1,3 +1,5 @@
+import pytest
+
 from krrood.entity_query_language.symbol_graph import SymbolGraph
 
 from semantic_digital_twin.world import World
@@ -12,3 +14,10 @@ def pytest_configure(config):
     # Execute the ORM generation script as a standalone module
     runpy.run_path(str(generate_orm_path), run_name="__main__")
     SymbolGraph()
+
+@pytest.fixture(autouse=True, scope="function")
+def cleanup_after_test():
+    # runs BEFORE each test
+    yield
+    # runs AFTER each test (even if the test fails or errors)
+    SymbolGraph().clear()
