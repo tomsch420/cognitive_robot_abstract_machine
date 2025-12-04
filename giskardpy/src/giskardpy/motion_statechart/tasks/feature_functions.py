@@ -40,6 +40,8 @@ class FeatureFunctionGoal(Task):
         root_T_tip = context.world.compose_forward_kinematics_expression(
             self.root_link, self.tip_link
         )
+        print("reference_feature type:", type(self.reference_feature))
+        print("controlled_feature type:", type(self.controlled_feature))
         if isinstance(self.controlled_feature, cas.Point3):
             self.root_P_controlled_feature = root_T_tip @ tip_controlled_feature
             dbg = DebugExpression(
@@ -49,9 +51,7 @@ class FeatureFunctionGoal(Task):
             )
             artifacts.debug_expressions.append(dbg)
         elif isinstance(self.controlled_feature, cas.Vector3):
-            self.root_V_controlled_feature = (
-                root_T_tip @ tip_controlled_feature
-            ).to_vector3()
+            self.root_V_controlled_feature = root_T_tip @ tip_controlled_feature
             self.root_V_controlled_feature.vis_frame = self.controlled_feature.vis_frame
             dbg = DebugExpression(
                 name="root_V_controlled_feature",
@@ -68,8 +68,8 @@ class FeatureFunctionGoal(Task):
                 color=Color(0, 1, 0, 1),
             )
             artifacts.debug_expressions.append(dbg)
-        if isinstance(self.reference_feature, cas.Vector3):
-            self.root_V_reference_feature = root_reference_feature.to_vector3()
+        elif isinstance(self.reference_feature, cas.Vector3):
+            self.root_V_reference_feature = root_reference_feature
             self.root_V_reference_feature.vis_frame = self.controlled_feature.vis_frame
             dbg = DebugExpression(
                 name="root_V_reference_feature",
@@ -100,10 +100,9 @@ class AlignPerpendicular(FeatureFunctionGoal):
     threshold: float = field(default=0.01, kw_only=True)
 
     def build(self, context: BuildContext) -> NodeArtifacts:
-        artifacts = NodeArtifacts()
         self.controlled_feature = self.tip_normal
         self.reference_feature = self.reference_normal
-        super().__post_init__()
+        artifacts = super().build(context)
 
         expr = self.root_V_reference_feature.angle_between(
             self.root_V_controlled_feature
