@@ -135,9 +135,6 @@ class SymbolicExpression(Generic[T], ABC):
     _conclusion_: typing.Set[Conclusion] = field(init=False, default_factory=set)
     _symbolic_expression_stack_: ClassVar[List[SymbolicExpression]] = []
     _is_false_: bool = field(init=False, repr=False, default=False)
-    _seen_parent_values_by_parent_: Dict[int, Dict[bool, SeenSet]] = field(
-        default_factory=dict, init=False, repr=False
-    )
     _eval_parent_: Optional[SymbolicExpression] = field(
         default=None, init=False, repr=False
     )
@@ -307,30 +304,6 @@ class SymbolicExpression(Generic[T], ABC):
         This is useful for accessing the leaves of the symbolic expression tree.
         """
         ...
-
-    def _is_duplicate_output_(self, output: Dict[int, HashedValue]) -> bool:
-        """
-        Check if the output has been seen before for the current parent and truth branch.
-        """
-        projection = self._projection_(when_true=not self._is_false_)
-        if not projection:
-            return False
-
-        required_output = {k: v for k, v in output.items() if k in projection}
-        if not required_output:
-            return False
-
-        # Use a per-parent seen set to avoid suppressing outputs across different parent contexts
-        parent_id = self._parent_._id_ if self._parent_ else self._id_
-        seen_by_truth = self._seen_parent_values_by_parent_.setdefault(
-            parent_id, {True: SeenSet(), False: SeenSet()}
-        )
-        seen_set = seen_by_truth[not self._is_false_]
-
-        if seen_set.check(required_output):
-            return True
-        seen_set.add(required_output)
-        return False
 
     @property
     def _plot_color_(self) -> ColorLegend:
