@@ -40,8 +40,6 @@ class FeatureFunctionGoal(Task):
         root_T_tip = context.world.compose_forward_kinematics_expression(
             self.root_link, self.tip_link
         )
-        print("reference_feature type:", type(self.reference_feature))
-        print("controlled_feature type:", type(self.controlled_feature))
         if isinstance(self.controlled_feature, cas.Point3):
             self.root_P_controlled_feature = root_T_tip @ tip_controlled_feature
             dbg = DebugExpression(
