@@ -1349,7 +1349,7 @@ class MujocoBuilder(MultiSimBuilder):
             )
             return False
         mesh_name = os.path.splitext(os.path.basename(mesh_file_path))[0]
-        mesh_scale = mesh_entity.scale.tolist()
+        mesh_scale = [mesh_entity.scale.x, mesh_entity.scale.y, mesh_entity.scale.z]
         if not numpy.allclose(mesh_scale, [1.0, 1.0, 1.0]):
             mesh_name += f"_{'_'.join(map(str, mesh_scale))}"
         if mesh_name not in [mesh.name for mesh in self.spec.meshes]:

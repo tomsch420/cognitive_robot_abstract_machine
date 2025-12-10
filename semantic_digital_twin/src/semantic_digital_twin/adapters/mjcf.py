@@ -275,7 +275,7 @@ class MJCFParser:
                 mujoco_material: mujoco.MjsMaterial = self.spec.material(
                     mujoco_geom.material
                 )
-                meshscale = mujoco_mesh.scale
+                meshscale = Scale(mujoco_mesh.scale)
                 if mujoco_material is None:
                     return FileMesh(
                         filename=filename,
