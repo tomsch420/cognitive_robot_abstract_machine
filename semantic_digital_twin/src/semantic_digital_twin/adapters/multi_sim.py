@@ -828,6 +828,18 @@ class MujocoEquality(SemanticAnnotation):
     """
 
 
+@dataclass(eq=False)
+class MujocoMocapBody(SemanticAnnotation):
+    """
+    Semantic annotation declaring that a Body is a MujocoMocapBody.
+    """
+
+    body: Body
+    """
+    The body which is a MujocoMocapBody.
+    """
+
+
 class MujocoConverter(EntityConverter, ABC): ...
 
 
@@ -1060,30 +1072,36 @@ class MultiSimBuilder(ABC):
     A builder to build a world in the Multiverse simulator.
     """
 
+    _world: Optional[World] = None
+    """
+    The world to be built.
+    """
+
     def build_world(self, world: World, file_path: str):
         """
         Builds the world in the simulator and saves it to a file.
 
-        :param world: The world to build.
+        :param world: The world to be built.
         :param file_path: The file path to save the world to.
         """
+        self._world = world
         self._asset_folder_path = os.path.join(os.path.dirname(file_path), "assets")
         if not os.path.exists(self.asset_folder_path):
             os.makedirs(self.asset_folder_path)
-        if len(world.bodies) == 0:
-            with world.modify_world():
+        if len(self.world.bodies) == 0:
+            with self.world.modify_world():
                 root = Body(name=PrefixedName("world"))
-                world.add_body(root)
-        elif world.bodies[0].name.name != "world":
+                self.world.add_body(root)
+        elif self.world.bodies[0].name.name != "world":
             with world.modify_world():
                 root_bodies = [
-                    body for body in world.bodies if body.parent_connection is None
+                    body for body in self.world.bodies if body.parent_connection is None
                 ]
                 root = Body(name=PrefixedName("world"))
-                world.add_body(root)
+                self.world.add_body(root)
                 for root_body in root_bodies:
                     connection = FixedConnection(parent=root, child=root_body)
-                    world.add_connection(connection)
+                    self.world.add_connection(connection)
 
         self._start_build(file_path=file_path)
 
@@ -1099,7 +1117,7 @@ class MultiSimBuilder(ABC):
         for actuator in world.actuators:
             self._build_actuator(actuator=actuator)
 
-        self._end_build(file_path=file_path, world=world)
+        self._end_build(file_path=file_path)
 
     def build_body(self, body: Body):
         """
@@ -1142,12 +1160,11 @@ class MultiSimBuilder(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def _end_build(self, file_path: str, world: World):
+    def _end_build(self, file_path: str):
         """
         Ends the building process for the simulator and saves the world to a file.
 
         :param file_path: The file path to save the world to.
-        :param world: The world that was built.
         """
         raise NotImplementedError
 
@@ -1221,6 +1238,10 @@ class MultiSimBuilder(ABC):
         """
         return self._asset_folder_path
 
+    @property
+    def world(self) -> World:
+        return self._world
+
 
 @dataclass
 class MujocoBuilder(MultiSimBuilder):
@@ -1235,8 +1256,8 @@ class MujocoBuilder(MultiSimBuilder):
         self.spec.modelname = "scene"
         self.spec.compiler.degree = 0
 
-    def _end_build(self, file_path: str, world: World):
-        self._build_equalities(world=world)
+    def _end_build(self, file_path: str):
+        self._build_equalities()
         self.spec.compile()
         self.spec.to_file(file_path)
         import xml.etree.ElementTree as ET
@@ -1468,6 +1489,15 @@ class MujocoBuilder(MultiSimBuilder):
                 entity_name=parent_body_name,
                 entity_type=mujoco.mjtObj.mjOBJ_BODY,
             )
+        if any(
+            [
+                semantic_annotation.body == body
+                for semantic_annotation in self.world.get_semantic_annotations_by_type(
+                    MujocoMocapBody
+                )
+            ]
+        ):
+            body_props["mocap"] = 1
         body_spec = parent_body_spec.add_body(**body_props)
         if body_spec is None:
             raise MujocoEntityNotFoundError(
@@ -1476,11 +1506,11 @@ class MujocoBuilder(MultiSimBuilder):
                 action="add",
             )
 
-    def _build_equalities(self, world: World):
+    def _build_equalities(self):
         """
         Builds all equalities in the Mujoco spec.
         """
-        for equality_semantic_annotation in world.get_semantic_annotations_by_type(
+        for equality_semantic_annotation in self.world.get_semantic_annotations_by_type(
             MujocoEquality
         ):
             equality = self.spec.add_equality()
@@ -1500,7 +1530,7 @@ class MujocoBuilder(MultiSimBuilder):
         """
         Finds an entity in the Mujoco spec by its type and name.
 
-        :param entity_type: The type of the entity
+        :param entity_type: The type of the entity.
         :param entity_name: The name of the entity.
         :return: The entity if found, None otherwise.
         """

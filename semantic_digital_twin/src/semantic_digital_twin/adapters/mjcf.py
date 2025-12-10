@@ -42,6 +42,7 @@ from .multi_sim import (
     GeomVisibilityAndCollisionType,
     MujocoCamera,
     MujocoEquality,
+    MujocoMocapBody,
 )
 
 logger = logging.getLogger(__name__)
@@ -125,6 +126,8 @@ class MJCFParser:
         body.visual = ShapeCollection(shapes=visuals, reference_frame=body)
         body.collision = ShapeCollection(shapes=collisions, reference_frame=body)
         self.world.add_kinematic_structure_entity(body)
+        if mujoco_body.mocap:
+            self.world.add_semantic_annotation(MujocoMocapBody(body=body))
         for mujoco_child_body in mujoco_body.bodies:
             self.parse_body(mujoco_body=mujoco_child_body)
 
