@@ -333,6 +333,15 @@ class Selectable(SymbolicExpression[T], ABC):
     variable.
     """
 
+    _type_: Type[T] = field(init=False, default=None)
+    """
+    The type of the variable.
+    """
+
+    @cached_property
+    def _type__(self):
+        return self._var_._type_ if self._var_ else None
+
     def _process_result_(
             self, result: OperationResult
     ) -> T:
@@ -367,14 +376,6 @@ class CanBehaveLikeAVariable(Selectable[T], ABC):
     """
     The path of the variable in the symbol graph as a sequence of relation instances.
     """
-    _type_: Type[T] = field(init=False, default=None)
-    """
-    The type of the variable.
-    """
-
-    @cached_property
-    def _type__(self):
-        return self._var_._type_ if self._var_ else None
 
     def __getattr__(self, name: str) -> CanBehaveLikeAVariable[T]:
         # Prevent debugger/private attribute lookups from being interpreted as symbolic attributes
@@ -1298,7 +1299,7 @@ class DomainMapping(CanBehaveLikeAVariable[T], ABC):
     A symbolic expression the maps the domain of symbolic variables.
     """
 
-    _child_: CanBehaveLikeAVariable[T]
+    _child_: Selectable[T]
 
     def __post_init__(self):
         super().__post_init__()

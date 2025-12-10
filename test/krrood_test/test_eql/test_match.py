@@ -72,7 +72,7 @@ def test_select(handles_and_containers_world):
                ))
 
     assert set(container_and_handle_2.evaluate().values()) == set(container_and_handle.evaluate().values())
-    assert isinstance(container_and_handle._expression_._child_, SetOf)
+    assert isinstance(container_and_handle.expression._child_, SetOf)
 
     answers = container_and_handle.evaluate()
     assert isinstance(answers, UnificationDict)
@@ -101,7 +101,7 @@ def test_select_where(handles_and_containers_world):
                ))
 
     assert set(container_and_handle_2.evaluate().values()) == set(container_and_handle.evaluate().values())
-    assert isinstance(container_and_handle._expression_._child_, SetOf)
+    assert isinstance(container_and_handle.expression._child_, SetOf)
 
     answers = container_and_handle.evaluate()
     assert isinstance(answers, UnificationDict)
