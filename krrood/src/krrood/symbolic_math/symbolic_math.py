@@ -284,11 +284,14 @@ class CompiledFunctionWithViews:
     A wrapper for CompiledFunction which automatically splits the result array into multiple views, with minimal
     overhead.
     Useful, when many arrays must be evaluated at the same time, especially when they depend on the same variables.
+    __call__ returns first a list of expressions, followed by additional_views.
+    e.g. CompiledFunctionWithViews(expressions=[expr1, expr2], additional_views=[(start, end)])
+        returns [expr1_result, expr2_result, np.concatenate([expr1_result, expr2_result])[start:end]]
     """
 
     expressions: _te.List[Expression]
     """
-    The list of expressions to be compiled, the first len(expressions) many results of __call__ correspond to those
+    The list of expressions to be compiled.
     """
 
     variable_parameters: _te.List[_te.List[FloatVariable]]
