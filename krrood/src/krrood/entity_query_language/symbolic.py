@@ -845,7 +845,7 @@ class QueryObjectDescriptor(SymbolicExpression[T], ABC):
     """
     The child of the query object descriptor is the root of the conditions in the query/sub-query graph.
     """
-    _selected_variables: List[CanBehaveLikeAVariable[T]] = field(default_factory=list)
+    _selected_variables: List[Selectable[T]] = field(default_factory=list)
     """
     The variables that are selected by the query object descriptor.
     """

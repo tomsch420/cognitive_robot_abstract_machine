@@ -65,8 +65,8 @@ def entity(selected_variable: T) -> Entity[T]:
 
 
 def set_of(
-    *selected_variables: T,
-) -> SetOf[T]:
+    *selected_variables: Selectable,
+) -> SetOf:
     """
     Create a set descriptor for the selected variables.
 
@@ -153,7 +153,7 @@ def or_(*conditions):
     return chained_logic(optimize_or, *conditions)
 
 
-def not_(operand: SymbolicExpression):
+def not_(operand: ConditionType) -> SymbolicExpression:
     """
     A symbolic NOT operation that can be used to negate symbolic expressions.
     """
