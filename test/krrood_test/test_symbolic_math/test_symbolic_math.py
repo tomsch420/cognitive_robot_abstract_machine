@@ -377,145 +377,6 @@ class TestExpression:
         r2 = np.kron(m1, m1)
         assert np.allclose(r1, r2)
 
-    def test_jacobian(self):
-        a = cas.FloatVariable(name="a")
-        b = cas.FloatVariable(name="b")
-        m = cas.Expression(data=[a + b, a**2, b**2])
-        jac = m.jacobian([a, b])
-        expected = cas.Expression(data=[[1, 1], [2 * a, 0], [0, 2 * b]])
-        for i in range(expected.shape[0]):
-            for j in range(expected.shape[1]):
-                assert jac[i, j].equivalent(expected[i, j])
-
-    def test_jacobian_dot(self):
-        a, ad, b, bd = 1.0, 2.0, 3.0, 4.0
-        kwargs = {
-            "a": a,
-            "ad": ad,
-            "b": b,
-            "bd": bd,
-        }
-        a_s = cas.FloatVariable(name="a")
-        ad_s = cas.FloatVariable(name="ad")
-        b_s = cas.FloatVariable(name="b")
-        bd_s = cas.FloatVariable(name="bd")
-        m = cas.Expression(
-            data=[
-                a_s**3 * b_s**3,
-                -a_s * cas.cos(b_s),
-            ]
-        )
-        jac = m.jacobian_dot([a_s, b_s], [ad_s, bd_s])
-        expected_expr = cas.Expression(
-            data=[
-                [
-                    6 * ad_s * a_s * b_s**3 + 9 * a_s**2 * bd_s * b_s**2,
-                    9 * ad_s * a_s**2 * b_s**2 + 6 * a_s**3 * bd_s * b,
-                ],
-                # [0, 2 * bd_s],
-                [bd_s * cas.sin(b_s), ad_s * cas.sin(b_s) + a_s * bd_s * cas.cos(b_s)],
-                # [4 * bd * b ** 3, 4 * ad * b ** 3 + 12 * a * bd * b ** 2]
-            ]
-        )
-        actual = jac.compile().call_with_kwargs(**kwargs)
-        expected = expected_expr.compile().call_with_kwargs(**kwargs)
-        assert np.allclose(actual, expected)
-
-    def test_jacobian_ddot(self):
-        a, ad, add, b, bd, bdd = 1, 2, 3, 4, 5, 6
-        kwargs = {
-            "a": a,
-            "ad": ad,
-            "add": add,
-            "b": b,
-            "bd": bd,
-            "bdd": bdd,
-        }
-        a_s = cas.FloatVariable(name="a")
-        ad_s = cas.FloatVariable(name="ad")
-        add_s = cas.FloatVariable(name="add")
-        b_s = cas.FloatVariable(name="b")
-        bd_s = cas.FloatVariable(name="bd")
-        bdd_s = cas.FloatVariable(name="bdd")
-        m = cas.Expression(
-            data=[
-                a_s**3 * b_s**3,
-                b_s**2,
-                -a_s * cas.cos(b_s),
-            ]
-        )
-        jac = m.jacobian_ddot([a_s, b_s], [ad_s, bd_s], [add_s, bdd_s])
-        expected = np.array(
-            [
-                [
-                    add * 6 * b**3 + bdd * 18 * a**2 * b + 2 * ad * bd * 18 * a * b**2,
-                    bdd * 6 * a**3 + add * 18 * b**2 * a + 2 * ad * bd * 18 * b * a**2,
-                ],
-                [0, 0],
-                [bdd * np.cos(b), bdd * -a * np.sin(b) + 2 * ad * bd * np.cos(b)],
-            ]
-        )
-        actual = jac.compile().call_with_kwargs(**kwargs)
-        assert np.allclose(actual, expected)
-
-    def test_total_derivative2(self):
-        a, b, ad, bd, add, bdd = 1, 2, 3, 4, 5, 6
-        kwargs = {
-            "a": a,
-            "ad": ad,
-            "add": add,
-            "b": b,
-            "bd": bd,
-            "bdd": bdd,
-        }
-        a_s = cas.FloatVariable(name="a")
-        ad_s = cas.FloatVariable(name="ad")
-        add_s = cas.FloatVariable(name="add")
-        b_s = cas.FloatVariable(name="b")
-        bd_s = cas.FloatVariable(name="bd")
-        bdd_s = cas.FloatVariable(name="bdd")
-        m = a_s * b_s**2
-        jac = m.second_order_total_derivative([a_s, b_s], [ad_s, bd_s], [add_s, bdd_s])
-        actual = jac.compile().call_with_kwargs(**kwargs)
-        expected = bdd * 2 * a + 2 * ad * bd * 2 * b
-        assert np.allclose(actual, expected)
-
-    def test_total_derivative2_2(self):
-        a, b, c, ad, bd, cd, add, bdd, cdd = 1, 2, 3, 4, 5, 6, 7, 8, 9
-        kwargs = {
-            "a": a,
-            "ad": ad,
-            "add": add,
-            "b": b,
-            "bd": bd,
-            "bdd": bdd,
-            "c": c,
-            "cd": cd,
-            "cdd": cdd,
-        }
-        a_s = cas.FloatVariable(name="a")
-        ad_s = cas.FloatVariable(name="ad")
-        add_s = cas.FloatVariable(name="add")
-        b_s = cas.FloatVariable(name="b")
-        bd_s = cas.FloatVariable(name="bd")
-        bdd_s = cas.FloatVariable(name="bdd")
-        c_s = cas.FloatVariable(name="c")
-        cd_s = cas.FloatVariable(name="cd")
-        cdd_s = cas.FloatVariable(name="cdd")
-        m = data = a_s * b_s**2 * c_s**3
-        jac = m.second_order_total_derivative(
-            [a_s, b_s, c_s], [ad_s, bd_s, cd_s], [add_s, bdd_s, cdd_s]
-        )
-        actual = jac.compile().call_with_kwargs(**kwargs)
-        expected = (
-            bdd * 2 * a * c**3
-            + cdd * 6 * a * b**2 * c
-            + 4 * ad * bd * b * c**3
-            + 6 * ad * b**2 * cd * c**2
-            + 12 * a * bd * b * cd * c**2
-        )
-        assert np.allclose(actual, expected)
-
     def test_free_variables(self):
         m = cas.Expression(data=cas.create_float_variables(["a", "b", "c", "d"]))
         assert len(m.free_variables()) == 4
@@ -1133,6 +994,145 @@ class TestVector:
             assert (
                 result.shape == expected.shape
             ), f"{op.__name__} result shape is wrong"
+
+    def test_jacobian(self):
+        a = cas.FloatVariable(name="a")
+        b = cas.FloatVariable(name="b")
+        m = cas.Vector(data=[a + b, a**2, b**2])
+        jac = m.jacobian([a, b])
+        expected = cas.Expression(data=[[1, 1], [2 * a, 0], [0, 2 * b]])
+        for i in range(expected.shape[0]):
+            for j in range(expected.shape[1]):
+                assert jac[i, j].equivalent(expected[i, j])
+
+    def test_jacobian_dot(self):
+        a, ad, b, bd = 1.0, 2.0, 3.0, 4.0
+        kwargs = {
+            "a": a,
+            "ad": ad,
+            "b": b,
+            "bd": bd,
+        }
+        a_s = cas.FloatVariable(name="a")
+        ad_s = cas.FloatVariable(name="ad")
+        b_s = cas.FloatVariable(name="b")
+        bd_s = cas.FloatVariable(name="bd")
+        m = cas.Vector(
+            data=[
+                a_s**3 * b_s**3,
+                -a_s * cas.cos(b_s),
+            ]
+        )
+        jac = m.jacobian_dot([a_s, b_s], [ad_s, bd_s])
+        expected_expr = cas.Matrix(
+            data=[
+                [
+                    6 * ad_s * a_s * b_s**3 + 9 * a_s**2 * bd_s * b_s**2,
+                    9 * ad_s * a_s**2 * b_s**2 + 6 * a_s**3 * bd_s * b,
+                ],
+                # [0, 2 * bd_s],
+                [bd_s * cas.sin(b_s), ad_s * cas.sin(b_s) + a_s * bd_s * cas.cos(b_s)],
+                # [4 * bd * b ** 3, 4 * ad * b ** 3 + 12 * a * bd * b ** 2]
+            ]
+        )
+        actual = jac.compile().call_with_kwargs(**kwargs)
+        expected = expected_expr.compile().call_with_kwargs(**kwargs)
+        assert np.allclose(actual, expected)
+
+    def test_jacobian_ddot(self):
+        a, ad, add, b, bd, bdd = 1, 2, 3, 4, 5, 6
+        kwargs = {
+            "a": a,
+            "ad": ad,
+            "add": add,
+            "b": b,
+            "bd": bd,
+            "bdd": bdd,
+        }
+        a_s = cas.FloatVariable(name="a")
+        ad_s = cas.FloatVariable(name="ad")
+        add_s = cas.FloatVariable(name="add")
+        b_s = cas.FloatVariable(name="b")
+        bd_s = cas.FloatVariable(name="bd")
+        bdd_s = cas.FloatVariable(name="bdd")
+        m = cas.Expression(
+            data=[
+                a_s**3 * b_s**3,
+                b_s**2,
+                -a_s * cas.cos(b_s),
+            ]
+        )
+        jac = m.jacobian_ddot([a_s, b_s], [ad_s, bd_s], [add_s, bdd_s])
+        expected = np.array(
+            [
+                [
+                    add * 6 * b**3 + bdd * 18 * a**2 * b + 2 * ad * bd * 18 * a * b**2,
+                    bdd * 6 * a**3 + add * 18 * b**2 * a + 2 * ad * bd * 18 * b * a**2,
+                ],
+                [0, 0],
+                [bdd * np.cos(b), bdd * -a * np.sin(b) + 2 * ad * bd * np.cos(b)],
+            ]
+        )
+        actual = jac.compile().call_with_kwargs(**kwargs)
+        assert np.allclose(actual, expected)
+
+    def test_total_derivative2(self):
+        a, b, ad, bd, add, bdd = 1, 2, 3, 4, 5, 6
+        kwargs = {
+            "a": a,
+            "ad": ad,
+            "add": add,
+            "b": b,
+            "bd": bd,
+            "bdd": bdd,
+        }
+        a_s = cas.FloatVariable(name="a")
+        ad_s = cas.FloatVariable(name="ad")
+        add_s = cas.FloatVariable(name="add")
+        b_s = cas.FloatVariable(name="b")
+        bd_s = cas.FloatVariable(name="bd")
+        bdd_s = cas.FloatVariable(name="bdd")
+        m = a_s * b_s**2
+        jac = m.second_order_total_derivative([a_s, b_s], [ad_s, bd_s], [add_s, bdd_s])
+        actual = jac.compile().call_with_kwargs(**kwargs)
+        expected = bdd * 2 * a + 2 * ad * bd * 2 * b
+        assert np.allclose(actual, expected)
+
+    def test_total_derivative2_2(self):
+        a, b, c, ad, bd, cd, add, bdd, cdd = 1, 2, 3, 4, 5, 6, 7, 8, 9
+        kwargs = {
+            "a": a,
+            "ad": ad,
+            "add": add,
+            "b": b,
+            "bd": bd,
+            "bdd": bdd,
+            "c": c,
+            "cd": cd,
+            "cdd": cdd,
+        }
+        a_s = cas.FloatVariable(name="a")
+        ad_s = cas.FloatVariable(name="ad")
+        add_s = cas.FloatVariable(name="add")
+        b_s = cas.FloatVariable(name="b")
+        bd_s = cas.FloatVariable(name="bd")
+        bdd_s = cas.FloatVariable(name="bdd")
+        c_s = cas.FloatVariable(name="c")
+        cd_s = cas.FloatVariable(name="cd")
+        cdd_s = cas.FloatVariable(name="cdd")
+        m = data = a_s * b_s**2 * c_s**3
+        jac = m.second_order_total_derivative(
+            [a_s, b_s, c_s], [ad_s, bd_s, cd_s], [add_s, bdd_s, cdd_s]
+        )
+        actual = jac.compile().call_with_kwargs(**kwargs)
+        expected = (
+            bdd * 2 * a * c**3
+            + cdd * 6 * a * b**2 * c
+            + 4 * ad * bd * b * c**3
+            + 6 * ad * b**2 * cd * c**2
+            + 12 * a * bd * b * cd * c**2
+        )
+        assert np.allclose(actual, expected)
 
 
 class TestMatrix:

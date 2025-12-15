@@ -70,7 +70,7 @@ class CartesianPoseStraight(Goal):
         obs_expressions = []
         for task in self.tasks:
             obs_expressions.append(task.observation_expression)
-        self.observation_expression = cas.logic_and(*obs_expressions)
+        self.observation_expression = cas.logic_all(*obs_expressions)
 
 
 @dataclass
