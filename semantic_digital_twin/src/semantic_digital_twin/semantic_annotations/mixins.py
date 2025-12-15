@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from enum import IntEnum, Enum
+from enum import Enum
 from functools import reduce
 from operator import or_
 from typing import (
@@ -20,7 +20,7 @@ from numpy._typing import NDArray
 from probabilistic_model.probabilistic_circuit.rx.helper import (
     uniform_measure_of_simple_event,
 )
-from random_events.interval import closed, SimpleInterval, Bound
+from random_events.interval import SimpleInterval, Bound
 from random_events.product_algebra import SimpleEvent, Event
 from random_events.variable import Continuous
 from typing_extensions import TYPE_CHECKING, assert_never
@@ -44,7 +44,7 @@ from ..world_description.world_entity import (
     SemanticAnnotation,
     Body,
     Region,
-    Connection,
+    KinematicStructureEntity,
 )
 
 if TYPE_CHECKING:
@@ -52,6 +52,7 @@ if TYPE_CHECKING:
         Drawer,
         Door,
         Handle,
+        Hinge,
     )
 
 
@@ -206,8 +207,34 @@ class HasBody(SemanticAnnotation, ABC):
     @classmethod
     @abstractmethod
     def create_with_new_body_in_world(
-        cls, name: PrefixedName, world: World, connection: Connection, *args, **kwargs
+        cls,
+        name: PrefixedName,
+        world: World,
+        parent: Optional[KinematicStructureEntity] = None,
+        parent_T_self: Optional[TransformationMatrix] = None,
+        **kwargs,
     ) -> Self: ...
+
+    @classmethod
+    def _create_with_fixed_connection_in_world(cls, world, body, parent, parent_T_self):
+        self_instance = cls(body=body)
+        parent = parent if parent is not None else world.root
+        parent_T_self = (
+            parent_T_self if parent_T_self is not None else TransformationMatrix()
+        )
+
+        with world.modify_world():
+            world.add_semantic_annotation(self_instance)
+            world.add_body(body)
+            if parent is not None:
+                parent_C_self = FixedConnection(
+                    parent=parent,
+                    child=body,
+                    parent_T_connection_expression=parent_T_self,
+                )
+                world.add_connection(parent_C_self)
+
+        return self_instance
 
 
 @dataclass(eq=False)
@@ -227,43 +254,13 @@ class HasRegion(SemanticAnnotation, ABC):
 
 
 @dataclass
-class _HasActiveConnection(ABC):
+class HasActiveConnection(ABC):
 
-    connection_T_child: TransformationMatrix
-
-    def _create_door_upper_lower_limits(
-        self, parent_T_hinge: TransformationMatrix, opening_axis: Vector3
-    ) -> Tuple[DerivativeMap[float], DerivativeMap[float]]:
-        """
-        Return the upper and lower limits for the door's degree of freedom.
-
-        :param parent_T_hinge: The transformation matrix defining the door's pivot point relative to the parent world.
-        :param opening_axis: The axis around which the door opens.
-
-        :return: The upper and lower limits for the door's degree of freedom.
-        """
-
-        # upper and lower limit need to be chosen based on the pivot point of the door
-        match opening_axis.to_np().tolist():
-            case [0, 1, 0, 0]:
-                sign = np.sign(parent_T_hinge.to_position().to_np()[2])
-                lower_limit_position, upper_limit_position = (
-                    (-np.pi / 2, 0) if sign > 0 else (0, np.pi / 2)
-                )
-            case [0, 0, 1, 0]:
-                sign = np.sign(parent_T_hinge.to_position().to_np()[1])
-                lower_limit_position, upper_limit_position = (
-                    (-np.pi / 2, 0) if sign < 0 else (0, np.pi / 2)
-                )
-            case _:
-                raise InvalidAxisError(axis=opening_axis)
-
-        lower_limits = DerivativeMap[float]()
-        upper_limits = DerivativeMap[float]()
-        lower_limits.position = lower_limit_position
-        upper_limits.position = upper_limit_position
-
-        return upper_limits, lower_limits
+    @classmethod
+    @abstractmethod
+    def create_default_upper_lower_limits(
+        cls, *args, **kwargs
+    ) -> Tuple[DerivativeMap, DerivativeMap]: ...
 
     @staticmethod
     def _create_drawer_upper_lower_limits(
@@ -283,7 +280,143 @@ class _HasActiveConnection(ABC):
 
 
 @dataclass(eq=False)
-class HasDrawers(_HasActiveConnection):
+class HasRevoluteConnection(HasActiveConnection):
+
+    @classmethod
+    def create_default_upper_lower_limits(
+        cls, parent_T_child: TransformationMatrix, axis: Vector3
+    ) -> Tuple[DerivativeMap[float], DerivativeMap[float]]:
+        """
+        Return the upper and lower limits for the door's degree of freedom.
+
+        :param parent_T_hinge: The transformation matrix defining the door's pivot point relative to the parent world.
+        :param opening_axis: The axis around which the door opens.
+
+        :return: The upper and lower limits for the door's degree of freedom.
+        """
+
+        # upper and lower limit need to be chosen based on the pivot point of the door
+        match axis.to_np().tolist():
+            case [0, 1, 0, 0]:
+                sign = np.sign(parent_T_child.to_position().to_np()[2])
+                lower_limit_position, upper_limit_position = (
+                    (-np.pi / 2, 0) if sign > 0 else (0, np.pi / 2)
+                )
+            case [0, 0, 1, 0]:
+                sign = np.sign(parent_T_child.to_position().to_np()[1])
+                lower_limit_position, upper_limit_position = (
+                    (-np.pi / 2, 0) if sign < 0 else (0, np.pi / 2)
+                )
+            case _:
+                raise InvalidAxisError(axis=axis)
+
+        lower_limits = DerivativeMap[float]()
+        upper_limits = DerivativeMap[float]()
+        lower_limits.position = lower_limit_position
+        upper_limits.position = upper_limit_position
+
+        return upper_limits, lower_limits
+
+
+@dataclass(eq=False)
+class HasHinge(HasActiveConnection, ABC):
+    """
+    A mixin class for semantic annotations that have hinge joints.
+    """
+
+    hinge: Optional[Hinge] = field(init=False, default=None)
+
+    def add_hinge(
+        self: HasBody | Self,
+        parent_world: World,
+        hinge_T_self: TransformationMatrix,
+        opening_axis: Vector3,
+        connection_limits: Optional[
+            Tuple[DerivativeMap[float], DerivativeMap[float]]
+        ] = None,
+        connection_multiplier: float = 1.0,
+        connection_offset: float = 0.0,
+        parent: Optional[KinematicStructureEntity] = None,
+    ):
+        """
+        Adds a door to the parent world using a new door hinge body with a revolute connection.
+
+        :param door_factory: The factory used to create the door.
+        :param parent_T_hinge: The transformation matrix defining the door's position and orientation relative
+        to the parent world.
+        :param parent_world: The world to which the door will be added.
+        """
+        parent = parent_world.root if parent is None else parent
+
+        if parent._world != parent_world:
+            raise ValueError(
+                "Parent world does not match the world of the parent kinematic structure entity."
+            )
+
+        if connection_limits is not None:
+            if connection_limits[0].position <= connection_limits[1].position:
+                raise ValueError("Upper limit must be greater than lower limit.")
+        else:
+            connection_limits = self._create_door_upper_lower_limits(
+                parent_T_hinge, opening_axis
+            )
+
+        with parent_world.modify_world():
+            hinge_body = self._add_hinge_to_world(
+                parent,
+                parent_T_hinge,
+                opening_axis,
+                connection_limits,
+                connection_multiplier,
+                connection_offset,
+            )
+            hinge_C_child = FixedConnection(hinge_body, self.body, hinge_T_child)
+            parent_world.add_connection(hinge_C_child)
+
+    def _add_hinge_to_world(
+        self: HasBody | Self,
+        parent: KinematicStructureEntity,
+        parent_T_hinge: TransformationMatrix,
+        opening_axis: Vector3,
+        connection_limits,
+        multiplier: float = 1.0,
+        offset: float = 0.0,
+    ):
+        """
+        Adds a hinge to the door. The hinge's pivot point is on the opposite side of the handle.
+        :param door_factory: The factory used to create the door.
+        :param parent_T_door: The transformation matrix defining the door's position and orientation relative
+        :param opening_axis: The axis around which the door opens.
+        """
+        parent_world = parent._world
+        hinge_body = Body(
+            name=PrefixedName(f"{self.name.name}_hinge", self.name.prefix)
+        )
+
+        dof = DegreeOfFreedom(
+            name=PrefixedName(f"{self.name.name}_hinge_dof", self.name.prefix),
+            upper_limits=connection_limits[0],
+            lower_limits=connection_limits[1],
+        )
+
+        parent_world.add_degree_of_freedom(dof)
+        parent_C_hinge = RevoluteConnection(
+            parent=parent_world.root,
+            child=hinge_body,
+            parent_T_connection_expression=parent_T_hinge,
+            multiplier=multiplier,
+            offset=offset,
+            axis=opening_axis,
+            dof_id=dof.id,
+        )
+
+        parent_world.add_connection(parent_C_hinge)
+
+        return hinge_body
+
+
+@dataclass(eq=False)
+class HasDrawers(HasActiveConnection):
     """
     A mixin class for semantic annotations that have drawers.
     """
@@ -329,17 +462,17 @@ class HasDrawers(_HasActiveConnection):
 
 
 @dataclass(eq=False)
-class HasDoors(_HasActiveConnection):
+class HasDoors(HasActiveConnection):
     """
     A mixin class for semantic annotations that have doors.
     """
 
     doors: List[Door] = field(default_factory=list, hash=False, kw_only=True)
 
-    def add_door(
+    def add_door_to_world(
         self,
-        door_factory: DoorFactory,
-        parent_T_door: TransformationMatrix,
+        door_factory: Door,
+        hinge_T_door: TransformationMatrix,
         opening_axis: Vector3,
         parent_world: World,
     ):
@@ -351,40 +484,15 @@ class HasDoors(_HasActiveConnection):
         to the parent world.
         :param parent_world: The world to which the door will be added.
         """
-        with parent_world.modify_world():
-            door_world, parent_T_hinge = self._add_hinge_to_door(
-                door_factory, parent_T_door, opening_axis
-            )
 
-            upper_limits, lower_limits = self._create_door_upper_lower_limits(
-                parent_T_hinge, opening_axis
-            )
+        self._add_door_to_world(door_factory, hinge_T_door, opening_axis, parent_world)
 
-            root = door_world.root
-            dof = DegreeOfFreedom(
-                name=PrefixedName(f"{root.name.name}_connection", root.name.prefix),
-                lower_limits=lower_limits,
-                upper_limits=upper_limits,
-            )
-            with parent_world.modify_world():
-                parent_world.add_degree_of_freedom(dof)
-                connection = RevoluteConnection(
-                    parent=parent_world.root,
-                    child=root,
-                    parent_T_connection_expression=parent_T_hinge,
-                    multiplier=1.0,
-                    offset=0.0,
-                    axis=opening_axis,
-                    dof_id=dof.id,
-                )
-
-                parent_world.merge_world(door_world, connection)
-
-    def _add_hinge_to_door(
+    def _add_door_to_world(
         self,
-        door_factory: DoorFactory,
-        parent_T_door: TransformationMatrix,
+        door_factory: Door,
+        hinge_T_door: TransformationMatrix,
         opening_axis: Vector3,
+        parent_world: World,
     ):
         """
         Adds a hinge to the door. The hinge's pivot point is on the opposite side of the handle.
@@ -403,11 +511,11 @@ class HasDoors(_HasActiveConnection):
         )
         parent_T_hinge = self._calculate_door_pivot_point(
             semantic_door_annotation,
-            parent_T_door,
+            hinge_T_door,
             door_factory.scale,
             opening_axis,
         )
-        hinge_T_door = parent_T_hinge.inverse() @ parent_T_door
+        hinge_T_door = parent_T_hinge.inverse() @ hinge_T_door
 
         hinge_door_connection = FixedConnection(
             parent=door_hinge,
@@ -459,6 +567,30 @@ class HasDoors(_HasActiveConnection):
         )
 
         return parent_T_hinge
+
+
+@dataclass(eq=False)
+class HasLeftRightDoor(HasDoors):
+
+    def add_door_to_world(
+        self,
+        door_factory: Door,
+        parent_T_door: TransformationMatrix,
+        opening_axis: Vector3,
+        parent_world: World,
+    ):
+        raise NotImplementedError(
+            "To add a door to a annotation inheriting from HasLeftRightDoor, please use add_right_door_to_world or add_left_door_to_world respectively"
+        )
+
+    def add_right_door_to_world(
+        self,
+        door_factory: Door,
+        parent_T_door: TransformationMatrix,
+        opening_axis: Vector3,
+        parent_world: World,
+    ):
+        self._add_door_to_world(door_factory, parent_T_door, opening_axis, parent_world)
 
 
 HandlePosition = Union[SemanticPositionDescription, TransformationMatrix]

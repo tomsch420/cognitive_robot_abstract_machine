@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC
 from dataclasses import dataclass, field
-from typing import Iterable, Optional, Self
+from typing import Iterable, Optional, Self, Tuple
 
 import numpy as np
 from probabilistic_model.probabilistic_circuit.rx.helper import uniform_measure_of_event
@@ -20,17 +20,26 @@ from .mixins import (
     HasDoors,
     HasHandle,
     HasCorpus,
+    HasHinge,
+    HasActiveConnection,
+    HasRevoluteConnection,
 )
 from ..datastructures.prefixed_name import PrefixedName
 from ..datastructures.variables import SpatialVariables
+from ..exceptions import InvalidDoorDimensions
 from ..reasoning.predicates import InsideOf
-from ..spatial_types import Point3
+from ..spatial_types import Point3, TransformationMatrix, Vector3
+from ..spatial_types.derivatives import DerivativeMap
 from ..utils import Direction
+from ..world import World
+from ..world_description.connections import FixedConnection, RevoluteConnection
+from ..world_description.degree_of_freedom import DegreeOfFreedom
 from ..world_description.geometry import Scale
 from ..world_description.shape_collection import BoundingBoxCollection
 from ..world_description.world_entity import (
     SemanticAnnotation,
     Body,
+    KinematicStructureEntity,
 )
 
 
@@ -51,7 +60,14 @@ class Handle(HasBody):
 
     @classmethod
     def create_with_new_body_in_world(
-        cls, name: PrefixedName, scale: Scale, thickness: float
+        cls,
+        name: PrefixedName,
+        world: World,
+        parent: Optional[KinematicStructureEntity] = None,
+        parent_T_self: Optional[TransformationMatrix] = None,
+        *,
+        scale: Scale = Scale(0.1, 0.02, 0.02),
+        thickness: float = 0.005,
     ) -> Self:
         handle_event = cls._create_handle_geometry(scale=scale).as_composite_set()
 
@@ -61,10 +77,15 @@ class Handle(HasBody):
 
         handle_event -= inner_box
 
-        handle = Body(name=name)
-        collision = BoundingBoxCollection.from_event(handle, handle_event).as_shapes()
-        handle.collision = collision
-        handle.visual = collision
+        handle_body = Body(name=name)
+        collision = BoundingBoxCollection.from_event(
+            handle_body, handle_event
+        ).as_shapes()
+        handle_body.collision = collision
+        handle_body.visual = collision
+        return cls._create_with_fixed_connection_in_world(
+            world, handle_body, parent, parent_T_self
+        )
 
     @classmethod
     def _create_handle_geometry(
@@ -117,7 +138,61 @@ class Aperture(HasRegion):
 
 
 @dataclass(eq=False)
-class Door(HasBody, HasHandle):
+class Hinge(HasBody, HasRevoluteConnection):
+    """
+    A hinge is a physical entity that connects two bodies and allows one to rotate around a fixed axis.
+    """
+
+    @classmethod
+    def create_with_new_body_in_world(
+        cls,
+        name: PrefixedName,
+        world: World,
+        parent: Optional[KinematicStructureEntity] = None,
+        parent_T_self: Optional[TransformationMatrix] = None,
+        *,
+        opening_axis: Vector3 = Vector3.Z(),
+        connection_limits: Optional[
+            Tuple[DerivativeMap[float], DerivativeMap[float]]
+        ] = None,
+        connection_multiplier: float = 1.0,
+        connection_offset: float = 0.0,
+    ) -> Self:
+        hinge_body = Body(name=name)
+        parent_world = parent._world
+
+        if connection_limits is not None:
+            if connection_limits[0].position <= connection_limits[1].position:
+                raise ValueError("Upper limit must be greater than lower limit.")
+        else:
+            connection_limits = cls.create_default_upper_lower_limits(
+                parent_T_self, opening_axis
+            )
+
+        dof = DegreeOfFreedom(
+            name=PrefixedName(f"{name.name}_hinge_dof", name.prefix),
+            upper_limits=connection_limits[0],
+            lower_limits=connection_limits[1],
+        )
+
+        parent_world.add_degree_of_freedom(dof)
+        parent_C_hinge = RevoluteConnection(
+            parent=parent_world.root,
+            child=hinge_body,
+            parent_T_connection_expression=parent_T_self,
+            multiplier=connection_multiplier,
+            offset=connection_offset,
+            axis=opening_axis,
+            dof_id=dof.id,
+        )
+
+        parent_world.add_connection(parent_C_hinge)
+
+        return hinge_body
+
+
+@dataclass(eq=False)
+class Door(HasBody, HasHandle, HasHinge):
     """
     A door is a physical entity that has covers an opening, has a movable body and a handle.
     """
@@ -126,20 +201,30 @@ class Door(HasBody, HasHandle):
     def create_with_new_body_in_world(
         cls,
         name: PrefixedName,
-        scale: Scale,
+        world: World,
+        parent: Optional[KinematicStructureEntity] = None,
+        parent_T_self: Optional[TransformationMatrix] = None,
+        *,
+        scale: Scale = Scale(0.03, 1, 2),
     ) -> Self:
-        door_event = scale.to_simple_event().as_composite_set()
-        body = Body(name=name)
-        bounding_box_collection = BoundingBoxCollection.from_event(body, door_event)
-        collision = bounding_box_collection.as_shapes()
-        body.collision = collision
-        body.visual = collision
+        if not (scale.x < scale.y and scale.x < scale.z):
+            raise InvalidDoorDimensions(scale)
 
-        return cls(body=body)
+        door_event = scale.to_simple_event().as_composite_set()
+        door_body = Body(name=name)
+        bounding_box_collection = BoundingBoxCollection.from_event(
+            door_body, door_event
+        )
+        collision = bounding_box_collection.as_shapes()
+        door_body.collision = collision
+        door_body.visual = collision
+        return cls._create_with_fixed_connection_in_world(
+            world, door_body, parent, parent_T_self
+        )
 
 
 @dataclass(eq=False)
-class DoubleDoor(SemanticAnnotation):
+class DoubleDoor(HasDoors):
     left_door: Door
     right_door: Door
 

@@ -97,6 +97,9 @@ class Scale(SubclassJSONSerializer):
     The scale in the z direction.
     """
 
+    def __hash__(self):
+        return hash((self.x, self.y, self.z))
+
     def to_json(self) -> Dict[str, Any]:
         return {**super().to_json(), "x": self.x, "y": self.y, "z": self.z}
 

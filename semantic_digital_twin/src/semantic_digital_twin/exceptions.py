@@ -20,6 +20,7 @@ from .datastructures.prefixed_name import PrefixedName
 
 if TYPE_CHECKING:
     from .world import World
+    from .world_description.geometry import Scale
     from .world_description.world_entity import (
         SemanticAnnotation,
         WorldEntity,
@@ -98,6 +99,16 @@ class UsageError(LogicalError):
     """
     An exception raised when an incorrect usage of the API is encountered.
     """
+
+
+@dataclass
+class InvalidDoorDimensions(UsageError):
+
+    scale: Scale
+
+    def __post_init__(self):
+        msg = f"The depth of a door must be less than its width or height. This doesnt hold for your door with dimensions {self.scale}"
+        super().__init__(msg)
 
 
 @dataclass
