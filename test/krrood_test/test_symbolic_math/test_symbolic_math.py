@@ -333,7 +333,7 @@ class TestFloatVariable:
 
     def test_float_casting(self):
         v = cas.FloatVariable(name="v")
-        with pytest.raises(TypeError):
+        with pytest.raises(HasFreeVariablesError):
             # noinspection PyTypeChecker
             float(v)
 
@@ -841,6 +841,11 @@ class TestScalar:
         f1 = cas.Scalar(23)
         f2 = cas.Scalar(69)
         assert np.allclose(cas.min(f1, f2), min(f1, f2))
+
+    def test_negative(self):
+        f1 = cas.Scalar(23)
+        assert np.allclose(-f1, -float(f1))
+        assert isinstance(-f1, cas.Scalar)
 
     def test_save_division(self):
         f1, f2 = 23, 69

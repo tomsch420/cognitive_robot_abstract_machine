@@ -74,71 +74,6 @@ class VariableParameters:
         return cls(groups=tuple(VariableGroup(tuple(g)) for g in groups))
 
 
-class _BaseArithmeticMixin:
-    """
-    Provides generic elementwise arithmetic operator implementations by lifting to
-    CasADi SX and delegating to operations, then wrapping the result via `_wrap`.
-    """
-
-    _wrap: ClassVar[Callable[[ca.SX], Any]]
-
-    def _binary(self, other, op: Callable[[ca.SX, ca.SX], ca.SX]):
-        if not isinstance(other, ScalarData):
-            return NotImplemented
-        a = to_sx(self)
-        b = to_sx(other)
-        return self._wrap(op(a, b))
-
-    def _rbinary(self, other, op: Callable[[ca.SX, ca.SX], ca.SX]):
-        if not isinstance(other, ScalarData):
-            return NotImplemented
-        a = to_sx(other)
-        b = to_sx(self)
-        return self._wrap(op(a, b))
-
-    def __add__(self, other: ScalarData) -> Scalar:
-        return self._binary(other, operator.add)
-
-    def __radd__(self, other: ScalarData) -> Scalar:
-        return self._rbinary(other, operator.add)
-
-    def __sub__(self, other: ScalarData) -> Scalar:
-        return self._binary(other, operator.sub)
-
-    def __rsub__(self, other: ScalarData) -> Scalar:
-        return self._rbinary(other, operator.sub)
-
-    def __mul__(self, other: ScalarData) -> Scalar:
-        return self._binary(other, operator.mul)
-
-    def __rmul__(self, other: ScalarData) -> Scalar:
-        return self._rbinary(other, operator.mul)
-
-    def __truediv__(self, other: ScalarData) -> Scalar:
-        return self._binary(other, operator.truediv)
-
-    def __rtruediv__(self, other: ScalarData) -> Scalar:
-        return self._rbinary(other, operator.truediv)
-
-    def __pow__(self, other: ScalarData) -> Scalar:
-        return self._binary(other, operator.pow)
-
-    def __rpow__(self, other: ScalarData) -> Scalar:
-        return self._rbinary(other, operator.pow)
-
-    def __floordiv__(self, other: ScalarData) -> Scalar:
-        return self._binary(other, lambda a, b: ca.floor(to_sx(a) / to_sx(b)))
-
-    def __rfloordiv__(self, other: ScalarData) -> Scalar:
-        return self._rbinary(other, lambda a, b: ca.floor(to_sx(a) / to_sx(b)))
-
-    def __mod__(self, other: ScalarData) -> Scalar:
-        return self._binary(other, ca.fmod)
-
-    def __rmod__(self, other: ScalarData) -> Scalar:
-        return self._rbinary(other, ca.fmod)
-
-
 class _DenseLayout:
     """Strategy for dense compiled function setup."""
 
@@ -652,99 +587,6 @@ class SymbolicMathType(Symbol):
 
 
 @dataclass(eq=False)
-class FloatVariable(SymbolicMathType, _BaseArithmeticMixin):
-    """
-    A symbolic expression representing a single float variable.
-    No matrix and no numbers.
-    """
-
-    _wrap: ClassVar[Callable[[ca.SX], Scalar]] = staticmethod(
-        lambda sx: Scalar.from_casadi_sx(sx)
-    )
-
-    name: str = field(kw_only=True)
-
-    casadi_sx: ca.SX = field(kw_only=True, init=False, default=None)
-
-    _registry: ClassVar[Dict[ca.SX, FloatVariable]] = {}
-    """
-    Keeps track of which FloatVariable instances are associated with which which casadi.SX instances.
-    Needed to recreate the FloatVariables from a casadi expression.
-    .. warning:: Does not ensure that two FloatVariable instances are identical.
-    """
-
-    def __post_init__(self):
-        self.casadi_sx = ca.SX.sym(str(self.name))
-        self._registry[self.casadi_sx] = self
-
-    def __str__(self):
-        return str(self.name)
-
-    def __repr__(self):
-        return f"Variable({self})"
-
-    def __hash__(self):
-        return hash(self.casadi_sx)
-
-    def resolve(self) -> float:
-        """
-        This method is called by SymbolicType.evaluate().
-        Subclasses should override this method to return the current float value for this variable.
-        :return: This variables' current value.
-        """
-        return np.nan
-
-    def __bool__(self) -> bool:
-        """
-        Python's default behavior would be to return True, because the object is not None.
-        We don't want that, given that constant Expressions are properly evaluated.
-        """
-        raise HasFreeVariablesError(self.free_variables())
-
-    def __neg__(self) -> Scalar:
-        return Scalar.from_casadi_sx(self.casadi_sx.__neg__())
-
-    # %% Boolean operations
-    def is_const_true(self) -> bool:
-        return False
-
-    def is_const_unknown(self) -> bool:
-        return False
-
-    def is_const_false(self) -> bool:
-        return False
-
-    def __invert__(self) -> Scalar:
-        return Scalar.from_casadi_sx(ca.logic_not(self.casadi_sx))
-
-    def __and__(self, other: Scalar | FloatVariable) -> Scalar:
-        if other.is_const_false():
-            return other
-        return Scalar.from_casadi_sx(ca.logic_or(self.casadi_sx, other.casadi_sx))
-
-    def __or__(self, other: Scalar | FloatVariable) -> Scalar:
-        if other.is_const_true():
-            return other
-        return Scalar.from_casadi_sx(ca.logic_or(self.casadi_sx, other.casadi_sx))
-
-    # %% Comparison operations
-    def __eq__(self, other: Scalar | FloatVariable) -> Scalar:
-        return Scalar.from_casadi_sx(self.casadi_sx.__eq__(other.casadi_sx))
-
-    def __le__(self, other: Scalar | FloatVariable) -> Scalar:
-        return Scalar.from_casadi_sx(self.casadi_sx.__le__(other.casadi_sx))
-
-    def __lt__(self, other: Scalar | FloatVariable) -> Scalar:
-        return Scalar.from_casadi_sx(self.casadi_sx.__lt__(other.casadi_sx))
-
-    def __ge__(self, other: Scalar | FloatVariable) -> Scalar:
-        return Scalar.from_casadi_sx(self.casadi_sx.__ge__(other.casadi_sx))
-
-    def __gt__(self, other: Scalar | FloatVariable) -> Scalar:
-        return Scalar.from_casadi_sx(self.casadi_sx.__gt__(other.casadi_sx))
-
-
-@dataclass(eq=False)
 class Expression(SymbolicMathType):
     """
     Represents symbolic expressions with rich mathematical capabilities, including matrix
@@ -938,11 +780,7 @@ class Expression(SymbolicMathType):
 
 
 @dataclass(eq=False, init=False)
-class Scalar(Expression, _BaseArithmeticMixin):
-    _wrap: ClassVar[Callable[[ca.SX], Scalar]] = staticmethod(
-        lambda sx: Scalar.from_casadi_sx(sx)
-    )
-
+class Scalar(Expression):
     def __init__(self, data: ScalarData = 0):
         self.casadi_sx = to_sx(data)
         self.verify_scalar()
@@ -999,6 +837,9 @@ class Scalar(Expression, _BaseArithmeticMixin):
             right = self.casadi_sx.dep(1)
             return ca.is_equal(ca.simplify(left), ca.simplify(right), 5)
         raise HasFreeVariablesError(self.free_variables())
+
+    def __neg__(self) -> Scalar:
+        return Scalar.from_casadi_sx(self.casadi_sx.__neg__())
 
     def __invert__(self) -> Scalar:
         return Scalar.from_casadi_sx(ca.logic_not(self.casadi_sx))
@@ -1080,6 +921,102 @@ class Scalar(Expression, _BaseArithmeticMixin):
         """
         expressions = self.casadi_sx
         return Matrix(ca.hessian(expressions, to_sx(variables))[0])
+
+    def _binary(self, other, op: Callable[[ca.SX, ca.SX], ca.SX]):
+        if not isinstance(other, ScalarData):
+            return NotImplemented
+        a = to_sx(self)
+        b = to_sx(other)
+        return Scalar.from_casadi_sx(op(a, b))
+
+    def _rbinary(self, other, op: Callable[[ca.SX, ca.SX], ca.SX]):
+        if not isinstance(other, ScalarData):
+            return NotImplemented
+        a = to_sx(other)
+        b = to_sx(self)
+        return Scalar.from_casadi_sx(op(a, b))
+
+    def __add__(self, other: ScalarData) -> Scalar:
+        return self._binary(other, operator.add)
+
+    def __radd__(self, other: ScalarData) -> Scalar:
+        return self._rbinary(other, operator.add)
+
+    def __sub__(self, other: ScalarData) -> Scalar:
+        return self._binary(other, operator.sub)
+
+    def __rsub__(self, other: ScalarData) -> Scalar:
+        return self._rbinary(other, operator.sub)
+
+    def __mul__(self, other: ScalarData) -> Scalar:
+        return self._binary(other, operator.mul)
+
+    def __rmul__(self, other: ScalarData) -> Scalar:
+        return self._rbinary(other, operator.mul)
+
+    def __truediv__(self, other: ScalarData) -> Scalar:
+        return self._binary(other, operator.truediv)
+
+    def __rtruediv__(self, other: ScalarData) -> Scalar:
+        return self._rbinary(other, operator.truediv)
+
+    def __pow__(self, other: ScalarData) -> Scalar:
+        return self._binary(other, operator.pow)
+
+    def __rpow__(self, other: ScalarData) -> Scalar:
+        return self._rbinary(other, operator.pow)
+
+    def __floordiv__(self, other: ScalarData) -> Scalar:
+        return self._binary(other, lambda a, b: ca.floor(to_sx(a) / to_sx(b)))
+
+    def __rfloordiv__(self, other: ScalarData) -> Scalar:
+        return self._rbinary(other, lambda a, b: ca.floor(to_sx(a) / to_sx(b)))
+
+    def __mod__(self, other: ScalarData) -> Scalar:
+        return self._binary(other, ca.fmod)
+
+    def __rmod__(self, other: ScalarData) -> Scalar:
+        return self._rbinary(other, ca.fmod)
+
+
+@dataclass(eq=False, init=False)
+class FloatVariable(Scalar):
+    """
+    A symbolic expression representing a single float variable.
+    No matrix and no numbers.
+    """
+
+    name: str = field(kw_only=True)
+
+    _registry: ClassVar[Dict[ca.SX, FloatVariable]] = {}
+    """
+    Keeps track of which FloatVariable instances are associated with which which casadi.SX instances.
+    Needed to recreate the FloatVariables from a casadi expression.
+    .. warning:: Does not ensure that two FloatVariable instances are identical.
+    """
+
+    def __init__(self, name: str):
+        self.name = name
+        casadi_sx = ca.SX.sym(self.name)
+        self._registry[casadi_sx] = self
+        super().__init__(casadi_sx)
+
+    def __str__(self):
+        return str(self.name)
+
+    def __repr__(self):
+        return f"Variable({self})"
+
+    def __hash__(self):
+        return hash(self.casadi_sx)
+
+    def resolve(self) -> float:
+        """
+        This method is called by SymbolicType.evaluate().
+        Subclasses should override this method to return the current float value for this variable.
+        :return: This variables' current value.
+        """
+        return np.nan
 
 
 @dataclass(eq=False)
