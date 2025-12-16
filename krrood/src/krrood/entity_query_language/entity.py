@@ -61,9 +61,7 @@ def entity(selected_variable: T) -> Entity[T]:
     return Entity(_selected_variables=[selected_variable])
 
 
-def set_of(
-    *selected_variables: Selectable,
-) -> SetOf:
+def set_of(*selected_variables: Union[Selectable[T], Any]) -> SetOf:
     """
     Create a set descriptor for the selected variables.
 
