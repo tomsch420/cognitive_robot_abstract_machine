@@ -952,7 +952,7 @@ class QueryObjectDescriptor(SymbolicExpression[T], ABC):
         :param on: The variables to be used for distinctness.
         :return: This query object descriptor.
         """
-        on_ids = tuple([v._var_._id_ for v in on]) if on else tuple()
+        on_ids = tuple([v._var_._id_ for v in on]) if on else tuple([v._var_._id_ for v in self._selected_variables])
         seen_results = SeenSet(keys=on_ids)
 
         def get_distinct_results(
