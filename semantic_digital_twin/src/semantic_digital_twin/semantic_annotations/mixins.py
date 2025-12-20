@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from types import new_class
 
 import numpy as np
 import trimesh
@@ -23,7 +22,6 @@ from typing_extensions import (
 from krrood.ormatic.utils import classproperty
 from ..datastructures.prefixed_name import PrefixedName
 from ..datastructures.variables import SpatialVariables
-from ..exceptions import InvalidAxisError
 from ..spatial_types import Point3, TransformationMatrix, Vector3
 from ..spatial_types.derivatives import DerivativeMap
 from ..utils import Direction
@@ -34,7 +32,7 @@ from ..world_description.connections import (
     PrismaticConnection,
     ActiveConnection1DOF,
 )
-from ..world_description.degree_of_freedom import DegreeOfFreedom
+from ..world_description.degree_of_freedom import DegreeOfFreedomLimits
 from ..world_description.geometry import Scale
 from ..world_description.shape_collection import BoundingBoxCollection
 from ..world_description.world_entity import (
@@ -227,9 +225,7 @@ class SemanticAssociation(ABC):
         self: HasRootBody | Self,
         new_parent_entity: KinematicStructureEntity,
         connection_type: Type[ActiveConnection1DOF],
-        connection_limits: Optional[
-            Tuple[DerivativeMap[float], DerivativeMap[float]]
-        ] = None,
+        connection_limits: Optional[DegreeOfFreedomLimits] = None,
         active_axis: Vector3 = Vector3.Z(),
         connection_multiplier: float = 1.0,
         connection_offset: float = 0.0,
@@ -242,22 +238,6 @@ class SemanticAssociation(ABC):
         world = self._world
         new_parent_T_self = self.get_new_parent_T_self(new_parent_entity)
         new_grandparent = self.get_new_grandparent(new_parent_entity)
-
-        if connection_limits is not None:
-            if connection_limits[0].position <= connection_limits[1].position:
-                raise ValueError("Upper limit must be greater than lower limit.")
-        else:
-            if connection_type == RevoluteConnection:
-                connection_limits = self.create_default_upper_lower_limits(
-                    new_parent_T_self, active_axis
-                )
-            elif connection_type == PrismaticConnection:
-                bounding_box = self.body.collision.as_bounding_box_collection_in_frame(
-                    self.body
-                ).bounding_box()
-                connection_limits = self.create_default_upper_lower_limits(
-                    bounding_box.scale, active_axis
-                )
 
         with world.modify_world():
             parent_C_self = self.body.parent_connection
@@ -287,9 +267,8 @@ class SemanticAssociation(ABC):
                     multiplier=connection_multiplier,
                     offset=connection_offset,
                     axis=active_axis,
+                    limits=connection_limits,
                 )
-                new_grandparent_C_new_parent.dof.upper_limit = connection_limits[0]
-                new_grandparent_C_new_parent.dof.lower_limit = connection_limits[1]
             else:
                 new_grandparent_C_new_parent = FixedConnection(
                     parent=new_grandparent,
@@ -302,9 +281,7 @@ class SemanticAssociation(ABC):
         self: HasRootBody | Self,
         child_kinematic_structure_entity: KinematicStructureEntity,
         connection_type: Type[Connection],
-        connection_limits: Optional[
-            Tuple[DerivativeMap[float], DerivativeMap[float]]
-        ] = None,
+        connection_limits: Optional[DegreeOfFreedomLimits] = None,
         active_axis: Vector3 = Vector3.Z(),
         connection_multiplier: float = 1.0,
         connection_offset: float = 0.0,
@@ -314,22 +291,6 @@ class SemanticAssociation(ABC):
 
         world = self._world
         self_T_new_child = self.get_self_T_new_child(child_kinematic_structure_entity)
-
-        if connection_limits is not None:
-            if connection_limits[0].position <= connection_limits[1].position:
-                raise ValueError("Upper limit must be greater than lower limit.")
-        else:
-            if connection_type == RevoluteConnection:
-                connection_limits = self.create_default_upper_lower_limits(
-                    self_T_new_child, active_axis
-                )
-            elif connection_type == PrismaticConnection:
-                bounding_box = self.body.collision.as_bounding_box_collection_in_frame(
-                    self.body
-                ).bounding_box()
-                connection_limits = self.create_default_upper_lower_limits(
-                    bounding_box.scale, active_axis
-                )
 
         with world.modify_world():
             parent_C_new_child = child_kinematic_structure_entity.parent_connection
@@ -344,9 +305,8 @@ class SemanticAssociation(ABC):
                     multiplier=connection_multiplier,
                     offset=connection_offset,
                     axis=active_axis,
+                    limits=connection_limits,
                 )
-                self_C_new_child.dof.upper_limit = connection_limits[0]
-                self_C_new_child.dof.lower_limit = connection_limits[1]
             else:
                 self_C_new_child = FixedConnection(
                     parent=self.body,
@@ -402,9 +362,7 @@ class HasHinge(HasRevoluteConnection, SemanticAssociation, ABC):
         self: HasRootBody | Self,
         hinge: Hinge,
         rotation_axis: Vector3 = Vector3.Z(),
-        connection_limits: Optional[
-            Tuple[DerivativeMap[float], DerivativeMap[float]]
-        ] = None,
+        connection_limits: Optional[DegreeOfFreedomLimits] = None,
         connection_multiplier: float = 1.0,
         connection_offset: float = 0.0,
     ):
@@ -439,9 +397,7 @@ class HasSlider(HasPrismaticConnection, SemanticAssociation, ABC):
         self: HasRootBody | Self,
         slider: Slider,
         translation_axis: Vector3 = Vector3.X(),
-        connection_limits: Optional[
-            Tuple[DerivativeMap[float], DerivativeMap[float]]
-        ] = None,
+        connection_limits: Optional[DegreeOfFreedomLimits] = None,
         connection_multiplier: float = 1.0,
         connection_offset: float = 0.0,
     ):

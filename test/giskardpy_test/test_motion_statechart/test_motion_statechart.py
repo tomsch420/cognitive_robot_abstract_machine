@@ -107,7 +107,10 @@ from semantic_digital_twin.world_description.connections import (
     FixedConnection,
     OmniDrive,
 )
-from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
+from semantic_digital_twin.world_description.degree_of_freedom import (
+    DegreeOfFreedom,
+    DegreeOfFreedomLimits,
+)
 from semantic_digital_twin.world_description.geometry import Cylinder
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
@@ -1943,7 +1946,9 @@ class TestOpenClose:
         door.add_handle(handle)
         door.add_hinge(
             hinge=hinge,
-            connection_limits=(upper_limits, lower_limits),
+            connection_limits=DegreeOfFreedomLimits(
+                lower_limit=lower_limits, upper_limit=upper_limits
+            ),
         )
 
         root_C_hinge = door.hinge.body.parent_connection
