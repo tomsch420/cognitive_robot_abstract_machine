@@ -36,7 +36,6 @@ from giskardpy.motion_statechart.goals.templates import Sequence
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from giskardpy.qp.qp_controller_config import QPControllerConfig
-from semantic_digital_twin.adapters.viz_marker import VizMarkerPublisher
 from semantic_digital_twin.datastructures.variables import SpatialVariables
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.spatial_types import Point3
@@ -63,6 +62,7 @@ from ..costmaps import (
     SemanticCostmap,
     GaussianCostmap,
     Costmap,
+    OrientationGenerator,
 )
 from ..datastructures.enums import (
     Arms,
@@ -76,10 +76,8 @@ from ..datastructures.pose import PoseStamped, GraspPose, PyCramVector3
 from ..designator import LocationDesignatorDescription
 from ..failures import RobotInCollision
 from ..pose_generator_and_validator import (
-    PoseGenerator,
     visibility_validator,
     pose_sequence_reachability_validator,
-    OrientationGenerator,
     collision_check,
 )
 from ..robot_description import ViewManager
@@ -357,8 +355,9 @@ class CostmapLocation(LocationDesignatorDescription):
             final_map = self.setup_costmaps(
                 target, params_box.visible_for, params_box.reachable_for
             )
+            final_map.number_of_samples = 600
 
-            for pose_candidate in PoseGenerator(final_map, number_of_samples=600):
+            for pose_candidate in final_map:
                 logger.debug(f"Testing candidate pose at {pose_candidate}")
                 pose_candidate.position.z = 0
                 test_robot.root.parent_connection.origin = (
@@ -611,14 +610,14 @@ class AccessingLocation(LocationDesignatorDescription):
             target_sequence = self.create_target_sequence(params_box, final_map)
             half_pose = target_sequence[1]
 
-            orientation_generator = lambda p, o: PoseGenerator.generate_orientation(
-                p, half_pose
+            orientation_generator = (
+                lambda p, o: OrientationGenerator.generate_origin_orientation(
+                    p, half_pose
+                )
             )
-            for pose_candidate in PoseGenerator(
-                final_map,
-                number_of_samples=600,
-                orientation_generator=orientation_generator,
-            ):
+            final_map.number_of_samples = 600
+            final_map.orientation_generator = orientation_generator
+            for pose_candidate in final_map:
                 pose_candidate.position.z = 0
                 test_robot.root.parent_connection.origin = (
                     pose_candidate.to_spatial_type()
@@ -730,7 +729,7 @@ class SemanticCostmapLocation(LocationDesignatorDescription):
                 min_z = min(np_points, key=lambda p: p[2])[2]
                 max_z = max(np_points, key=lambda p: p[2])[2]
                 height_offset = (max_z - min_z) / 2
-            for maybe_pose in PoseGenerator(self.sem_costmap):
+            for maybe_pose in self.sem_costmap:
                 maybe_pose.position.z += height_offset
                 yield maybe_pose
 
@@ -1651,24 +1650,27 @@ class GiskardLocation(LocationDesignatorDescription):
 
         for params in self.generate_permutations():
 
+            ground_pose = deepcopy(params["target_pose"])
+            ground_pose.position.z = 0.0
             occupancy_map = OccupancyCostmap(
                 resolution=0.02,
                 height=200,
                 width=200,
                 world=self.world,
                 robot_view=self.robot_view,
-                origin=params["target_pose"],
-                distance_to_obstacle=0.03,
+                origin=ground_pose,
+                distance_to_obstacle=0.3,
             )
             gaussian_map = GaussianCostmap(
                 resolution=0.02,
-                origin=params["target_pose"],
+                origin=ground_pose,
                 mean=200,
                 sigma=15,
                 world=self.world,
             )
 
             reachability_map = occupancy_map + gaussian_map
+            reachability_map.number_of_samples = 10
 
             ee = ViewManager.get_arm_view(self.arm, self.robot_view)
 
@@ -1690,7 +1692,7 @@ class GiskardLocation(LocationDesignatorDescription):
                 distance=0.1,
             )
 
-            for candidate in PoseGenerator(reachability_map, number_of_samples=10):
+            for candidate in reachability_map:
 
                 grasp_descriptions = (
                     [params["grasp_description"]]

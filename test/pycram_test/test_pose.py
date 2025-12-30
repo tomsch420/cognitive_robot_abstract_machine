@@ -3,6 +3,7 @@ import pytest
 from copy import deepcopy
 
 import numpy as np
+from numpy.testing import assert_raises
 
 from pycram.datastructures.pose import (
     PoseStamped,
@@ -11,6 +12,7 @@ from pycram.datastructures.pose import (
     PyCramVector3,
     AxisIdentifier,
 )
+from pycram.tf_transformations import inverse_matrix
 
 
 def test_pose_creation(immutable_model_world):
@@ -30,7 +32,10 @@ def test_pose_to_transform(immutable_model_world):
     transform = p.to_transform_stamped(world.get_body_by_name("r_gripper_tool_frame"))
 
     assert transform == TransformStamped.from_list(
-        [3, 2, 1], [0, 0, 1, 0], world.root, world.get_body_by_name("r_gripper_tool_frame")
+        [3, 2, 1],
+        [0, 0, 1, 0],
+        world.root,
+        world.get_body_by_name("r_gripper_tool_frame"),
     )
 
 
@@ -108,7 +113,10 @@ def test_transform_multiplication(immutable_model_world):
     test_body = world.get_body_by_name("milk.stl")
     t = TransformStamped.from_list([1, 2, 3], [0, 0, 0, 1], world.root, test_body)
     t2 = TransformStamped.from_list(
-        [3, 2, 1], [0, 0, 0, 1], test_body, world.get_body_by_name("r_gripper_tool_frame")
+        [3, 2, 1],
+        [0, 0, 0, 1],
+        test_body,
+        world.get_body_by_name("r_gripper_tool_frame"),
     )
 
     mul_t = t * t2
@@ -145,9 +153,14 @@ def test_is_facing_x_or_y(immutable_model_world):
 
 def test_transform_stamped_multiplication(immutable_model_world):
     world, robot_view, context = immutable_model_world
-    t1 = TransformStamped.from_list([1, 2, 3], [0, 0, 0, 1], world.root, robot_view.root)
+    t1 = TransformStamped.from_list(
+        [1, 2, 3], [0, 0, 0, 1], world.root, robot_view.root
+    )
     t2 = TransformStamped.from_list(
-        [4, 5, 6], [0, 0, 0, 1], robot_view.root, world.get_body_by_name("r_gripper_tool_frame")
+        [4, 5, 6],
+        [0, 0, 0, 1],
+        robot_view.root,
+        world.get_body_by_name("r_gripper_tool_frame"),
     )
 
     result = t1 * t2
@@ -159,9 +172,14 @@ def test_transform_stamped_multiplication(immutable_model_world):
 
 def test_transform_multiplication_inverse(immutable_model_world):
     world, robot_view, context = immutable_model_world
-    t1 = TransformStamped.from_list([1, 2, 3], [0, 0, 0, 1], world.root, robot_view.root)
+    t1 = TransformStamped.from_list(
+        [1, 2, 3], [0, 0, 0, 1], world.root, robot_view.root
+    )
     t2 = TransformStamped.from_list(
-        [4, 5, 6], [0, 0, 0, 1], robot_view.root, world.get_body_by_name("r_gripper_tool_frame")
+        [4, 5, 6],
+        [0, 0, 0, 1],
+        robot_view.root,
+        world.get_body_by_name("r_gripper_tool_frame"),
     )
 
     result = t1 * t2
@@ -172,25 +190,60 @@ def test_transform_multiplication_inverse(immutable_model_world):
     assert inverse_result.child_frame_id == world.root
 
 
+def test_transform_inverse(immutable_model_world):
+    world, robot_view, context = immutable_model_world
+    p = PoseStamped.from_list([1, 2, 3], [0, 0, 0, 1], robot_view.root)
+
+    t = ~p.to_transform_stamped(None)
+
+    assert t.position.x == -1
+    assert t.position.y == -2
+    assert t.position.z == -3
+
+
+def test_inverse_matrix():
+    p = PoseStamped.from_list([3.1, 2, 0], [0, 0, 0, 1])
+
+    t = p.to_transform_stamped(None)
+
+    t_matrix = t.transform.to_matrix()
+
+    t_inverse = inverse_matrix(t.transform.to_matrix())
+
+    assert_raises(AssertionError, np.testing.assert_almost_equal, t_matrix, t_inverse)
+
+
 def test_transform_multiplication_rotation(immutable_model_world):
     world, robot_view, context = immutable_model_world
-    t1 = TransformStamped.from_list([1, 1, 1], [0, 0, 1, 1], world.root, robot_view.root)
+    t1 = TransformStamped.from_list(
+        [1, 1, 1], [0, 0, 1, 1], world.root, robot_view.root
+    )
     t2 = TransformStamped.from_list(
-        [1, 0, 0], [0, 0, 0, 1], robot_view.root, world.get_body_by_name("r_gripper_tool_frame")
+        [1, 0, 0],
+        [0, 0, 0, 1],
+        robot_view.root,
+        world.get_body_by_name("r_gripper_tool_frame"),
     )
 
     result = t1 * t2
 
     assert [1, 2, 1] == result.translation.to_list()
     assert result.frame_id == world.root
-    np.testing.assert_almost_equal(result.rotation.to_list(), [0, 0, 0.707, 0.707], decimal=3)
+    np.testing.assert_almost_equal(
+        result.rotation.to_list(), [0, 0, 0.707, 0.707], decimal=3
+    )
 
 
 def test_transform_multiplication_translation_inverse(immutable_model_world):
     world, robot_view, context = immutable_model_world
-    t1 = TransformStamped.from_list([1, 1, 1], [0, 0, 0, 1], world.root, robot_view.root)
+    t1 = TransformStamped.from_list(
+        [1, 1, 1], [0, 0, 0, 1], world.root, robot_view.root
+    )
     t2 = TransformStamped.from_list(
-        [1, 0, 0], [0, 0, 0, 1], world.root, world.get_body_by_name("r_gripper_tool_frame")
+        [1, 0, 0],
+        [0, 0, 0, 1],
+        world.root,
+        world.get_body_by_name("r_gripper_tool_frame"),
     )
 
     result = ~t1 * t2
@@ -202,26 +255,40 @@ def test_transform_multiplication_translation_inverse(immutable_model_world):
 
 def test_transform_multiplication_with_inverse(immutable_model_world):
     world, robot_view, context = immutable_model_world
-    t1 = TransformStamped.from_list([1, 1, 1], [0, 0, 0, 1], world.root, robot_view.root)
+    t1 = TransformStamped.from_list(
+        [1, 1, 1], [0, 0, 0, 1], world.root, robot_view.root
+    )
     t2 = TransformStamped.from_list(
-        [2, 2, 1], [0, 0, -1, 1], world.root, world.get_body_by_name("r_gripper_tool_frame")
+        [2, 2, 1],
+        [0, 0, -1, 1],
+        world.root,
+        world.get_body_by_name("r_gripper_tool_frame"),
     )
     result = ~t1 * t2
 
     assert result.frame_id == robot_view.root
     assert result.child_frame_id == world.get_body_by_name("r_gripper_tool_frame")
     np.testing.assert_almost_equal(result.translation.to_list(), [1, 1, 0], decimal=3)
-    np.testing.assert_almost_equal(result.rotation.to_list(), [0, 0, -0.707, 0.707], decimal=3)
+    np.testing.assert_almost_equal(
+        result.rotation.to_list(), [0, 0, -0.707, 0.707], decimal=3
+    )
 
 
 def test_rotation_multiplication(immutable_model_world):
     world, robot_view, context = immutable_model_world
-    t1 = TransformStamped.from_list([0, 0, 0], [0, 0, 1, 1], world.root, robot_view.root)
+    t1 = TransformStamped.from_list(
+        [0, 0, 0], [0, 0, 1, 1], world.root, robot_view.root
+    )
     t2 = TransformStamped.from_list(
-        [0, 0, 0], [0, 0, 1, 0], robot_view.root, world.get_body_by_name("r_gripper_tool_frame")
+        [0, 0, 0],
+        [0, 0, 1, 0],
+        robot_view.root,
+        world.get_body_by_name("r_gripper_tool_frame"),
     )
 
     result = t1 * t2
     assert result.frame_id == world.root
-    np.testing.assert_almost_equal(result.rotation.to_list(), [0, 0, -0.707, 0.707], decimal=3)
+    np.testing.assert_almost_equal(
+        result.rotation.to_list(), [0, 0, -0.707, 0.707], decimal=3
+    )
     assert result.translation.to_list() == [0, 0, 0]

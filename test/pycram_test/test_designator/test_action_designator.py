@@ -294,9 +294,11 @@ def test_close(immutable_model_world):
 
 def test_transport(mutable_model_world):
     world, robot_view, context = mutable_model_world
+    node = rclpy.create_node("test_node")
+    VizMarkerPublisher(world, node, throttle_state_updates=20)
     description = TransportActionDescription(
         world.get_body_by_name("milk.stl"),
-        [PoseStamped.from_list([2.9, 2.2, 0.95], [0.0, 0.0, 1.0, 0.0], world.root)],
+        [PoseStamped.from_list([3.0, 2.2, 0.95], [0.0, 0.0, 1.0, 0.0], world.root)],
         [Arms.LEFT],
     )
     plan = SequentialPlan(
@@ -305,7 +307,7 @@ def test_transport(mutable_model_world):
     with simulated_robot:
         plan.perform()
     milk_position = world.get_body_by_name("milk.stl").global_pose.to_np()[:3, 3]
-    dist = np.linalg.norm(milk_position - np.array([2.9, 2.2, 0.95]))
+    dist = np.linalg.norm(milk_position - np.array([3, 2.2, 0.95]))
     assert dist <= 0.01
 
 
