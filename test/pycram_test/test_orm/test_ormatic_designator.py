@@ -277,11 +277,15 @@ def test_parkArmsAction(database, mutable_model_world):
 def test_transportAction(database, mutable_simple_pr2_world):
     session = database
     world, robot_view, context = mutable_simple_pr2_world
+    node = rclpy.create_node(
+        "test_node",
+    )
+    VizMarkerPublisher(world, node, throttle_state_updates=20)
     action = SequentialPlan(
         Context.from_world(world),
         TransportActionDescription(
             world.get_body_by_name("milk.stl"),
-            PoseStamped.from_list([1.8, 0.2, 1.07], [0, 0, 0, 1], world.root),
+            PoseStamped.from_list([1.7, 0.0, 1.07], [0, 0, 0, 1], world.root),
             Arms.LEFT,
         ),
     )

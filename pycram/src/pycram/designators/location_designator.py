@@ -311,7 +311,7 @@ class CostmapLocation(LocationDesignatorDescription):
                 width=200,
                 height=200,
                 std=15,
-                distance=0.5,  # That needs to be replaced with an estimate of the reachability space of the robot arms
+                distance=0.4,  # That needs to be replaced with an estimate of the reachability space of the robot arms
                 world=self.world,
                 origin=target,
             )
