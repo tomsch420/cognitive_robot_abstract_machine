@@ -2,6 +2,10 @@
 requires = ["setuptools", "setuptools-scm"]
 build-backend = "setuptools.build_meta"
 
+[tool.pyrefly]
+project-includes = ["**/*"]
+project-excludes = ["**/*venv/**/*"]
+
 [project]
 name = "probabilistic_model"
 authors = [
@@ -10,7 +14,7 @@ authors = [
 ]
 description = "Models for probabilistic reasoning"
 readme = "README.md"
-requires-python = ">=3.6"
+requires-python = ">=3.10"
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
