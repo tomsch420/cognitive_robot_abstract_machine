@@ -14,51 +14,49 @@ on:
 
 # This job installs dependencies, builds the book, and pushes it to `gh-pages`
 jobs:
-  deploy-book:
+  to-lowercase:
     runs-on: ubuntu-latest
+    outputs:
+      repo_lowercase: ${{ steps.lowercase.outputs.repository }}
+    steps:
+      - id: lowercase
+        run: |
+          echo "repository=ghcr.io/${GITHUB_REPOSITORY,,}:jazzy" >> $GITHUB_OUTPUT
+
+  deploy-book:
+    needs: to-lowercase
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ needs.to-lowercase.outputs.repo_lowercase }}
     environment:
       name: github-pages
     permissions:
       pages: write
       id-token: write
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    # Install dependencies
-    - name: Set up Python 3.12
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.12'
-        cache: pip # Implicitly uses requirements.txt for cache key
-    
-    - name: Install dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y python3-pip
-        python3 -m pip install -U pip --break-system-packages && python3 -m pip install -r requirements-dev.txt --break-system-packages && python3 -m pip install . --break-system-packages && python3 -m pip install -r doc/requirements.txt --break-system-packages
+      # Install dependencies
+      - name: Install dependencies
+        run: |
+          source /opt/ros/cram-env/bin/activate
+          poetry install
+          python3 -m pip install -r krrood/doc/requirements.txt
+          python3 -m pip install jupyter-book jupytext nbconvert
 
-    # (optional) Cache your executed notebooks between runs
-    # if you have config:
-    # execute:
-    #   execute_notebooks: cache
-    - name: cache executed notebooks
-      uses: actions/cache@v4
-      with:
-        path: doc/_build/.jupyter_cache
-        key: jupyter-book-cache-${{ hashFiles('requirements.txt') }}
+      # Build the book
+      - name: Build the book
+        run: |
+          source /opt/ros/cram-env/bin/activate
+          jupyter-book build krrood/doc
 
-    # Build the book
-    - name: Build the book
-      run: |
-        jupyter-book build doc
+      # Upload the book's HTML as an artifact
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: "krrood/doc/_build/html"
 
-    # Upload the book's HTML as an artifact
-    - name: Upload artifact
-      uses: actions/upload-pages-artifact@v3
-      with:
-        path: "doc/_build/html"
-
-    # Deploy the book's HTML to GitHub Pages
-    - name: Deploy to GitHub Pages
-      id: deployment
-      uses: actions/deploy-pages@v4
+      # Deploy the book's HTML to GitHub Pages
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

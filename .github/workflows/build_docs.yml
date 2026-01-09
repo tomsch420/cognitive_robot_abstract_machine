@@ -16,8 +16,21 @@ permissions:
 jobs:
   build-docs:
     runs-on: ubuntu-latest
+    outputs:
+      repo_lowercase: ${{ steps.lowercase.outputs.repository }}
+    steps:
+      - id: lowercase
+        run: |
+          echo "repository=ghcr.io/${GITHUB_REPOSITORY,,}:jazzy" >> $GITHUB_OUTPUT
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+  build:
+    needs: build-docs
+    runs-on: ubuntu-latest
     container:
-      image: "pycram/semantic_world:jazzy"
+      image: ${{ needs.build-docs.outputs.repo_lowercase }}
     
     steps:
       - name: Checkout repository
@@ -26,31 +39,22 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y pandoc python3-pip
-          python3 -m pip install -U pip --break-system-packages
-          python3 -m pip install jupyter-book jupytext nbconvert --break-system-packages
-          
-          # Install KRROOD dependencies
-          cd krrood
-          python3 -m pip install -r requirements.txt --break-system-packages
-          python3 -m pip install -r requirements-dev.txt --break-system-packages
-          python3 -m pip install -r doc/requirements.txt --break-system-packages
-          python3 -m pip install . --break-system-packages
-          cd ..
-          
-          # Install Semantic Digital Twin dependencies
-          cd semantic_digital_twin
-          python3 -m pip install -r requirements.txt --break-system-packages
-          python3 -m pip install -r doc/requirements.txt --break-system-packages
-          python3 -m pip install . --break-system-packages
-          cd ..
+          sudo apt-get install -y pandoc
+          source /opt/ros/cram-env/bin/activate
+          poetry install
+          # Install doc-specific dependencies that might not be in poetry
+          python3 -m pip install -r krrood/doc/requirements.txt
+          python3 -m pip install -r semantic_digital_twin/doc/requirements.txt
+          python3 -m pip install jupyter-book jupytext nbconvert
 
       - name: Build KRROOD documentation
         run: |
+          source /opt/ros/cram-env/bin/activate
           jupyter-book build krrood/doc
 
       - name: Build Semantic Digital Twin documentation
         run: |
+          source /opt/ros/cram-env/bin/activate
           # Strip exercise-tagged cells (following existing practice)
           cd semantic_digital_twin/doc/self_assessment/exercises
           find . -type f -name '*.md' -print0 | while IFS= read -r -d '' f; do
@@ -68,6 +72,7 @@ jobs:
 
       - name: Prepare staging area
         run: |
+          source /opt/ros/cram-env/bin/activate
           mkdir -p staging
           pandoc --standalone doc/index.md -o staging/index.html --metadata title="CRAM Documentation" --css doc/style.css --self-contained
           cp -r krrood/doc/_build/html staging/krrood
@@ -81,7 +86,7 @@ jobs:
 
   deploy:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: build-docs
+    needs: build
     runs-on: ubuntu-latest
     environment:
       name: github-pages
