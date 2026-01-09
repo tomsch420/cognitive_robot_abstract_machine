@@ -35,7 +35,7 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y python3-pip
-        python3 -m pip install -U pip && python3 -m pip install -r requirements-dev.txt && python3 -m pip install . && python3 -m pip install -r doc/requirements.txt
+        python3 -m pip install -U pip --break-system-packages && python3 -m pip install -r requirements-dev.txt --break-system-packages && python3 -m pip install . --break-system-packages && python3 -m pip install -r doc/requirements.txt --break-system-packages
 
     # (optional) Cache your executed notebooks between runs
     # if you have config:
