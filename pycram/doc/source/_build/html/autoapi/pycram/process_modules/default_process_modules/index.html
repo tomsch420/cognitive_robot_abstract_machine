@@ -1,0 +1,1467 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>pycram.process_modules.default_process_modules &#8212; PyCRAM</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../../../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../../../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../../../../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/styles/sphinx-book-theme.css?v=eba8b062" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/togglebutton.css?v=13237357" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/sphinx-thebe.css?v=4fa983c6" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/proof.css" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/graphviz.css?v=fd3f3429" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/sphinx-design.min.css?v=95c83b7e" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/custom.css?v=5c87bd76" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../../../../_static/documentation_options.js?v=9eb32ce0"></script>
+    <script src="../../../../_static/doctools.js?v=9a2dae69"></script>
+    <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../../_static/scripts/sphinx-book-theme.js?v=887ef09a"></script>
+    <script>let toggleHintShow = 'Click to show';</script>
+    <script>let toggleHintHide = 'Click to hide';</script>
+    <script>let toggleOpenOnPrint = 'true';</script>
+    <script src="../../../../_static/togglebutton.js?v=4a39c7ea"></script>
+    <script>var togglebuttonSelector = '.toggle, .admonition.dropdown';</script>
+    <script src="../../../../_static/design-tabs.js?v=f930bc37"></script>
+    <script>const THEBE_JS_URL = "https://unpkg.com/thebe@0.8.2/lib/index.js"; const thebe_selector = ".thebe,.cell"; const thebe_selector_input = "pre"; const thebe_selector_output = ".output, .cell_output"</script>
+    <script async="async" src="../../../../_static/sphinx-thebe.js?v=c100c467"></script>
+    <script>var togglebuttonSelector = '.toggle, .admonition.dropdown';</script>
+    <script>const THEBE_JS_URL = "https://unpkg.com/thebe@0.8.2/lib/index.js"; const thebe_selector = ".thebe,.cell"; const thebe_selector_input = "pre"; const thebe_selector_output = ".output, .cell_output"</script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'autoapi/pycram/process_modules/default_process_modules/index';</script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" />
+    <link rel="next" title="pycram.process_modules.donbot_process_modules" href="../donbot_process_modules/index.html" />
+    <link rel="prev" title="pycram.process_modules.boxy_process_modules" href="../boxy_process_modules/index.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search..."
+         aria-label="Search..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../../../../_static/new_pycram_logo_clean.svg" class="logo__image only-light" alt="PyCRAM - Home"/>
+    <script>document.write(`<img src="../../../../_static/new_pycram_logo_clean_dark.svg" class="logo__image only-dark" alt="PyCRAM - Home"/>`);</script>
+  
+  
+</a></div>
+        <div class="sidebar-primary-item">
+
+ <script>
+ document.write(`
+   <button class="btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script></div>
+        <div class="sidebar-primary-item"><nav class="bd-links bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item navbar-nav active">
+        <p aria-level="2" class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../../../../installation.html">Installation Guide</a></li>
+
+
+<li class="toctree-l1"><a class="reference internal" href="../../../../quickstart.html">Quickstart Guide</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Concepts</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../../../../plan.html">The PyCRAM Plan</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../designators.html">Designators in PyCRAM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../orm_concept.html">PyCRAM ORM: An Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../abstract_robot.html">Astract Robot Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../process_modules.html">Process Modules in PyCRAM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../costmap.html">Costmaps</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../notebooks.html">Jupyter Notebook Examples</a></li>
+
+
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Adding a new Robot</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../../../../new_robot.html">Adding a new robot to PyCRAM</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Trouble Shooting</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../../../../troubleshooting.html">Troubleshooting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../remarks.html">General Remarks</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Examples</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../../../../notebooks/language.html">Plan Language</a></li>
+
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../../designator_example.html">Designators</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../../notebooks/action_designator.html">Action Designator</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../notebooks/object_designator.html">Object Designator</a></li>
+
+<li class="toctree-l2"><a class="reference internal" href="../../../../notebooks/location_designator.html">Location Designator</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../notebooks/motion_designator.html">from pycram.language import SequentialPlan—
+jupyter:
+jupytext:
+text_representation:
+extension: .md
+format_name: markdown
+format_version: ‘1.3’
+jupytext_version: 1.16.3
+kernelspec:
+display_name: Python 3
+language: python
+name: python3</a></li>
+
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../../orm.html">ORM</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../../notebooks/orm_example.html">from pycram.orm.ormatic_interface import ResolvedActionNodeMappingDAOfrom pycram.orm.model import ResolvedActionNodeMapping—
+jupyter:
+jupytext:
+text_representation:
+extension: .md
+format_name: markdown
+format_version: ‘1.3’
+jupytext_version: 1.16.3
+kernelspec:
+display_name: Python 3
+language: python
+name: python3</a></li>
+
+<li class="toctree-l2"><a class="reference internal" href="../../../../notebooks/orm_querying_examples.html">ORM querying</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../../datastructures.html">Datastructure</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../../notebooks/pose.html">Pose</a></li>
+
+</ul>
+</details></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../ros_utils.html">ROS Utils</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">API</span></p>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="../../index.html">pycram</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../alternative_motion_mappings/index.html">pycram.alternative_motion_mappings</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../alternative_motion_mappings/hsrb_motion_mapping/index.html">pycram.alternative_motion_mappings.hsrb_motion_mapping</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../config/index.html">pycram.config</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../config/action_conf/index.html">pycram.config.action_conf</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="../../costmaps/index.html">pycram.costmaps</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../datastructures/index.html">pycram.datastructures</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../datastructures/dataclasses/index.html">pycram.datastructures.dataclasses</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../datastructures/enums/index.html">pycram.datastructures.enums</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../datastructures/grasp/index.html">pycram.datastructures.grasp</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../datastructures/partial_designator/index.html">pycram.datastructures.partial_designator</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../datastructures/pose/index.html">pycram.datastructures.pose</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="../../designator/index.html">pycram.designator</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../designators/index.html">pycram.designators</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../designators/location_designator/index.html">pycram.designators.location_designator</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../designators/object_designator/index.html">pycram.designators.object_designator</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../designators/specialized_designators/index.html">pycram.designators.specialized_designators</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../designators/specialized_designators/action/index.html">pycram.designators.specialized_designators.action</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../designators/specialized_designators/location/index.html">pycram.designators.specialized_designators.location</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../designators/specialized_designators/probabilistic/index.html">pycram.designators.specialized_designators.probabilistic</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../external_interfaces/index.html">pycram.external_interfaces</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../external_interfaces/blum_api/index.html">pycram.external_interfaces.blum_api</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../external_interfaces/giskard/index.html">pycram.external_interfaces.giskard</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../external_interfaces/move_base/index.html">pycram.external_interfaces.move_base</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../external_interfaces/procthor/index.html">pycram.external_interfaces.procthor</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../external_interfaces/robokudo/index.html">pycram.external_interfaces.robokudo</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../external_interfaces/tmc/index.html">pycram.external_interfaces.tmc</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="../../failure_handling/index.html">pycram.failure_handling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../failures/index.html">pycram.failures</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../filter/index.html">pycram.filter</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../fluent/index.html">pycram.fluent</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../has_parameters/index.html">pycram.has_parameters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../helper/index.html">pycram.helper</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../joint_state/index.html">pycram.joint_state</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../language/index.html">pycram.language</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../motion_executor/index.html">pycram.motion_executor</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../ontomatic/index.html">pycram.ontomatic</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../ontomatic/performables_to_ontology/index.html">pycram.ontomatic.performables_to_ontology</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../orm/index.html">pycram.orm</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../orm/model/index.html">pycram.orm.model</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../orm/ormatic_interface/index.html">pycram.orm.ormatic_interface</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../orm/utils/index.html">pycram.orm.utils</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../orm/views/index.html">pycram.orm.views</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="../../parameterizer/index.html">pycram.parameterizer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../perception/index.html">pycram.perception</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../plan/index.html">pycram.plan</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../pose_validator/index.html">pycram.pose_validator</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../probabilistic_costmap/index.html">pycram.probabilistic_costmap</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../process_module/index.html">pycram.process_module</a></li>
+<li class="toctree-l2 current active has-children"><a class="reference internal" href="../index.html">pycram.process_modules</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../armar_process_modules/index.html">pycram.process_modules.armar_process_modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../boxy_process_modules/index.html">pycram.process_modules.boxy_process_modules</a></li>
+<li class="toctree-l3 current active"><a class="current reference internal" href="#">pycram.process_modules.default_process_modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../donbot_process_modules/index.html">pycram.process_modules.donbot_process_modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../hsrb_process_modules/index.html">pycram.process_modules.hsrb_process_modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../icub3_process_modules/index.html">pycram.process_modules.icub3_process_modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../justin_process_modules/index.html">pycram.process_modules.justin_process_modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../kevin_process_modules/index.html">pycram.process_modules.kevin_process_modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../pr2_process_modules/index.html">pycram.process_modules.pr2_process_modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../robotiq_gripper_process_module/index.html">pycram.process_modules.robotiq_gripper_process_module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../stretch_process_modules/index.html">pycram.process_modules.stretch_process_modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../tiago_process_modules/index.html">pycram.process_modules.tiago_process_modules</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="../../robot_description/index.html">pycram.robot_description</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../robot_descriptions/index.html">pycram.robot_descriptions</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../robot_descriptions/armar_description/index.html">pycram.robot_descriptions.armar_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../robot_descriptions/boxy_description/index.html">pycram.robot_descriptions.boxy_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../robot_descriptions/donbot_description/index.html">pycram.robot_descriptions.donbot_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../robot_descriptions/hsrb_description/index.html">pycram.robot_descriptions.hsrb_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../robot_descriptions/hsrb_states/index.html">pycram.robot_descriptions.hsrb_states</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../robot_descriptions/icub3_description/index.html">pycram.robot_descriptions.icub3_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../robot_descriptions/justin_description/index.html">pycram.robot_descriptions.justin_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../robot_descriptions/kevin_description/index.html">pycram.robot_descriptions.kevin_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../robot_descriptions/panda_description/index.html">pycram.robot_descriptions.panda_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../robot_descriptions/pr2_description/index.html">pycram.robot_descriptions.pr2_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../robot_descriptions/pr2_states/index.html">pycram.robot_descriptions.pr2_states</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../robot_descriptions/stretch_description/index.html">pycram.robot_descriptions.stretch_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../robot_descriptions/tiago_description/index.html">pycram.robot_descriptions.tiago_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../robot_descriptions/tracy_description/index.html">pycram.robot_descriptions.tracy_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../robot_descriptions/tracy_states/index.html">pycram.robot_descriptions.tracy_states</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../robot_descriptions/turtlebot_description/index.html">pycram.robot_descriptions.turtlebot_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../robot_descriptions/ur5_description/index.html">pycram.robot_descriptions.ur5_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../robot_descriptions/ur5e_controlled_description/index.html">pycram.robot_descriptions.ur5e_controlled_description</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../robot_plans/index.html">pycram.robot_plans</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../robot_plans/actions/index.html">pycram.robot_plans.actions</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../robot_plans/actions/base/index.html">pycram.robot_plans.actions.base</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../robot_plans/actions/composite/index.html">pycram.robot_plans.actions.composite</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../robot_plans/actions/core/index.html">pycram.robot_plans.actions.core</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../robot_plans/motions/index.html">pycram.robot_plans.motions</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../robot_plans/motions/base/index.html">pycram.robot_plans.motions.base</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../robot_plans/motions/container/index.html">pycram.robot_plans.motions.container</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../robot_plans/motions/gripper/index.html">pycram.robot_plans.motions.gripper</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../robot_plans/motions/misc/index.html">pycram.robot_plans.motions.misc</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../robot_plans/motions/navigation/index.html">pycram.robot_plans.motions.navigation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../robot_plans/motions/robot_body/index.html">pycram.robot_plans.motions.robot_body</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../ros/index.html">pycram.ros</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../ros/no_ros/index.html">pycram.ros.no_ros</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../ros/no_ros/action_lib/index.html">pycram.ros.no_ros.action_lib</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ros/no_ros/data_types/index.html">pycram.ros.no_ros.data_types</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ros/no_ros/publisher/index.html">pycram.ros.no_ros.publisher</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ros/no_ros/ros_tools/index.html">pycram.ros.no_ros.ros_tools</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ros/no_ros/service/index.html">pycram.ros.no_ros.service</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ros/no_ros/subscriber/index.html">pycram.ros.no_ros.subscriber</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../ros/ros1/index.html">pycram.ros.ros1</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../ros/ros1/action_lib/index.html">pycram.ros.ros1.action_lib</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ros/ros1/data_types/index.html">pycram.ros.ros1.data_types</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ros/ros1/publisher/index.html">pycram.ros.ros1.publisher</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ros/ros1/ros_tools/index.html">pycram.ros.ros1.ros_tools</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ros/ros1/service/index.html">pycram.ros.ros1.service</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ros/ros1/subscriber/index.html">pycram.ros.ros1.subscriber</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ros/ros1/viz_marker_publisher/index.html">pycram.ros.ros1.viz_marker_publisher</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../ros/ros2/index.html">pycram.ros.ros2</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../ros/ros2/action_lib/index.html">pycram.ros.ros2.action_lib</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ros/ros2/data_types/index.html">pycram.ros.ros2.data_types</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ros/ros2/filter/index.html">pycram.ros.ros2.filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ros/ros2/publisher/index.html">pycram.ros.ros2.publisher</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ros/ros2/ros_tools/index.html">pycram.ros.ros2.ros_tools</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ros/ros2/service/index.html">pycram.ros.ros2.service</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ros/ros2/subscriber/index.html">pycram.ros.ros2.subscriber</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ros/ros2/viz_marker_publisher/index.html">pycram.ros.ros2.viz_marker_publisher</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../ros_utils/index.html">pycram.ros_utils</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../ros_utils/force_torque_sensor/index.html">pycram.ros_utils.force_torque_sensor</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../ros_utils/joint_state_publisher/index.html">pycram.ros_utils.joint_state_publisher</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../ros_utils/marker_publisher_base/index.html">pycram.ros_utils.marker_publisher_base</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../ros_utils/tf_broadcaster/index.html">pycram.ros_utils.tf_broadcaster</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="../../testing/index.html">pycram.testing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tf_transformations/index.html">pycram.tf_transformations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../units/index.html">pycram.units</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../utils/index.html">pycram.utils</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../validation/index.html">pycram.validation</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../validation/error_checkers/index.html">pycram.validation.error_checkers</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../validation/goal_validator/index.html">pycram.validation.goal_validator</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="../../visualization/index.html">pycram.visualization</a></li>
+</ul>
+</details></li>
+</ul>
+
+    </div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+
+<div class="sbt-scroll-pixel-helper"></div>
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item"><button class="sidebar-toggle primary-toggle btn btn-sm" title="Toggle primary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <span class="fa-solid fa-bars"></span>
+</button></div>
+      
+    </div>
+  
+  
+    <div class="header-article-items__end">
+      
+        <div class="header-article-item">
+
+<div class="article-header-buttons">
+
+
+
+
+
+<div class="dropdown dropdown-download-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Download this page">
+    <i class="fas fa-download"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="../../../../_sources/autoapi/pycram/process_modules/default_process_modules/index.rst" target="_blank"
+   class="btn btn-sm btn-download-source-button dropdown-item"
+   title="Download source file"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file"></i>
+  </span>
+<span class="btn__text-container">.rst</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li>
+<button onclick="window.print()"
+  class="btn btn-sm btn-download-pdf-button dropdown-item"
+  title="Print to PDF"
+  data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file-pdf"></i>
+  </span>
+<span class="btn__text-container">.pdf</span>
+</button>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+<button onclick="toggleFullScreen()"
+  class="btn btn-sm btn-fullscreen-button"
+  title="Fullscreen mode"
+  data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script>
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script>
+<button class="sidebar-toggle secondary-toggle btn btn-sm" title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</button>
+</div></div>
+      
+    </div>
+  
+</div>
+</div>
+              
+              
+
+<div id="jb-print-docs-body" class="onlyprint">
+    <h1>pycram.process_modules.default_process_modules</h1>
+    <!-- Table of contents -->
+    <div id="print-main-content">
+        <div id="jb-print-toc">
+            
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#attributes">Attributes</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#classes">Classes</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#functions">Functions</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#module-contents">Module Contents</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.logger"><code class="docutils literal notranslate"><span class="pre">logger</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultNavigation"><code class="docutils literal notranslate"><span class="pre">DefaultNavigation</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultNavigation._execute"><code class="docutils literal notranslate"><span class="pre">DefaultNavigation._execute()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultMoveHead"><code class="docutils literal notranslate"><span class="pre">DefaultMoveHead</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultMoveHead._execute"><code class="docutils literal notranslate"><span class="pre">DefaultMoveHead._execute()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultMoveGripper"><code class="docutils literal notranslate"><span class="pre">DefaultMoveGripper</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultMoveGripper._execute"><code class="docutils literal notranslate"><span class="pre">DefaultMoveGripper._execute()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultDetecting"><code class="docutils literal notranslate"><span class="pre">DefaultDetecting</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultDetecting._execute"><code class="docutils literal notranslate"><span class="pre">DefaultDetecting._execute()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultMoveTCP"><code class="docutils literal notranslate"><span class="pre">DefaultMoveTCP</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultMoveTCP._execute"><code class="docutils literal notranslate"><span class="pre">DefaultMoveTCP._execute()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultMoveArmJoints"><code class="docutils literal notranslate"><span class="pre">DefaultMoveArmJoints</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultMoveArmJoints._execute"><code class="docutils literal notranslate"><span class="pre">DefaultMoveArmJoints._execute()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultMoveJoints"><code class="docutils literal notranslate"><span class="pre">DefaultMoveJoints</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultMoveJoints._execute"><code class="docutils literal notranslate"><span class="pre">DefaultMoveJoints._execute()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultOpen"><code class="docutils literal notranslate"><span class="pre">DefaultOpen</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultOpen._execute"><code class="docutils literal notranslate"><span class="pre">DefaultOpen._execute()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultClose"><code class="docutils literal notranslate"><span class="pre">DefaultClose</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultClose._execute"><code class="docutils literal notranslate"><span class="pre">DefaultClose._execute()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultMoveTCPWaypoints"><code class="docutils literal notranslate"><span class="pre">DefaultMoveTCPWaypoints</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultMoveTCPWaypoints._execute"><code class="docutils literal notranslate"><span class="pre">DefaultMoveTCPWaypoints._execute()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules._move_arm_tcp"><code class="docutils literal notranslate"><span class="pre">_move_arm_tcp()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultDetectingReal"><code class="docutils literal notranslate"><span class="pre">DefaultDetectingReal</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultDetectingReal._execute"><code class="docutils literal notranslate"><span class="pre">DefaultDetectingReal._execute()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultNavigationReal"><code class="docutils literal notranslate"><span class="pre">DefaultNavigationReal</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultNavigationReal._execute"><code class="docutils literal notranslate"><span class="pre">DefaultNavigationReal._execute()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultMoveHeadReal"><code class="docutils literal notranslate"><span class="pre">DefaultMoveHeadReal</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultMoveHeadReal._execute"><code class="docutils literal notranslate"><span class="pre">DefaultMoveHeadReal._execute()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultMoveTCPReal"><code class="docutils literal notranslate"><span class="pre">DefaultMoveTCPReal</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultMoveTCPReal._execute"><code class="docutils literal notranslate"><span class="pre">DefaultMoveTCPReal._execute()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultMoveArmJointsReal"><code class="docutils literal notranslate"><span class="pre">DefaultMoveArmJointsReal</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultMoveArmJointsReal._execute"><code class="docutils literal notranslate"><span class="pre">DefaultMoveArmJointsReal._execute()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultMoveJointsReal"><code class="docutils literal notranslate"><span class="pre">DefaultMoveJointsReal</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultMoveJointsReal._execute"><code class="docutils literal notranslate"><span class="pre">DefaultMoveJointsReal._execute()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultMoveGripperReal"><code class="docutils literal notranslate"><span class="pre">DefaultMoveGripperReal</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultMoveGripperReal._execute"><code class="docutils literal notranslate"><span class="pre">DefaultMoveGripperReal._execute()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultOpenReal"><code class="docutils literal notranslate"><span class="pre">DefaultOpenReal</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultOpenReal._execute"><code class="docutils literal notranslate"><span class="pre">DefaultOpenReal._execute()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultCloseReal"><code class="docutils literal notranslate"><span class="pre">DefaultCloseReal</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultCloseReal._execute"><code class="docutils literal notranslate"><span class="pre">DefaultCloseReal._execute()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultMoveTCPWaypointsReal"><code class="docutils literal notranslate"><span class="pre">DefaultMoveTCPWaypointsReal</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultMoveTCPWaypointsReal._execute"><code class="docutils literal notranslate"><span class="pre">DefaultMoveTCPWaypointsReal._execute()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultManager"><code class="docutils literal notranslate"><span class="pre">DefaultManager</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultManager.navigate"><code class="docutils literal notranslate"><span class="pre">DefaultManager.navigate()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultManager.looking"><code class="docutils literal notranslate"><span class="pre">DefaultManager.looking()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultManager.detecting"><code class="docutils literal notranslate"><span class="pre">DefaultManager.detecting()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultManager.move_tcp"><code class="docutils literal notranslate"><span class="pre">DefaultManager.move_tcp()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultManager.move_arm_joints"><code class="docutils literal notranslate"><span class="pre">DefaultManager.move_arm_joints()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultManager.move_joints"><code class="docutils literal notranslate"><span class="pre">DefaultManager.move_joints()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultManager.move_gripper"><code class="docutils literal notranslate"><span class="pre">DefaultManager.move_gripper()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultManager.open"><code class="docutils literal notranslate"><span class="pre">DefaultManager.open()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultManager.close"><code class="docutils literal notranslate"><span class="pre">DefaultManager.close()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultManager.move_tcp_waypoints"><code class="docutils literal notranslate"><span class="pre">DefaultManager.move_tcp_waypoints()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="module-pycram.process_modules.default_process_modules">
+<span id="pycram-process-modules-default-process-modules"></span><h1>pycram.process_modules.default_process_modules<a class="headerlink" href="#module-pycram.process_modules.default_process_modules" title="Link to this heading">#</a></h1>
+<section id="attributes">
+<h2>Attributes<a class="headerlink" href="#attributes" title="Link to this heading">#</a></h2>
+<div class="pst-scrollable-table-container"><table class="autosummary longtable table autosummary">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pycram.process_modules.default_process_modules.logger" title="pycram.process_modules.default_process_modules.logger"><code class="xref py py-obj docutils literal notranslate"><span class="pre">logger</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="classes">
+<h2>Classes<a class="headerlink" href="#classes" title="Link to this heading">#</a></h2>
+<div class="pst-scrollable-table-container"><table class="autosummary longtable table autosummary">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pycram.process_modules.default_process_modules.DefaultNavigation" title="pycram.process_modules.default_process_modules.DefaultNavigation"><code class="xref py py-obj docutils literal notranslate"><span class="pre">DefaultNavigation</span></code></a></p></td>
+<td><p>The process module to move the robot from one position to another.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#pycram.process_modules.default_process_modules.DefaultMoveHead" title="pycram.process_modules.default_process_modules.DefaultMoveHead"><code class="xref py py-obj docutils literal notranslate"><span class="pre">DefaultMoveHead</span></code></a></p></td>
+<td><p>Moves the robot's head to look at a specified target point in the world coordinate frame.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pycram.process_modules.default_process_modules.DefaultMoveGripper" title="pycram.process_modules.default_process_modules.DefaultMoveGripper"><code class="xref py py-obj docutils literal notranslate"><span class="pre">DefaultMoveGripper</span></code></a></p></td>
+<td><p>This process module controls the gripper of the robot. They can either be opened or closed.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#pycram.process_modules.default_process_modules.DefaultDetecting" title="pycram.process_modules.default_process_modules.DefaultDetecting"><code class="xref py py-obj docutils literal notranslate"><span class="pre">DefaultDetecting</span></code></a></p></td>
+<td><p>This process module tries to detect an object with the given type. To be detected the object has to be in</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pycram.process_modules.default_process_modules.DefaultMoveTCP" title="pycram.process_modules.default_process_modules.DefaultMoveTCP"><code class="xref py py-obj docutils literal notranslate"><span class="pre">DefaultMoveTCP</span></code></a></p></td>
+<td><p>This process moves the tool center point of either the right or the left arm.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#pycram.process_modules.default_process_modules.DefaultMoveArmJoints" title="pycram.process_modules.default_process_modules.DefaultMoveArmJoints"><code class="xref py py-obj docutils literal notranslate"><span class="pre">DefaultMoveArmJoints</span></code></a></p></td>
+<td><p>This process modules moves the joints of either the right or the left arm. The joint states can be given as</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pycram.process_modules.default_process_modules.DefaultMoveJoints" title="pycram.process_modules.default_process_modules.DefaultMoveJoints"><code class="xref py py-obj docutils literal notranslate"><span class="pre">DefaultMoveJoints</span></code></a></p></td>
+<td><p>Implementation of process modules. Process modules are the part that communicate with the outer world to execute</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#pycram.process_modules.default_process_modules.DefaultOpen" title="pycram.process_modules.default_process_modules.DefaultOpen"><code class="xref py py-obj docutils literal notranslate"><span class="pre">DefaultOpen</span></code></a></p></td>
+<td><p>Low-level implementation of opening a container in the simulation. Assumes the handle is already grasped.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pycram.process_modules.default_process_modules.DefaultClose" title="pycram.process_modules.default_process_modules.DefaultClose"><code class="xref py py-obj docutils literal notranslate"><span class="pre">DefaultClose</span></code></a></p></td>
+<td><p>Low-level implementation that lets the robot close a grasped container, in simulation</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#pycram.process_modules.default_process_modules.DefaultMoveTCPWaypoints" title="pycram.process_modules.default_process_modules.DefaultMoveTCPWaypoints"><code class="xref py py-obj docutils literal notranslate"><span class="pre">DefaultMoveTCPWaypoints</span></code></a></p></td>
+<td><p>This process moves the tool center point of either the right or the left arm along a list of waypoints.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pycram.process_modules.default_process_modules.DefaultDetectingReal" title="pycram.process_modules.default_process_modules.DefaultDetectingReal"><code class="xref py py-obj docutils literal notranslate"><span class="pre">DefaultDetectingReal</span></code></a></p></td>
+<td><p>Implementation of process modules. Process modules are the part that communicate with the outer world to execute</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#pycram.process_modules.default_process_modules.DefaultNavigationReal" title="pycram.process_modules.default_process_modules.DefaultNavigationReal"><code class="xref py py-obj docutils literal notranslate"><span class="pre">DefaultNavigationReal</span></code></a></p></td>
+<td><p>Process module for the real robot that sends a cartesian goal to giskard to move the robot base</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pycram.process_modules.default_process_modules.DefaultMoveHeadReal" title="pycram.process_modules.default_process_modules.DefaultMoveHeadReal"><code class="xref py py-obj docutils literal notranslate"><span class="pre">DefaultMoveHeadReal</span></code></a></p></td>
+<td><p>Process module for controlling the real robot's head to look at a specified position.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#pycram.process_modules.default_process_modules.DefaultMoveTCPReal" title="pycram.process_modules.default_process_modules.DefaultMoveTCPReal"><code class="xref py py-obj docutils literal notranslate"><span class="pre">DefaultMoveTCPReal</span></code></a></p></td>
+<td><p>Moves the tool center point of the real robot while avoiding all collisions</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pycram.process_modules.default_process_modules.DefaultMoveArmJointsReal" title="pycram.process_modules.default_process_modules.DefaultMoveArmJointsReal"><code class="xref py py-obj docutils literal notranslate"><span class="pre">DefaultMoveArmJointsReal</span></code></a></p></td>
+<td><p>Moves the arm joints of the real robot to the given configuration while avoiding all collisions</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#pycram.process_modules.default_process_modules.DefaultMoveJointsReal" title="pycram.process_modules.default_process_modules.DefaultMoveJointsReal"><code class="xref py py-obj docutils literal notranslate"><span class="pre">DefaultMoveJointsReal</span></code></a></p></td>
+<td><p>Moves any joint using giskard, avoids all collisions while doint this.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pycram.process_modules.default_process_modules.DefaultMoveGripperReal" title="pycram.process_modules.default_process_modules.DefaultMoveGripperReal"><code class="xref py py-obj docutils literal notranslate"><span class="pre">DefaultMoveGripperReal</span></code></a></p></td>
+<td><p>Opens or closes the gripper of the real robot, gripper uses an action server for this instead of giskard</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#pycram.process_modules.default_process_modules.DefaultOpenReal" title="pycram.process_modules.default_process_modules.DefaultOpenReal"><code class="xref py py-obj docutils literal notranslate"><span class="pre">DefaultOpenReal</span></code></a></p></td>
+<td><p>Tries to open an already grasped container</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pycram.process_modules.default_process_modules.DefaultCloseReal" title="pycram.process_modules.default_process_modules.DefaultCloseReal"><code class="xref py py-obj docutils literal notranslate"><span class="pre">DefaultCloseReal</span></code></a></p></td>
+<td><p>Tries to close an already grasped container</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#pycram.process_modules.default_process_modules.DefaultMoveTCPWaypointsReal" title="pycram.process_modules.default_process_modules.DefaultMoveTCPWaypointsReal"><code class="xref py py-obj docutils literal notranslate"><span class="pre">DefaultMoveTCPWaypointsReal</span></code></a></p></td>
+<td><p>Moves the tool center point of the real robot along a list of waypoints while avoiding all collisions</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pycram.process_modules.default_process_modules.DefaultManager" title="pycram.process_modules.default_process_modules.DefaultManager"><code class="xref py py-obj docutils literal notranslate"><span class="pre">DefaultManager</span></code></a></p></td>
+<td><p>Base class for all Process Module Managers. This class is used to register the Process Modules for the robot.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="functions">
+<h2>Functions<a class="headerlink" href="#functions" title="Link to this heading">#</a></h2>
+<div class="pst-scrollable-table-container"><table class="autosummary longtable table autosummary">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pycram.process_modules.default_process_modules._move_arm_tcp" title="pycram.process_modules.default_process_modules._move_arm_tcp"><code class="xref py py-obj docutils literal notranslate"><span class="pre">_move_arm_tcp</span></code></a>(→ None)</p></td>
+<td><p>Calls the ik solver to calculate the inverse kinematics of the arm and then sets the joint states accordingly.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="module-contents">
+<h2>Module Contents<a class="headerlink" href="#module-contents" title="Link to this heading">#</a></h2>
+<dl class="py data">
+<dt class="sig sig-object py" id="pycram.process_modules.default_process_modules.logger">
+<span class="sig-prename descclassname"><span class="pre">pycram.process_modules.default_process_modules.</span></span><span class="sig-name descname"><span class="pre">logger</span></span><a class="headerlink" href="#pycram.process_modules.default_process_modules.logger" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pycram.process_modules.default_process_modules.DefaultNavigation">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pycram.process_modules.default_process_modules.</span></span><span class="sig-name descname"><span class="pre">DefaultNavigation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lock</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.process_modules.default_process_modules.DefaultNavigation" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="../../process_module/index.html#pycram.process_module.ProcessModule" title="pycram.process_module.ProcessModule"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pycram.process_module.ProcessModule</span></code></a></p>
+<p>The process module to move the robot from one position to another.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="pycram.process_modules.default_process_modules.DefaultNavigation._execute">
+<span class="sig-name descname"><span class="pre">_execute</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">desig</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../../robot_plans/actions/core/index.html#pycram.robot_plans.actions.core.MoveMotion" title="pycram.robot_plans.actions.core.MoveMotion"><span class="pre">MoveMotion</span></a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.process_modules.default_process_modules.DefaultNavigation._execute" title="Link to this definition">#</a></dt>
+<dd><p>Helper method for internal usage only.
+This method is to be overwritten instead of the execute method.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pycram.process_modules.default_process_modules.DefaultMoveHead">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pycram.process_modules.default_process_modules.</span></span><span class="sig-name descname"><span class="pre">DefaultMoveHead</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lock</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.process_modules.default_process_modules.DefaultMoveHead" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="../../process_module/index.html#pycram.process_module.ProcessModule" title="pycram.process_module.ProcessModule"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pycram.process_module.ProcessModule</span></code></a></p>
+<p>Moves the robot’s head to look at a specified target point in the world coordinate frame.
+The target can be either a position or an object.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="pycram.process_modules.default_process_modules.DefaultMoveHead._execute">
+<span class="sig-name descname"><span class="pre">_execute</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">desig</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../../robot_plans/actions/core/index.html#pycram.robot_plans.actions.core.LookingMotion" title="pycram.robot_plans.actions.core.LookingMotion"><span class="pre">LookingMotion</span></a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.process_modules.default_process_modules.DefaultMoveHead._execute" title="Link to this definition">#</a></dt>
+<dd><p>Helper method for internal usage only.
+This method is to be overwritten instead of the execute method.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pycram.process_modules.default_process_modules.DefaultMoveGripper">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pycram.process_modules.default_process_modules.</span></span><span class="sig-name descname"><span class="pre">DefaultMoveGripper</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lock</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.process_modules.default_process_modules.DefaultMoveGripper" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="../../process_module/index.html#pycram.process_module.ProcessModule" title="pycram.process_module.ProcessModule"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pycram.process_module.ProcessModule</span></code></a></p>
+<p>This process module controls the gripper of the robot. They can either be opened or closed.
+Furthermore, it can only move one gripper at a time.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="pycram.process_modules.default_process_modules.DefaultMoveGripper._execute">
+<span class="sig-name descname"><span class="pre">_execute</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">desig</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../../robot_plans/actions/core/index.html#id287" title="pycram.robot_plans.actions.core.MoveGripperMotion"><span class="pre">MoveGripperMotion</span></a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.process_modules.default_process_modules.DefaultMoveGripper._execute" title="Link to this definition">#</a></dt>
+<dd><p>Helper method for internal usage only.
+This method is to be overwritten instead of the execute method.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pycram.process_modules.default_process_modules.DefaultDetecting">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pycram.process_modules.default_process_modules.</span></span><span class="sig-name descname"><span class="pre">DefaultDetecting</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lock</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.process_modules.default_process_modules.DefaultDetecting" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="../../process_module/index.html#pycram.process_module.ProcessModule" title="pycram.process_module.ProcessModule"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pycram.process_module.ProcessModule</span></code></a></p>
+<p>This process module tries to detect an object with the given type. To be detected the object has to be in
+the field of view of the robot.
+:return: A list of perceived objects.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="pycram.process_modules.default_process_modules.DefaultDetecting._execute">
+<span class="sig-name descname"><span class="pre">_execute</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">designator</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../../robot_plans/index.html#pycram.robot_plans.DetectingMotion" title="pycram.robot_plans.DetectingMotion"><span class="pre">DetectingMotion</span></a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.process_modules.default_process_modules.DefaultDetecting._execute" title="Link to this definition">#</a></dt>
+<dd><p>Helper method for internal usage only.
+This method is to be overwritten instead of the execute method.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pycram.process_modules.default_process_modules.DefaultMoveTCP">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pycram.process_modules.default_process_modules.</span></span><span class="sig-name descname"><span class="pre">DefaultMoveTCP</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lock</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.process_modules.default_process_modules.DefaultMoveTCP" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="../../process_module/index.html#pycram.process_module.ProcessModule" title="pycram.process_module.ProcessModule"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pycram.process_module.ProcessModule</span></code></a></p>
+<p>This process moves the tool center point of either the right or the left arm.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="pycram.process_modules.default_process_modules.DefaultMoveTCP._execute">
+<span class="sig-name descname"><span class="pre">_execute</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">desig</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../../robot_plans/actions/composite/index.html#pycram.robot_plans.actions.composite.MoveTCPMotion" title="pycram.robot_plans.actions.composite.MoveTCPMotion"><span class="pre">MoveTCPMotion</span></a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.process_modules.default_process_modules.DefaultMoveTCP._execute" title="Link to this definition">#</a></dt>
+<dd><p>Helper method for internal usage only.
+This method is to be overwritten instead of the execute method.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pycram.process_modules.default_process_modules.DefaultMoveArmJoints">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pycram.process_modules.default_process_modules.</span></span><span class="sig-name descname"><span class="pre">DefaultMoveArmJoints</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lock</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.process_modules.default_process_modules.DefaultMoveArmJoints" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="../../process_module/index.html#pycram.process_module.ProcessModule" title="pycram.process_module.ProcessModule"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pycram.process_module.ProcessModule</span></code></a></p>
+<p>This process modules moves the joints of either the right or the left arm. The joint states can be given as
+list that should be applied or a pre-defined position can be used, such as “parking”</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="pycram.process_modules.default_process_modules.DefaultMoveArmJoints._execute">
+<span class="sig-name descname"><span class="pre">_execute</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">desig</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">MoveArmJointsMotion</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.process_modules.default_process_modules.DefaultMoveArmJoints._execute" title="Link to this definition">#</a></dt>
+<dd><p>Helper method for internal usage only.
+This method is to be overwritten instead of the execute method.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pycram.process_modules.default_process_modules.DefaultMoveJoints">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pycram.process_modules.default_process_modules.</span></span><span class="sig-name descname"><span class="pre">DefaultMoveJoints</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lock</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.process_modules.default_process_modules.DefaultMoveJoints" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="../../process_module/index.html#pycram.process_module.ProcessModule" title="pycram.process_module.ProcessModule"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pycram.process_module.ProcessModule</span></code></a></p>
+<dl class="simple">
+<dt>Implementation of process modules. Process modules are the part that communicate with the outer world to execute</dt><dd><p>designators.</p>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="pycram.process_modules.default_process_modules.DefaultMoveJoints._execute">
+<span class="sig-name descname"><span class="pre">_execute</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">desig</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../../robot_plans/actions/core/index.html#pycram.robot_plans.actions.core.MoveJointsMotion" title="pycram.robot_plans.actions.core.MoveJointsMotion"><span class="pre">MoveJointsMotion</span></a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.process_modules.default_process_modules.DefaultMoveJoints._execute" title="Link to this definition">#</a></dt>
+<dd><p>Helper method for internal usage only.
+This method is to be overwritten instead of the execute method.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pycram.process_modules.default_process_modules.DefaultOpen">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pycram.process_modules.default_process_modules.</span></span><span class="sig-name descname"><span class="pre">DefaultOpen</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lock</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.process_modules.default_process_modules.DefaultOpen" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="../../process_module/index.html#pycram.process_module.ProcessModule" title="pycram.process_module.ProcessModule"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pycram.process_module.ProcessModule</span></code></a></p>
+<p>Low-level implementation of opening a container in the simulation. Assumes the handle is already grasped.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="pycram.process_modules.default_process_modules.DefaultOpen._execute">
+<span class="sig-name descname"><span class="pre">_execute</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">desig</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../../robot_plans/actions/core/index.html#pycram.robot_plans.actions.core.OpeningMotion" title="pycram.robot_plans.actions.core.OpeningMotion"><span class="pre">OpeningMotion</span></a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.process_modules.default_process_modules.DefaultOpen._execute" title="Link to this definition">#</a></dt>
+<dd><p>Helper method for internal usage only.
+This method is to be overwritten instead of the execute method.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pycram.process_modules.default_process_modules.DefaultClose">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pycram.process_modules.default_process_modules.</span></span><span class="sig-name descname"><span class="pre">DefaultClose</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lock</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.process_modules.default_process_modules.DefaultClose" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="../../process_module/index.html#pycram.process_module.ProcessModule" title="pycram.process_module.ProcessModule"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pycram.process_module.ProcessModule</span></code></a></p>
+<p>Low-level implementation that lets the robot close a grasped container, in simulation</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="pycram.process_modules.default_process_modules.DefaultClose._execute">
+<span class="sig-name descname"><span class="pre">_execute</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">desig</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../../robot_plans/actions/core/index.html#pycram.robot_plans.actions.core.ClosingMotion" title="pycram.robot_plans.actions.core.ClosingMotion"><span class="pre">ClosingMotion</span></a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.process_modules.default_process_modules.DefaultClose._execute" title="Link to this definition">#</a></dt>
+<dd><p>Helper method for internal usage only.
+This method is to be overwritten instead of the execute method.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pycram.process_modules.default_process_modules.DefaultMoveTCPWaypoints">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pycram.process_modules.default_process_modules.</span></span><span class="sig-name descname"><span class="pre">DefaultMoveTCPWaypoints</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lock</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.process_modules.default_process_modules.DefaultMoveTCPWaypoints" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="../../process_module/index.html#pycram.process_module.ProcessModule" title="pycram.process_module.ProcessModule"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pycram.process_module.ProcessModule</span></code></a></p>
+<p>This process moves the tool center point of either the right or the left arm along a list of waypoints.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="pycram.process_modules.default_process_modules.DefaultMoveTCPWaypoints._execute">
+<span class="sig-name descname"><span class="pre">_execute</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">desig</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../../robot_plans/index.html#pycram.robot_plans.MoveTCPWaypointsMotion" title="pycram.robot_plans.MoveTCPWaypointsMotion"><span class="pre">MoveTCPWaypointsMotion</span></a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.process_modules.default_process_modules.DefaultMoveTCPWaypoints._execute" title="Link to this definition">#</a></dt>
+<dd><p>Helper method for internal usage only.
+This method is to be overwritten instead of the execute method.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pycram.process_modules.default_process_modules._move_arm_tcp">
+<span class="sig-prename descclassname"><span class="pre">pycram.process_modules.default_process_modules.</span></span><span class="sig-name descname"><span class="pre">_move_arm_tcp</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">target</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../../datastructures/pose/index.html#pycram.datastructures.pose.PoseStamped" title="pycram.datastructures.pose.PoseStamped"><span class="pre">PoseStamped</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">robot</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">semantic_digital_twin.robots.pr2.AbstractRobot</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">arm</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../../datastructures/enums/index.html#pycram.datastructures.enums.Arms" title="pycram.datastructures.enums.Arms"><span class="pre">Arms</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">world</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">semantic_digital_twin.world.World</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#pycram.process_modules.default_process_modules._move_arm_tcp" title="Link to this definition">#</a></dt>
+<dd><p>Calls the ik solver to calculate the inverse kinematics of the arm and then sets the joint states accordingly.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>target</strong> – Target pose to which the end-effector should move.</p></li>
+<li><p><strong>robot</strong> – Robot object representing the robot.</p></li>
+<li><p><strong>arm</strong> – Which arm to move</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pycram.process_modules.default_process_modules.DefaultDetectingReal">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pycram.process_modules.default_process_modules.</span></span><span class="sig-name descname"><span class="pre">DefaultDetectingReal</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lock</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.process_modules.default_process_modules.DefaultDetectingReal" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="../../process_module/index.html#pycram.process_module.ProcessModule" title="pycram.process_module.ProcessModule"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pycram.process_module.ProcessModule</span></code></a></p>
+<dl class="simple">
+<dt>Implementation of process modules. Process modules are the part that communicate with the outer world to execute</dt><dd><p>designators.</p>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="pycram.process_modules.default_process_modules.DefaultDetectingReal._execute">
+<span class="sig-name descname"><span class="pre">_execute</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">designator</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../../robot_plans/index.html#pycram.robot_plans.DetectingMotion" title="pycram.robot_plans.DetectingMotion"><span class="pre">DetectingMotion</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">Body</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#pycram.process_modules.default_process_modules.DefaultDetectingReal._execute" title="Link to this definition">#</a></dt>
+<dd><p>Perform a query based on the detection technique and state defined in the designator.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>A list of perceived objects.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pycram.process_modules.default_process_modules.DefaultNavigationReal">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pycram.process_modules.default_process_modules.</span></span><span class="sig-name descname"><span class="pre">DefaultNavigationReal</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lock</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.process_modules.default_process_modules.DefaultNavigationReal" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="../../process_module/index.html#pycram.process_module.ProcessModule" title="pycram.process_module.ProcessModule"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pycram.process_module.ProcessModule</span></code></a></p>
+<p>Process module for the real robot that sends a cartesian goal to giskard to move the robot base</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="pycram.process_modules.default_process_modules.DefaultNavigationReal._execute">
+<span class="sig-name descname"><span class="pre">_execute</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">designator</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../../robot_plans/actions/core/index.html#pycram.robot_plans.actions.core.MoveMotion" title="pycram.robot_plans.actions.core.MoveMotion"><span class="pre">MoveMotion</span></a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.process_modules.default_process_modules.DefaultNavigationReal._execute" title="Link to this definition">#</a></dt>
+<dd><p>Helper method for internal usage only.
+This method is to be overwritten instead of the execute method.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pycram.process_modules.default_process_modules.DefaultMoveHeadReal">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pycram.process_modules.default_process_modules.</span></span><span class="sig-name descname"><span class="pre">DefaultMoveHeadReal</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lock</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.process_modules.default_process_modules.DefaultMoveHeadReal" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="../../process_module/index.html#pycram.process_module.ProcessModule" title="pycram.process_module.ProcessModule"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pycram.process_module.ProcessModule</span></code></a></p>
+<p>Process module for controlling the real robot’s head to look at a specified position.
+Uses the same calculations as the simulated version to orient the head.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="pycram.process_modules.default_process_modules.DefaultMoveHeadReal._execute">
+<span class="sig-name descname"><span class="pre">_execute</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">desig</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../../robot_plans/actions/core/index.html#pycram.robot_plans.actions.core.LookingMotion" title="pycram.robot_plans.actions.core.LookingMotion"><span class="pre">LookingMotion</span></a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.process_modules.default_process_modules.DefaultMoveHeadReal._execute" title="Link to this definition">#</a></dt>
+<dd><p>Helper method for internal usage only.
+This method is to be overwritten instead of the execute method.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pycram.process_modules.default_process_modules.DefaultMoveTCPReal">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pycram.process_modules.default_process_modules.</span></span><span class="sig-name descname"><span class="pre">DefaultMoveTCPReal</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lock</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.process_modules.default_process_modules.DefaultMoveTCPReal" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="../../process_module/index.html#pycram.process_module.ProcessModule" title="pycram.process_module.ProcessModule"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pycram.process_module.ProcessModule</span></code></a></p>
+<p>Moves the tool center point of the real robot while avoiding all collisions</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="pycram.process_modules.default_process_modules.DefaultMoveTCPReal._execute">
+<span class="sig-name descname"><span class="pre">_execute</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">designator</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../../robot_plans/actions/composite/index.html#pycram.robot_plans.actions.composite.MoveTCPMotion" title="pycram.robot_plans.actions.composite.MoveTCPMotion"><span class="pre">MoveTCPMotion</span></a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.process_modules.default_process_modules.DefaultMoveTCPReal._execute" title="Link to this definition">#</a></dt>
+<dd><p>Helper method for internal usage only.
+This method is to be overwritten instead of the execute method.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pycram.process_modules.default_process_modules.DefaultMoveArmJointsReal">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pycram.process_modules.default_process_modules.</span></span><span class="sig-name descname"><span class="pre">DefaultMoveArmJointsReal</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lock</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.process_modules.default_process_modules.DefaultMoveArmJointsReal" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="../../process_module/index.html#pycram.process_module.ProcessModule" title="pycram.process_module.ProcessModule"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pycram.process_module.ProcessModule</span></code></a></p>
+<p>Moves the arm joints of the real robot to the given configuration while avoiding all collisions</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="pycram.process_modules.default_process_modules.DefaultMoveArmJointsReal._execute">
+<span class="sig-name descname"><span class="pre">_execute</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">designator</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">MoveArmJointsMotion</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.process_modules.default_process_modules.DefaultMoveArmJointsReal._execute" title="Link to this definition">#</a></dt>
+<dd><p>Helper method for internal usage only.
+This method is to be overwritten instead of the execute method.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pycram.process_modules.default_process_modules.DefaultMoveJointsReal">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pycram.process_modules.default_process_modules.</span></span><span class="sig-name descname"><span class="pre">DefaultMoveJointsReal</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lock</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.process_modules.default_process_modules.DefaultMoveJointsReal" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="../../process_module/index.html#pycram.process_module.ProcessModule" title="pycram.process_module.ProcessModule"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pycram.process_module.ProcessModule</span></code></a></p>
+<p>Moves any joint using giskard, avoids all collisions while doint this.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="pycram.process_modules.default_process_modules.DefaultMoveJointsReal._execute">
+<span class="sig-name descname"><span class="pre">_execute</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">designator</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../../robot_plans/actions/core/index.html#pycram.robot_plans.actions.core.MoveJointsMotion" title="pycram.robot_plans.actions.core.MoveJointsMotion"><span class="pre">MoveJointsMotion</span></a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.process_modules.default_process_modules.DefaultMoveJointsReal._execute" title="Link to this definition">#</a></dt>
+<dd><p>Helper method for internal usage only.
+This method is to be overwritten instead of the execute method.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pycram.process_modules.default_process_modules.DefaultMoveGripperReal">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pycram.process_modules.default_process_modules.</span></span><span class="sig-name descname"><span class="pre">DefaultMoveGripperReal</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lock</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.process_modules.default_process_modules.DefaultMoveGripperReal" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="../../process_module/index.html#pycram.process_module.ProcessModule" title="pycram.process_module.ProcessModule"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pycram.process_module.ProcessModule</span></code></a></p>
+<p>Opens or closes the gripper of the real robot, gripper uses an action server for this instead of giskard</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="pycram.process_modules.default_process_modules.DefaultMoveGripperReal._execute">
+<em class="property"><span class="pre">abstract</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">_execute</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">designator</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../../robot_plans/actions/core/index.html#id287" title="pycram.robot_plans.actions.core.MoveGripperMotion"><span class="pre">MoveGripperMotion</span></a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.process_modules.default_process_modules.DefaultMoveGripperReal._execute" title="Link to this definition">#</a></dt>
+<dd><p>Helper method for internal usage only.
+This method is to be overwritten instead of the execute method.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pycram.process_modules.default_process_modules.DefaultOpenReal">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pycram.process_modules.default_process_modules.</span></span><span class="sig-name descname"><span class="pre">DefaultOpenReal</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lock</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.process_modules.default_process_modules.DefaultOpenReal" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="../../process_module/index.html#pycram.process_module.ProcessModule" title="pycram.process_module.ProcessModule"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pycram.process_module.ProcessModule</span></code></a></p>
+<p>Tries to open an already grasped container</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="pycram.process_modules.default_process_modules.DefaultOpenReal._execute">
+<span class="sig-name descname"><span class="pre">_execute</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">designator</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../../robot_plans/actions/core/index.html#pycram.robot_plans.actions.core.OpeningMotion" title="pycram.robot_plans.actions.core.OpeningMotion"><span class="pre">OpeningMotion</span></a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.process_modules.default_process_modules.DefaultOpenReal._execute" title="Link to this definition">#</a></dt>
+<dd><p>Helper method for internal usage only.
+This method is to be overwritten instead of the execute method.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pycram.process_modules.default_process_modules.DefaultCloseReal">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pycram.process_modules.default_process_modules.</span></span><span class="sig-name descname"><span class="pre">DefaultCloseReal</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lock</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.process_modules.default_process_modules.DefaultCloseReal" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="../../process_module/index.html#pycram.process_module.ProcessModule" title="pycram.process_module.ProcessModule"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pycram.process_module.ProcessModule</span></code></a></p>
+<p>Tries to close an already grasped container</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="pycram.process_modules.default_process_modules.DefaultCloseReal._execute">
+<span class="sig-name descname"><span class="pre">_execute</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">designator</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../../robot_plans/actions/core/index.html#pycram.robot_plans.actions.core.ClosingMotion" title="pycram.robot_plans.actions.core.ClosingMotion"><span class="pre">ClosingMotion</span></a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.process_modules.default_process_modules.DefaultCloseReal._execute" title="Link to this definition">#</a></dt>
+<dd><p>Helper method for internal usage only.
+This method is to be overwritten instead of the execute method.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pycram.process_modules.default_process_modules.DefaultMoveTCPWaypointsReal">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pycram.process_modules.default_process_modules.</span></span><span class="sig-name descname"><span class="pre">DefaultMoveTCPWaypointsReal</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lock</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.process_modules.default_process_modules.DefaultMoveTCPWaypointsReal" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="../../process_module/index.html#pycram.process_module.ProcessModule" title="pycram.process_module.ProcessModule"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pycram.process_module.ProcessModule</span></code></a></p>
+<p>Moves the tool center point of the real robot along a list of waypoints while avoiding all collisions</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="pycram.process_modules.default_process_modules.DefaultMoveTCPWaypointsReal._execute">
+<span class="sig-name descname"><span class="pre">_execute</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">designator</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../../robot_plans/index.html#pycram.robot_plans.MoveTCPWaypointsMotion" title="pycram.robot_plans.MoveTCPWaypointsMotion"><span class="pre">MoveTCPWaypointsMotion</span></a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.process_modules.default_process_modules.DefaultMoveTCPWaypointsReal._execute" title="Link to this definition">#</a></dt>
+<dd><p>Helper method for internal usage only.
+This method is to be overwritten instead of the execute method.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pycram.process_modules.default_process_modules.DefaultManager">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pycram.process_modules.default_process_modules.</span></span><span class="sig-name descname"><span class="pre">DefaultManager</span></span><a class="headerlink" href="#pycram.process_modules.default_process_modules.DefaultManager" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="../../process_module/index.html#pycram.process_module.ManagerBase" title="pycram.process_module.ManagerBase"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pycram.process_module.ManagerBase</span></code></a></p>
+<p>Base class for all Process Module Managers. This class is used to register the Process Modules for the robot.
+It is intended to be used as a base class for all Process Module Managers.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="pycram.process_modules.default_process_modules.DefaultManager.navigate">
+<span class="sig-name descname"><span class="pre">navigate</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pycram.process_modules.default_process_modules.DefaultManager.navigate" title="Link to this definition">#</a></dt>
+<dd><dl class="simple">
+<dt>Get the Process Module for navigating the robot with respect to</dt><dd><p>the <code class="xref py py-attr docutils literal notranslate"><span class="pre">execution_type</span></code></p>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The Process Module for navigating</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pycram.process_modules.default_process_modules.DefaultManager.looking">
+<span class="sig-name descname"><span class="pre">looking</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pycram.process_modules.default_process_modules.DefaultManager.looking" title="Link to this definition">#</a></dt>
+<dd><dl class="simple">
+<dt>Get the Process Module for looking at a point with respect to</dt><dd><p>the <code class="xref py py-attr docutils literal notranslate"><span class="pre">execution_type</span></code></p>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pycram.process_modules.default_process_modules.DefaultManager.detecting">
+<span class="sig-name descname"><span class="pre">detecting</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pycram.process_modules.default_process_modules.DefaultManager.detecting" title="Link to this definition">#</a></dt>
+<dd><dl class="simple">
+<dt>Get the Process Module for detecting an object with respect to</dt><dd><p>the <code class="xref py py-attr docutils literal notranslate"><span class="pre">execution_type</span></code></p>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The Process Module for detecting an object</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pycram.process_modules.default_process_modules.DefaultManager.move_tcp">
+<span class="sig-name descname"><span class="pre">move_tcp</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pycram.process_modules.default_process_modules.DefaultManager.move_tcp" title="Link to this definition">#</a></dt>
+<dd><dl class="simple">
+<dt>Get the Process Module for moving the Tool Center Point with respect to</dt><dd><p>the <code class="xref py py-attr docutils literal notranslate"><span class="pre">execution_type</span></code></p>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The Process Module for moving the TCP</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pycram.process_modules.default_process_modules.DefaultManager.move_arm_joints">
+<span class="sig-name descname"><span class="pre">move_arm_joints</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pycram.process_modules.default_process_modules.DefaultManager.move_arm_joints" title="Link to this definition">#</a></dt>
+<dd><p>Get the Process Module for moving the joints of the robot arm
+with respect to the <code class="xref py py-attr docutils literal notranslate"><span class="pre">execution_type</span></code></p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The Process Module for moving the arm joints</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pycram.process_modules.default_process_modules.DefaultManager.move_joints">
+<span class="sig-name descname"><span class="pre">move_joints</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pycram.process_modules.default_process_modules.DefaultManager.move_joints" title="Link to this definition">#</a></dt>
+<dd><p>Get the Process Module for moving any joint of the robot with respect to the
+<code class="xref py py-attr docutils literal notranslate"><span class="pre">execution_type</span></code></p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The Process Module for moving joints</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pycram.process_modules.default_process_modules.DefaultManager.move_gripper">
+<span class="sig-name descname"><span class="pre">move_gripper</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pycram.process_modules.default_process_modules.DefaultManager.move_gripper" title="Link to this definition">#</a></dt>
+<dd><dl class="simple">
+<dt>Get the Process Module for moving the gripper with respect to</dt><dd><p>the <code class="xref py py-attr docutils literal notranslate"><span class="pre">execution_type</span></code></p>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The Process Module for moving the gripper</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pycram.process_modules.default_process_modules.DefaultManager.open">
+<span class="sig-name descname"><span class="pre">open</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pycram.process_modules.default_process_modules.DefaultManager.open" title="Link to this definition">#</a></dt>
+<dd><dl class="simple">
+<dt>Get the Process Module for opening drawers with respect to</dt><dd><p>the <code class="xref py py-attr docutils literal notranslate"><span class="pre">execution_type</span></code></p>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The Process Module for opening drawers</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pycram.process_modules.default_process_modules.DefaultManager.close">
+<span class="sig-name descname"><span class="pre">close</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pycram.process_modules.default_process_modules.DefaultManager.close" title="Link to this definition">#</a></dt>
+<dd><dl class="simple">
+<dt>Get the Process Module for closing drawers with respect to</dt><dd><p>the <code class="xref py py-attr docutils literal notranslate"><span class="pre">execution_type</span></code></p>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The Process Module for closing drawers</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pycram.process_modules.default_process_modules.DefaultManager.move_tcp_waypoints">
+<span class="sig-name descname"><span class="pre">move_tcp_waypoints</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pycram.process_modules.default_process_modules.DefaultManager.move_tcp_waypoints" title="Link to this definition">#</a></dt>
+<dd><dl class="simple">
+<dt>Get the Process Module for moving the Tool Center Point along a list of waypoints with respect to</dt><dd><p>the <code class="xref py py-attr docutils literal notranslate"><span class="pre">execution_type</span></code></p>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The Process Module for moving the TCP along a list of waypoints</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+</section>
+
+    <script type="text/x-thebe-config">
+    {
+        requestKernel: true,
+        binderOptions: {
+            repo: "binder-examples/jupyter-stacks-datascience",
+            ref: "master",
+        },
+        codeMirrorConfig: {
+            theme: "abcdef",
+            mode: "python"
+        },
+        kernelOptions: {
+            name: "python3",
+            path: "./autoapi/pycram/process_modules/default_process_modules"
+        },
+        predefinedOutput: true
+    }
+    </script>
+    <script>kernelName = 'python3'</script>
+
+                </article>
+              
+
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="../boxy_process_modules/index.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">pycram.process_modules.boxy_process_modules</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="../donbot_process_modules/index.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">pycram.process_modules.donbot_process_modules</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+  <div class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#attributes">Attributes</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#classes">Classes</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#functions">Functions</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#module-contents">Module Contents</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.logger"><code class="docutils literal notranslate"><span class="pre">logger</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultNavigation"><code class="docutils literal notranslate"><span class="pre">DefaultNavigation</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultNavigation._execute"><code class="docutils literal notranslate"><span class="pre">DefaultNavigation._execute()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultMoveHead"><code class="docutils literal notranslate"><span class="pre">DefaultMoveHead</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultMoveHead._execute"><code class="docutils literal notranslate"><span class="pre">DefaultMoveHead._execute()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultMoveGripper"><code class="docutils literal notranslate"><span class="pre">DefaultMoveGripper</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultMoveGripper._execute"><code class="docutils literal notranslate"><span class="pre">DefaultMoveGripper._execute()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultDetecting"><code class="docutils literal notranslate"><span class="pre">DefaultDetecting</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultDetecting._execute"><code class="docutils literal notranslate"><span class="pre">DefaultDetecting._execute()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultMoveTCP"><code class="docutils literal notranslate"><span class="pre">DefaultMoveTCP</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultMoveTCP._execute"><code class="docutils literal notranslate"><span class="pre">DefaultMoveTCP._execute()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultMoveArmJoints"><code class="docutils literal notranslate"><span class="pre">DefaultMoveArmJoints</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultMoveArmJoints._execute"><code class="docutils literal notranslate"><span class="pre">DefaultMoveArmJoints._execute()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultMoveJoints"><code class="docutils literal notranslate"><span class="pre">DefaultMoveJoints</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultMoveJoints._execute"><code class="docutils literal notranslate"><span class="pre">DefaultMoveJoints._execute()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultOpen"><code class="docutils literal notranslate"><span class="pre">DefaultOpen</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultOpen._execute"><code class="docutils literal notranslate"><span class="pre">DefaultOpen._execute()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultClose"><code class="docutils literal notranslate"><span class="pre">DefaultClose</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultClose._execute"><code class="docutils literal notranslate"><span class="pre">DefaultClose._execute()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultMoveTCPWaypoints"><code class="docutils literal notranslate"><span class="pre">DefaultMoveTCPWaypoints</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultMoveTCPWaypoints._execute"><code class="docutils literal notranslate"><span class="pre">DefaultMoveTCPWaypoints._execute()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules._move_arm_tcp"><code class="docutils literal notranslate"><span class="pre">_move_arm_tcp()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultDetectingReal"><code class="docutils literal notranslate"><span class="pre">DefaultDetectingReal</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultDetectingReal._execute"><code class="docutils literal notranslate"><span class="pre">DefaultDetectingReal._execute()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultNavigationReal"><code class="docutils literal notranslate"><span class="pre">DefaultNavigationReal</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultNavigationReal._execute"><code class="docutils literal notranslate"><span class="pre">DefaultNavigationReal._execute()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultMoveHeadReal"><code class="docutils literal notranslate"><span class="pre">DefaultMoveHeadReal</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultMoveHeadReal._execute"><code class="docutils literal notranslate"><span class="pre">DefaultMoveHeadReal._execute()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultMoveTCPReal"><code class="docutils literal notranslate"><span class="pre">DefaultMoveTCPReal</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultMoveTCPReal._execute"><code class="docutils literal notranslate"><span class="pre">DefaultMoveTCPReal._execute()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultMoveArmJointsReal"><code class="docutils literal notranslate"><span class="pre">DefaultMoveArmJointsReal</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultMoveArmJointsReal._execute"><code class="docutils literal notranslate"><span class="pre">DefaultMoveArmJointsReal._execute()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultMoveJointsReal"><code class="docutils literal notranslate"><span class="pre">DefaultMoveJointsReal</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultMoveJointsReal._execute"><code class="docutils literal notranslate"><span class="pre">DefaultMoveJointsReal._execute()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultMoveGripperReal"><code class="docutils literal notranslate"><span class="pre">DefaultMoveGripperReal</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultMoveGripperReal._execute"><code class="docutils literal notranslate"><span class="pre">DefaultMoveGripperReal._execute()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultOpenReal"><code class="docutils literal notranslate"><span class="pre">DefaultOpenReal</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultOpenReal._execute"><code class="docutils literal notranslate"><span class="pre">DefaultOpenReal._execute()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultCloseReal"><code class="docutils literal notranslate"><span class="pre">DefaultCloseReal</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultCloseReal._execute"><code class="docutils literal notranslate"><span class="pre">DefaultCloseReal._execute()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultMoveTCPWaypointsReal"><code class="docutils literal notranslate"><span class="pre">DefaultMoveTCPWaypointsReal</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultMoveTCPWaypointsReal._execute"><code class="docutils literal notranslate"><span class="pre">DefaultMoveTCPWaypointsReal._execute()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultManager"><code class="docutils literal notranslate"><span class="pre">DefaultManager</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultManager.navigate"><code class="docutils literal notranslate"><span class="pre">DefaultManager.navigate()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultManager.looking"><code class="docutils literal notranslate"><span class="pre">DefaultManager.looking()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultManager.detecting"><code class="docutils literal notranslate"><span class="pre">DefaultManager.detecting()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultManager.move_tcp"><code class="docutils literal notranslate"><span class="pre">DefaultManager.move_tcp()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultManager.move_arm_joints"><code class="docutils literal notranslate"><span class="pre">DefaultManager.move_arm_joints()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultManager.move_joints"><code class="docutils literal notranslate"><span class="pre">DefaultManager.move_joints()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultManager.move_gripper"><code class="docutils literal notranslate"><span class="pre">DefaultManager.move_gripper()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultManager.open"><code class="docutils literal notranslate"><span class="pre">DefaultManager.open()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultManager.close"><code class="docutils literal notranslate"><span class="pre">DefaultManager.close()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.process_modules.default_process_modules.DefaultManager.move_tcp_waypoints"><code class="docutils literal notranslate"><span class="pre">DefaultManager.move_tcp_waypoints()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+<div class="bd-footer-content__inner container">
+  
+  <div class="footer-item">
+    
+<p class="component-author">
+By Jonas Dech
+</p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+
+  <p class="copyright">
+    
+      © Copyright 2025.
+      <br/>
+    
+  </p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+</div>
+          </footer>
+        
+
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../../../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+  </footer>
+  </body>
+</html>

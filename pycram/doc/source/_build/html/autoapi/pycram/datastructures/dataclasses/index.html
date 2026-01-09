@@ -1,0 +1,1625 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>pycram.datastructures.dataclasses &#8212; PyCRAM</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../../../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../../../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../../../../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/styles/sphinx-book-theme.css?v=eba8b062" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/togglebutton.css?v=13237357" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/sphinx-thebe.css?v=4fa983c6" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/proof.css" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/graphviz.css?v=fd3f3429" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/sphinx-design.min.css?v=95c83b7e" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/custom.css?v=5c87bd76" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../../../../_static/documentation_options.js?v=9eb32ce0"></script>
+    <script src="../../../../_static/doctools.js?v=9a2dae69"></script>
+    <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../../_static/scripts/sphinx-book-theme.js?v=887ef09a"></script>
+    <script>let toggleHintShow = 'Click to show';</script>
+    <script>let toggleHintHide = 'Click to hide';</script>
+    <script>let toggleOpenOnPrint = 'true';</script>
+    <script src="../../../../_static/togglebutton.js?v=4a39c7ea"></script>
+    <script>var togglebuttonSelector = '.toggle, .admonition.dropdown';</script>
+    <script src="../../../../_static/design-tabs.js?v=f930bc37"></script>
+    <script>const THEBE_JS_URL = "https://unpkg.com/thebe@0.8.2/lib/index.js"; const thebe_selector = ".thebe,.cell"; const thebe_selector_input = "pre"; const thebe_selector_output = ".output, .cell_output"</script>
+    <script async="async" src="../../../../_static/sphinx-thebe.js?v=c100c467"></script>
+    <script>var togglebuttonSelector = '.toggle, .admonition.dropdown';</script>
+    <script>const THEBE_JS_URL = "https://unpkg.com/thebe@0.8.2/lib/index.js"; const thebe_selector = ".thebe,.cell"; const thebe_selector_input = "pre"; const thebe_selector_output = ".output, .cell_output"</script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'autoapi/pycram/datastructures/dataclasses/index';</script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" />
+    <link rel="next" title="pycram.datastructures.enums" href="../enums/index.html" />
+    <link rel="prev" title="pycram.datastructures" href="../index.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search..."
+         aria-label="Search..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../../../../_static/new_pycram_logo_clean.svg" class="logo__image only-light" alt="PyCRAM - Home"/>
+    <script>document.write(`<img src="../../../../_static/new_pycram_logo_clean_dark.svg" class="logo__image only-dark" alt="PyCRAM - Home"/>`);</script>
+  
+  
+</a></div>
+        <div class="sidebar-primary-item">
+
+ <script>
+ document.write(`
+   <button class="btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script></div>
+        <div class="sidebar-primary-item"><nav class="bd-links bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item navbar-nav active">
+        <p aria-level="2" class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../../../../installation.html">Installation Guide</a></li>
+
+
+<li class="toctree-l1"><a class="reference internal" href="../../../../quickstart.html">Quickstart Guide</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Concepts</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../../../../plan.html">The PyCRAM Plan</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../designators.html">Designators in PyCRAM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../orm_concept.html">PyCRAM ORM: An Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../abstract_robot.html">Astract Robot Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../process_modules.html">Process Modules in PyCRAM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../costmap.html">Costmaps</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../notebooks.html">Jupyter Notebook Examples</a></li>
+
+
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Adding a new Robot</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../../../../new_robot.html">Adding a new robot to PyCRAM</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Trouble Shooting</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../../../../troubleshooting.html">Troubleshooting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../remarks.html">General Remarks</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Examples</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../../../../notebooks/language.html">Plan Language</a></li>
+
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../../designator_example.html">Designators</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../../notebooks/action_designator.html">Action Designator</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../notebooks/object_designator.html">Object Designator</a></li>
+
+<li class="toctree-l2"><a class="reference internal" href="../../../../notebooks/location_designator.html">Location Designator</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../notebooks/motion_designator.html">from pycram.language import SequentialPlan—
+jupyter:
+jupytext:
+text_representation:
+extension: .md
+format_name: markdown
+format_version: ‘1.3’
+jupytext_version: 1.16.3
+kernelspec:
+display_name: Python 3
+language: python
+name: python3</a></li>
+
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../../orm.html">ORM</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../../notebooks/orm_example.html">from pycram.orm.ormatic_interface import ResolvedActionNodeMappingDAOfrom pycram.orm.model import ResolvedActionNodeMapping—
+jupyter:
+jupytext:
+text_representation:
+extension: .md
+format_name: markdown
+format_version: ‘1.3’
+jupytext_version: 1.16.3
+kernelspec:
+display_name: Python 3
+language: python
+name: python3</a></li>
+
+<li class="toctree-l2"><a class="reference internal" href="../../../../notebooks/orm_querying_examples.html">ORM querying</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../../datastructures.html">Datastructure</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../../notebooks/pose.html">Pose</a></li>
+
+</ul>
+</details></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../ros_utils.html">ROS Utils</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">API</span></p>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="../../index.html">pycram</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../alternative_motion_mappings/index.html">pycram.alternative_motion_mappings</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../alternative_motion_mappings/hsrb_motion_mapping/index.html">pycram.alternative_motion_mappings.hsrb_motion_mapping</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../config/index.html">pycram.config</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../config/action_conf/index.html">pycram.config.action_conf</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="../../costmaps/index.html">pycram.costmaps</a></li>
+<li class="toctree-l2 current active has-children"><a class="reference internal" href="../index.html">pycram.datastructures</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l3 current active"><a class="current reference internal" href="#">pycram.datastructures.dataclasses</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../enums/index.html">pycram.datastructures.enums</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../grasp/index.html">pycram.datastructures.grasp</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../partial_designator/index.html">pycram.datastructures.partial_designator</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../pose/index.html">pycram.datastructures.pose</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="../../designator/index.html">pycram.designator</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../designators/index.html">pycram.designators</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../designators/location_designator/index.html">pycram.designators.location_designator</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../designators/object_designator/index.html">pycram.designators.object_designator</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../designators/specialized_designators/index.html">pycram.designators.specialized_designators</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../designators/specialized_designators/action/index.html">pycram.designators.specialized_designators.action</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../designators/specialized_designators/location/index.html">pycram.designators.specialized_designators.location</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../designators/specialized_designators/probabilistic/index.html">pycram.designators.specialized_designators.probabilistic</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../external_interfaces/index.html">pycram.external_interfaces</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../external_interfaces/blum_api/index.html">pycram.external_interfaces.blum_api</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../external_interfaces/giskard/index.html">pycram.external_interfaces.giskard</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../external_interfaces/move_base/index.html">pycram.external_interfaces.move_base</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../external_interfaces/procthor/index.html">pycram.external_interfaces.procthor</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../external_interfaces/robokudo/index.html">pycram.external_interfaces.robokudo</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../external_interfaces/tmc/index.html">pycram.external_interfaces.tmc</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="../../failure_handling/index.html">pycram.failure_handling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../failures/index.html">pycram.failures</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../filter/index.html">pycram.filter</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../fluent/index.html">pycram.fluent</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../has_parameters/index.html">pycram.has_parameters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../helper/index.html">pycram.helper</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../joint_state/index.html">pycram.joint_state</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../language/index.html">pycram.language</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../motion_executor/index.html">pycram.motion_executor</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../ontomatic/index.html">pycram.ontomatic</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../ontomatic/performables_to_ontology/index.html">pycram.ontomatic.performables_to_ontology</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../orm/index.html">pycram.orm</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../orm/model/index.html">pycram.orm.model</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../orm/ormatic_interface/index.html">pycram.orm.ormatic_interface</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../orm/utils/index.html">pycram.orm.utils</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../orm/views/index.html">pycram.orm.views</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="../../parameterizer/index.html">pycram.parameterizer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../perception/index.html">pycram.perception</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../plan/index.html">pycram.plan</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../pose_validator/index.html">pycram.pose_validator</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../probabilistic_costmap/index.html">pycram.probabilistic_costmap</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../process_module/index.html">pycram.process_module</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../process_modules/index.html">pycram.process_modules</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../process_modules/armar_process_modules/index.html">pycram.process_modules.armar_process_modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../process_modules/boxy_process_modules/index.html">pycram.process_modules.boxy_process_modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../process_modules/default_process_modules/index.html">pycram.process_modules.default_process_modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../process_modules/donbot_process_modules/index.html">pycram.process_modules.donbot_process_modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../process_modules/hsrb_process_modules/index.html">pycram.process_modules.hsrb_process_modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../process_modules/icub3_process_modules/index.html">pycram.process_modules.icub3_process_modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../process_modules/justin_process_modules/index.html">pycram.process_modules.justin_process_modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../process_modules/kevin_process_modules/index.html">pycram.process_modules.kevin_process_modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../process_modules/pr2_process_modules/index.html">pycram.process_modules.pr2_process_modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../process_modules/robotiq_gripper_process_module/index.html">pycram.process_modules.robotiq_gripper_process_module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../process_modules/stretch_process_modules/index.html">pycram.process_modules.stretch_process_modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../process_modules/tiago_process_modules/index.html">pycram.process_modules.tiago_process_modules</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="../../robot_description/index.html">pycram.robot_description</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../robot_descriptions/index.html">pycram.robot_descriptions</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../robot_descriptions/armar_description/index.html">pycram.robot_descriptions.armar_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../robot_descriptions/boxy_description/index.html">pycram.robot_descriptions.boxy_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../robot_descriptions/donbot_description/index.html">pycram.robot_descriptions.donbot_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../robot_descriptions/hsrb_description/index.html">pycram.robot_descriptions.hsrb_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../robot_descriptions/hsrb_states/index.html">pycram.robot_descriptions.hsrb_states</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../robot_descriptions/icub3_description/index.html">pycram.robot_descriptions.icub3_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../robot_descriptions/justin_description/index.html">pycram.robot_descriptions.justin_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../robot_descriptions/kevin_description/index.html">pycram.robot_descriptions.kevin_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../robot_descriptions/panda_description/index.html">pycram.robot_descriptions.panda_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../robot_descriptions/pr2_description/index.html">pycram.robot_descriptions.pr2_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../robot_descriptions/pr2_states/index.html">pycram.robot_descriptions.pr2_states</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../robot_descriptions/stretch_description/index.html">pycram.robot_descriptions.stretch_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../robot_descriptions/tiago_description/index.html">pycram.robot_descriptions.tiago_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../robot_descriptions/tracy_description/index.html">pycram.robot_descriptions.tracy_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../robot_descriptions/tracy_states/index.html">pycram.robot_descriptions.tracy_states</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../robot_descriptions/turtlebot_description/index.html">pycram.robot_descriptions.turtlebot_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../robot_descriptions/ur5_description/index.html">pycram.robot_descriptions.ur5_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../robot_descriptions/ur5e_controlled_description/index.html">pycram.robot_descriptions.ur5e_controlled_description</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../robot_plans/index.html">pycram.robot_plans</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../robot_plans/actions/index.html">pycram.robot_plans.actions</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../robot_plans/actions/base/index.html">pycram.robot_plans.actions.base</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../robot_plans/actions/composite/index.html">pycram.robot_plans.actions.composite</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../robot_plans/actions/core/index.html">pycram.robot_plans.actions.core</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../robot_plans/motions/index.html">pycram.robot_plans.motions</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../robot_plans/motions/base/index.html">pycram.robot_plans.motions.base</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../robot_plans/motions/container/index.html">pycram.robot_plans.motions.container</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../robot_plans/motions/gripper/index.html">pycram.robot_plans.motions.gripper</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../robot_plans/motions/misc/index.html">pycram.robot_plans.motions.misc</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../robot_plans/motions/navigation/index.html">pycram.robot_plans.motions.navigation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../robot_plans/motions/robot_body/index.html">pycram.robot_plans.motions.robot_body</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../ros/index.html">pycram.ros</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../ros/no_ros/index.html">pycram.ros.no_ros</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../ros/no_ros/action_lib/index.html">pycram.ros.no_ros.action_lib</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ros/no_ros/data_types/index.html">pycram.ros.no_ros.data_types</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ros/no_ros/publisher/index.html">pycram.ros.no_ros.publisher</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ros/no_ros/ros_tools/index.html">pycram.ros.no_ros.ros_tools</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ros/no_ros/service/index.html">pycram.ros.no_ros.service</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ros/no_ros/subscriber/index.html">pycram.ros.no_ros.subscriber</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../ros/ros1/index.html">pycram.ros.ros1</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../ros/ros1/action_lib/index.html">pycram.ros.ros1.action_lib</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ros/ros1/data_types/index.html">pycram.ros.ros1.data_types</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ros/ros1/publisher/index.html">pycram.ros.ros1.publisher</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ros/ros1/ros_tools/index.html">pycram.ros.ros1.ros_tools</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ros/ros1/service/index.html">pycram.ros.ros1.service</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ros/ros1/subscriber/index.html">pycram.ros.ros1.subscriber</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ros/ros1/viz_marker_publisher/index.html">pycram.ros.ros1.viz_marker_publisher</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../ros/ros2/index.html">pycram.ros.ros2</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../ros/ros2/action_lib/index.html">pycram.ros.ros2.action_lib</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ros/ros2/data_types/index.html">pycram.ros.ros2.data_types</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ros/ros2/filter/index.html">pycram.ros.ros2.filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ros/ros2/publisher/index.html">pycram.ros.ros2.publisher</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ros/ros2/ros_tools/index.html">pycram.ros.ros2.ros_tools</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ros/ros2/service/index.html">pycram.ros.ros2.service</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ros/ros2/subscriber/index.html">pycram.ros.ros2.subscriber</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ros/ros2/viz_marker_publisher/index.html">pycram.ros.ros2.viz_marker_publisher</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../ros_utils/index.html">pycram.ros_utils</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../ros_utils/force_torque_sensor/index.html">pycram.ros_utils.force_torque_sensor</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../ros_utils/joint_state_publisher/index.html">pycram.ros_utils.joint_state_publisher</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../ros_utils/marker_publisher_base/index.html">pycram.ros_utils.marker_publisher_base</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../ros_utils/tf_broadcaster/index.html">pycram.ros_utils.tf_broadcaster</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="../../testing/index.html">pycram.testing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tf_transformations/index.html">pycram.tf_transformations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../units/index.html">pycram.units</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../utils/index.html">pycram.utils</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../validation/index.html">pycram.validation</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../validation/error_checkers/index.html">pycram.validation.error_checkers</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../validation/goal_validator/index.html">pycram.validation.goal_validator</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="../../visualization/index.html">pycram.visualization</a></li>
+</ul>
+</details></li>
+</ul>
+
+    </div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+
+<div class="sbt-scroll-pixel-helper"></div>
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item"><button class="sidebar-toggle primary-toggle btn btn-sm" title="Toggle primary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <span class="fa-solid fa-bars"></span>
+</button></div>
+      
+    </div>
+  
+  
+    <div class="header-article-items__end">
+      
+        <div class="header-article-item">
+
+<div class="article-header-buttons">
+
+
+
+
+
+<div class="dropdown dropdown-download-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Download this page">
+    <i class="fas fa-download"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="../../../../_sources/autoapi/pycram/datastructures/dataclasses/index.rst" target="_blank"
+   class="btn btn-sm btn-download-source-button dropdown-item"
+   title="Download source file"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file"></i>
+  </span>
+<span class="btn__text-container">.rst</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li>
+<button onclick="window.print()"
+  class="btn btn-sm btn-download-pdf-button dropdown-item"
+  title="Print to PDF"
+  data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file-pdf"></i>
+  </span>
+<span class="btn__text-container">.pdf</span>
+</button>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+<button onclick="toggleFullScreen()"
+  class="btn btn-sm btn-fullscreen-button"
+  title="Fullscreen mode"
+  data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script>
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script>
+<button class="sidebar-toggle secondary-toggle btn btn-sm" title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</button>
+</div></div>
+      
+    </div>
+  
+</div>
+</div>
+              
+              
+
+<div id="jb-print-docs-body" class="onlyprint">
+    <h1>pycram.datastructures.dataclasses</h1>
+    <!-- Table of contents -->
+    <div id="print-main-content">
+        <div id="jb-print-toc">
+            
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#classes">Classes</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#functions">Functions</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#module-contents">Module Contents</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Context"><code class="docutils literal notranslate"><span class="pre">Context</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Context.world"><code class="docutils literal notranslate"><span class="pre">Context.world</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Context.robot"><code class="docutils literal notranslate"><span class="pre">Context.robot</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Context.super_plan"><code class="docutils literal notranslate"><span class="pre">Context.super_plan</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Context.ros_node"><code class="docutils literal notranslate"><span class="pre">Context.ros_node</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Context.from_world"><code class="docutils literal notranslate"><span class="pre">Context.from_world()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Context.from_plan"><code class="docutils literal notranslate"><span class="pre">Context.from_plan()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.ExecutionData"><code class="docutils literal notranslate"><span class="pre">ExecutionData</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.ExecutionData.execution_start_pose"><code class="docutils literal notranslate"><span class="pre">ExecutionData.execution_start_pose</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.ExecutionData.execution_start_world_state"><code class="docutils literal notranslate"><span class="pre">ExecutionData.execution_start_world_state</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.ExecutionData.execution_end_pose"><code class="docutils literal notranslate"><span class="pre">ExecutionData.execution_end_pose</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.ExecutionData.execution_end_world_state"><code class="docutils literal notranslate"><span class="pre">ExecutionData.execution_end_world_state</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.ExecutionData.added_world_modifications"><code class="docutils literal notranslate"><span class="pre">ExecutionData.added_world_modifications</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.ExecutionData.manipulated_body_pose_start"><code class="docutils literal notranslate"><span class="pre">ExecutionData.manipulated_body_pose_start</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.ExecutionData.manipulated_body_pose_end"><code class="docutils literal notranslate"><span class="pre">ExecutionData.manipulated_body_pose_end</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.ExecutionData.manipulated_body"><code class="docutils literal notranslate"><span class="pre">ExecutionData.manipulated_body</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.ExecutionData.manipulated_body_name"><code class="docutils literal notranslate"><span class="pre">ExecutionData.manipulated_body_name</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.ManipulatorData"><code class="docutils literal notranslate"><span class="pre">ManipulatorData</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.ManipulatorData.name"><code class="docutils literal notranslate"><span class="pre">ManipulatorData.name</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.ManipulatorData.base_link"><code class="docutils literal notranslate"><span class="pre">ManipulatorData.base_link</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.ManipulatorData.arm_end_link"><code class="docutils literal notranslate"><span class="pre">ManipulatorData.arm_end_link</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.ManipulatorData.joint_names"><code class="docutils literal notranslate"><span class="pre">ManipulatorData.joint_names</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.ManipulatorData.home_joint_values"><code class="docutils literal notranslate"><span class="pre">ManipulatorData.home_joint_values</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.ManipulatorData.gripper_name"><code class="docutils literal notranslate"><span class="pre">ManipulatorData.gripper_name</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.ManipulatorData.gripper_tool_frame"><code class="docutils literal notranslate"><span class="pre">ManipulatorData.gripper_tool_frame</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.ManipulatorData.gripper_joint_names"><code class="docutils literal notranslate"><span class="pre">ManipulatorData.gripper_joint_names</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.ManipulatorData.closed_joint_values"><code class="docutils literal notranslate"><span class="pre">ManipulatorData.closed_joint_values</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.ManipulatorData.open_joint_values"><code class="docutils literal notranslate"><span class="pre">ManipulatorData.open_joint_values</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.ManipulatorData.opening_distance"><code class="docutils literal notranslate"><span class="pre">ManipulatorData.opening_distance</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.ManipulatorData.fingers_link_names"><code class="docutils literal notranslate"><span class="pre">ManipulatorData.fingers_link_names</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.ManipulatorData.relative_dir"><code class="docutils literal notranslate"><span class="pre">ManipulatorData.relative_dir</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.ManipulatorData.gripper_cmd_topic"><code class="docutils literal notranslate"><span class="pre">ManipulatorData.gripper_cmd_topic</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.ManipulatorData.gripper_open_cmd_value"><code class="docutils literal notranslate"><span class="pre">ManipulatorData.gripper_open_cmd_value</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.ManipulatorData.gripper_close_cmd_value"><code class="docutils literal notranslate"><span class="pre">ManipulatorData.gripper_close_cmd_value</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.ManipulatorData.gripper_relative_dir"><code class="docutils literal notranslate"><span class="pre">ManipulatorData.gripper_relative_dir</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.get_point_as_list"><code class="docutils literal notranslate"><span class="pre">get_point_as_list()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Color"><code class="docutils literal notranslate"><span class="pre">Color</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Color.R"><code class="docutils literal notranslate"><span class="pre">Color.R</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Color.G"><code class="docutils literal notranslate"><span class="pre">Color.G</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Color.B"><code class="docutils literal notranslate"><span class="pre">Color.B</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Color.A"><code class="docutils literal notranslate"><span class="pre">Color.A</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Color.from_list"><code class="docutils literal notranslate"><span class="pre">Color.from_list()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Color.from_rgb"><code class="docutils literal notranslate"><span class="pre">Color.from_rgb()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Color.from_rgba"><code class="docutils literal notranslate"><span class="pre">Color.from_rgba()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Color.get_rgba"><code class="docutils literal notranslate"><span class="pre">Color.get_rgba()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Color.get_rgb"><code class="docutils literal notranslate"><span class="pre">Color.get_rgb()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Colors"><code class="docutils literal notranslate"><span class="pre">Colors</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Colors.PINK"><code class="docutils literal notranslate"><span class="pre">Colors.PINK</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Colors.BLACK"><code class="docutils literal notranslate"><span class="pre">Colors.BLACK</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Colors.WHITE"><code class="docutils literal notranslate"><span class="pre">Colors.WHITE</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Colors.RED"><code class="docutils literal notranslate"><span class="pre">Colors.RED</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Colors.GREEN"><code class="docutils literal notranslate"><span class="pre">Colors.GREEN</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Colors.BLUE"><code class="docutils literal notranslate"><span class="pre">Colors.BLUE</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Colors.YELLOW"><code class="docutils literal notranslate"><span class="pre">Colors.YELLOW</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Colors.CYAN"><code class="docutils literal notranslate"><span class="pre">Colors.CYAN</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Colors.MAGENTA"><code class="docutils literal notranslate"><span class="pre">Colors.MAGENTA</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Colors.GREY"><code class="docutils literal notranslate"><span class="pre">Colors.GREY</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Colors.from_string"><code class="docutils literal notranslate"><span class="pre">Colors.from_string()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.CollisionCallbacks"><code class="docutils literal notranslate"><span class="pre">CollisionCallbacks</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.CollisionCallbacks.on_collision_cb"><code class="docutils literal notranslate"><span class="pre">CollisionCallbacks.on_collision_cb</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.CollisionCallbacks.no_collision_cb"><code class="docutils literal notranslate"><span class="pre">CollisionCallbacks.no_collision_cb</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.LateralFriction"><code class="docutils literal notranslate"><span class="pre">LateralFriction</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.LateralFriction.lateral_friction"><code class="docutils literal notranslate"><span class="pre">LateralFriction.lateral_friction</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.LateralFriction.lateral_friction_direction"><code class="docutils literal notranslate"><span class="pre">LateralFriction.lateral_friction_direction</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.TextAnnotation"><code class="docutils literal notranslate"><span class="pre">TextAnnotation</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.TextAnnotation.text"><code class="docutils literal notranslate"><span class="pre">TextAnnotation.text</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.TextAnnotation.position"><code class="docutils literal notranslate"><span class="pre">TextAnnotation.position</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.TextAnnotation.id"><code class="docutils literal notranslate"><span class="pre">TextAnnotation.id</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.TextAnnotation.color"><code class="docutils literal notranslate"><span class="pre">TextAnnotation.color</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.TextAnnotation.size"><code class="docutils literal notranslate"><span class="pre">TextAnnotation.size</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.VirtualJoint"><code class="docutils literal notranslate"><span class="pre">VirtualJoint</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.VirtualJoint.name"><code class="docutils literal notranslate"><span class="pre">VirtualJoint.name</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.VirtualJoint.type_"><code class="docutils literal notranslate"><span class="pre">VirtualJoint.type_</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.VirtualJoint.axes"><code class="docutils literal notranslate"><span class="pre">VirtualJoint.axes</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.VirtualJoint.type"><code class="docutils literal notranslate"><span class="pre">VirtualJoint.type</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.VirtualJoint.is_virtual"><code class="docutils literal notranslate"><span class="pre">VirtualJoint.is_virtual</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.VirtualJoint.__hash__"><code class="docutils literal notranslate"><span class="pre">VirtualJoint.__hash__()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Rotations"><code class="docutils literal notranslate"><span class="pre">Rotations</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Rotations.SIDE_ROTATIONS"><code class="docutils literal notranslate"><span class="pre">Rotations.SIDE_ROTATIONS</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Rotations.VERTICAL_ROTATIONS"><code class="docutils literal notranslate"><span class="pre">Rotations.VERTICAL_ROTATIONS</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Rotations.HORIZONTAL_ROTATIONS"><code class="docutils literal notranslate"><span class="pre">Rotations.HORIZONTAL_ROTATIONS</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.VirtualMobileBaseJoints"><code class="docutils literal notranslate"><span class="pre">VirtualMobileBaseJoints</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.VirtualMobileBaseJoints.translation_x"><code class="docutils literal notranslate"><span class="pre">VirtualMobileBaseJoints.translation_x</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.VirtualMobileBaseJoints.translation_y"><code class="docutils literal notranslate"><span class="pre">VirtualMobileBaseJoints.translation_y</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.VirtualMobileBaseJoints.angular_z"><code class="docutils literal notranslate"><span class="pre">VirtualMobileBaseJoints.angular_z</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.VirtualMobileBaseJoints.names"><code class="docutils literal notranslate"><span class="pre">VirtualMobileBaseJoints.names</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.VirtualMobileBaseJoints.get_types"><code class="docutils literal notranslate"><span class="pre">VirtualMobileBaseJoints.get_types()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.VirtualMobileBaseJoints.get_axes"><code class="docutils literal notranslate"><span class="pre">VirtualMobileBaseJoints.get_axes()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.MultiverseMetaData"><code class="docutils literal notranslate"><span class="pre">MultiverseMetaData</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.MultiverseMetaData.world_name"><code class="docutils literal notranslate"><span class="pre">MultiverseMetaData.world_name</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.MultiverseMetaData.simulation_name"><code class="docutils literal notranslate"><span class="pre">MultiverseMetaData.simulation_name</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.MultiverseMetaData.length_unit"><code class="docutils literal notranslate"><span class="pre">MultiverseMetaData.length_unit</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.MultiverseMetaData.angle_unit"><code class="docutils literal notranslate"><span class="pre">MultiverseMetaData.angle_unit</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.MultiverseMetaData.mass_unit"><code class="docutils literal notranslate"><span class="pre">MultiverseMetaData.mass_unit</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.MultiverseMetaData.time_unit"><code class="docutils literal notranslate"><span class="pre">MultiverseMetaData.time_unit</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.MultiverseMetaData.handedness"><code class="docutils literal notranslate"><span class="pre">MultiverseMetaData.handedness</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="module-pycram.datastructures.dataclasses">
+<span id="pycram-datastructures-dataclasses"></span><h1>pycram.datastructures.dataclasses<a class="headerlink" href="#module-pycram.datastructures.dataclasses" title="Link to this heading">#</a></h1>
+<section id="classes">
+<h2>Classes<a class="headerlink" href="#classes" title="Link to this heading">#</a></h2>
+<div class="pst-scrollable-table-container"><table class="autosummary longtable table autosummary">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pycram.datastructures.dataclasses.Context" title="pycram.datastructures.dataclasses.Context"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Context</span></code></a></p></td>
+<td><p>A dataclass for storing the context of a plan</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#pycram.datastructures.dataclasses.ExecutionData" title="pycram.datastructures.dataclasses.ExecutionData"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ExecutionData</span></code></a></p></td>
+<td><p>A dataclass for storing the information of an execution that is used for creating a robot description for that</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pycram.datastructures.dataclasses.ManipulatorData" title="pycram.datastructures.dataclasses.ManipulatorData"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ManipulatorData</span></code></a></p></td>
+<td><p>A dataclass for storing the information of a manipulator that is used for creating a robot description for that</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#pycram.datastructures.dataclasses.Color" title="pycram.datastructures.dataclasses.Color"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Color</span></code></a></p></td>
+<td><p>Dataclass for storing rgba_color as an RGBA value.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pycram.datastructures.dataclasses.Colors" title="pycram.datastructures.dataclasses.Colors"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Colors</span></code></a></p></td>
+<td><p>Enum for easy access to some common colors.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#pycram.datastructures.dataclasses.CollisionCallbacks" title="pycram.datastructures.dataclasses.CollisionCallbacks"><code class="xref py py-obj docutils literal notranslate"><span class="pre">CollisionCallbacks</span></code></a></p></td>
+<td><p>Dataclass for storing the collision callbacks which are callables that get called when there is a collision</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pycram.datastructures.dataclasses.LateralFriction" title="pycram.datastructures.dataclasses.LateralFriction"><code class="xref py py-obj docutils literal notranslate"><span class="pre">LateralFriction</span></code></a></p></td>
+<td><p>Dataclass for storing the information of the lateral friction.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#pycram.datastructures.dataclasses.TextAnnotation" title="pycram.datastructures.dataclasses.TextAnnotation"><code class="xref py py-obj docutils literal notranslate"><span class="pre">TextAnnotation</span></code></a></p></td>
+<td><p>Dataclass for storing text annotations that can be displayed in the simulation.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pycram.datastructures.dataclasses.VirtualJoint" title="pycram.datastructures.dataclasses.VirtualJoint"><code class="xref py py-obj docutils literal notranslate"><span class="pre">VirtualJoint</span></code></a></p></td>
+<td><p>A virtual (not real) joint that is most likely used for simulation purposes.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#pycram.datastructures.dataclasses.Rotations" title="pycram.datastructures.dataclasses.Rotations"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Rotations</span></code></a></p></td>
+<td><p>A dictionary that defines standard quaternions for different grasps and orientations. This is mainly used</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pycram.datastructures.dataclasses.VirtualMobileBaseJoints" title="pycram.datastructures.dataclasses.VirtualMobileBaseJoints"><code class="xref py py-obj docutils literal notranslate"><span class="pre">VirtualMobileBaseJoints</span></code></a></p></td>
+<td><p>Dataclass for storing the names, types and axes of the virtual mobile base joints of a mobile robot.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#pycram.datastructures.dataclasses.MultiverseMetaData" title="pycram.datastructures.dataclasses.MultiverseMetaData"><code class="xref py py-obj docutils literal notranslate"><span class="pre">MultiverseMetaData</span></code></a></p></td>
+<td><p>Meta data for the Multiverse Client, the simulation_name should be non-empty and unique for each simulation</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="functions">
+<h2>Functions<a class="headerlink" href="#functions" title="Link to this heading">#</a></h2>
+<div class="pst-scrollable-table-container"><table class="autosummary longtable table autosummary">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pycram.datastructures.dataclasses.get_point_as_list" title="pycram.datastructures.dataclasses.get_point_as_list"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_point_as_list</span></code></a>(→ typing_extensions.List[float])</p></td>
+<td><p>Return the point as a list.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="module-contents">
+<h2>Module Contents<a class="headerlink" href="#module-contents" title="Link to this heading">#</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.Context">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pycram.datastructures.dataclasses.</span></span><span class="sig-name descname"><span class="pre">Context</span></span><a class="headerlink" href="#pycram.datastructures.dataclasses.Context" title="Link to this definition">#</a></dt>
+<dd><p>A dataclass for storing the context of a plan</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.Context.world">
+<span class="sig-name descname"><span class="pre">world</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">semantic_digital_twin.world.World</span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.Context.world" title="Link to this definition">#</a></dt>
+<dd><p>The world in which the plan is executed</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.Context.robot">
+<span class="sig-name descname"><span class="pre">robot</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">semantic_digital_twin.robots.abstract_robot.AbstractRobot</span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.Context.robot" title="Link to this definition">#</a></dt>
+<dd><p>The semantic robot annotation which should execute the plan</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.Context.super_plan">
+<span class="sig-name descname"><span class="pre">super_plan</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.Optional</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="../../plan/index.html#pycram.plan.Plan" title="pycram.plan.Plan"><span class="pre">pycram.plan.Plan</span></a><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.Context.super_plan" title="Link to this definition">#</a></dt>
+<dd><p>The plan of which this plan/designator is a part of</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.Context.ros_node">
+<span class="sig-name descname"><span class="pre">ros_node</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">typing_extensions.Any</span><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.Context.ros_node" title="Link to this definition">#</a></dt>
+<dd><p>A ROS node that should be used for communication in this plan</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.Context.from_world">
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_world</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">world</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">semantic_digital_twin.world.World</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">super_plan</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Optional</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="../../plan/index.html#pycram.plan.Plan" title="pycram.plan.Plan"><span class="pre">pycram.plan.Plan</span></a><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.datastructures.dataclasses.Context.from_world" title="Link to this definition">#</a></dt>
+<dd><p>Create a context from a world by getting the first robot in the world. There is no super plan in this case.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>world</strong> – The world for which to create the context</p></li>
+<li><p><strong>super_plan</strong> – An optional super plan</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A context with the first robot in the world and no super plan</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.Context.from_plan">
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_plan</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">plan</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../../plan/index.html#pycram.plan.Plan" title="pycram.plan.Plan"><span class="pre">pycram.plan.Plan</span></a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.datastructures.dataclasses.Context.from_plan" title="Link to this definition">#</a></dt>
+<dd><p>Create a context from a plan by getting the context information from the plan and setting the super plan to
+the given plan.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>plan</strong> – Plan from which to create the context</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A new context with the world and robot from the plan and the super plan set to the given plan</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.ExecutionData">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pycram.datastructures.dataclasses.</span></span><span class="sig-name descname"><span class="pre">ExecutionData</span></span><a class="headerlink" href="#pycram.datastructures.dataclasses.ExecutionData" title="Link to this definition">#</a></dt>
+<dd><p>A dataclass for storing the information of an execution that is used for creating a robot description for that
+execution. An execution is a Robot with a virtual mobile base that can be used to move the robot in the environment.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.ExecutionData.execution_start_pose">
+<span class="sig-name descname"><span class="pre">execution_start_pose</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="../pose/index.html#pycram.datastructures.pose.PoseStamped" title="pycram.datastructures.pose.PoseStamped"><span class="pre">pycram.datastructures.pose.PoseStamped</span></a></em><a class="headerlink" href="#pycram.datastructures.dataclasses.ExecutionData.execution_start_pose" title="Link to this definition">#</a></dt>
+<dd><p>Start of the robot at the start of execution of an action designator</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.ExecutionData.execution_start_world_state">
+<span class="sig-name descname"><span class="pre">execution_start_world_state</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">numpy.ndarray</span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.ExecutionData.execution_start_world_state" title="Link to this definition">#</a></dt>
+<dd><p>The world state at the start of execution of an action designator</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.ExecutionData.execution_end_pose">
+<span class="sig-name descname"><span class="pre">execution_end_pose</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.Optional</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="../pose/index.html#pycram.datastructures.pose.PoseStamped" title="pycram.datastructures.pose.PoseStamped"><span class="pre">pycram.datastructures.pose.PoseStamped</span></a><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.ExecutionData.execution_end_pose" title="Link to this definition">#</a></dt>
+<dd><p>The pose of the robot at the end of executing an action designator</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.ExecutionData.execution_end_world_state">
+<span class="sig-name descname"><span class="pre">execution_end_world_state</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">numpy.ndarray</span><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.ExecutionData.execution_end_world_state" title="Link to this definition">#</a></dt>
+<dd><p>The world state at the end of executing an action designator</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.ExecutionData.added_world_modifications">
+<span class="sig-name descname"><span class="pre">added_world_modifications</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.List</span><span class="p"><span class="pre">[</span></span><span class="pre">semantic_digital_twin.world_description.world_modification.WorldModelModificationBlock</span><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">[]</span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.ExecutionData.added_world_modifications" title="Link to this definition">#</a></dt>
+<dd><p>A list of World modification blocks that were added during the execution of the action designator</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.ExecutionData.manipulated_body_pose_start">
+<span class="sig-name descname"><span class="pre">manipulated_body_pose_start</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.Optional</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="../pose/index.html#pycram.datastructures.pose.PoseStamped" title="pycram.datastructures.pose.PoseStamped"><span class="pre">pycram.datastructures.pose.PoseStamped</span></a><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.ExecutionData.manipulated_body_pose_start" title="Link to this definition">#</a></dt>
+<dd><p>Start pose of the manipulated Body if there was one</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.ExecutionData.manipulated_body_pose_end">
+<span class="sig-name descname"><span class="pre">manipulated_body_pose_end</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.Optional</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="../pose/index.html#pycram.datastructures.pose.PoseStamped" title="pycram.datastructures.pose.PoseStamped"><span class="pre">pycram.datastructures.pose.PoseStamped</span></a><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.ExecutionData.manipulated_body_pose_end" title="Link to this definition">#</a></dt>
+<dd><p>End pose of the manipulated Body if there was one</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.ExecutionData.manipulated_body">
+<span class="sig-name descname"><span class="pre">manipulated_body</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">semantic_digital_twin.world_description.world_entity.Body</span><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.ExecutionData.manipulated_body" title="Link to this definition">#</a></dt>
+<dd><p>Reference to the manipulated body</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.ExecutionData.manipulated_body_name">
+<span class="sig-name descname"><span class="pre">manipulated_body_name</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.ExecutionData.manipulated_body_name" title="Link to this definition">#</a></dt>
+<dd><p>Name of the manipulated body</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.ManipulatorData">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pycram.datastructures.dataclasses.</span></span><span class="sig-name descname"><span class="pre">ManipulatorData</span></span><a class="headerlink" href="#pycram.datastructures.dataclasses.ManipulatorData" title="Link to this definition">#</a></dt>
+<dd><p>A dataclass for storing the information of a manipulator that is used for creating a robot description for that
+manipulator. A manipulator is an Arm with an end-effector that can be used to interact with the environment.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.ManipulatorData.name">
+<span class="sig-name descname"><span class="pre">name</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.ManipulatorData.name" title="Link to this definition">#</a></dt>
+<dd><p>Name of the Manipulator.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.ManipulatorData.base_link">
+<span class="sig-name descname"><span class="pre">base_link</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.ManipulatorData.base_link" title="Link to this definition">#</a></dt>
+<dd><p>Manipulator’s base link.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.ManipulatorData.arm_end_link">
+<span class="sig-name descname"><span class="pre">arm_end_link</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.ManipulatorData.arm_end_link" title="Link to this definition">#</a></dt>
+<dd><p>Manipulator’s arm end link.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.ManipulatorData.joint_names">
+<span class="sig-name descname"><span class="pre">joint_names</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.ManipulatorData.joint_names" title="Link to this definition">#</a></dt>
+<dd><p>List of joint names.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.ManipulatorData.home_joint_values">
+<span class="sig-name descname"><span class="pre">home_joint_values</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.List</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.ManipulatorData.home_joint_values" title="Link to this definition">#</a></dt>
+<dd><p>List of joint values for the home position. (default position)</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.ManipulatorData.gripper_name">
+<span class="sig-name descname"><span class="pre">gripper_name</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.ManipulatorData.gripper_name" title="Link to this definition">#</a></dt>
+<dd><p>Name of the gripper at the end of the arm.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.ManipulatorData.gripper_tool_frame">
+<span class="sig-name descname"><span class="pre">gripper_tool_frame</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.ManipulatorData.gripper_tool_frame" title="Link to this definition">#</a></dt>
+<dd><p>Name of the frame of the gripper tool.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.ManipulatorData.gripper_joint_names">
+<span class="sig-name descname"><span class="pre">gripper_joint_names</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.ManipulatorData.gripper_joint_names" title="Link to this definition">#</a></dt>
+<dd><p>List of gripper joint names.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.ManipulatorData.closed_joint_values">
+<span class="sig-name descname"><span class="pre">closed_joint_values</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.List</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.ManipulatorData.closed_joint_values" title="Link to this definition">#</a></dt>
+<dd><p>List of joint values for the gripper in the closed position.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.ManipulatorData.open_joint_values">
+<span class="sig-name descname"><span class="pre">open_joint_values</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.List</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.ManipulatorData.open_joint_values" title="Link to this definition">#</a></dt>
+<dd><p>List of joint values for the gripper in the open position.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.ManipulatorData.opening_distance">
+<span class="sig-name descname"><span class="pre">opening_distance</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.ManipulatorData.opening_distance" title="Link to this definition">#</a></dt>
+<dd><p>The opening distance of the gripper.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.ManipulatorData.fingers_link_names">
+<span class="sig-name descname"><span class="pre">fingers_link_names</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">typing_extensions.List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.ManipulatorData.fingers_link_names" title="Link to this definition">#</a></dt>
+<dd><p>List of link names for the fingers of the gripper.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.ManipulatorData.relative_dir">
+<span class="sig-name descname"><span class="pre">relative_dir</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">''</span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.ManipulatorData.relative_dir" title="Link to this definition">#</a></dt>
+<dd><p>Relative directory of the manipulator description file in the resources directory.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.ManipulatorData.gripper_cmd_topic">
+<span class="sig-name descname"><span class="pre">gripper_cmd_topic</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.ManipulatorData.gripper_cmd_topic" title="Link to this definition">#</a></dt>
+<dd><p>Gripper command topic in ROS if it has one.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.ManipulatorData.gripper_open_cmd_value">
+<span class="sig-name descname"><span class="pre">gripper_open_cmd_value</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.ManipulatorData.gripper_open_cmd_value" title="Link to this definition">#</a></dt>
+<dd><p>Grip open command value.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.ManipulatorData.gripper_close_cmd_value">
+<span class="sig-name descname"><span class="pre">gripper_close_cmd_value</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.ManipulatorData.gripper_close_cmd_value" title="Link to this definition">#</a></dt>
+<dd><p>Grip close command value.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.ManipulatorData.gripper_relative_dir">
+<span class="sig-name descname"><span class="pre">gripper_relative_dir</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.ManipulatorData.gripper_relative_dir" title="Link to this definition">#</a></dt>
+<dd><dl class="simple">
+<dt>Relative directory of the gripper description file in the resources directory if it has one and is not part of the</dt><dd><p>manipulator description file.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.get_point_as_list">
+<span class="sig-prename descclassname"><span class="pre">pycram.datastructures.dataclasses.</span></span><span class="sig-name descname"><span class="pre">get_point_as_list</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">point</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">pycram.datastructures.pose.Point</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">typing_extensions.List</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#pycram.datastructures.dataclasses.get_point_as_list" title="Link to this definition">#</a></dt>
+<dd><p>Return the point as a list.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>point</strong> – The point.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The point as a list</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.Color">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pycram.datastructures.dataclasses.</span></span><span class="sig-name descname"><span class="pre">Color</span></span><a class="headerlink" href="#pycram.datastructures.dataclasses.Color" title="Link to this definition">#</a></dt>
+<dd><p>Dataclass for storing rgba_color as an RGBA value.
+The values are stored as floats between 0 and 1.
+The default rgba_color is white. ‘A’ stands for the opacity.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.Color.R">
+<span class="sig-name descname"><span class="pre">R</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1</span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.Color.R" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.Color.G">
+<span class="sig-name descname"><span class="pre">G</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1</span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.Color.G" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.Color.B">
+<span class="sig-name descname"><span class="pre">B</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1</span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.Color.B" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.Color.A">
+<span class="sig-name descname"><span class="pre">A</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1</span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.Color.A" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.Color.from_list">
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_list</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">color</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.List</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.datastructures.dataclasses.Color.from_list" title="Link to this definition">#</a></dt>
+<dd><p>Set the rgba_color from a list of RGBA values.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>color</strong> – The list of RGBA values</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.Color.from_rgb">
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_rgb</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">rgb</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.List</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.datastructures.dataclasses.Color.from_rgb" title="Link to this definition">#</a></dt>
+<dd><p>Set the rgba_color from a list of RGB values.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>rgb</strong> – The list of RGB values</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.Color.from_rgba">
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_rgba</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">rgba</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.List</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.datastructures.dataclasses.Color.from_rgba" title="Link to this definition">#</a></dt>
+<dd><p>Set the rgba_color from a list of RGBA values.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>rgba</strong> – The list of RGBA values</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.Color.get_rgba">
+<span class="sig-name descname"><span class="pre">get_rgba</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">typing_extensions.List</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#pycram.datastructures.dataclasses.Color.get_rgba" title="Link to this definition">#</a></dt>
+<dd><p>Return the rgba_color as a list of RGBA values.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The rgba_color as a list of RGBA values</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.Color.get_rgb">
+<span class="sig-name descname"><span class="pre">get_rgb</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">typing_extensions.List</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#pycram.datastructures.dataclasses.Color.get_rgb" title="Link to this definition">#</a></dt>
+<dd><p>Return the rgba_color as a list of RGB values.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The rgba_color as a list of RGB values</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.Colors">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pycram.datastructures.dataclasses.</span></span><span class="sig-name descname"><span class="pre">Colors</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwds</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.datastructures.dataclasses.Colors" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#pycram.datastructures.dataclasses.Color" title="pycram.datastructures.dataclasses.Color"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Color</span></code></a>, <code class="xref py py-obj docutils literal notranslate"><span class="pre">enum.Enum</span></code></p>
+<p>Enum for easy access to some common colors.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.Colors.PINK">
+<span class="sig-name descname"><span class="pre">PINK</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">(1,</span> <span class="pre">0,</span> <span class="pre">1,</span> <span class="pre">1)</span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.Colors.PINK" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.Colors.BLACK">
+<span class="sig-name descname"><span class="pre">BLACK</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">(0,</span> <span class="pre">0,</span> <span class="pre">0,</span> <span class="pre">1)</span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.Colors.BLACK" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.Colors.WHITE">
+<span class="sig-name descname"><span class="pre">WHITE</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">(1,</span> <span class="pre">1,</span> <span class="pre">1,</span> <span class="pre">1)</span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.Colors.WHITE" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.Colors.RED">
+<span class="sig-name descname"><span class="pre">RED</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">(1,</span> <span class="pre">0,</span> <span class="pre">0,</span> <span class="pre">1)</span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.Colors.RED" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.Colors.GREEN">
+<span class="sig-name descname"><span class="pre">GREEN</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">(0,</span> <span class="pre">1,</span> <span class="pre">0,</span> <span class="pre">1)</span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.Colors.GREEN" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.Colors.BLUE">
+<span class="sig-name descname"><span class="pre">BLUE</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">(0,</span> <span class="pre">0,</span> <span class="pre">1,</span> <span class="pre">1)</span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.Colors.BLUE" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.Colors.YELLOW">
+<span class="sig-name descname"><span class="pre">YELLOW</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">(1,</span> <span class="pre">1,</span> <span class="pre">0,</span> <span class="pre">1)</span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.Colors.YELLOW" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.Colors.CYAN">
+<span class="sig-name descname"><span class="pre">CYAN</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">(0,</span> <span class="pre">1,</span> <span class="pre">1,</span> <span class="pre">1)</span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.Colors.CYAN" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.Colors.MAGENTA">
+<span class="sig-name descname"><span class="pre">MAGENTA</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">(1,</span> <span class="pre">0,</span> <span class="pre">1,</span> <span class="pre">1)</span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.Colors.MAGENTA" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.Colors.GREY">
+<span class="sig-name descname"><span class="pre">GREY</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">(0.5,</span> <span class="pre">0.5,</span> <span class="pre">0.5,</span> <span class="pre">1)</span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.Colors.GREY" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.Colors.from_string">
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_string</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">color</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#pycram.datastructures.dataclasses.Color" title="pycram.datastructures.dataclasses.Color"><span class="pre">Color</span></a></span></span><a class="headerlink" href="#pycram.datastructures.dataclasses.Colors.from_string" title="Link to this definition">#</a></dt>
+<dd><p>Set the rgba_color from a string. If the string is not a valid color, it will return the color WHITE.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>color</strong> – The string of the color</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.CollisionCallbacks">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pycram.datastructures.dataclasses.</span></span><span class="sig-name descname"><span class="pre">CollisionCallbacks</span></span><a class="headerlink" href="#pycram.datastructures.dataclasses.CollisionCallbacks" title="Link to this definition">#</a></dt>
+<dd><p>Dataclass for storing the collision callbacks which are callables that get called when there is a collision
+or when a collision is no longer there.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.CollisionCallbacks.on_collision_cb">
+<span class="sig-name descname"><span class="pre">on_collision_cb</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.Callable</span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.CollisionCallbacks.on_collision_cb" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.CollisionCallbacks.no_collision_cb">
+<span class="sig-name descname"><span class="pre">no_collision_cb</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">typing_extensions.Callable</span><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.CollisionCallbacks.no_collision_cb" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.LateralFriction">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pycram.datastructures.dataclasses.</span></span><span class="sig-name descname"><span class="pre">LateralFriction</span></span><a class="headerlink" href="#pycram.datastructures.dataclasses.LateralFriction" title="Link to this definition">#</a></dt>
+<dd><p>Dataclass for storing the information of the lateral friction.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.LateralFriction.lateral_friction">
+<span class="sig-name descname"><span class="pre">lateral_friction</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.LateralFriction.lateral_friction" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.LateralFriction.lateral_friction_direction">
+<span class="sig-name descname"><span class="pre">lateral_friction_direction</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.List</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.LateralFriction.lateral_friction_direction" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.TextAnnotation">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pycram.datastructures.dataclasses.</span></span><span class="sig-name descname"><span class="pre">TextAnnotation</span></span><a class="headerlink" href="#pycram.datastructures.dataclasses.TextAnnotation" title="Link to this definition">#</a></dt>
+<dd><p>Dataclass for storing text annotations that can be displayed in the simulation.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.TextAnnotation.text">
+<span class="sig-name descname"><span class="pre">text</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.TextAnnotation.text" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.TextAnnotation.position">
+<span class="sig-name descname"><span class="pre">position</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.List</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.TextAnnotation.position" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.TextAnnotation.id">
+<span class="sig-name descname"><span class="pre">id</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.TextAnnotation.id" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.TextAnnotation.color">
+<span class="sig-name descname"><span class="pre">color</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#pycram.datastructures.dataclasses.Color" title="pycram.datastructures.dataclasses.Color"><span class="pre">Color</span></a></em><a class="headerlink" href="#pycram.datastructures.dataclasses.TextAnnotation.color" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.TextAnnotation.size">
+<span class="sig-name descname"><span class="pre">size</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0.1</span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.TextAnnotation.size" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.VirtualJoint">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pycram.datastructures.dataclasses.</span></span><span class="sig-name descname"><span class="pre">VirtualJoint</span></span><a class="headerlink" href="#pycram.datastructures.dataclasses.VirtualJoint" title="Link to this definition">#</a></dt>
+<dd><p>A virtual (not real) joint that is most likely used for simulation purposes.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.VirtualJoint.name">
+<span class="sig-name descname"><span class="pre">name</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.VirtualJoint.name" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.VirtualJoint.type_">
+<span class="sig-name descname"><span class="pre">type_</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="../enums/index.html#pycram.datastructures.enums.JointType" title="pycram.datastructures.enums.JointType"><span class="pre">pycram.datastructures.enums.JointType</span></a></em><a class="headerlink" href="#pycram.datastructures.dataclasses.VirtualJoint.type_" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.VirtualJoint.axes">
+<span class="sig-name descname"><span class="pre">axes</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">pycram.datastructures.pose.Point</span><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.VirtualJoint.axes" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.VirtualJoint.type">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">type</span></span><a class="headerlink" href="#pycram.datastructures.dataclasses.VirtualJoint.type" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.VirtualJoint.is_virtual">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">is_virtual</span></span><a class="headerlink" href="#pycram.datastructures.dataclasses.VirtualJoint.is_virtual" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.VirtualJoint.__hash__">
+<span class="sig-name descname"><span class="pre">__hash__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pycram.datastructures.dataclasses.VirtualJoint.__hash__" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.Rotations">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pycram.datastructures.dataclasses.</span></span><span class="sig-name descname"><span class="pre">Rotations</span></span><a class="headerlink" href="#pycram.datastructures.dataclasses.Rotations" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <code class="xref py py-obj docutils literal notranslate"><span class="pre">typing_extensions.Dict</span></code>[<code class="xref py py-obj docutils literal notranslate"><span class="pre">typing_extensions.Optional</span></code>[<code class="xref py py-obj docutils literal notranslate"><span class="pre">typing_extensions.Union</span></code>[<a class="reference internal" href="../enums/index.html#pycram.datastructures.enums.Grasp" title="pycram.datastructures.enums.Grasp"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pycram.datastructures.enums.Grasp</span></code></a>, <code class="xref py py-obj docutils literal notranslate"><span class="pre">bool</span></code>]], <code class="xref py py-obj docutils literal notranslate"><span class="pre">typing_extensions.List</span></code>[<code class="xref py py-obj docutils literal notranslate"><span class="pre">float</span></code>]]</p>
+<p>A dictionary that defines standard quaternions for different grasps and orientations. This is mainly used
+to automatically calculate all grasp descriptions of a robot gripper for the robot description.</p>
+<p>SIDE_ROTATIONS: The quaternions for the different approach directions (front, back, left, right)
+VERTICAL_ROTATIONS: The quaternions for the different vertical alignments, in case the object requires for
+example a top grasp
+HORIZONTAL_ROTATIONS: The quaternions for the different horizontal alignments, in case the gripper needs to roll
+90°</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.Rotations.SIDE_ROTATIONS">
+<span class="sig-name descname"><span class="pre">SIDE_ROTATIONS</span></span><a class="headerlink" href="#pycram.datastructures.dataclasses.Rotations.SIDE_ROTATIONS" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.Rotations.VERTICAL_ROTATIONS">
+<span class="sig-name descname"><span class="pre">VERTICAL_ROTATIONS</span></span><a class="headerlink" href="#pycram.datastructures.dataclasses.Rotations.VERTICAL_ROTATIONS" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.Rotations.HORIZONTAL_ROTATIONS">
+<span class="sig-name descname"><span class="pre">HORIZONTAL_ROTATIONS</span></span><a class="headerlink" href="#pycram.datastructures.dataclasses.Rotations.HORIZONTAL_ROTATIONS" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.VirtualMobileBaseJoints">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pycram.datastructures.dataclasses.</span></span><span class="sig-name descname"><span class="pre">VirtualMobileBaseJoints</span></span><a class="headerlink" href="#pycram.datastructures.dataclasses.VirtualMobileBaseJoints" title="Link to this definition">#</a></dt>
+<dd><p>Dataclass for storing the names, types and axes of the virtual mobile base joints of a mobile robot.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.VirtualMobileBaseJoints.translation_x">
+<span class="sig-name descname"><span class="pre">translation_x</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.Optional</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#pycram.datastructures.dataclasses.VirtualJoint" title="pycram.datastructures.dataclasses.VirtualJoint"><span class="pre">VirtualJoint</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.VirtualMobileBaseJoints.translation_x" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.VirtualMobileBaseJoints.translation_y">
+<span class="sig-name descname"><span class="pre">translation_y</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.Optional</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#pycram.datastructures.dataclasses.VirtualJoint" title="pycram.datastructures.dataclasses.VirtualJoint"><span class="pre">VirtualJoint</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.VirtualMobileBaseJoints.translation_y" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.VirtualMobileBaseJoints.angular_z">
+<span class="sig-name descname"><span class="pre">angular_z</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.Optional</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#pycram.datastructures.dataclasses.VirtualJoint" title="pycram.datastructures.dataclasses.VirtualJoint"><span class="pre">VirtualJoint</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.VirtualMobileBaseJoints.angular_z" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.VirtualMobileBaseJoints.names">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">names</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.VirtualMobileBaseJoints.names" title="Link to this definition">#</a></dt>
+<dd><p>Return the names of the virtual mobile base joints.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.VirtualMobileBaseJoints.get_types">
+<span class="sig-name descname"><span class="pre">get_types</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">typing_extensions.Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="../enums/index.html#pycram.datastructures.enums.JointType" title="pycram.datastructures.enums.JointType"><span class="pre">pycram.datastructures.enums.JointType</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#pycram.datastructures.dataclasses.VirtualMobileBaseJoints.get_types" title="Link to this definition">#</a></dt>
+<dd><p>Return the joint types of the virtual mobile base joints.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.VirtualMobileBaseJoints.get_axes">
+<span class="sig-name descname"><span class="pre">get_axes</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">typing_extensions.Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">pycram.datastructures.pose.Point</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#pycram.datastructures.dataclasses.VirtualMobileBaseJoints.get_axes" title="Link to this definition">#</a></dt>
+<dd><p>Return the axes (i.e. The axis on which the joint moves) of the virtual mobile base joints.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.MultiverseMetaData">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pycram.datastructures.dataclasses.</span></span><span class="sig-name descname"><span class="pre">MultiverseMetaData</span></span><a class="headerlink" href="#pycram.datastructures.dataclasses.MultiverseMetaData" title="Link to this definition">#</a></dt>
+<dd><p>Meta data for the Multiverse Client, the simulation_name should be non-empty and unique for each simulation</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.MultiverseMetaData.world_name">
+<span class="sig-name descname"><span class="pre">world_name</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'world'</span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.MultiverseMetaData.world_name" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.MultiverseMetaData.simulation_name">
+<span class="sig-name descname"><span class="pre">simulation_name</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'cram'</span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.MultiverseMetaData.simulation_name" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.MultiverseMetaData.length_unit">
+<span class="sig-name descname"><span class="pre">length_unit</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'m'</span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.MultiverseMetaData.length_unit" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.MultiverseMetaData.angle_unit">
+<span class="sig-name descname"><span class="pre">angle_unit</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'rad'</span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.MultiverseMetaData.angle_unit" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.MultiverseMetaData.mass_unit">
+<span class="sig-name descname"><span class="pre">mass_unit</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'kg'</span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.MultiverseMetaData.mass_unit" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.MultiverseMetaData.time_unit">
+<span class="sig-name descname"><span class="pre">time_unit</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'s'</span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.MultiverseMetaData.time_unit" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.datastructures.dataclasses.MultiverseMetaData.handedness">
+<span class="sig-name descname"><span class="pre">handedness</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'rhs'</span></em><a class="headerlink" href="#pycram.datastructures.dataclasses.MultiverseMetaData.handedness" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</section>
+</section>
+
+    <script type="text/x-thebe-config">
+    {
+        requestKernel: true,
+        binderOptions: {
+            repo: "binder-examples/jupyter-stacks-datascience",
+            ref: "master",
+        },
+        codeMirrorConfig: {
+            theme: "abcdef",
+            mode: "python"
+        },
+        kernelOptions: {
+            name: "python3",
+            path: "./autoapi/pycram/datastructures/dataclasses"
+        },
+        predefinedOutput: true
+    }
+    </script>
+    <script>kernelName = 'python3'</script>
+
+                </article>
+              
+
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="../index.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">pycram.datastructures</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="../enums/index.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">pycram.datastructures.enums</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+  <div class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#classes">Classes</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#functions">Functions</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#module-contents">Module Contents</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Context"><code class="docutils literal notranslate"><span class="pre">Context</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Context.world"><code class="docutils literal notranslate"><span class="pre">Context.world</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Context.robot"><code class="docutils literal notranslate"><span class="pre">Context.robot</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Context.super_plan"><code class="docutils literal notranslate"><span class="pre">Context.super_plan</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Context.ros_node"><code class="docutils literal notranslate"><span class="pre">Context.ros_node</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Context.from_world"><code class="docutils literal notranslate"><span class="pre">Context.from_world()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Context.from_plan"><code class="docutils literal notranslate"><span class="pre">Context.from_plan()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.ExecutionData"><code class="docutils literal notranslate"><span class="pre">ExecutionData</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.ExecutionData.execution_start_pose"><code class="docutils literal notranslate"><span class="pre">ExecutionData.execution_start_pose</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.ExecutionData.execution_start_world_state"><code class="docutils literal notranslate"><span class="pre">ExecutionData.execution_start_world_state</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.ExecutionData.execution_end_pose"><code class="docutils literal notranslate"><span class="pre">ExecutionData.execution_end_pose</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.ExecutionData.execution_end_world_state"><code class="docutils literal notranslate"><span class="pre">ExecutionData.execution_end_world_state</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.ExecutionData.added_world_modifications"><code class="docutils literal notranslate"><span class="pre">ExecutionData.added_world_modifications</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.ExecutionData.manipulated_body_pose_start"><code class="docutils literal notranslate"><span class="pre">ExecutionData.manipulated_body_pose_start</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.ExecutionData.manipulated_body_pose_end"><code class="docutils literal notranslate"><span class="pre">ExecutionData.manipulated_body_pose_end</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.ExecutionData.manipulated_body"><code class="docutils literal notranslate"><span class="pre">ExecutionData.manipulated_body</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.ExecutionData.manipulated_body_name"><code class="docutils literal notranslate"><span class="pre">ExecutionData.manipulated_body_name</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.ManipulatorData"><code class="docutils literal notranslate"><span class="pre">ManipulatorData</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.ManipulatorData.name"><code class="docutils literal notranslate"><span class="pre">ManipulatorData.name</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.ManipulatorData.base_link"><code class="docutils literal notranslate"><span class="pre">ManipulatorData.base_link</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.ManipulatorData.arm_end_link"><code class="docutils literal notranslate"><span class="pre">ManipulatorData.arm_end_link</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.ManipulatorData.joint_names"><code class="docutils literal notranslate"><span class="pre">ManipulatorData.joint_names</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.ManipulatorData.home_joint_values"><code class="docutils literal notranslate"><span class="pre">ManipulatorData.home_joint_values</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.ManipulatorData.gripper_name"><code class="docutils literal notranslate"><span class="pre">ManipulatorData.gripper_name</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.ManipulatorData.gripper_tool_frame"><code class="docutils literal notranslate"><span class="pre">ManipulatorData.gripper_tool_frame</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.ManipulatorData.gripper_joint_names"><code class="docutils literal notranslate"><span class="pre">ManipulatorData.gripper_joint_names</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.ManipulatorData.closed_joint_values"><code class="docutils literal notranslate"><span class="pre">ManipulatorData.closed_joint_values</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.ManipulatorData.open_joint_values"><code class="docutils literal notranslate"><span class="pre">ManipulatorData.open_joint_values</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.ManipulatorData.opening_distance"><code class="docutils literal notranslate"><span class="pre">ManipulatorData.opening_distance</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.ManipulatorData.fingers_link_names"><code class="docutils literal notranslate"><span class="pre">ManipulatorData.fingers_link_names</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.ManipulatorData.relative_dir"><code class="docutils literal notranslate"><span class="pre">ManipulatorData.relative_dir</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.ManipulatorData.gripper_cmd_topic"><code class="docutils literal notranslate"><span class="pre">ManipulatorData.gripper_cmd_topic</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.ManipulatorData.gripper_open_cmd_value"><code class="docutils literal notranslate"><span class="pre">ManipulatorData.gripper_open_cmd_value</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.ManipulatorData.gripper_close_cmd_value"><code class="docutils literal notranslate"><span class="pre">ManipulatorData.gripper_close_cmd_value</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.ManipulatorData.gripper_relative_dir"><code class="docutils literal notranslate"><span class="pre">ManipulatorData.gripper_relative_dir</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.get_point_as_list"><code class="docutils literal notranslate"><span class="pre">get_point_as_list()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Color"><code class="docutils literal notranslate"><span class="pre">Color</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Color.R"><code class="docutils literal notranslate"><span class="pre">Color.R</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Color.G"><code class="docutils literal notranslate"><span class="pre">Color.G</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Color.B"><code class="docutils literal notranslate"><span class="pre">Color.B</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Color.A"><code class="docutils literal notranslate"><span class="pre">Color.A</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Color.from_list"><code class="docutils literal notranslate"><span class="pre">Color.from_list()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Color.from_rgb"><code class="docutils literal notranslate"><span class="pre">Color.from_rgb()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Color.from_rgba"><code class="docutils literal notranslate"><span class="pre">Color.from_rgba()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Color.get_rgba"><code class="docutils literal notranslate"><span class="pre">Color.get_rgba()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Color.get_rgb"><code class="docutils literal notranslate"><span class="pre">Color.get_rgb()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Colors"><code class="docutils literal notranslate"><span class="pre">Colors</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Colors.PINK"><code class="docutils literal notranslate"><span class="pre">Colors.PINK</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Colors.BLACK"><code class="docutils literal notranslate"><span class="pre">Colors.BLACK</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Colors.WHITE"><code class="docutils literal notranslate"><span class="pre">Colors.WHITE</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Colors.RED"><code class="docutils literal notranslate"><span class="pre">Colors.RED</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Colors.GREEN"><code class="docutils literal notranslate"><span class="pre">Colors.GREEN</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Colors.BLUE"><code class="docutils literal notranslate"><span class="pre">Colors.BLUE</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Colors.YELLOW"><code class="docutils literal notranslate"><span class="pre">Colors.YELLOW</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Colors.CYAN"><code class="docutils literal notranslate"><span class="pre">Colors.CYAN</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Colors.MAGENTA"><code class="docutils literal notranslate"><span class="pre">Colors.MAGENTA</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Colors.GREY"><code class="docutils literal notranslate"><span class="pre">Colors.GREY</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Colors.from_string"><code class="docutils literal notranslate"><span class="pre">Colors.from_string()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.CollisionCallbacks"><code class="docutils literal notranslate"><span class="pre">CollisionCallbacks</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.CollisionCallbacks.on_collision_cb"><code class="docutils literal notranslate"><span class="pre">CollisionCallbacks.on_collision_cb</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.CollisionCallbacks.no_collision_cb"><code class="docutils literal notranslate"><span class="pre">CollisionCallbacks.no_collision_cb</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.LateralFriction"><code class="docutils literal notranslate"><span class="pre">LateralFriction</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.LateralFriction.lateral_friction"><code class="docutils literal notranslate"><span class="pre">LateralFriction.lateral_friction</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.LateralFriction.lateral_friction_direction"><code class="docutils literal notranslate"><span class="pre">LateralFriction.lateral_friction_direction</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.TextAnnotation"><code class="docutils literal notranslate"><span class="pre">TextAnnotation</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.TextAnnotation.text"><code class="docutils literal notranslate"><span class="pre">TextAnnotation.text</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.TextAnnotation.position"><code class="docutils literal notranslate"><span class="pre">TextAnnotation.position</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.TextAnnotation.id"><code class="docutils literal notranslate"><span class="pre">TextAnnotation.id</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.TextAnnotation.color"><code class="docutils literal notranslate"><span class="pre">TextAnnotation.color</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.TextAnnotation.size"><code class="docutils literal notranslate"><span class="pre">TextAnnotation.size</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.VirtualJoint"><code class="docutils literal notranslate"><span class="pre">VirtualJoint</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.VirtualJoint.name"><code class="docutils literal notranslate"><span class="pre">VirtualJoint.name</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.VirtualJoint.type_"><code class="docutils literal notranslate"><span class="pre">VirtualJoint.type_</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.VirtualJoint.axes"><code class="docutils literal notranslate"><span class="pre">VirtualJoint.axes</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.VirtualJoint.type"><code class="docutils literal notranslate"><span class="pre">VirtualJoint.type</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.VirtualJoint.is_virtual"><code class="docutils literal notranslate"><span class="pre">VirtualJoint.is_virtual</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.VirtualJoint.__hash__"><code class="docutils literal notranslate"><span class="pre">VirtualJoint.__hash__()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Rotations"><code class="docutils literal notranslate"><span class="pre">Rotations</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Rotations.SIDE_ROTATIONS"><code class="docutils literal notranslate"><span class="pre">Rotations.SIDE_ROTATIONS</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Rotations.VERTICAL_ROTATIONS"><code class="docutils literal notranslate"><span class="pre">Rotations.VERTICAL_ROTATIONS</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.Rotations.HORIZONTAL_ROTATIONS"><code class="docutils literal notranslate"><span class="pre">Rotations.HORIZONTAL_ROTATIONS</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.VirtualMobileBaseJoints"><code class="docutils literal notranslate"><span class="pre">VirtualMobileBaseJoints</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.VirtualMobileBaseJoints.translation_x"><code class="docutils literal notranslate"><span class="pre">VirtualMobileBaseJoints.translation_x</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.VirtualMobileBaseJoints.translation_y"><code class="docutils literal notranslate"><span class="pre">VirtualMobileBaseJoints.translation_y</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.VirtualMobileBaseJoints.angular_z"><code class="docutils literal notranslate"><span class="pre">VirtualMobileBaseJoints.angular_z</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.VirtualMobileBaseJoints.names"><code class="docutils literal notranslate"><span class="pre">VirtualMobileBaseJoints.names</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.VirtualMobileBaseJoints.get_types"><code class="docutils literal notranslate"><span class="pre">VirtualMobileBaseJoints.get_types()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.VirtualMobileBaseJoints.get_axes"><code class="docutils literal notranslate"><span class="pre">VirtualMobileBaseJoints.get_axes()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.MultiverseMetaData"><code class="docutils literal notranslate"><span class="pre">MultiverseMetaData</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.MultiverseMetaData.world_name"><code class="docutils literal notranslate"><span class="pre">MultiverseMetaData.world_name</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.MultiverseMetaData.simulation_name"><code class="docutils literal notranslate"><span class="pre">MultiverseMetaData.simulation_name</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.MultiverseMetaData.length_unit"><code class="docutils literal notranslate"><span class="pre">MultiverseMetaData.length_unit</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.MultiverseMetaData.angle_unit"><code class="docutils literal notranslate"><span class="pre">MultiverseMetaData.angle_unit</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.MultiverseMetaData.mass_unit"><code class="docutils literal notranslate"><span class="pre">MultiverseMetaData.mass_unit</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.MultiverseMetaData.time_unit"><code class="docutils literal notranslate"><span class="pre">MultiverseMetaData.time_unit</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.datastructures.dataclasses.MultiverseMetaData.handedness"><code class="docutils literal notranslate"><span class="pre">MultiverseMetaData.handedness</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+<div class="bd-footer-content__inner container">
+  
+  <div class="footer-item">
+    
+<p class="component-author">
+By Jonas Dech
+</p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+
+  <p class="copyright">
+    
+      © Copyright 2025.
+      <br/>
+    
+  </p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+</div>
+          </footer>
+        
+
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../../../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+  </footer>
+  </body>
+</html>

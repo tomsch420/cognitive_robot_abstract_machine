@@ -1,0 +1,1357 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>pycram.external_interfaces.giskard &#8212; PyCRAM</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../../../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../../../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../../../../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/styles/sphinx-book-theme.css?v=eba8b062" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/togglebutton.css?v=13237357" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/sphinx-thebe.css?v=4fa983c6" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/proof.css" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/graphviz.css?v=fd3f3429" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/sphinx-design.min.css?v=95c83b7e" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/custom.css?v=5c87bd76" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../../../../_static/documentation_options.js?v=9eb32ce0"></script>
+    <script src="../../../../_static/doctools.js?v=9a2dae69"></script>
+    <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../../_static/scripts/sphinx-book-theme.js?v=887ef09a"></script>
+    <script>let toggleHintShow = 'Click to show';</script>
+    <script>let toggleHintHide = 'Click to hide';</script>
+    <script>let toggleOpenOnPrint = 'true';</script>
+    <script src="../../../../_static/togglebutton.js?v=4a39c7ea"></script>
+    <script>var togglebuttonSelector = '.toggle, .admonition.dropdown';</script>
+    <script src="../../../../_static/design-tabs.js?v=f930bc37"></script>
+    <script>const THEBE_JS_URL = "https://unpkg.com/thebe@0.8.2/lib/index.js"; const thebe_selector = ".thebe,.cell"; const thebe_selector_input = "pre"; const thebe_selector_output = ".output, .cell_output"</script>
+    <script async="async" src="../../../../_static/sphinx-thebe.js?v=c100c467"></script>
+    <script>var togglebuttonSelector = '.toggle, .admonition.dropdown';</script>
+    <script>const THEBE_JS_URL = "https://unpkg.com/thebe@0.8.2/lib/index.js"; const thebe_selector = ".thebe,.cell"; const thebe_selector_input = "pre"; const thebe_selector_output = ".output, .cell_output"</script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'autoapi/pycram/external_interfaces/giskard/index';</script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" />
+    <link rel="next" title="pycram.external_interfaces.move_base" href="../move_base/index.html" />
+    <link rel="prev" title="pycram.external_interfaces.blum_api" href="../blum_api/index.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search..."
+         aria-label="Search..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../../../../_static/new_pycram_logo_clean.svg" class="logo__image only-light" alt="PyCRAM - Home"/>
+    <script>document.write(`<img src="../../../../_static/new_pycram_logo_clean_dark.svg" class="logo__image only-dark" alt="PyCRAM - Home"/>`);</script>
+  
+  
+</a></div>
+        <div class="sidebar-primary-item">
+
+ <script>
+ document.write(`
+   <button class="btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script></div>
+        <div class="sidebar-primary-item"><nav class="bd-links bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item navbar-nav active">
+        <p aria-level="2" class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../../../../installation.html">Installation Guide</a></li>
+
+
+<li class="toctree-l1"><a class="reference internal" href="../../../../quickstart.html">Quickstart Guide</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Concepts</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../../../../plan.html">The PyCRAM Plan</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../designators.html">Designators in PyCRAM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../orm_concept.html">PyCRAM ORM: An Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../abstract_robot.html">Astract Robot Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../process_modules.html">Process Modules in PyCRAM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../costmap.html">Costmaps</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../notebooks.html">Jupyter Notebook Examples</a></li>
+
+
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Adding a new Robot</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../../../../new_robot.html">Adding a new robot to PyCRAM</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Trouble Shooting</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../../../../troubleshooting.html">Troubleshooting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../remarks.html">General Remarks</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Examples</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../../../../notebooks/language.html">Plan Language</a></li>
+
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../../designator_example.html">Designators</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../../notebooks/action_designator.html">Action Designator</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../notebooks/object_designator.html">Object Designator</a></li>
+
+<li class="toctree-l2"><a class="reference internal" href="../../../../notebooks/location_designator.html">Location Designator</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../notebooks/motion_designator.html">from pycram.language import SequentialPlan—
+jupyter:
+jupytext:
+text_representation:
+extension: .md
+format_name: markdown
+format_version: ‘1.3’
+jupytext_version: 1.16.3
+kernelspec:
+display_name: Python 3
+language: python
+name: python3</a></li>
+
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../../orm.html">ORM</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../../notebooks/orm_example.html">from pycram.orm.ormatic_interface import ResolvedActionNodeMappingDAOfrom pycram.orm.model import ResolvedActionNodeMapping—
+jupyter:
+jupytext:
+text_representation:
+extension: .md
+format_name: markdown
+format_version: ‘1.3’
+jupytext_version: 1.16.3
+kernelspec:
+display_name: Python 3
+language: python
+name: python3</a></li>
+
+<li class="toctree-l2"><a class="reference internal" href="../../../../notebooks/orm_querying_examples.html">ORM querying</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../../datastructures.html">Datastructure</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../../notebooks/pose.html">Pose</a></li>
+
+</ul>
+</details></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../ros_utils.html">ROS Utils</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">API</span></p>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="../../index.html">pycram</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../alternative_motion_mappings/index.html">pycram.alternative_motion_mappings</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../alternative_motion_mappings/hsrb_motion_mapping/index.html">pycram.alternative_motion_mappings.hsrb_motion_mapping</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../config/index.html">pycram.config</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../config/action_conf/index.html">pycram.config.action_conf</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="../../costmaps/index.html">pycram.costmaps</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../datastructures/index.html">pycram.datastructures</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../datastructures/dataclasses/index.html">pycram.datastructures.dataclasses</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../datastructures/enums/index.html">pycram.datastructures.enums</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../datastructures/grasp/index.html">pycram.datastructures.grasp</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../datastructures/partial_designator/index.html">pycram.datastructures.partial_designator</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../datastructures/pose/index.html">pycram.datastructures.pose</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="../../designator/index.html">pycram.designator</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../designators/index.html">pycram.designators</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../designators/location_designator/index.html">pycram.designators.location_designator</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../designators/object_designator/index.html">pycram.designators.object_designator</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../designators/specialized_designators/index.html">pycram.designators.specialized_designators</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../designators/specialized_designators/action/index.html">pycram.designators.specialized_designators.action</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../designators/specialized_designators/location/index.html">pycram.designators.specialized_designators.location</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../designators/specialized_designators/probabilistic/index.html">pycram.designators.specialized_designators.probabilistic</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l2 current active has-children"><a class="reference internal" href="../index.html">pycram.external_interfaces</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../blum_api/index.html">pycram.external_interfaces.blum_api</a></li>
+<li class="toctree-l3 current active"><a class="current reference internal" href="#">pycram.external_interfaces.giskard</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../move_base/index.html">pycram.external_interfaces.move_base</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../procthor/index.html">pycram.external_interfaces.procthor</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../robokudo/index.html">pycram.external_interfaces.robokudo</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../tmc/index.html">pycram.external_interfaces.tmc</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="../../failure_handling/index.html">pycram.failure_handling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../failures/index.html">pycram.failures</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../filter/index.html">pycram.filter</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../fluent/index.html">pycram.fluent</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../has_parameters/index.html">pycram.has_parameters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../helper/index.html">pycram.helper</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../joint_state/index.html">pycram.joint_state</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../language/index.html">pycram.language</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../motion_executor/index.html">pycram.motion_executor</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../ontomatic/index.html">pycram.ontomatic</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../ontomatic/performables_to_ontology/index.html">pycram.ontomatic.performables_to_ontology</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../orm/index.html">pycram.orm</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../orm/model/index.html">pycram.orm.model</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../orm/ormatic_interface/index.html">pycram.orm.ormatic_interface</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../orm/utils/index.html">pycram.orm.utils</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../orm/views/index.html">pycram.orm.views</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="../../parameterizer/index.html">pycram.parameterizer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../perception/index.html">pycram.perception</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../plan/index.html">pycram.plan</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../pose_validator/index.html">pycram.pose_validator</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../probabilistic_costmap/index.html">pycram.probabilistic_costmap</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../process_module/index.html">pycram.process_module</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../process_modules/index.html">pycram.process_modules</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../process_modules/armar_process_modules/index.html">pycram.process_modules.armar_process_modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../process_modules/boxy_process_modules/index.html">pycram.process_modules.boxy_process_modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../process_modules/default_process_modules/index.html">pycram.process_modules.default_process_modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../process_modules/donbot_process_modules/index.html">pycram.process_modules.donbot_process_modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../process_modules/hsrb_process_modules/index.html">pycram.process_modules.hsrb_process_modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../process_modules/icub3_process_modules/index.html">pycram.process_modules.icub3_process_modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../process_modules/justin_process_modules/index.html">pycram.process_modules.justin_process_modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../process_modules/kevin_process_modules/index.html">pycram.process_modules.kevin_process_modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../process_modules/pr2_process_modules/index.html">pycram.process_modules.pr2_process_modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../process_modules/robotiq_gripper_process_module/index.html">pycram.process_modules.robotiq_gripper_process_module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../process_modules/stretch_process_modules/index.html">pycram.process_modules.stretch_process_modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../process_modules/tiago_process_modules/index.html">pycram.process_modules.tiago_process_modules</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="../../robot_description/index.html">pycram.robot_description</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../robot_descriptions/index.html">pycram.robot_descriptions</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../robot_descriptions/armar_description/index.html">pycram.robot_descriptions.armar_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../robot_descriptions/boxy_description/index.html">pycram.robot_descriptions.boxy_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../robot_descriptions/donbot_description/index.html">pycram.robot_descriptions.donbot_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../robot_descriptions/hsrb_description/index.html">pycram.robot_descriptions.hsrb_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../robot_descriptions/hsrb_states/index.html">pycram.robot_descriptions.hsrb_states</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../robot_descriptions/icub3_description/index.html">pycram.robot_descriptions.icub3_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../robot_descriptions/justin_description/index.html">pycram.robot_descriptions.justin_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../robot_descriptions/kevin_description/index.html">pycram.robot_descriptions.kevin_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../robot_descriptions/panda_description/index.html">pycram.robot_descriptions.panda_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../robot_descriptions/pr2_description/index.html">pycram.robot_descriptions.pr2_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../robot_descriptions/pr2_states/index.html">pycram.robot_descriptions.pr2_states</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../robot_descriptions/stretch_description/index.html">pycram.robot_descriptions.stretch_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../robot_descriptions/tiago_description/index.html">pycram.robot_descriptions.tiago_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../robot_descriptions/tracy_description/index.html">pycram.robot_descriptions.tracy_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../robot_descriptions/tracy_states/index.html">pycram.robot_descriptions.tracy_states</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../robot_descriptions/turtlebot_description/index.html">pycram.robot_descriptions.turtlebot_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../robot_descriptions/ur5_description/index.html">pycram.robot_descriptions.ur5_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../robot_descriptions/ur5e_controlled_description/index.html">pycram.robot_descriptions.ur5e_controlled_description</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../robot_plans/index.html">pycram.robot_plans</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../robot_plans/actions/index.html">pycram.robot_plans.actions</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../robot_plans/actions/base/index.html">pycram.robot_plans.actions.base</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../robot_plans/actions/composite/index.html">pycram.robot_plans.actions.composite</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../robot_plans/actions/core/index.html">pycram.robot_plans.actions.core</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../robot_plans/motions/index.html">pycram.robot_plans.motions</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../robot_plans/motions/base/index.html">pycram.robot_plans.motions.base</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../robot_plans/motions/container/index.html">pycram.robot_plans.motions.container</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../robot_plans/motions/gripper/index.html">pycram.robot_plans.motions.gripper</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../robot_plans/motions/misc/index.html">pycram.robot_plans.motions.misc</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../robot_plans/motions/navigation/index.html">pycram.robot_plans.motions.navigation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../robot_plans/motions/robot_body/index.html">pycram.robot_plans.motions.robot_body</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../ros/index.html">pycram.ros</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../ros/no_ros/index.html">pycram.ros.no_ros</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../ros/no_ros/action_lib/index.html">pycram.ros.no_ros.action_lib</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ros/no_ros/data_types/index.html">pycram.ros.no_ros.data_types</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ros/no_ros/publisher/index.html">pycram.ros.no_ros.publisher</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ros/no_ros/ros_tools/index.html">pycram.ros.no_ros.ros_tools</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ros/no_ros/service/index.html">pycram.ros.no_ros.service</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ros/no_ros/subscriber/index.html">pycram.ros.no_ros.subscriber</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../ros/ros1/index.html">pycram.ros.ros1</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../ros/ros1/action_lib/index.html">pycram.ros.ros1.action_lib</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ros/ros1/data_types/index.html">pycram.ros.ros1.data_types</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ros/ros1/publisher/index.html">pycram.ros.ros1.publisher</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ros/ros1/ros_tools/index.html">pycram.ros.ros1.ros_tools</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ros/ros1/service/index.html">pycram.ros.ros1.service</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ros/ros1/subscriber/index.html">pycram.ros.ros1.subscriber</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ros/ros1/viz_marker_publisher/index.html">pycram.ros.ros1.viz_marker_publisher</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../ros/ros2/index.html">pycram.ros.ros2</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../ros/ros2/action_lib/index.html">pycram.ros.ros2.action_lib</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ros/ros2/data_types/index.html">pycram.ros.ros2.data_types</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ros/ros2/filter/index.html">pycram.ros.ros2.filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ros/ros2/publisher/index.html">pycram.ros.ros2.publisher</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ros/ros2/ros_tools/index.html">pycram.ros.ros2.ros_tools</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ros/ros2/service/index.html">pycram.ros.ros2.service</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ros/ros2/subscriber/index.html">pycram.ros.ros2.subscriber</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ros/ros2/viz_marker_publisher/index.html">pycram.ros.ros2.viz_marker_publisher</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../ros_utils/index.html">pycram.ros_utils</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../ros_utils/force_torque_sensor/index.html">pycram.ros_utils.force_torque_sensor</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../ros_utils/joint_state_publisher/index.html">pycram.ros_utils.joint_state_publisher</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../ros_utils/marker_publisher_base/index.html">pycram.ros_utils.marker_publisher_base</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../ros_utils/tf_broadcaster/index.html">pycram.ros_utils.tf_broadcaster</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="../../testing/index.html">pycram.testing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tf_transformations/index.html">pycram.tf_transformations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../units/index.html">pycram.units</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../utils/index.html">pycram.utils</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../validation/index.html">pycram.validation</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../validation/error_checkers/index.html">pycram.validation.error_checkers</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../validation/goal_validator/index.html">pycram.validation.goal_validator</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="../../visualization/index.html">pycram.visualization</a></li>
+</ul>
+</details></li>
+</ul>
+
+    </div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+
+<div class="sbt-scroll-pixel-helper"></div>
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item"><button class="sidebar-toggle primary-toggle btn btn-sm" title="Toggle primary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <span class="fa-solid fa-bars"></span>
+</button></div>
+      
+    </div>
+  
+  
+    <div class="header-article-items__end">
+      
+        <div class="header-article-item">
+
+<div class="article-header-buttons">
+
+
+
+
+
+<div class="dropdown dropdown-download-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Download this page">
+    <i class="fas fa-download"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="../../../../_sources/autoapi/pycram/external_interfaces/giskard/index.rst" target="_blank"
+   class="btn btn-sm btn-download-source-button dropdown-item"
+   title="Download source file"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file"></i>
+  </span>
+<span class="btn__text-container">.rst</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li>
+<button onclick="window.print()"
+  class="btn btn-sm btn-download-pdf-button dropdown-item"
+  title="Print to PDF"
+  data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file-pdf"></i>
+  </span>
+<span class="btn__text-container">.pdf</span>
+</button>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+<button onclick="toggleFullScreen()"
+  class="btn btn-sm btn-fullscreen-button"
+  title="Fullscreen mode"
+  data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script>
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script>
+<button class="sidebar-toggle secondary-toggle btn btn-sm" title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</button>
+</div></div>
+      
+    </div>
+  
+</div>
+</div>
+              
+              
+
+<div id="jb-print-docs-body" class="onlyprint">
+    <h1>pycram.external_interfaces.giskard</h1>
+    <!-- Table of contents -->
+    <div id="print-main-content">
+        <div id="jb-print-toc">
+            
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#attributes">Attributes</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#functions">Functions</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#module-contents">Module Contents</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.logger"><code class="docutils literal notranslate"><span class="pre">logger</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.giskard_wrapper"><code class="docutils literal notranslate"><span class="pre">giskard_wrapper</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.is_init"><code class="docutils literal notranslate"><span class="pre">is_init</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.giskard_lock"><code class="docutils literal notranslate"><span class="pre">giskard_lock</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.giskard_rlock"><code class="docutils literal notranslate"><span class="pre">giskard_rlock</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.par_threads"><code class="docutils literal notranslate"><span class="pre">par_threads</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.thread_safe"><code class="docutils literal notranslate"><span class="pre">thread_safe()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.init_giskard_interface"><code class="docutils literal notranslate"><span class="pre">init_giskard_interface()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.achieve_joint_goal"><code class="docutils literal notranslate"><span class="pre">achieve_joint_goal()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.set_joint_goal"><code class="docutils literal notranslate"><span class="pre">set_joint_goal()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.achieve_cartesian_goal"><code class="docutils literal notranslate"><span class="pre">achieve_cartesian_goal()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.achieve_straight_cartesian_goal"><code class="docutils literal notranslate"><span class="pre">achieve_straight_cartesian_goal()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.achieve_translation_goal"><code class="docutils literal notranslate"><span class="pre">achieve_translation_goal()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.achieve_straight_translation_goal"><code class="docutils literal notranslate"><span class="pre">achieve_straight_translation_goal()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.achieve_rotation_goal"><code class="docutils literal notranslate"><span class="pre">achieve_rotation_goal()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.achieve_align_planes_goal"><code class="docutils literal notranslate"><span class="pre">achieve_align_planes_goal()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.achieve_open_container_goal"><code class="docutils literal notranslate"><span class="pre">achieve_open_container_goal()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.achieve_close_container_goal"><code class="docutils literal notranslate"><span class="pre">achieve_close_container_goal()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.achieve_cartesian_waypoints_goal"><code class="docutils literal notranslate"><span class="pre">achieve_cartesian_waypoints_goal()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.projection_cartesian_goal"><code class="docutils literal notranslate"><span class="pre">projection_cartesian_goal()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.projection_cartesian_goal_with_approach"><code class="docutils literal notranslate"><span class="pre">projection_cartesian_goal_with_approach()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.projection_joint_goal"><code class="docutils literal notranslate"><span class="pre">projection_joint_goal()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.allow_gripper_collision"><code class="docutils literal notranslate"><span class="pre">allow_gripper_collision()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.allow_all_collision"><code class="docutils literal notranslate"><span class="pre">allow_all_collision()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.get_gripper_group_names"><code class="docutils literal notranslate"><span class="pre">get_gripper_group_names()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.add_gripper_groups"><code class="docutils literal notranslate"><span class="pre">add_gripper_groups()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.avoid_all_collisions"><code class="docutils literal notranslate"><span class="pre">avoid_all_collisions()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.allow_self_collision"><code class="docutils literal notranslate"><span class="pre">allow_self_collision()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.avoid_collisions"><code class="docutils literal notranslate"><span class="pre">avoid_collisions()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.make_point_stamped"><code class="docutils literal notranslate"><span class="pre">make_point_stamped()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.make_quaternion_stamped"><code class="docutils literal notranslate"><span class="pre">make_quaternion_stamped()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.make_vector_stamped"><code class="docutils literal notranslate"><span class="pre">make_vector_stamped()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.set_straight_cart_goal"><code class="docutils literal notranslate"><span class="pre">set_straight_cart_goal()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.set_cart_goal"><code class="docutils literal notranslate"><span class="pre">set_cart_goal()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.execute"><code class="docutils literal notranslate"><span class="pre">execute()</span></code></a></li>
+</ul>
+</li>
+</ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="module-pycram.external_interfaces.giskard">
+<span id="pycram-external-interfaces-giskard"></span><h1>pycram.external_interfaces.giskard<a class="headerlink" href="#module-pycram.external_interfaces.giskard" title="Link to this heading">#</a></h1>
+<section id="attributes">
+<h2>Attributes<a class="headerlink" href="#attributes" title="Link to this heading">#</a></h2>
+<div class="pst-scrollable-table-container"><table class="autosummary longtable table autosummary">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pycram.external_interfaces.giskard.logger" title="pycram.external_interfaces.giskard.logger"><code class="xref py py-obj docutils literal notranslate"><span class="pre">logger</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#pycram.external_interfaces.giskard.giskard_wrapper" title="pycram.external_interfaces.giskard.giskard_wrapper"><code class="xref py py-obj docutils literal notranslate"><span class="pre">giskard_wrapper</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pycram.external_interfaces.giskard.is_init" title="pycram.external_interfaces.giskard.is_init"><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_init</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#pycram.external_interfaces.giskard.giskard_lock" title="pycram.external_interfaces.giskard.giskard_lock"><code class="xref py py-obj docutils literal notranslate"><span class="pre">giskard_lock</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pycram.external_interfaces.giskard.giskard_rlock" title="pycram.external_interfaces.giskard.giskard_rlock"><code class="xref py py-obj docutils literal notranslate"><span class="pre">giskard_rlock</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#pycram.external_interfaces.giskard.par_threads" title="pycram.external_interfaces.giskard.par_threads"><code class="xref py py-obj docutils literal notranslate"><span class="pre">par_threads</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="functions">
+<h2>Functions<a class="headerlink" href="#functions" title="Link to this heading">#</a></h2>
+<div class="pst-scrollable-table-container"><table class="autosummary longtable table autosummary">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pycram.external_interfaces.giskard.thread_safe" title="pycram.external_interfaces.giskard.thread_safe"><code class="xref py py-obj docutils literal notranslate"><span class="pre">thread_safe</span></code></a>(→ typing_extensions.Callable)</p></td>
+<td><p>Adds thread safety to a function via a decorator. This uses the giskard_lock</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#pycram.external_interfaces.giskard.init_giskard_interface" title="pycram.external_interfaces.giskard.init_giskard_interface"><code class="xref py py-obj docutils literal notranslate"><span class="pre">init_giskard_interface</span></code></a>(→ typing_extensions.Callable)</p></td>
+<td><p>Checks if the ROS messages are available and if giskard is running, if that is the case the interface will be</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pycram.external_interfaces.giskard.achieve_joint_goal" title="pycram.external_interfaces.giskard.achieve_joint_goal"><code class="xref py py-obj docutils literal notranslate"><span class="pre">achieve_joint_goal</span></code></a>(goal_poses)</p></td>
+<td><p>Takes a dictionary of joint position that should be achieved, the keys in the dictionary are the joint names and</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#pycram.external_interfaces.giskard.set_joint_goal" title="pycram.external_interfaces.giskard.set_joint_goal"><code class="xref py py-obj docutils literal notranslate"><span class="pre">set_joint_goal</span></code></a>(→ None)</p></td>
+<td><p>Takes a dictionary of joint position that should be achieved, the keys in the dictionary are the joint names and</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pycram.external_interfaces.giskard.achieve_cartesian_goal" title="pycram.external_interfaces.giskard.achieve_cartesian_goal"><code class="xref py py-obj docutils literal notranslate"><span class="pre">achieve_cartesian_goal</span></code></a>(goal_pose, tip_link, root_link)</p></td>
+<td><p>Takes a cartesian position and tries to move the tip_link to this position using the chain defined by</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#pycram.external_interfaces.giskard.achieve_straight_cartesian_goal" title="pycram.external_interfaces.giskard.achieve_straight_cartesian_goal"><code class="xref py py-obj docutils literal notranslate"><span class="pre">achieve_straight_cartesian_goal</span></code></a>(goal_pose, tip_link, ...)</p></td>
+<td><p>Takes a cartesian position and tries to move the tip_link to this position in a straight line, using the chain</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pycram.external_interfaces.giskard.achieve_translation_goal" title="pycram.external_interfaces.giskard.achieve_translation_goal"><code class="xref py py-obj docutils literal notranslate"><span class="pre">achieve_translation_goal</span></code></a>(goal_point, tip_link, root_link)</p></td>
+<td><p>Tries to move the tip_link to the position defined by goal_point using the chain defined by root_link and</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#pycram.external_interfaces.giskard.achieve_straight_translation_goal" title="pycram.external_interfaces.giskard.achieve_straight_translation_goal"><code class="xref py py-obj docutils literal notranslate"><span class="pre">achieve_straight_translation_goal</span></code></a>(goal_point, ...)</p></td>
+<td><p>Tries to move the tip_link to the position defined by goal_point in a straight line, using the chain defined by</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pycram.external_interfaces.giskard.achieve_rotation_goal" title="pycram.external_interfaces.giskard.achieve_rotation_goal"><code class="xref py py-obj docutils literal notranslate"><span class="pre">achieve_rotation_goal</span></code></a>(quat, tip_link, root_link)</p></td>
+<td><p>Tries to bring the tip link into the rotation defined by quat using the chain defined by root_link and</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#pycram.external_interfaces.giskard.achieve_align_planes_goal" title="pycram.external_interfaces.giskard.achieve_align_planes_goal"><code class="xref py py-obj docutils literal notranslate"><span class="pre">achieve_align_planes_goal</span></code></a>(goal_normal, tip_link, ...)</p></td>
+<td><p>Tries to align the plane defined by tip normal with goal_normal using the chain between root_link and</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pycram.external_interfaces.giskard.achieve_open_container_goal" title="pycram.external_interfaces.giskard.achieve_open_container_goal"><code class="xref py py-obj docutils literal notranslate"><span class="pre">achieve_open_container_goal</span></code></a>(tip_link, environment_link)</p></td>
+<td><p>Tries to open a container in an environment, this only works if the container was added as a URDF. This goal assumes</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#pycram.external_interfaces.giskard.achieve_close_container_goal" title="pycram.external_interfaces.giskard.achieve_close_container_goal"><code class="xref py py-obj docutils literal notranslate"><span class="pre">achieve_close_container_goal</span></code></a>(tip_link, environment_link)</p></td>
+<td><p>Tries to close a container, this only works if the container was added as a URDF. Assumes that the handle of the</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pycram.external_interfaces.giskard.achieve_cartesian_waypoints_goal" title="pycram.external_interfaces.giskard.achieve_cartesian_waypoints_goal"><code class="xref py py-obj docutils literal notranslate"><span class="pre">achieve_cartesian_waypoints_goal</span></code></a>(waypoints, tip_link, ...)</p></td>
+<td><p>Tries to achieve each waypoint in the given sequence of waypoints.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#pycram.external_interfaces.giskard.projection_cartesian_goal" title="pycram.external_interfaces.giskard.projection_cartesian_goal"><code class="xref py py-obj docutils literal notranslate"><span class="pre">projection_cartesian_goal</span></code></a>(goal_pose, tip_link, root_link)</p></td>
+<td><p>Tries to move the tip_link to the position defined by goal_pose using the chain defined by tip_link and root_link.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pycram.external_interfaces.giskard.projection_cartesian_goal_with_approach" title="pycram.external_interfaces.giskard.projection_cartesian_goal_with_approach"><code class="xref py py-obj docutils literal notranslate"><span class="pre">projection_cartesian_goal_with_approach</span></code></a>(approach_pose, ...)</p></td>
+<td><p>Tries to achieve the goal_pose using the chain defined by tip_link and root_link. The approach_pose is used to drive</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#pycram.external_interfaces.giskard.projection_joint_goal" title="pycram.external_interfaces.giskard.projection_joint_goal"><code class="xref py py-obj docutils literal notranslate"><span class="pre">projection_joint_goal</span></code></a>(goal_poses[, allow_collisions])</p></td>
+<td><p>Tries to achieve the joint goal defined by goal_poses, the goal_poses are projected to the closest point on the</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pycram.external_interfaces.giskard.allow_gripper_collision" title="pycram.external_interfaces.giskard.allow_gripper_collision"><code class="xref py py-obj docutils literal notranslate"><span class="pre">allow_gripper_collision</span></code></a>(→ None)</p></td>
+<td><p>Allows the specified gripper to collide with anything.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#pycram.external_interfaces.giskard.allow_all_collision" title="pycram.external_interfaces.giskard.allow_all_collision"><code class="xref py py-obj docutils literal notranslate"><span class="pre">allow_all_collision</span></code></a>()</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pycram.external_interfaces.giskard.get_gripper_group_names" title="pycram.external_interfaces.giskard.get_gripper_group_names"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_gripper_group_names</span></code></a>(→ typing_extensions.List[str])</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#pycram.external_interfaces.giskard.add_gripper_groups" title="pycram.external_interfaces.giskard.add_gripper_groups"><code class="xref py py-obj docutils literal notranslate"><span class="pre">add_gripper_groups</span></code></a>(→ None)</p></td>
+<td><p>Add the gripper links as a group for collision avoidance.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pycram.external_interfaces.giskard.avoid_all_collisions" title="pycram.external_interfaces.giskard.avoid_all_collisions"><code class="xref py py-obj docutils literal notranslate"><span class="pre">avoid_all_collisions</span></code></a>(→ None)</p></td>
+<td><p>Will avoid all collision for the next goal.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#pycram.external_interfaces.giskard.allow_self_collision" title="pycram.external_interfaces.giskard.allow_self_collision"><code class="xref py py-obj docutils literal notranslate"><span class="pre">allow_self_collision</span></code></a>(→ None)</p></td>
+<td><p>Will allow the robot collision with itself.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pycram.external_interfaces.giskard.avoid_collisions" title="pycram.external_interfaces.giskard.avoid_collisions"><code class="xref py py-obj docutils literal notranslate"><span class="pre">avoid_collisions</span></code></a>(→ None)</p></td>
+<td><p>Will avoid collision between the two objects for the next goal.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#pycram.external_interfaces.giskard.make_point_stamped" title="pycram.external_interfaces.giskard.make_point_stamped"><code class="xref py py-obj docutils literal notranslate"><span class="pre">make_point_stamped</span></code></a>(→ geometry_msgs.msg.PointStamped)</p></td>
+<td><p>Creates a PointStamped message for the given position in world coordinate frame.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pycram.external_interfaces.giskard.make_quaternion_stamped" title="pycram.external_interfaces.giskard.make_quaternion_stamped"><code class="xref py py-obj docutils literal notranslate"><span class="pre">make_quaternion_stamped</span></code></a>(...)</p></td>
+<td><p>Creates a QuaternionStamped message for the given quaternion.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#pycram.external_interfaces.giskard.make_vector_stamped" title="pycram.external_interfaces.giskard.make_vector_stamped"><code class="xref py py-obj docutils literal notranslate"><span class="pre">make_vector_stamped</span></code></a>(→ geometry_msgs.msg.Vector3Stamped)</p></td>
+<td><p>Creates a Vector3Stamped message, this is similar to PointStamped but represents a vector instead of a point.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pycram.external_interfaces.giskard.set_straight_cart_goal" title="pycram.external_interfaces.giskard.set_straight_cart_goal"><code class="xref py py-obj docutils literal notranslate"><span class="pre">set_straight_cart_goal</span></code></a>(goal_pose, tip_link, root_link)</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#pycram.external_interfaces.giskard.set_cart_goal" title="pycram.external_interfaces.giskard.set_cart_goal"><code class="xref py py-obj docutils literal notranslate"><span class="pre">set_cart_goal</span></code></a>(goal_pose, tip_link, root_link[, ...])</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pycram.external_interfaces.giskard.execute" title="pycram.external_interfaces.giskard.execute"><code class="xref py py-obj docutils literal notranslate"><span class="pre">execute</span></code></a>([add_default])</p></td>
+<td><p></p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="module-contents">
+<h2>Module Contents<a class="headerlink" href="#module-contents" title="Link to this heading">#</a></h2>
+<dl class="py data">
+<dt class="sig sig-object py" id="pycram.external_interfaces.giskard.logger">
+<span class="sig-prename descclassname"><span class="pre">pycram.external_interfaces.giskard.</span></span><span class="sig-name descname"><span class="pre">logger</span></span><a class="headerlink" href="#pycram.external_interfaces.giskard.logger" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="pycram.external_interfaces.giskard.giskard_wrapper">
+<span class="sig-prename descclassname"><span class="pre">pycram.external_interfaces.giskard.</span></span><span class="sig-name descname"><span class="pre">giskard_wrapper</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#pycram.external_interfaces.giskard.giskard_wrapper" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="pycram.external_interfaces.giskard.is_init">
+<span class="sig-prename descclassname"><span class="pre">pycram.external_interfaces.giskard.</span></span><span class="sig-name descname"><span class="pre">is_init</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">False</span></em><a class="headerlink" href="#pycram.external_interfaces.giskard.is_init" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="pycram.external_interfaces.giskard.giskard_lock">
+<span class="sig-prename descclassname"><span class="pre">pycram.external_interfaces.giskard.</span></span><span class="sig-name descname"><span class="pre">giskard_lock</span></span><a class="headerlink" href="#pycram.external_interfaces.giskard.giskard_lock" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="pycram.external_interfaces.giskard.giskard_rlock">
+<span class="sig-prename descclassname"><span class="pre">pycram.external_interfaces.giskard.</span></span><span class="sig-name descname"><span class="pre">giskard_rlock</span></span><a class="headerlink" href="#pycram.external_interfaces.giskard.giskard_rlock" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="pycram.external_interfaces.giskard.par_threads">
+<span class="sig-prename descclassname"><span class="pre">pycram.external_interfaces.giskard.</span></span><span class="sig-name descname"><span class="pre">par_threads</span></span><a class="headerlink" href="#pycram.external_interfaces.giskard.par_threads" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pycram.external_interfaces.giskard.thread_safe">
+<span class="sig-prename descclassname"><span class="pre">pycram.external_interfaces.giskard.</span></span><span class="sig-name descname"><span class="pre">thread_safe</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">func</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Callable</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">typing_extensions.Callable</span></span></span><a class="headerlink" href="#pycram.external_interfaces.giskard.thread_safe" title="Link to this definition">#</a></dt>
+<dd><p>Adds thread safety to a function via a decorator. This uses the giskard_lock</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>func</strong> – Function that should be thread safe</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A function with thread safety</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pycram.external_interfaces.giskard.init_giskard_interface">
+<span class="sig-prename descclassname"><span class="pre">pycram.external_interfaces.giskard.</span></span><span class="sig-name descname"><span class="pre">init_giskard_interface</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">func</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Callable</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">typing_extensions.Callable</span></span></span><a class="headerlink" href="#pycram.external_interfaces.giskard.init_giskard_interface" title="Link to this definition">#</a></dt>
+<dd><p>Checks if the ROS messages are available and if giskard is running, if that is the case the interface will be
+initialized.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>func</strong> – Function this decorator should be wrapping</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A callable function which initializes the interface and then calls the wrapped function</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pycram.external_interfaces.giskard.achieve_joint_goal">
+<span class="sig-prename descclassname"><span class="pre">pycram.external_interfaces.giskard.</span></span><span class="sig-name descname"><span class="pre">achieve_joint_goal</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">goal_poses</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.external_interfaces.giskard.achieve_joint_goal" title="Link to this definition">#</a></dt>
+<dd><p>Takes a dictionary of joint position that should be achieved, the keys in the dictionary are the joint names and
+values are the goal joint positions.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>goal_poses</strong> – Dictionary with joint names and position goals</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>MoveResult message for this goal</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pycram.external_interfaces.giskard.set_joint_goal">
+<span class="sig-prename descclassname"><span class="pre">pycram.external_interfaces.giskard.</span></span><span class="sig-name descname"><span class="pre">set_joint_goal</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">goal_poses</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#pycram.external_interfaces.giskard.set_joint_goal" title="Link to this definition">#</a></dt>
+<dd><p>Takes a dictionary of joint position that should be achieved, the keys in the dictionary are the joint names and
+values are the goal joint positions.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>goal_poses</strong> – Dictionary with joint names and position goals</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pycram.external_interfaces.giskard.achieve_cartesian_goal">
+<span class="sig-prename descclassname"><span class="pre">pycram.external_interfaces.giskard.</span></span><span class="sig-name descname"><span class="pre">achieve_cartesian_goal</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">goal_pose</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../../datastructures/pose/index.html#pycram.datastructures.pose.PoseStamped" title="pycram.datastructures.pose.PoseStamped"><span class="pre">pycram.datastructures.pose.PoseStamped</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">tip_link</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">root_link</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">position_threshold</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.02</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">orientation_threshold</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.02</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_monitor</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">grippers_that_can_collide</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Optional</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="../../datastructures/enums/index.html#pycram.datastructures.enums.Arms" title="pycram.datastructures.enums.Arms"><span class="pre">pycram.datastructures.enums.Arms</span></a><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.external_interfaces.giskard.achieve_cartesian_goal" title="Link to this definition">#</a></dt>
+<dd><p>Takes a cartesian position and tries to move the tip_link to this position using the chain defined by
+tip_link and root_link.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>goal_pose</strong> – The position which should be achieved with tip_link</p></li>
+<li><p><strong>tip_link</strong> – The end link of the chain as well as the link which should achieve the goal_pose</p></li>
+<li><p><strong>root_link</strong> – The starting link of the chain which should be used to achieve this goal</p></li>
+<li><p><strong>position_threshold</strong> – Position distance at which the goal is successfully reached</p></li>
+<li><p><strong>orientation_threshold</strong> – Orientation distance at which the goal is successfully reached</p></li>
+<li><p><strong>use_monitor</strong> – Whether to use a monitor for this goal or not.</p></li>
+<li><p><strong>grippers_that_can_collide</strong> – The gripper(s) that should be allowed to collide.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>MoveResult message for this goal</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pycram.external_interfaces.giskard.achieve_straight_cartesian_goal">
+<span class="sig-prename descclassname"><span class="pre">pycram.external_interfaces.giskard.</span></span><span class="sig-name descname"><span class="pre">achieve_straight_cartesian_goal</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">goal_pose</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../../datastructures/pose/index.html#pycram.datastructures.pose.PoseStamped" title="pycram.datastructures.pose.PoseStamped"><span class="pre">pycram.datastructures.pose.PoseStamped</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">tip_link</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">root_link</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">grippers_that_can_collide</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Optional</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="../../datastructures/enums/index.html#pycram.datastructures.enums.Arms" title="pycram.datastructures.enums.Arms"><span class="pre">pycram.datastructures.enums.Arms</span></a><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.external_interfaces.giskard.achieve_straight_cartesian_goal" title="Link to this definition">#</a></dt>
+<dd><p>Takes a cartesian position and tries to move the tip_link to this position in a straight line, using the chain
+defined by tip_link and root_link.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>goal_pose</strong> – The position which should be achieved with tip_link</p></li>
+<li><p><strong>tip_link</strong> – The end link of the chain as well as the link which should achieve the goal_pose</p></li>
+<li><p><strong>root_link</strong> – The starting link of the chain which should be used to achieve this goal</p></li>
+<li><p><strong>grippers_that_can_collide</strong> – The gripper(s) that should be allowed to collide.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>MoveResult message for this goal</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pycram.external_interfaces.giskard.achieve_translation_goal">
+<span class="sig-prename descclassname"><span class="pre">pycram.external_interfaces.giskard.</span></span><span class="sig-name descname"><span class="pre">achieve_translation_goal</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">goal_point</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.List</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tip_link</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">root_link</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.external_interfaces.giskard.achieve_translation_goal" title="Link to this definition">#</a></dt>
+<dd><p>Tries to move the tip_link to the position defined by goal_point using the chain defined by root_link and
+tip_link. Since goal_point only defines the position but no rotation, rotation is not taken into account.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>goal_point</strong> – The goal position of the tip_link</p></li>
+<li><p><strong>tip_link</strong> – The link which should be moved to goal_point as well as the end of the used chain</p></li>
+<li><p><strong>root_link</strong> – The start link of the chain</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>MoveResult message for this goal</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pycram.external_interfaces.giskard.achieve_straight_translation_goal">
+<span class="sig-prename descclassname"><span class="pre">pycram.external_interfaces.giskard.</span></span><span class="sig-name descname"><span class="pre">achieve_straight_translation_goal</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">goal_point</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.List</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tip_link</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">root_link</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.external_interfaces.giskard.achieve_straight_translation_goal" title="Link to this definition">#</a></dt>
+<dd><p>Tries to move the tip_link to the position defined by goal_point in a straight line, using the chain defined by
+root_link and tip_link. Since goal_point only defines the position but no rotation, rotation is not taken into account.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>goal_point</strong> – The goal position of the tip_link</p></li>
+<li><p><strong>tip_link</strong> – The link which should be moved to goal_point as well as the end of the used chain</p></li>
+<li><p><strong>root_link</strong> – The start link of the chain</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>MoveResult message for this goal</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pycram.external_interfaces.giskard.achieve_rotation_goal">
+<span class="sig-prename descclassname"><span class="pre">pycram.external_interfaces.giskard.</span></span><span class="sig-name descname"><span class="pre">achieve_rotation_goal</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">quat</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.List</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tip_link</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">root_link</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.external_interfaces.giskard.achieve_rotation_goal" title="Link to this definition">#</a></dt>
+<dd><p>Tries to bring the tip link into the rotation defined by quat using the chain defined by root_link and
+tip_link.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>quat</strong> – The rotation that should be achieved, given as a quaternion</p></li>
+<li><p><strong>tip_link</strong> – The link that should be in the rotation defined by quat</p></li>
+<li><p><strong>root_link</strong> – The start link of the chain</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>MoveResult message for this goal</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pycram.external_interfaces.giskard.achieve_align_planes_goal">
+<span class="sig-prename descclassname"><span class="pre">pycram.external_interfaces.giskard.</span></span><span class="sig-name descname"><span class="pre">achieve_align_planes_goal</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">goal_normal</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.List</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tip_link</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tip_normal</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.List</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">root_link</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.external_interfaces.giskard.achieve_align_planes_goal" title="Link to this definition">#</a></dt>
+<dd><p>Tries to align the plane defined by tip normal with goal_normal using the chain between root_link and
+tip_link.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>goal_normal</strong> – The goal plane, given as a list of XYZ</p></li>
+<li><p><strong>tip_link</strong> – The end link of the chain that should be used.</p></li>
+<li><p><strong>tip_normal</strong> – The plane that should be aligned with goal_normal, given as a list of XYZ</p></li>
+<li><p><strong>root_link</strong> – The starting link of the chain that should be used.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>MoveResult message for this goal</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pycram.external_interfaces.giskard.achieve_open_container_goal">
+<span class="sig-prename descclassname"><span class="pre">pycram.external_interfaces.giskard.</span></span><span class="sig-name descname"><span class="pre">achieve_open_container_goal</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tip_link</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">environment_link</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.external_interfaces.giskard.achieve_open_container_goal" title="Link to this definition">#</a></dt>
+<dd><p>Tries to open a container in an environment, this only works if the container was added as a URDF. This goal assumes
+that the handle was already grasped. Can only handle container with 1 DOF</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>tip_link</strong> – The End effector that should open the container</p></li>
+<li><p><strong>environment_link</strong> – The name of the handle for this container.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>MoveResult message for this goal</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pycram.external_interfaces.giskard.achieve_close_container_goal">
+<span class="sig-prename descclassname"><span class="pre">pycram.external_interfaces.giskard.</span></span><span class="sig-name descname"><span class="pre">achieve_close_container_goal</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tip_link</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">environment_link</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.external_interfaces.giskard.achieve_close_container_goal" title="Link to this definition">#</a></dt>
+<dd><p>Tries to close a container, this only works if the container was added as a URDF. Assumes that the handle of the
+container was already grasped. Can only handle container with 1 DOF.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>tip_link</strong> – Link name that should be used to close the container.</p></li>
+<li><p><strong>environment_link</strong> – Name of the handle</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>MoveResult message for this goal</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pycram.external_interfaces.giskard.achieve_cartesian_waypoints_goal">
+<span class="sig-prename descclassname"><span class="pre">pycram.external_interfaces.giskard.</span></span><span class="sig-name descname"><span class="pre">achieve_cartesian_waypoints_goal</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">waypoints</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.List</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="../../datastructures/pose/index.html#pycram.datastructures.pose.PoseStamped" title="pycram.datastructures.pose.PoseStamped"><span class="pre">pycram.datastructures.pose.PoseStamped</span></a><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tip_link</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">root_link</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">enforce_final_orientation</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.external_interfaces.giskard.achieve_cartesian_waypoints_goal" title="Link to this definition">#</a></dt>
+<dd><p>Tries to achieve each waypoint in the given sequence of waypoints.
+If :param enforce_final_orientation is False, each waypoint needs a corresponding orientation. If it is True only
+the last waypoint needs to have an orientation.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>waypoints</strong> – The sequence of waypoints as poses to achieve.</p></li>
+<li><p><strong>tip_link</strong> – The endeffector link of the chain that should be used.</p></li>
+<li><p><strong>root_link</strong> – The root link of the chain that should be used.</p></li>
+<li><p><strong>enforce_final_orientation</strong> – If true, only achieve the orientation of the last waypoint. If false, achieve the orientation of each waypoint.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>MoveResult message for this goal</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pycram.external_interfaces.giskard.projection_cartesian_goal">
+<span class="sig-prename descclassname"><span class="pre">pycram.external_interfaces.giskard.</span></span><span class="sig-name descname"><span class="pre">projection_cartesian_goal</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">goal_pose</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../../datastructures/pose/index.html#pycram.datastructures.pose.PoseStamped" title="pycram.datastructures.pose.PoseStamped"><span class="pre">pycram.datastructures.pose.PoseStamped</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">tip_link</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">root_link</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.external_interfaces.giskard.projection_cartesian_goal" title="Link to this definition">#</a></dt>
+<dd><p>Tries to move the tip_link to the position defined by goal_pose using the chain defined by tip_link and root_link.
+The goal_pose is projected to the closest point on the robot’s workspace.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>goal_pose</strong> – The position which should be achieved with tip_link</p></li>
+<li><p><strong>tip_link</strong> – The end link of the chain as well as the link which should achieve the goal_pose</p></li>
+<li><p><strong>root_link</strong> – The starting link of the chain which should be used to achieve this goal</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>MoveResult message for this goal</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pycram.external_interfaces.giskard.projection_cartesian_goal_with_approach">
+<span class="sig-prename descclassname"><span class="pre">pycram.external_interfaces.giskard.</span></span><span class="sig-name descname"><span class="pre">projection_cartesian_goal_with_approach</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">approach_pose</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../../datastructures/pose/index.html#pycram.datastructures.pose.PoseStamped" title="pycram.datastructures.pose.PoseStamped"><span class="pre">pycram.datastructures.pose.PoseStamped</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">goal_pose</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../../datastructures/pose/index.html#pycram.datastructures.pose.PoseStamped" title="pycram.datastructures.pose.PoseStamped"><span class="pre">pycram.datastructures.pose.PoseStamped</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">tip_link</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">root_link</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">robot_base_link</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.external_interfaces.giskard.projection_cartesian_goal_with_approach" title="Link to this definition">#</a></dt>
+<dd><p>Tries to achieve the goal_pose using the chain defined by tip_link and root_link. The approach_pose is used to drive
+the robot to a pose close the actual goal pose, the robot_base_link is used to define the base link of the robot.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>approach_pose</strong> – Pose near the goal_pose</p></li>
+<li><p><strong>goal_pose</strong> – Pose to which the tip_link should be moved</p></li>
+<li><p><strong>tip_link</strong> – The link which should be moved to goal_pose, usually the tool frame</p></li>
+<li><p><strong>root_link</strong> – The start of the link chain which should be used for planning</p></li>
+<li><p><strong>robot_base_link</strong> – The base link of the robot</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A trajectory calculated to move the tip_link to the goal_pose</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pycram.external_interfaces.giskard.projection_joint_goal">
+<span class="sig-prename descclassname"><span class="pre">pycram.external_interfaces.giskard.</span></span><span class="sig-name descname"><span class="pre">projection_joint_goal</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">goal_poses</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">allow_collisions</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.external_interfaces.giskard.projection_joint_goal" title="Link to this definition">#</a></dt>
+<dd><p>Tries to achieve the joint goal defined by goal_poses, the goal_poses are projected to the closest point on the
+robot’s workspace.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>goal_poses</strong> – Dictionary with joint names and position goals</p></li>
+<li><p><strong>allow_collisions</strong> – If all collisions should be allowed for this goal</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>MoveResult message for this goal</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pycram.external_interfaces.giskard.allow_gripper_collision">
+<span class="sig-prename descclassname"><span class="pre">pycram.external_interfaces.giskard.</span></span><span class="sig-name descname"><span class="pre">allow_gripper_collision</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">gripper</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../../datastructures/enums/index.html#pycram.datastructures.enums.Arms" title="pycram.datastructures.enums.Arms"><span class="pre">pycram.datastructures.enums.Arms</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">at_goal</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#pycram.external_interfaces.giskard.allow_gripper_collision" title="Link to this definition">#</a></dt>
+<dd><p>Allows the specified gripper to collide with anything.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>gripper</strong> – The gripper which can collide, either ‘Arms.RIGHT’, ‘Arms.LEFT’ or ‘Arms.BOTH’</p></li>
+<li><p><strong>at_goal</strong> – If the collision should be allowed only for this motion goal.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pycram.external_interfaces.giskard.allow_all_collision">
+<span class="sig-prename descclassname"><span class="pre">pycram.external_interfaces.giskard.</span></span><span class="sig-name descname"><span class="pre">allow_all_collision</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pycram.external_interfaces.giskard.allow_all_collision" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pycram.external_interfaces.giskard.get_gripper_group_names">
+<span class="sig-prename descclassname"><span class="pre">pycram.external_interfaces.giskard.</span></span><span class="sig-name descname"><span class="pre">get_gripper_group_names</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">typing_extensions.List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#pycram.external_interfaces.giskard.get_gripper_group_names" title="Link to this definition">#</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The list of groups that are registered in giskard which have ‘gripper’ in their name.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pycram.external_interfaces.giskard.add_gripper_groups">
+<span class="sig-prename descclassname"><span class="pre">pycram.external_interfaces.giskard.</span></span><span class="sig-name descname"><span class="pre">add_gripper_groups</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#pycram.external_interfaces.giskard.add_gripper_groups" title="Link to this definition">#</a></dt>
+<dd><p>Add the gripper links as a group for collision avoidance.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Response of the RegisterGroup Service</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pycram.external_interfaces.giskard.avoid_all_collisions">
+<span class="sig-prename descclassname"><span class="pre">pycram.external_interfaces.giskard.</span></span><span class="sig-name descname"><span class="pre">avoid_all_collisions</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#pycram.external_interfaces.giskard.avoid_all_collisions" title="Link to this definition">#</a></dt>
+<dd><p>Will avoid all collision for the next goal.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pycram.external_interfaces.giskard.allow_self_collision">
+<span class="sig-prename descclassname"><span class="pre">pycram.external_interfaces.giskard.</span></span><span class="sig-name descname"><span class="pre">allow_self_collision</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#pycram.external_interfaces.giskard.allow_self_collision" title="Link to this definition">#</a></dt>
+<dd><p>Will allow the robot collision with itself.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pycram.external_interfaces.giskard.avoid_collisions">
+<span class="sig-prename descclassname"><span class="pre">pycram.external_interfaces.giskard.</span></span><span class="sig-name descname"><span class="pre">avoid_collisions</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">object1</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">semantic_digital_twin.world_description.world_entity.Body</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">object2</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">semantic_digital_twin.world_description.world_entity.Body</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#pycram.external_interfaces.giskard.avoid_collisions" title="Link to this definition">#</a></dt>
+<dd><p>Will avoid collision between the two objects for the next goal.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>object1</strong> – The first World Object</p></li>
+<li><p><strong>object2</strong> – The second World Object</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pycram.external_interfaces.giskard.make_point_stamped">
+<span class="sig-prename descclassname"><span class="pre">pycram.external_interfaces.giskard.</span></span><span class="sig-name descname"><span class="pre">make_point_stamped</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">point</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.List</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">geometry_msgs.msg.PointStamped</span></span></span><a class="headerlink" href="#pycram.external_interfaces.giskard.make_point_stamped" title="Link to this definition">#</a></dt>
+<dd><p>Creates a PointStamped message for the given position in world coordinate frame.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>point</strong> – XYZ coordinates of the point</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A PointStamped message</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pycram.external_interfaces.giskard.make_quaternion_stamped">
+<span class="sig-prename descclassname"><span class="pre">pycram.external_interfaces.giskard.</span></span><span class="sig-name descname"><span class="pre">make_quaternion_stamped</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">quaternion</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.List</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">geometry_msgs.msg.QuaternionStamped</span></span></span><a class="headerlink" href="#pycram.external_interfaces.giskard.make_quaternion_stamped" title="Link to this definition">#</a></dt>
+<dd><p>Creates a QuaternionStamped message for the given quaternion.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>quaternion</strong> – The quaternion as a list of xyzw</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A QuaternionStamped message</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pycram.external_interfaces.giskard.make_vector_stamped">
+<span class="sig-prename descclassname"><span class="pre">pycram.external_interfaces.giskard.</span></span><span class="sig-name descname"><span class="pre">make_vector_stamped</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.List</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">geometry_msgs.msg.Vector3Stamped</span></span></span><a class="headerlink" href="#pycram.external_interfaces.giskard.make_vector_stamped" title="Link to this definition">#</a></dt>
+<dd><p>Creates a Vector3Stamped message, this is similar to PointStamped but represents a vector instead of a point.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>vector</strong> – The vector given as xyz in world frame</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A Vector3Stamped message</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pycram.external_interfaces.giskard.set_straight_cart_goal">
+<span class="sig-prename descclassname"><span class="pre">pycram.external_interfaces.giskard.</span></span><span class="sig-name descname"><span class="pre">set_straight_cart_goal</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">goal_pose</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../../datastructures/pose/index.html#pycram.datastructures.pose.PoseStamped" title="pycram.datastructures.pose.PoseStamped"><span class="pre">pycram.datastructures.pose.PoseStamped</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">tip_link</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">root_link</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tip_group</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">root_group</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reference_linear_velocity</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reference_angular_velocity</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">weight</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.external_interfaces.giskard.set_straight_cart_goal" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pycram.external_interfaces.giskard.set_cart_goal">
+<span class="sig-prename descclassname"><span class="pre">pycram.external_interfaces.giskard.</span></span><span class="sig-name descname"><span class="pre">set_cart_goal</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">goal_pose</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../../datastructures/pose/index.html#pycram.datastructures.pose.PoseStamped" title="pycram.datastructures.pose.PoseStamped"><span class="pre">pycram.datastructures.pose.PoseStamped</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">tip_link</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">root_link</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tip_group</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">root_group</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reference_linear_velocity</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reference_angular_velocity</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">weight</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">add_monitor</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.external_interfaces.giskard.set_cart_goal" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pycram.external_interfaces.giskard.execute">
+<span class="sig-prename descclassname"><span class="pre">pycram.external_interfaces.giskard.</span></span><span class="sig-name descname"><span class="pre">execute</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">add_default</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.external_interfaces.giskard.execute" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+</section>
+</section>
+
+    <script type="text/x-thebe-config">
+    {
+        requestKernel: true,
+        binderOptions: {
+            repo: "binder-examples/jupyter-stacks-datascience",
+            ref: "master",
+        },
+        codeMirrorConfig: {
+            theme: "abcdef",
+            mode: "python"
+        },
+        kernelOptions: {
+            name: "python3",
+            path: "./autoapi/pycram/external_interfaces/giskard"
+        },
+        predefinedOutput: true
+    }
+    </script>
+    <script>kernelName = 'python3'</script>
+
+                </article>
+              
+
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="../blum_api/index.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">pycram.external_interfaces.blum_api</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="../move_base/index.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">pycram.external_interfaces.move_base</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+  <div class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#attributes">Attributes</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#functions">Functions</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#module-contents">Module Contents</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.logger"><code class="docutils literal notranslate"><span class="pre">logger</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.giskard_wrapper"><code class="docutils literal notranslate"><span class="pre">giskard_wrapper</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.is_init"><code class="docutils literal notranslate"><span class="pre">is_init</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.giskard_lock"><code class="docutils literal notranslate"><span class="pre">giskard_lock</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.giskard_rlock"><code class="docutils literal notranslate"><span class="pre">giskard_rlock</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.par_threads"><code class="docutils literal notranslate"><span class="pre">par_threads</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.thread_safe"><code class="docutils literal notranslate"><span class="pre">thread_safe()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.init_giskard_interface"><code class="docutils literal notranslate"><span class="pre">init_giskard_interface()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.achieve_joint_goal"><code class="docutils literal notranslate"><span class="pre">achieve_joint_goal()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.set_joint_goal"><code class="docutils literal notranslate"><span class="pre">set_joint_goal()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.achieve_cartesian_goal"><code class="docutils literal notranslate"><span class="pre">achieve_cartesian_goal()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.achieve_straight_cartesian_goal"><code class="docutils literal notranslate"><span class="pre">achieve_straight_cartesian_goal()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.achieve_translation_goal"><code class="docutils literal notranslate"><span class="pre">achieve_translation_goal()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.achieve_straight_translation_goal"><code class="docutils literal notranslate"><span class="pre">achieve_straight_translation_goal()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.achieve_rotation_goal"><code class="docutils literal notranslate"><span class="pre">achieve_rotation_goal()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.achieve_align_planes_goal"><code class="docutils literal notranslate"><span class="pre">achieve_align_planes_goal()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.achieve_open_container_goal"><code class="docutils literal notranslate"><span class="pre">achieve_open_container_goal()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.achieve_close_container_goal"><code class="docutils literal notranslate"><span class="pre">achieve_close_container_goal()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.achieve_cartesian_waypoints_goal"><code class="docutils literal notranslate"><span class="pre">achieve_cartesian_waypoints_goal()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.projection_cartesian_goal"><code class="docutils literal notranslate"><span class="pre">projection_cartesian_goal()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.projection_cartesian_goal_with_approach"><code class="docutils literal notranslate"><span class="pre">projection_cartesian_goal_with_approach()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.projection_joint_goal"><code class="docutils literal notranslate"><span class="pre">projection_joint_goal()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.allow_gripper_collision"><code class="docutils literal notranslate"><span class="pre">allow_gripper_collision()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.allow_all_collision"><code class="docutils literal notranslate"><span class="pre">allow_all_collision()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.get_gripper_group_names"><code class="docutils literal notranslate"><span class="pre">get_gripper_group_names()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.add_gripper_groups"><code class="docutils literal notranslate"><span class="pre">add_gripper_groups()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.avoid_all_collisions"><code class="docutils literal notranslate"><span class="pre">avoid_all_collisions()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.allow_self_collision"><code class="docutils literal notranslate"><span class="pre">allow_self_collision()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.avoid_collisions"><code class="docutils literal notranslate"><span class="pre">avoid_collisions()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.make_point_stamped"><code class="docutils literal notranslate"><span class="pre">make_point_stamped()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.make_quaternion_stamped"><code class="docutils literal notranslate"><span class="pre">make_quaternion_stamped()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.make_vector_stamped"><code class="docutils literal notranslate"><span class="pre">make_vector_stamped()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.set_straight_cart_goal"><code class="docutils literal notranslate"><span class="pre">set_straight_cart_goal()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.set_cart_goal"><code class="docutils literal notranslate"><span class="pre">set_cart_goal()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.external_interfaces.giskard.execute"><code class="docutils literal notranslate"><span class="pre">execute()</span></code></a></li>
+</ul>
+</li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+<div class="bd-footer-content__inner container">
+  
+  <div class="footer-item">
+    
+<p class="component-author">
+By Jonas Dech
+</p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+
+  <p class="copyright">
+    
+      © Copyright 2025.
+      <br/>
+    
+  </p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+</div>
+          </footer>
+        
+
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../../../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+  </footer>
+  </body>
+</html>

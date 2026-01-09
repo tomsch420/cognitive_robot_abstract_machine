@@ -1,0 +1,1352 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>pycram.language &#8212; PyCRAM</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../../../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/styles/sphinx-book-theme.css?v=eba8b062" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/togglebutton.css?v=13237357" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sphinx-thebe.css?v=4fa983c6" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/proof.css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=fd3f3429" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sphinx-design.min.css?v=95c83b7e" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=5c87bd76" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../../../_static/documentation_options.js?v=9eb32ce0"></script>
+    <script src="../../../_static/doctools.js?v=9a2dae69"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../_static/scripts/sphinx-book-theme.js?v=887ef09a"></script>
+    <script>let toggleHintShow = 'Click to show';</script>
+    <script>let toggleHintHide = 'Click to hide';</script>
+    <script>let toggleOpenOnPrint = 'true';</script>
+    <script src="../../../_static/togglebutton.js?v=4a39c7ea"></script>
+    <script>var togglebuttonSelector = '.toggle, .admonition.dropdown';</script>
+    <script src="../../../_static/design-tabs.js?v=f930bc37"></script>
+    <script>const THEBE_JS_URL = "https://unpkg.com/thebe@0.8.2/lib/index.js"; const thebe_selector = ".thebe,.cell"; const thebe_selector_input = "pre"; const thebe_selector_output = ".output, .cell_output"</script>
+    <script async="async" src="../../../_static/sphinx-thebe.js?v=c100c467"></script>
+    <script>var togglebuttonSelector = '.toggle, .admonition.dropdown';</script>
+    <script>const THEBE_JS_URL = "https://unpkg.com/thebe@0.8.2/lib/index.js"; const thebe_selector = ".thebe,.cell"; const thebe_selector_input = "pre"; const thebe_selector_output = ".output, .cell_output"</script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'autoapi/pycram/language/index';</script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="pycram.motion_executor" href="../motion_executor/index.html" />
+    <link rel="prev" title="pycram.joint_state" href="../joint_state/index.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search..."
+         aria-label="Search..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../../../_static/new_pycram_logo_clean.svg" class="logo__image only-light" alt="PyCRAM - Home"/>
+    <script>document.write(`<img src="../../../_static/new_pycram_logo_clean_dark.svg" class="logo__image only-dark" alt="PyCRAM - Home"/>`);</script>
+  
+  
+</a></div>
+        <div class="sidebar-primary-item">
+
+ <script>
+ document.write(`
+   <button class="btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script></div>
+        <div class="sidebar-primary-item"><nav class="bd-links bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item navbar-nav active">
+        <p aria-level="2" class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../../../installation.html">Installation Guide</a></li>
+
+
+<li class="toctree-l1"><a class="reference internal" href="../../../quickstart.html">Quickstart Guide</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Concepts</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../../../plan.html">The PyCRAM Plan</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../designators.html">Designators in PyCRAM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../orm_concept.html">PyCRAM ORM: An Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../abstract_robot.html">Astract Robot Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../process_modules.html">Process Modules in PyCRAM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../costmap.html">Costmaps</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notebooks.html">Jupyter Notebook Examples</a></li>
+
+
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Adding a new Robot</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../../../new_robot.html">Adding a new robot to PyCRAM</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Trouble Shooting</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../../../troubleshooting.html">Troubleshooting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../remarks.html">General Remarks</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Examples</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../../../notebooks/language.html">Plan Language</a></li>
+
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../designator_example.html">Designators</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../notebooks/action_designator.html">Action Designator</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../notebooks/object_designator.html">Object Designator</a></li>
+
+<li class="toctree-l2"><a class="reference internal" href="../../../notebooks/location_designator.html">Location Designator</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../notebooks/motion_designator.html">from pycram.language import SequentialPlan—
+jupyter:
+jupytext:
+text_representation:
+extension: .md
+format_name: markdown
+format_version: ‘1.3’
+jupytext_version: 1.16.3
+kernelspec:
+display_name: Python 3
+language: python
+name: python3</a></li>
+
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../orm.html">ORM</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../notebooks/orm_example.html">from pycram.orm.ormatic_interface import ResolvedActionNodeMappingDAOfrom pycram.orm.model import ResolvedActionNodeMapping—
+jupyter:
+jupytext:
+text_representation:
+extension: .md
+format_name: markdown
+format_version: ‘1.3’
+jupytext_version: 1.16.3
+kernelspec:
+display_name: Python 3
+language: python
+name: python3</a></li>
+
+<li class="toctree-l2"><a class="reference internal" href="../../../notebooks/orm_querying_examples.html">ORM querying</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../datastructures.html">Datastructure</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../notebooks/pose.html">Pose</a></li>
+
+</ul>
+</details></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../ros_utils.html">ROS Utils</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">API</span></p>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="../index.html">pycram</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2 has-children"><a class="reference internal" href="../alternative_motion_mappings/index.html">pycram.alternative_motion_mappings</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../alternative_motion_mappings/hsrb_motion_mapping/index.html">pycram.alternative_motion_mappings.hsrb_motion_mapping</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../config/index.html">pycram.config</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../config/action_conf/index.html">pycram.config.action_conf</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="../costmaps/index.html">pycram.costmaps</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../datastructures/index.html">pycram.datastructures</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../datastructures/dataclasses/index.html">pycram.datastructures.dataclasses</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../datastructures/enums/index.html">pycram.datastructures.enums</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../datastructures/grasp/index.html">pycram.datastructures.grasp</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../datastructures/partial_designator/index.html">pycram.datastructures.partial_designator</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../datastructures/pose/index.html">pycram.datastructures.pose</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="../designator/index.html">pycram.designator</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../designators/index.html">pycram.designators</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../designators/location_designator/index.html">pycram.designators.location_designator</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../designators/object_designator/index.html">pycram.designators.object_designator</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../designators/specialized_designators/index.html">pycram.designators.specialized_designators</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../designators/specialized_designators/action/index.html">pycram.designators.specialized_designators.action</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../designators/specialized_designators/location/index.html">pycram.designators.specialized_designators.location</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../designators/specialized_designators/probabilistic/index.html">pycram.designators.specialized_designators.probabilistic</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../external_interfaces/index.html">pycram.external_interfaces</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../external_interfaces/blum_api/index.html">pycram.external_interfaces.blum_api</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../external_interfaces/giskard/index.html">pycram.external_interfaces.giskard</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../external_interfaces/move_base/index.html">pycram.external_interfaces.move_base</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../external_interfaces/procthor/index.html">pycram.external_interfaces.procthor</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../external_interfaces/robokudo/index.html">pycram.external_interfaces.robokudo</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../external_interfaces/tmc/index.html">pycram.external_interfaces.tmc</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="../failure_handling/index.html">pycram.failure_handling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../failures/index.html">pycram.failures</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../filter/index.html">pycram.filter</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../fluent/index.html">pycram.fluent</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../has_parameters/index.html">pycram.has_parameters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../helper/index.html">pycram.helper</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../joint_state/index.html">pycram.joint_state</a></li>
+<li class="toctree-l2 current active"><a class="current reference internal" href="#">pycram.language</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../motion_executor/index.html">pycram.motion_executor</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../ontomatic/index.html">pycram.ontomatic</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../ontomatic/performables_to_ontology/index.html">pycram.ontomatic.performables_to_ontology</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../orm/index.html">pycram.orm</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../orm/model/index.html">pycram.orm.model</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../orm/ormatic_interface/index.html">pycram.orm.ormatic_interface</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../orm/utils/index.html">pycram.orm.utils</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../orm/views/index.html">pycram.orm.views</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="../parameterizer/index.html">pycram.parameterizer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../perception/index.html">pycram.perception</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../plan/index.html">pycram.plan</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../pose_validator/index.html">pycram.pose_validator</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../probabilistic_costmap/index.html">pycram.probabilistic_costmap</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../process_module/index.html">pycram.process_module</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../process_modules/index.html">pycram.process_modules</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../process_modules/armar_process_modules/index.html">pycram.process_modules.armar_process_modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../process_modules/boxy_process_modules/index.html">pycram.process_modules.boxy_process_modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../process_modules/default_process_modules/index.html">pycram.process_modules.default_process_modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../process_modules/donbot_process_modules/index.html">pycram.process_modules.donbot_process_modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../process_modules/hsrb_process_modules/index.html">pycram.process_modules.hsrb_process_modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../process_modules/icub3_process_modules/index.html">pycram.process_modules.icub3_process_modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../process_modules/justin_process_modules/index.html">pycram.process_modules.justin_process_modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../process_modules/kevin_process_modules/index.html">pycram.process_modules.kevin_process_modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../process_modules/pr2_process_modules/index.html">pycram.process_modules.pr2_process_modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../process_modules/robotiq_gripper_process_module/index.html">pycram.process_modules.robotiq_gripper_process_module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../process_modules/stretch_process_modules/index.html">pycram.process_modules.stretch_process_modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../process_modules/tiago_process_modules/index.html">pycram.process_modules.tiago_process_modules</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="../robot_description/index.html">pycram.robot_description</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../robot_descriptions/index.html">pycram.robot_descriptions</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../robot_descriptions/armar_description/index.html">pycram.robot_descriptions.armar_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../robot_descriptions/boxy_description/index.html">pycram.robot_descriptions.boxy_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../robot_descriptions/donbot_description/index.html">pycram.robot_descriptions.donbot_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../robot_descriptions/hsrb_description/index.html">pycram.robot_descriptions.hsrb_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../robot_descriptions/hsrb_states/index.html">pycram.robot_descriptions.hsrb_states</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../robot_descriptions/icub3_description/index.html">pycram.robot_descriptions.icub3_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../robot_descriptions/justin_description/index.html">pycram.robot_descriptions.justin_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../robot_descriptions/kevin_description/index.html">pycram.robot_descriptions.kevin_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../robot_descriptions/panda_description/index.html">pycram.robot_descriptions.panda_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../robot_descriptions/pr2_description/index.html">pycram.robot_descriptions.pr2_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../robot_descriptions/pr2_states/index.html">pycram.robot_descriptions.pr2_states</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../robot_descriptions/stretch_description/index.html">pycram.robot_descriptions.stretch_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../robot_descriptions/tiago_description/index.html">pycram.robot_descriptions.tiago_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../robot_descriptions/tracy_description/index.html">pycram.robot_descriptions.tracy_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../robot_descriptions/tracy_states/index.html">pycram.robot_descriptions.tracy_states</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../robot_descriptions/turtlebot_description/index.html">pycram.robot_descriptions.turtlebot_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../robot_descriptions/ur5_description/index.html">pycram.robot_descriptions.ur5_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../robot_descriptions/ur5e_controlled_description/index.html">pycram.robot_descriptions.ur5e_controlled_description</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../robot_plans/index.html">pycram.robot_plans</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../robot_plans/actions/index.html">pycram.robot_plans.actions</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../robot_plans/actions/base/index.html">pycram.robot_plans.actions.base</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../robot_plans/actions/composite/index.html">pycram.robot_plans.actions.composite</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../robot_plans/actions/core/index.html">pycram.robot_plans.actions.core</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../robot_plans/motions/index.html">pycram.robot_plans.motions</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../robot_plans/motions/base/index.html">pycram.robot_plans.motions.base</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../robot_plans/motions/container/index.html">pycram.robot_plans.motions.container</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../robot_plans/motions/gripper/index.html">pycram.robot_plans.motions.gripper</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../robot_plans/motions/misc/index.html">pycram.robot_plans.motions.misc</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../robot_plans/motions/navigation/index.html">pycram.robot_plans.motions.navigation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../robot_plans/motions/robot_body/index.html">pycram.robot_plans.motions.robot_body</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../ros/index.html">pycram.ros</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../ros/no_ros/index.html">pycram.ros.no_ros</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../ros/no_ros/action_lib/index.html">pycram.ros.no_ros.action_lib</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../ros/no_ros/data_types/index.html">pycram.ros.no_ros.data_types</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../ros/no_ros/publisher/index.html">pycram.ros.no_ros.publisher</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../ros/no_ros/ros_tools/index.html">pycram.ros.no_ros.ros_tools</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../ros/no_ros/service/index.html">pycram.ros.no_ros.service</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../ros/no_ros/subscriber/index.html">pycram.ros.no_ros.subscriber</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../ros/ros1/index.html">pycram.ros.ros1</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../ros/ros1/action_lib/index.html">pycram.ros.ros1.action_lib</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../ros/ros1/data_types/index.html">pycram.ros.ros1.data_types</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../ros/ros1/publisher/index.html">pycram.ros.ros1.publisher</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../ros/ros1/ros_tools/index.html">pycram.ros.ros1.ros_tools</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../ros/ros1/service/index.html">pycram.ros.ros1.service</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../ros/ros1/subscriber/index.html">pycram.ros.ros1.subscriber</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../ros/ros1/viz_marker_publisher/index.html">pycram.ros.ros1.viz_marker_publisher</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../ros/ros2/index.html">pycram.ros.ros2</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../ros/ros2/action_lib/index.html">pycram.ros.ros2.action_lib</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../ros/ros2/data_types/index.html">pycram.ros.ros2.data_types</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../ros/ros2/filter/index.html">pycram.ros.ros2.filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../ros/ros2/publisher/index.html">pycram.ros.ros2.publisher</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../ros/ros2/ros_tools/index.html">pycram.ros.ros2.ros_tools</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../ros/ros2/service/index.html">pycram.ros.ros2.service</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../ros/ros2/subscriber/index.html">pycram.ros.ros2.subscriber</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../ros/ros2/viz_marker_publisher/index.html">pycram.ros.ros2.viz_marker_publisher</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../ros_utils/index.html">pycram.ros_utils</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../ros_utils/force_torque_sensor/index.html">pycram.ros_utils.force_torque_sensor</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../ros_utils/joint_state_publisher/index.html">pycram.ros_utils.joint_state_publisher</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../ros_utils/marker_publisher_base/index.html">pycram.ros_utils.marker_publisher_base</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../ros_utils/tf_broadcaster/index.html">pycram.ros_utils.tf_broadcaster</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="../testing/index.html">pycram.testing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tf_transformations/index.html">pycram.tf_transformations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../units/index.html">pycram.units</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../utils/index.html">pycram.utils</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../validation/index.html">pycram.validation</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../validation/error_checkers/index.html">pycram.validation.error_checkers</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../validation/goal_validator/index.html">pycram.validation.goal_validator</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="../visualization/index.html">pycram.visualization</a></li>
+</ul>
+</details></li>
+</ul>
+
+    </div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+
+<div class="sbt-scroll-pixel-helper"></div>
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item"><button class="sidebar-toggle primary-toggle btn btn-sm" title="Toggle primary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <span class="fa-solid fa-bars"></span>
+</button></div>
+      
+    </div>
+  
+  
+    <div class="header-article-items__end">
+      
+        <div class="header-article-item">
+
+<div class="article-header-buttons">
+
+
+
+
+
+<div class="dropdown dropdown-download-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Download this page">
+    <i class="fas fa-download"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="../../../_sources/autoapi/pycram/language/index.rst" target="_blank"
+   class="btn btn-sm btn-download-source-button dropdown-item"
+   title="Download source file"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file"></i>
+  </span>
+<span class="btn__text-container">.rst</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li>
+<button onclick="window.print()"
+  class="btn btn-sm btn-download-pdf-button dropdown-item"
+  title="Print to PDF"
+  data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file-pdf"></i>
+  </span>
+<span class="btn__text-container">.pdf</span>
+</button>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+<button onclick="toggleFullScreen()"
+  class="btn btn-sm btn-fullscreen-button"
+  title="Fullscreen mode"
+  data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script>
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script>
+<button class="sidebar-toggle secondary-toggle btn btn-sm" title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</button>
+</div></div>
+      
+    </div>
+  
+</div>
+</div>
+              
+              
+
+<div id="jb-print-docs-body" class="onlyprint">
+    <h1>pycram.language</h1>
+    <!-- Table of contents -->
+    <div id="print-main-content">
+        <div id="jb-print-toc">
+            
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#attributes">Attributes</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#classes">Classes</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#module-contents">Module Contents</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.logger"><code class="docutils literal notranslate"><span class="pre">logger</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.LanguagePlan"><code class="docutils literal notranslate"><span class="pre">LanguagePlan</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.LanguagePlan.simplify_language_nodes"><code class="docutils literal notranslate"><span class="pre">LanguagePlan.simplify_language_nodes()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.SequentialPlan"><code class="docutils literal notranslate"><span class="pre">SequentialPlan</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.ParallelPlan"><code class="docutils literal notranslate"><span class="pre">ParallelPlan</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.ParallelPlan.parallel_blocklist"><code class="docutils literal notranslate"><span class="pre">ParallelPlan.parallel_blocklist</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.TryInOrderPlan"><code class="docutils literal notranslate"><span class="pre">TryInOrderPlan</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.TryAllPLan"><code class="docutils literal notranslate"><span class="pre">TryAllPLan</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.RepeatPlan"><code class="docutils literal notranslate"><span class="pre">RepeatPlan</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.MonitorPlan"><code class="docutils literal notranslate"><span class="pre">MonitorPlan</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.CodePlan"><code class="docutils literal notranslate"><span class="pre">CodePlan</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.LanguageNode"><code class="docutils literal notranslate"><span class="pre">LanguageNode</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.LanguageNode.designator_type"><code class="docutils literal notranslate"><span class="pre">LanguageNode.designator_type</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.SequentialNode"><code class="docutils literal notranslate"><span class="pre">SequentialNode</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.SequentialNode.designator_type"><code class="docutils literal notranslate"><span class="pre">SequentialNode.designator_type</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.SequentialNode.perform"><code class="docutils literal notranslate"><span class="pre">SequentialNode.perform()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.SequentialNode.perform_sequential"><code class="docutils literal notranslate"><span class="pre">SequentialNode.perform_sequential()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.SequentialNode.__hash__"><code class="docutils literal notranslate"><span class="pre">SequentialNode.__hash__()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.SequentialNode.__repr__"><code class="docutils literal notranslate"><span class="pre">SequentialNode.__repr__()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.ParallelNode"><code class="docutils literal notranslate"><span class="pre">ParallelNode</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.ParallelNode.perform"><code class="docutils literal notranslate"><span class="pre">ParallelNode.perform()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.ParallelNode.perform_parallel"><code class="docutils literal notranslate"><span class="pre">ParallelNode.perform_parallel()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.ParallelNode._lang_call"><code class="docutils literal notranslate"><span class="pre">ParallelNode._lang_call()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.ParallelNode.__hash__"><code class="docutils literal notranslate"><span class="pre">ParallelNode.__hash__()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.ParallelNode.__repr__"><code class="docutils literal notranslate"><span class="pre">ParallelNode.__repr__()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.RepeatNode"><code class="docutils literal notranslate"><span class="pre">RepeatNode</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.RepeatNode.repeat"><code class="docutils literal notranslate"><span class="pre">RepeatNode.repeat</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.RepeatNode.perform"><code class="docutils literal notranslate"><span class="pre">RepeatNode.perform()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.RepeatNode.__hash__"><code class="docutils literal notranslate"><span class="pre">RepeatNode.__hash__()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.MonitorNode"><code class="docutils literal notranslate"><span class="pre">MonitorNode</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.MonitorNode.kill_event"><code class="docutils literal notranslate"><span class="pre">MonitorNode.kill_event</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.MonitorNode.exception_queue"><code class="docutils literal notranslate"><span class="pre">MonitorNode.exception_queue</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.MonitorNode.behavior"><code class="docutils literal notranslate"><span class="pre">MonitorNode.behavior</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.MonitorNode.monitor_thread"><code class="docutils literal notranslate"><span class="pre">MonitorNode.monitor_thread</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.MonitorNode.perform"><code class="docutils literal notranslate"><span class="pre">MonitorNode.perform()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.MonitorNode.monitor"><code class="docutils literal notranslate"><span class="pre">MonitorNode.monitor()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.MonitorNode.__hash__"><code class="docutils literal notranslate"><span class="pre">MonitorNode.__hash__()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.TryInOrderNode"><code class="docutils literal notranslate"><span class="pre">TryInOrderNode</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.TryInOrderNode.perform"><code class="docutils literal notranslate"><span class="pre">TryInOrderNode.perform()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.TryInOrderNode.__hash__"><code class="docutils literal notranslate"><span class="pre">TryInOrderNode.__hash__()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.TryAllNode"><code class="docutils literal notranslate"><span class="pre">TryAllNode</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.TryAllNode.perform"><code class="docutils literal notranslate"><span class="pre">TryAllNode.perform()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.TryAllNode.__hash__"><code class="docutils literal notranslate"><span class="pre">TryAllNode.__hash__()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.CodeNode"><code class="docutils literal notranslate"><span class="pre">CodeNode</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.CodeNode.designator_type"><code class="docutils literal notranslate"><span class="pre">CodeNode.designator_type</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.CodeNode.function"><code class="docutils literal notranslate"><span class="pre">CodeNode.function</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.CodeNode.kwargs"><code class="docutils literal notranslate"><span class="pre">CodeNode.kwargs</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.CodeNode.perform"><code class="docutils literal notranslate"><span class="pre">CodeNode.perform</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.CodeNode.performable"><code class="docutils literal notranslate"><span class="pre">CodeNode.performable</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.CodeNode.action"><code class="docutils literal notranslate"><span class="pre">CodeNode.action</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.CodeNode.execute"><code class="docutils literal notranslate"><span class="pre">CodeNode.execute()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.CodeNode.resolve"><code class="docutils literal notranslate"><span class="pre">CodeNode.resolve()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.CodeNode.__hash__"><code class="docutils literal notranslate"><span class="pre">CodeNode.__hash__()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="module-pycram.language">
+<span id="pycram-language"></span><h1>pycram.language<a class="headerlink" href="#module-pycram.language" title="Link to this heading">#</a></h1>
+<section id="attributes">
+<h2>Attributes<a class="headerlink" href="#attributes" title="Link to this heading">#</a></h2>
+<div class="pst-scrollable-table-container"><table class="autosummary longtable table autosummary">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pycram.language.logger" title="pycram.language.logger"><code class="xref py py-obj docutils literal notranslate"><span class="pre">logger</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="classes">
+<h2>Classes<a class="headerlink" href="#classes" title="Link to this heading">#</a></h2>
+<div class="pst-scrollable-table-container"><table class="autosummary longtable table autosummary">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pycram.language.LanguagePlan" title="pycram.language.LanguagePlan"><code class="xref py py-obj docutils literal notranslate"><span class="pre">LanguagePlan</span></code></a></p></td>
+<td><p>Base class for language plans</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#pycram.language.SequentialPlan" title="pycram.language.SequentialPlan"><code class="xref py py-obj docutils literal notranslate"><span class="pre">SequentialPlan</span></code></a></p></td>
+<td><p>Creates a plan which executes its children in sequential order</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pycram.language.ParallelPlan" title="pycram.language.ParallelPlan"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ParallelPlan</span></code></a></p></td>
+<td><p>Creates a plan which executes all children in parallel in seperate threads</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#pycram.language.TryInOrderPlan" title="pycram.language.TryInOrderPlan"><code class="xref py py-obj docutils literal notranslate"><span class="pre">TryInOrderPlan</span></code></a></p></td>
+<td><p>Creates a plan that executes all children in sequential order but does not stop if one of them throws an error</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pycram.language.TryAllPLan" title="pycram.language.TryAllPLan"><code class="xref py py-obj docutils literal notranslate"><span class="pre">TryAllPLan</span></code></a></p></td>
+<td><p>Creates a plan which executes all children in parallel but does not abort if one throws an error</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#pycram.language.RepeatPlan" title="pycram.language.RepeatPlan"><code class="xref py py-obj docutils literal notranslate"><span class="pre">RepeatPlan</span></code></a></p></td>
+<td><p>A plan which repeats all children a number of times</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pycram.language.MonitorPlan" title="pycram.language.MonitorPlan"><code class="xref py py-obj docutils literal notranslate"><span class="pre">MonitorPlan</span></code></a></p></td>
+<td><p>A plan which monitors a condition and upon the condition becoming true interrupts all children. Monitors can have</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#pycram.language.CodePlan" title="pycram.language.CodePlan"><code class="xref py py-obj docutils literal notranslate"><span class="pre">CodePlan</span></code></a></p></td>
+<td><p>A Plan that contains a function to be executed. Mainly intended for debugging purposes</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pycram.language.LanguageNode" title="pycram.language.LanguageNode"><code class="xref py py-obj docutils literal notranslate"><span class="pre">LanguageNode</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#pycram.language.SequentialNode" title="pycram.language.SequentialNode"><code class="xref py py-obj docutils literal notranslate"><span class="pre">SequentialNode</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pycram.language.ParallelNode" title="pycram.language.ParallelNode"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ParallelNode</span></code></a></p></td>
+<td><p>Executes all children in parallel by creating a thread per children and executing them in the respective thread. All</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#pycram.language.RepeatNode" title="pycram.language.RepeatNode"><code class="xref py py-obj docutils literal notranslate"><span class="pre">RepeatNode</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pycram.language.MonitorNode" title="pycram.language.MonitorNode"><code class="xref py py-obj docutils literal notranslate"><span class="pre">MonitorNode</span></code></a></p></td>
+<td><p>Monitors a Language Expression and interrupts it when the given condition is evaluated to True.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#pycram.language.TryInOrderNode" title="pycram.language.TryInOrderNode"><code class="xref py py-obj docutils literal notranslate"><span class="pre">TryInOrderNode</span></code></a></p></td>
+<td><p>Executes all children sequentially, an exception while executing a child does not terminate the whole process.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pycram.language.TryAllNode" title="pycram.language.TryAllNode"><code class="xref py py-obj docutils literal notranslate"><span class="pre">TryAllNode</span></code></a></p></td>
+<td><p>Executes all children in parallel by creating a thread per children and executing them in the respective thread. All</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#pycram.language.CodeNode" title="pycram.language.CodeNode"><code class="xref py py-obj docutils literal notranslate"><span class="pre">CodeNode</span></code></a></p></td>
+<td><p>Executable code block in a plan.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="module-contents">
+<h2>Module Contents<a class="headerlink" href="#module-contents" title="Link to this heading">#</a></h2>
+<dl class="py data">
+<dt class="sig sig-object py" id="pycram.language.logger">
+<span class="sig-prename descclassname"><span class="pre">pycram.language.</span></span><span class="sig-name descname"><span class="pre">logger</span></span><a class="headerlink" href="#pycram.language.logger" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pycram.language.LanguagePlan">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pycram.language.</span></span><span class="sig-name descname"><span class="pre">LanguagePlan</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">root</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#pycram.language.LanguageNode" title="pycram.language.LanguageNode"><span class="pre">LanguageNode</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">context</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../datastructures/dataclasses/index.html#pycram.datastructures.dataclasses.Context" title="pycram.datastructures.dataclasses.Context"><span class="pre">pycram.datastructures.dataclasses.Context</span></a></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">children</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Union</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="../plan/index.html#pycram.plan.Plan" title="pycram.plan.Plan"><span class="pre">pycram.plan.Plan</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="../datastructures/partial_designator/index.html#pycram.datastructures.partial_designator.PartialDesignator" title="pycram.datastructures.partial_designator.PartialDesignator"><span class="pre">pycram.datastructures.partial_designator.PartialDesignator</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="../robot_plans/index.html#pycram.robot_plans.BaseMotion" title="pycram.robot_plans.BaseMotion"><span class="pre">pycram.robot_plans.BaseMotion</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="../robot_plans/actions/base/index.html#pycram.robot_plans.actions.base.ActionDescription" title="pycram.robot_plans.actions.base.ActionDescription"><span class="pre">pycram.robot_plans.actions.base.ActionDescription</span></a><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.language.LanguagePlan" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="../plan/index.html#pycram.plan.Plan" title="pycram.plan.Plan"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pycram.plan.Plan</span></code></a></p>
+<p>Base class for language plans</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="pycram.language.LanguagePlan.simplify_language_nodes">
+<span class="sig-name descname"><span class="pre">simplify_language_nodes</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pycram.language.LanguagePlan.simplify_language_nodes" title="Link to this definition">#</a></dt>
+<dd><p>Traverses the plan and merges LanguageNodes of the same type</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pycram.language.SequentialPlan">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pycram.language.</span></span><span class="sig-name descname"><span class="pre">SequentialPlan</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">context</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../datastructures/dataclasses/index.html#pycram.datastructures.dataclasses.Context" title="pycram.datastructures.dataclasses.Context"><span class="pre">pycram.datastructures.dataclasses.Context</span></a></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">children</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Union</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="../plan/index.html#pycram.plan.Plan" title="pycram.plan.Plan"><span class="pre">pycram.plan.Plan</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="../datastructures/partial_designator/index.html#pycram.datastructures.partial_designator.PartialDesignator" title="pycram.datastructures.partial_designator.PartialDesignator"><span class="pre">pycram.datastructures.partial_designator.PartialDesignator</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="../robot_plans/index.html#pycram.robot_plans.BaseMotion" title="pycram.robot_plans.BaseMotion"><span class="pre">pycram.robot_plans.BaseMotion</span></a><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.language.SequentialPlan" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#pycram.language.LanguagePlan" title="pycram.language.LanguagePlan"><code class="xref py py-obj docutils literal notranslate"><span class="pre">LanguagePlan</span></code></a></p>
+<p>Creates a plan which executes its children in sequential order</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pycram.language.ParallelPlan">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pycram.language.</span></span><span class="sig-name descname"><span class="pre">ParallelPlan</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">context</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../datastructures/dataclasses/index.html#pycram.datastructures.dataclasses.Context" title="pycram.datastructures.dataclasses.Context"><span class="pre">pycram.datastructures.dataclasses.Context</span></a></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">children</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Union</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="../plan/index.html#pycram.plan.Plan" title="pycram.plan.Plan"><span class="pre">pycram.plan.Plan</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="../datastructures/partial_designator/index.html#pycram.datastructures.partial_designator.PartialDesignator" title="pycram.datastructures.partial_designator.PartialDesignator"><span class="pre">pycram.datastructures.partial_designator.PartialDesignator</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="../robot_plans/index.html#pycram.robot_plans.BaseMotion" title="pycram.robot_plans.BaseMotion"><span class="pre">pycram.robot_plans.BaseMotion</span></a><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">root</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#pycram.language.LanguageNode" title="pycram.language.LanguageNode"><span class="pre">LanguageNode</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.language.ParallelPlan" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#pycram.language.LanguagePlan" title="pycram.language.LanguagePlan"><code class="xref py py-obj docutils literal notranslate"><span class="pre">LanguagePlan</span></code></a></p>
+<p>Creates a plan which executes all children in parallel in seperate threads</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.language.ParallelPlan.parallel_blocklist">
+<span class="sig-name descname"><span class="pre">parallel_blocklist</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">['PickUpAction',</span> <span class="pre">'PlaceAction',</span> <span class="pre">'OpenAction',</span> <span class="pre">'CloseAction',</span> <span class="pre">'TransportAction',</span> <span class="pre">'GraspingAction']</span></em><a class="headerlink" href="#pycram.language.ParallelPlan.parallel_blocklist" title="Link to this definition">#</a></dt>
+<dd><p>A list of Actions which can’t be part of a Parallel plan</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pycram.language.TryInOrderPlan">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pycram.language.</span></span><span class="sig-name descname"><span class="pre">TryInOrderPlan</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">context</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../datastructures/dataclasses/index.html#pycram.datastructures.dataclasses.Context" title="pycram.datastructures.dataclasses.Context"><span class="pre">pycram.datastructures.dataclasses.Context</span></a></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">children</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Union</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="../plan/index.html#pycram.plan.Plan" title="pycram.plan.Plan"><span class="pre">pycram.plan.Plan</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="../datastructures/partial_designator/index.html#pycram.datastructures.partial_designator.PartialDesignator" title="pycram.datastructures.partial_designator.PartialDesignator"><span class="pre">pycram.datastructures.partial_designator.PartialDesignator</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="../robot_plans/index.html#pycram.robot_plans.BaseMotion" title="pycram.robot_plans.BaseMotion"><span class="pre">pycram.robot_plans.BaseMotion</span></a><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.language.TryInOrderPlan" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#pycram.language.LanguagePlan" title="pycram.language.LanguagePlan"><code class="xref py py-obj docutils literal notranslate"><span class="pre">LanguagePlan</span></code></a></p>
+<p>Creates a plan that executes all children in sequential order but does not stop if one of them throws an error</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pycram.language.TryAllPLan">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pycram.language.</span></span><span class="sig-name descname"><span class="pre">TryAllPLan</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">context</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../datastructures/dataclasses/index.html#pycram.datastructures.dataclasses.Context" title="pycram.datastructures.dataclasses.Context"><span class="pre">pycram.datastructures.dataclasses.Context</span></a></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">children</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Union</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="../plan/index.html#pycram.plan.Plan" title="pycram.plan.Plan"><span class="pre">pycram.plan.Plan</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="../datastructures/partial_designator/index.html#pycram.datastructures.partial_designator.PartialDesignator" title="pycram.datastructures.partial_designator.PartialDesignator"><span class="pre">pycram.datastructures.partial_designator.PartialDesignator</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="../robot_plans/index.html#pycram.robot_plans.BaseMotion" title="pycram.robot_plans.BaseMotion"><span class="pre">pycram.robot_plans.BaseMotion</span></a><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.language.TryAllPLan" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#pycram.language.ParallelPlan" title="pycram.language.ParallelPlan"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ParallelPlan</span></code></a></p>
+<p>Creates a plan which executes all children in parallel but does not abort if one throws an error</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pycram.language.RepeatPlan">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pycram.language.</span></span><span class="sig-name descname"><span class="pre">RepeatPlan</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">context</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../datastructures/dataclasses/index.html#pycram.datastructures.dataclasses.Context" title="pycram.datastructures.dataclasses.Context"><span class="pre">pycram.datastructures.dataclasses.Context</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">repeat</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">children</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Union</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="../plan/index.html#pycram.plan.Plan" title="pycram.plan.Plan"><span class="pre">pycram.plan.Plan</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="../datastructures/partial_designator/index.html#pycram.datastructures.partial_designator.PartialDesignator" title="pycram.datastructures.partial_designator.PartialDesignator"><span class="pre">pycram.datastructures.partial_designator.PartialDesignator</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="../robot_plans/index.html#pycram.robot_plans.BaseMotion" title="pycram.robot_plans.BaseMotion"><span class="pre">pycram.robot_plans.BaseMotion</span></a><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.language.RepeatPlan" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#pycram.language.LanguagePlan" title="pycram.language.LanguagePlan"><code class="xref py py-obj docutils literal notranslate"><span class="pre">LanguagePlan</span></code></a></p>
+<p>A plan which repeats all children a number of times</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pycram.language.MonitorPlan">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pycram.language.</span></span><span class="sig-name descname"><span class="pre">MonitorPlan</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">condition</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">context</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../datastructures/dataclasses/index.html#pycram.datastructures.dataclasses.Context" title="pycram.datastructures.dataclasses.Context"><span class="pre">pycram.datastructures.dataclasses.Context</span></a></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">children</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Union</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="../plan/index.html#pycram.plan.Plan" title="pycram.plan.Plan"><span class="pre">pycram.plan.Plan</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="../datastructures/partial_designator/index.html#pycram.datastructures.partial_designator.PartialDesignator" title="pycram.datastructures.partial_designator.PartialDesignator"><span class="pre">pycram.datastructures.partial_designator.PartialDesignator</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="../robot_plans/index.html#pycram.robot_plans.BaseMotion" title="pycram.robot_plans.BaseMotion"><span class="pre">pycram.robot_plans.BaseMotion</span></a><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">behavior</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">MonitorBehavior.INTERRUPT</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.language.MonitorPlan" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#pycram.language.LanguagePlan" title="pycram.language.LanguagePlan"><code class="xref py py-obj docutils literal notranslate"><span class="pre">LanguagePlan</span></code></a></p>
+<p>A plan which monitors a condition and upon the condition becoming true interrupts all children. Monitors can have
+different behaviors, they can Interrupt, Pause or Resume the execution of the children. If the behavior is set to
+resume the plan will be paused until the condition is met.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>condition</strong> – A condition which should be monitored</p>
+</dd>
+<dt class="field-even">Behavior<span class="colon">:</span></dt>
+<dd class="field-even"><p>The behavior of the monitor, either <code class="xref py py-attr docutils literal notranslate"><span class="pre">INTERRUPT</span></code>, <code class="xref py py-attr docutils literal notranslate"><span class="pre">PAUSE</span></code> or <code class="xref py py-attr docutils literal notranslate"><span class="pre">RESUME</span></code></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pycram.language.CodePlan">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pycram.language.</span></span><span class="sig-name descname"><span class="pre">CodePlan</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">context</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../datastructures/dataclasses/index.html#pycram.datastructures.dataclasses.Context" title="pycram.datastructures.dataclasses.Context"><span class="pre">pycram.datastructures.dataclasses.Context</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">func</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Callable</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">typing_extensions.Any</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.language.CodePlan" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#pycram.language.LanguagePlan" title="pycram.language.LanguagePlan"><code class="xref py py-obj docutils literal notranslate"><span class="pre">LanguagePlan</span></code></a></p>
+<p>A Plan that contains a function to be executed. Mainly intended for debugging purposes</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pycram.language.LanguageNode">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pycram.language.</span></span><span class="sig-name descname"><span class="pre">LanguageNode</span></span><a class="headerlink" href="#pycram.language.LanguageNode" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="../plan/index.html#pycram.plan.PlanNode" title="pycram.plan.PlanNode"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pycram.plan.PlanNode</span></code></a></p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.language.LanguageNode.designator_type">
+<span class="sig-name descname"><span class="pre">designator_type</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.Type</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#pycram.language.LanguageNode" title="pycram.language.LanguageNode"><span class="pre">LanguageNode</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#pycram.language.LanguageNode.designator_type" title="Link to this definition">#</a></dt>
+<dd><p>Superclass for language nodes in a plan. Used to distinguish language nodes from other types of nodes.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pycram.language.SequentialNode">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pycram.language.</span></span><span class="sig-name descname"><span class="pre">SequentialNode</span></span><a class="headerlink" href="#pycram.language.SequentialNode" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#pycram.language.LanguageNode" title="pycram.language.LanguageNode"><code class="xref py py-obj docutils literal notranslate"><span class="pre">LanguageNode</span></code></a></p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.language.SequentialNode.designator_type">
+<span class="sig-name descname"><span class="pre">designator_type</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.Type</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#pycram.language.SequentialNode" title="pycram.language.SequentialNode"><span class="pre">SequentialNode</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#pycram.language.SequentialNode.designator_type" title="Link to this definition">#</a></dt>
+<dd><p>Executes all children sequentially, an exception while executing a child does not terminate the whole process.
+Instead, the exception is saved to a list of all exceptions thrown during execution and returned.</p>
+<dl class="simple">
+<dt>Behaviour:</dt><dd><p>Returns a tuple containing the final state of execution (SUCCEEDED, FAILED) and a list of results from each
+child’s perform() method. The state is <code class="xref py py-attr docutils literal notranslate"><span class="pre">SUCCEEDED</span></code> <em>iff</em> all children are executed without
+exception. In any other case the State <code class="xref py py-attr docutils literal notranslate"><span class="pre">FAILED</span></code> will be returned.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pycram.language.SequentialNode.perform">
+<span class="sig-name descname"><span class="pre">perform</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pycram.language.SequentialNode.perform" title="Link to this definition">#</a></dt>
+<dd><p>Behaviour of Sequential, calls perform() on each child sequentially</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The state and list of results according to the behaviour described in <code class="xref py py-func docutils literal notranslate"><span class="pre">Sequential()</span></code></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pycram.language.SequentialNode.perform_sequential">
+<span class="sig-name descname"><span class="pre">perform_sequential</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">nodes</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.List</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="../plan/index.html#pycram.plan.PlanNode" title="pycram.plan.PlanNode"><span class="pre">pycram.plan.PlanNode</span></a><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">raise_exceptions</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">typing_extensions.Any</span></span></span><a class="headerlink" href="#pycram.language.SequentialNode.perform_sequential" title="Link to this definition">#</a></dt>
+<dd><p>Behavior of the sequential node, performs all children in sequence and raises error if they occur.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>nodes</strong> – A list of nodes which should be performed in sequence</p></li>
+<li><p><strong>raise_exceptions</strong> – If True (default) errors will be raised</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pycram.language.SequentialNode.__hash__">
+<span class="sig-name descname"><span class="pre">__hash__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pycram.language.SequentialNode.__hash__" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pycram.language.SequentialNode.__repr__">
+<span class="sig-name descname"><span class="pre">__repr__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pycram.language.SequentialNode.__repr__" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pycram.language.ParallelNode">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pycram.language.</span></span><span class="sig-name descname"><span class="pre">ParallelNode</span></span><a class="headerlink" href="#pycram.language.ParallelNode" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#pycram.language.LanguageNode" title="pycram.language.LanguageNode"><code class="xref py py-obj docutils literal notranslate"><span class="pre">LanguageNode</span></code></a></p>
+<p>Executes all children in parallel by creating a thread per children and executing them in the respective thread. All
+exceptions during execution will be caught, saved to a list and returned upon end.</p>
+<dl class="simple">
+<dt>Behaviour:</dt><dd><p>Returns a tuple containing the final state of execution (SUCCEEDED, FAILED) and a list of results from
+each child’s perform() method. The state is <code class="xref py py-attr docutils literal notranslate"><span class="pre">SUCCEEDED</span></code> <em>iff</em> all children could be executed without
+an exception. In any other case the State <code class="xref py py-attr docutils literal notranslate"><span class="pre">FAILED</span></code> will be returned.</p>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="pycram.language.ParallelNode.perform">
+<span class="sig-name descname"><span class="pre">perform</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pycram.language.ParallelNode.perform" title="Link to this definition">#</a></dt>
+<dd><p>Behaviour of Parallel, creates a new thread for each child and calls perform() of the child in the respective
+thread.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The state and list of results according to the behaviour described in <code class="xref py py-func docutils literal notranslate"><span class="pre">Parallel()</span></code></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pycram.language.ParallelNode.perform_parallel">
+<span class="sig-name descname"><span class="pre">perform_parallel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">nodes</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.List</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="../plan/index.html#pycram.plan.PlanNode" title="pycram.plan.PlanNode"><span class="pre">pycram.plan.PlanNode</span></a><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.language.ParallelNode.perform_parallel" title="Link to this definition">#</a></dt>
+<dd><p>Behaviour of the parallel node performs the given nodes in parallel in different threads.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>nodes</strong> – A list of nodes which should be performed in parallel</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pycram.language.ParallelNode._lang_call">
+<span class="sig-name descname"><span class="pre">_lang_call</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">node</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../plan/index.html#pycram.plan.PlanNode" title="pycram.plan.PlanNode"><span class="pre">pycram.plan.PlanNode</span></a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.language.ParallelNode._lang_call" title="Link to this definition">#</a></dt>
+<dd><p>Wrapper method which is executed in the thread. Wraps the given node in a try catch and performs it</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>node</strong> – The node which is to be performed</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pycram.language.ParallelNode.__hash__">
+<span class="sig-name descname"><span class="pre">__hash__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pycram.language.ParallelNode.__hash__" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pycram.language.ParallelNode.__repr__">
+<span class="sig-name descname"><span class="pre">__repr__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pycram.language.ParallelNode.__repr__" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pycram.language.RepeatNode">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pycram.language.</span></span><span class="sig-name descname"><span class="pre">RepeatNode</span></span><a class="headerlink" href="#pycram.language.RepeatNode" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#pycram.language.SequentialNode" title="pycram.language.SequentialNode"><code class="xref py py-obj docutils literal notranslate"><span class="pre">SequentialNode</span></code></a></p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.language.RepeatNode.repeat">
+<span class="sig-name descname"><span class="pre">repeat</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1</span></em><a class="headerlink" href="#pycram.language.RepeatNode.repeat" title="Link to this definition">#</a></dt>
+<dd><p>Executes all children a given number of times in sequential order.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pycram.language.RepeatNode.perform">
+<span class="sig-name descname"><span class="pre">perform</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pycram.language.RepeatNode.perform" title="Link to this definition">#</a></dt>
+<dd><p>Behaviour of repeat, executes all children in a loop as often as stated on initialization.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pycram.language.RepeatNode.__hash__">
+<span class="sig-name descname"><span class="pre">__hash__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pycram.language.RepeatNode.__hash__" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pycram.language.MonitorNode">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pycram.language.</span></span><span class="sig-name descname"><span class="pre">MonitorNode</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">condition</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Union</span><span class="p"><span class="pre">[</span></span><span class="pre">typing_extensions.Callable</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="../fluent/index.html#pycram.fluent.Fluent" title="pycram.fluent.Fluent"><span class="pre">pycram.fluent.Fluent</span></a><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">behavior</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Optional</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="../datastructures/enums/index.html#pycram.datastructures.enums.MonitorBehavior" title="pycram.datastructures.enums.MonitorBehavior"><span class="pre">pycram.datastructures.enums.MonitorBehavior</span></a><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">MonitorBehavior.INTERRUPT</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.language.MonitorNode" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#pycram.language.SequentialNode" title="pycram.language.SequentialNode"><code class="xref py py-obj docutils literal notranslate"><span class="pre">SequentialNode</span></code></a></p>
+<p>Monitors a Language Expression and interrupts it when the given condition is evaluated to True.</p>
+<dl class="simple">
+<dt>Behaviour:</dt><dd><p>Monitors start a new Thread which checks the condition while performing the nodes below it. Monitors can have
+different behaviors, they can Interrupt, Pause or Resume the execution of the children.
+If the behavior is set to Resume the plan will be paused until the condition is met.</p>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.language.MonitorNode.kill_event">
+<span class="sig-name descname"><span class="pre">kill_event</span></span><a class="headerlink" href="#pycram.language.MonitorNode.kill_event" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.language.MonitorNode.exception_queue">
+<span class="sig-name descname"><span class="pre">exception_queue</span></span><a class="headerlink" href="#pycram.language.MonitorNode.exception_queue" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.language.MonitorNode.behavior">
+<span class="sig-name descname"><span class="pre">behavior</span></span><a class="headerlink" href="#pycram.language.MonitorNode.behavior" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.language.MonitorNode.monitor_thread">
+<span class="sig-name descname"><span class="pre">monitor_thread</span></span><a class="headerlink" href="#pycram.language.MonitorNode.monitor_thread" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pycram.language.MonitorNode.perform">
+<span class="sig-name descname"><span class="pre">perform</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pycram.language.MonitorNode.perform" title="Link to this definition">#</a></dt>
+<dd><p>Behavior of the Monitor, starts a new Thread which checks the condition and then performs the attached language
+expression</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The state of the attached language expression, as well as a list of the results of the children</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pycram.language.MonitorNode.monitor">
+<span class="sig-name descname"><span class="pre">monitor</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pycram.language.MonitorNode.monitor" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pycram.language.MonitorNode.__hash__">
+<span class="sig-name descname"><span class="pre">__hash__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pycram.language.MonitorNode.__hash__" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pycram.language.TryInOrderNode">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pycram.language.</span></span><span class="sig-name descname"><span class="pre">TryInOrderNode</span></span><a class="headerlink" href="#pycram.language.TryInOrderNode" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#pycram.language.SequentialNode" title="pycram.language.SequentialNode"><code class="xref py py-obj docutils literal notranslate"><span class="pre">SequentialNode</span></code></a></p>
+<p>Executes all children sequentially, an exception while executing a child does not terminate the whole process.
+Instead, the exception is saved to a list of all exceptions thrown during execution and returned.</p>
+<dl class="simple">
+<dt>Behaviour:</dt><dd><p>Returns a tuple containing the final state of execution (SUCCEEDED, FAILED) and a list of results from each
+child’s perform() method. The state is <code class="xref py py-attr docutils literal notranslate"><span class="pre">SUCCEEDED</span></code> if one or more children are executed without
+exception. In the case that all children could not be executed the State <code class="xref py py-attr docutils literal notranslate"><span class="pre">FAILED</span></code> will be returned.</p>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="pycram.language.TryInOrderNode.perform">
+<span class="sig-name descname"><span class="pre">perform</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pycram.language.TryInOrderNode.perform" title="Link to this definition">#</a></dt>
+<dd><p>Behaviour of TryInOrder, calls perform() on each child sequentially and catches raised exceptions.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The state and list of results according to the behaviour described in <code class="xref py py-func docutils literal notranslate"><span class="pre">TryInOrder()</span></code></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pycram.language.TryInOrderNode.__hash__">
+<span class="sig-name descname"><span class="pre">__hash__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pycram.language.TryInOrderNode.__hash__" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pycram.language.TryAllNode">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pycram.language.</span></span><span class="sig-name descname"><span class="pre">TryAllNode</span></span><a class="headerlink" href="#pycram.language.TryAllNode" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#pycram.language.ParallelNode" title="pycram.language.ParallelNode"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ParallelNode</span></code></a></p>
+<p>Executes all children in parallel by creating a thread per children and executing them in the respective thread. All
+exceptions during execution will be caught, saved to a list and returned upon end.</p>
+<dl class="simple">
+<dt>Behaviour:</dt><dd><p>Returns a tuple containing the final state of execution (SUCCEEDED, FAILED) and a list of results from each
+child’s perform() method. The state is <code class="xref py py-attr docutils literal notranslate"><span class="pre">SUCCEEDED</span></code> if one or more children could be executed
+without raising an exception. If all children fail the State <code class="xref py py-attr docutils literal notranslate"><span class="pre">FAILED</span></code> will be returned.</p>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="pycram.language.TryAllNode.perform">
+<span class="sig-name descname"><span class="pre">perform</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pycram.language.TryAllNode.perform" title="Link to this definition">#</a></dt>
+<dd><p>Behaviour of TryAll, creates a new thread for each child and executes all children in their respective threads.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The state and list of results according to the behaviour described in <code class="xref py py-func docutils literal notranslate"><span class="pre">TryAll()</span></code></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pycram.language.TryAllNode.__hash__">
+<span class="sig-name descname"><span class="pre">__hash__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pycram.language.TryAllNode.__hash__" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pycram.language.CodeNode">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pycram.language.</span></span><span class="sig-name descname"><span class="pre">CodeNode</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">function</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">typing_extensions.Callable</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">typing_extensions.Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">typing_extensions.Dict</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pycram.language.CodeNode" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#pycram.language.LanguageNode" title="pycram.language.LanguageNode"><code class="xref py py-obj docutils literal notranslate"><span class="pre">LanguageNode</span></code></a></p>
+<p>Executable code block in a plan.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Variables<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>function</strong> – The function (plan) that was called</p></li>
+<li><p><strong>kwargs</strong> – Dictionary holding the keyword arguments of the function</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.language.CodeNode.designator_type">
+<span class="sig-name descname"><span class="pre">designator_type</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.Type</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#pycram.language.LanguageNode" title="pycram.language.LanguageNode"><span class="pre">LanguageNode</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#pycram.language.CodeNode.designator_type" title="Link to this definition">#</a></dt>
+<dd><p>Superclass for language nodes in a plan. Used to distinguish language nodes from other types of nodes.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.language.CodeNode.function">
+<span class="sig-name descname"><span class="pre">function</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.Callable</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#pycram.language.CodeNode.function" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.language.CodeNode.kwargs">
+<span class="sig-name descname"><span class="pre">kwargs</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">typing_extensions.Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">typing_extensions.Any</span><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#pycram.language.CodeNode.kwargs" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.language.CodeNode.perform">
+<span class="sig-name descname"><span class="pre">perform</span></span><a class="headerlink" href="#pycram.language.CodeNode.perform" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.language.CodeNode.performable">
+<span class="sig-name descname"><span class="pre">performable</span></span><a class="headerlink" href="#pycram.language.CodeNode.performable" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pycram.language.CodeNode.action">
+<span class="sig-name descname"><span class="pre">action</span></span><a class="headerlink" href="#pycram.language.CodeNode.action" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pycram.language.CodeNode.execute">
+<span class="sig-name descname"><span class="pre">execute</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">typing_extensions.Any</span></span></span><a class="headerlink" href="#pycram.language.CodeNode.execute" title="Link to this definition">#</a></dt>
+<dd><p>Execute the code with its arguments</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Anything that the function associated with this object will return.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pycram.language.CodeNode.resolve">
+<span class="sig-name descname"><span class="pre">resolve</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">typing_extensions.Self</span></span></span><a class="headerlink" href="#pycram.language.CodeNode.resolve" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pycram.language.CodeNode.__hash__">
+<span class="sig-name descname"><span class="pre">__hash__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pycram.language.CodeNode.__hash__" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</section>
+</section>
+
+    <script type="text/x-thebe-config">
+    {
+        requestKernel: true,
+        binderOptions: {
+            repo: "binder-examples/jupyter-stacks-datascience",
+            ref: "master",
+        },
+        codeMirrorConfig: {
+            theme: "abcdef",
+            mode: "python"
+        },
+        kernelOptions: {
+            name: "python3",
+            path: "./autoapi/pycram/language"
+        },
+        predefinedOutput: true
+    }
+    </script>
+    <script>kernelName = 'python3'</script>
+
+                </article>
+              
+
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="../joint_state/index.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">pycram.joint_state</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="../motion_executor/index.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">pycram.motion_executor</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+  <div class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#attributes">Attributes</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#classes">Classes</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#module-contents">Module Contents</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.logger"><code class="docutils literal notranslate"><span class="pre">logger</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.LanguagePlan"><code class="docutils literal notranslate"><span class="pre">LanguagePlan</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.LanguagePlan.simplify_language_nodes"><code class="docutils literal notranslate"><span class="pre">LanguagePlan.simplify_language_nodes()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.SequentialPlan"><code class="docutils literal notranslate"><span class="pre">SequentialPlan</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.ParallelPlan"><code class="docutils literal notranslate"><span class="pre">ParallelPlan</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.ParallelPlan.parallel_blocklist"><code class="docutils literal notranslate"><span class="pre">ParallelPlan.parallel_blocklist</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.TryInOrderPlan"><code class="docutils literal notranslate"><span class="pre">TryInOrderPlan</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.TryAllPLan"><code class="docutils literal notranslate"><span class="pre">TryAllPLan</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.RepeatPlan"><code class="docutils literal notranslate"><span class="pre">RepeatPlan</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.MonitorPlan"><code class="docutils literal notranslate"><span class="pre">MonitorPlan</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.CodePlan"><code class="docutils literal notranslate"><span class="pre">CodePlan</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.LanguageNode"><code class="docutils literal notranslate"><span class="pre">LanguageNode</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.LanguageNode.designator_type"><code class="docutils literal notranslate"><span class="pre">LanguageNode.designator_type</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.SequentialNode"><code class="docutils literal notranslate"><span class="pre">SequentialNode</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.SequentialNode.designator_type"><code class="docutils literal notranslate"><span class="pre">SequentialNode.designator_type</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.SequentialNode.perform"><code class="docutils literal notranslate"><span class="pre">SequentialNode.perform()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.SequentialNode.perform_sequential"><code class="docutils literal notranslate"><span class="pre">SequentialNode.perform_sequential()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.SequentialNode.__hash__"><code class="docutils literal notranslate"><span class="pre">SequentialNode.__hash__()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.SequentialNode.__repr__"><code class="docutils literal notranslate"><span class="pre">SequentialNode.__repr__()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.ParallelNode"><code class="docutils literal notranslate"><span class="pre">ParallelNode</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.ParallelNode.perform"><code class="docutils literal notranslate"><span class="pre">ParallelNode.perform()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.ParallelNode.perform_parallel"><code class="docutils literal notranslate"><span class="pre">ParallelNode.perform_parallel()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.ParallelNode._lang_call"><code class="docutils literal notranslate"><span class="pre">ParallelNode._lang_call()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.ParallelNode.__hash__"><code class="docutils literal notranslate"><span class="pre">ParallelNode.__hash__()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.ParallelNode.__repr__"><code class="docutils literal notranslate"><span class="pre">ParallelNode.__repr__()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.RepeatNode"><code class="docutils literal notranslate"><span class="pre">RepeatNode</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.RepeatNode.repeat"><code class="docutils literal notranslate"><span class="pre">RepeatNode.repeat</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.RepeatNode.perform"><code class="docutils literal notranslate"><span class="pre">RepeatNode.perform()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.RepeatNode.__hash__"><code class="docutils literal notranslate"><span class="pre">RepeatNode.__hash__()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.MonitorNode"><code class="docutils literal notranslate"><span class="pre">MonitorNode</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.MonitorNode.kill_event"><code class="docutils literal notranslate"><span class="pre">MonitorNode.kill_event</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.MonitorNode.exception_queue"><code class="docutils literal notranslate"><span class="pre">MonitorNode.exception_queue</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.MonitorNode.behavior"><code class="docutils literal notranslate"><span class="pre">MonitorNode.behavior</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.MonitorNode.monitor_thread"><code class="docutils literal notranslate"><span class="pre">MonitorNode.monitor_thread</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.MonitorNode.perform"><code class="docutils literal notranslate"><span class="pre">MonitorNode.perform()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.MonitorNode.monitor"><code class="docutils literal notranslate"><span class="pre">MonitorNode.monitor()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.MonitorNode.__hash__"><code class="docutils literal notranslate"><span class="pre">MonitorNode.__hash__()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.TryInOrderNode"><code class="docutils literal notranslate"><span class="pre">TryInOrderNode</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.TryInOrderNode.perform"><code class="docutils literal notranslate"><span class="pre">TryInOrderNode.perform()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.TryInOrderNode.__hash__"><code class="docutils literal notranslate"><span class="pre">TryInOrderNode.__hash__()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.TryAllNode"><code class="docutils literal notranslate"><span class="pre">TryAllNode</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.TryAllNode.perform"><code class="docutils literal notranslate"><span class="pre">TryAllNode.perform()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.TryAllNode.__hash__"><code class="docutils literal notranslate"><span class="pre">TryAllNode.__hash__()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.CodeNode"><code class="docutils literal notranslate"><span class="pre">CodeNode</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.CodeNode.designator_type"><code class="docutils literal notranslate"><span class="pre">CodeNode.designator_type</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.CodeNode.function"><code class="docutils literal notranslate"><span class="pre">CodeNode.function</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.CodeNode.kwargs"><code class="docutils literal notranslate"><span class="pre">CodeNode.kwargs</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.CodeNode.perform"><code class="docutils literal notranslate"><span class="pre">CodeNode.perform</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.CodeNode.performable"><code class="docutils literal notranslate"><span class="pre">CodeNode.performable</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.CodeNode.action"><code class="docutils literal notranslate"><span class="pre">CodeNode.action</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.CodeNode.execute"><code class="docutils literal notranslate"><span class="pre">CodeNode.execute()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.CodeNode.resolve"><code class="docutils literal notranslate"><span class="pre">CodeNode.resolve()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#pycram.language.CodeNode.__hash__"><code class="docutils literal notranslate"><span class="pre">CodeNode.__hash__()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+<div class="bd-footer-content__inner container">
+  
+  <div class="footer-item">
+    
+<p class="component-author">
+By Jonas Dech
+</p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+
+  <p class="copyright">
+    
+      © Copyright 2025.
+      <br/>
+    
+  </p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+</div>
+          </footer>
+        
+
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+  </footer>
+  </body>
+</html>

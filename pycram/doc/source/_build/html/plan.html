@@ -1,0 +1,833 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="./" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>The PyCRAM Plan &#8212; PyCRAM</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="_static/styles/sphinx-book-theme.css?v=eba8b062" />
+    <link rel="stylesheet" type="text/css" href="_static/togglebutton.css?v=13237357" />
+    <link rel="stylesheet" type="text/css" href="_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css" />
+    <link rel="stylesheet" type="text/css" href="_static/sphinx-thebe.css?v=4fa983c6" />
+    <link rel="stylesheet" type="text/css" href="_static/proof.css" />
+    <link rel="stylesheet" type="text/css" href="_static/graphviz.css?v=fd3f3429" />
+    <link rel="stylesheet" type="text/css" href="_static/sphinx-design.min.css?v=95c83b7e" />
+    <link rel="stylesheet" type="text/css" href="_static/custom.css?v=5c87bd76" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="_static/documentation_options.js?v=9eb32ce0"></script>
+    <script src="_static/doctools.js?v=9a2dae69"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="_static/copybutton.js?v=f281be69"></script>
+    <script src="_static/scripts/sphinx-book-theme.js?v=887ef09a"></script>
+    <script>let toggleHintShow = 'Click to show';</script>
+    <script>let toggleHintHide = 'Click to hide';</script>
+    <script>let toggleOpenOnPrint = 'true';</script>
+    <script src="_static/togglebutton.js?v=4a39c7ea"></script>
+    <script>var togglebuttonSelector = '.toggle, .admonition.dropdown';</script>
+    <script src="_static/design-tabs.js?v=f930bc37"></script>
+    <script>const THEBE_JS_URL = "https://unpkg.com/thebe@0.8.2/lib/index.js"; const thebe_selector = ".thebe,.cell"; const thebe_selector_input = "pre"; const thebe_selector_output = ".output, .cell_output"</script>
+    <script async="async" src="_static/sphinx-thebe.js?v=c100c467"></script>
+    <script>var togglebuttonSelector = '.toggle, .admonition.dropdown';</script>
+    <script>const THEBE_JS_URL = "https://unpkg.com/thebe@0.8.2/lib/index.js"; const thebe_selector = ".thebe,.cell"; const thebe_selector_input = "pre"; const thebe_selector_output = ".output, .cell_output"</script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'plan';</script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Designators in PyCRAM" href="designators.html" />
+    <link rel="prev" title="Quickstart Guide" href="quickstart.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search..."
+         aria-label="Search..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="_static/new_pycram_logo_clean.svg" class="logo__image only-light" alt="PyCRAM - Home"/>
+    <script>document.write(`<img src="_static/new_pycram_logo_clean_dark.svg" class="logo__image only-dark" alt="PyCRAM - Home"/>`);</script>
+  
+  
+</a></div>
+        <div class="sidebar-primary-item">
+
+ <script>
+ document.write(`
+   <button class="btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script></div>
+        <div class="sidebar-primary-item"><nav class="bd-links bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item navbar-nav active">
+        <p aria-level="2" class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation Guide</a></li>
+
+
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart Guide</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Concepts</span></p>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1 current active"><a class="current reference internal" href="#">The PyCRAM Plan</a></li>
+<li class="toctree-l1"><a class="reference internal" href="designators.html">Designators in PyCRAM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="orm_concept.html">PyCRAM ORM: An Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="abstract_robot.html">Astract Robot Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="process_modules.html">Process Modules in PyCRAM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="costmap.html">Costmaps</a></li>
+<li class="toctree-l1"><a class="reference internal" href="notebooks.html">Jupyter Notebook Examples</a></li>
+
+
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Adding a new Robot</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="new_robot.html">Adding a new robot to PyCRAM</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Trouble Shooting</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="troubleshooting.html">Troubleshooting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="remarks.html">General Remarks</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Examples</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="notebooks/language.html">Plan Language</a></li>
+
+<li class="toctree-l1 has-children"><a class="reference internal" href="designator_example.html">Designators</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="notebooks/action_designator.html">Action Designator</a></li>
+<li class="toctree-l2"><a class="reference internal" href="notebooks/object_designator.html">Object Designator</a></li>
+
+<li class="toctree-l2"><a class="reference internal" href="notebooks/location_designator.html">Location Designator</a></li>
+<li class="toctree-l2"><a class="reference internal" href="notebooks/motion_designator.html">from pycram.language import SequentialPlan—
+jupyter:
+jupytext:
+text_representation:
+extension: .md
+format_name: markdown
+format_version: ‘1.3’
+jupytext_version: 1.16.3
+kernelspec:
+display_name: Python 3
+language: python
+name: python3</a></li>
+
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="orm.html">ORM</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="notebooks/orm_example.html">from pycram.orm.ormatic_interface import ResolvedActionNodeMappingDAOfrom pycram.orm.model import ResolvedActionNodeMapping—
+jupyter:
+jupytext:
+text_representation:
+extension: .md
+format_name: markdown
+format_version: ‘1.3’
+jupytext_version: 1.16.3
+kernelspec:
+display_name: Python 3
+language: python
+name: python3</a></li>
+
+<li class="toctree-l2"><a class="reference internal" href="notebooks/orm_querying_examples.html">ORM querying</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="datastructures.html">Datastructure</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="notebooks/pose.html">Pose</a></li>
+
+</ul>
+</details></li>
+<li class="toctree-l1"><a class="reference internal" href="ros_utils.html">ROS Utils</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">API</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="autoapi/pycram/index.html">pycram</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="autoapi/pycram/alternative_motion_mappings/index.html">pycram.alternative_motion_mappings</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="autoapi/pycram/alternative_motion_mappings/hsrb_motion_mapping/index.html">pycram.alternative_motion_mappings.hsrb_motion_mapping</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="autoapi/pycram/config/index.html">pycram.config</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="autoapi/pycram/config/action_conf/index.html">pycram.config.action_conf</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="autoapi/pycram/costmaps/index.html">pycram.costmaps</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="autoapi/pycram/datastructures/index.html">pycram.datastructures</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="autoapi/pycram/datastructures/dataclasses/index.html">pycram.datastructures.dataclasses</a></li>
+<li class="toctree-l3"><a class="reference internal" href="autoapi/pycram/datastructures/enums/index.html">pycram.datastructures.enums</a></li>
+<li class="toctree-l3"><a class="reference internal" href="autoapi/pycram/datastructures/grasp/index.html">pycram.datastructures.grasp</a></li>
+<li class="toctree-l3"><a class="reference internal" href="autoapi/pycram/datastructures/partial_designator/index.html">pycram.datastructures.partial_designator</a></li>
+<li class="toctree-l3"><a class="reference internal" href="autoapi/pycram/datastructures/pose/index.html">pycram.datastructures.pose</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="autoapi/pycram/designator/index.html">pycram.designator</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="autoapi/pycram/designators/index.html">pycram.designators</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="autoapi/pycram/designators/location_designator/index.html">pycram.designators.location_designator</a></li>
+<li class="toctree-l3"><a class="reference internal" href="autoapi/pycram/designators/object_designator/index.html">pycram.designators.object_designator</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="autoapi/pycram/designators/specialized_designators/index.html">pycram.designators.specialized_designators</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="autoapi/pycram/designators/specialized_designators/action/index.html">pycram.designators.specialized_designators.action</a></li>
+<li class="toctree-l4"><a class="reference internal" href="autoapi/pycram/designators/specialized_designators/location/index.html">pycram.designators.specialized_designators.location</a></li>
+<li class="toctree-l4"><a class="reference internal" href="autoapi/pycram/designators/specialized_designators/probabilistic/index.html">pycram.designators.specialized_designators.probabilistic</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="autoapi/pycram/external_interfaces/index.html">pycram.external_interfaces</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="autoapi/pycram/external_interfaces/blum_api/index.html">pycram.external_interfaces.blum_api</a></li>
+<li class="toctree-l3"><a class="reference internal" href="autoapi/pycram/external_interfaces/giskard/index.html">pycram.external_interfaces.giskard</a></li>
+<li class="toctree-l3"><a class="reference internal" href="autoapi/pycram/external_interfaces/move_base/index.html">pycram.external_interfaces.move_base</a></li>
+<li class="toctree-l3"><a class="reference internal" href="autoapi/pycram/external_interfaces/procthor/index.html">pycram.external_interfaces.procthor</a></li>
+<li class="toctree-l3"><a class="reference internal" href="autoapi/pycram/external_interfaces/robokudo/index.html">pycram.external_interfaces.robokudo</a></li>
+<li class="toctree-l3"><a class="reference internal" href="autoapi/pycram/external_interfaces/tmc/index.html">pycram.external_interfaces.tmc</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="autoapi/pycram/failure_handling/index.html">pycram.failure_handling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="autoapi/pycram/failures/index.html">pycram.failures</a></li>
+<li class="toctree-l2"><a class="reference internal" href="autoapi/pycram/filter/index.html">pycram.filter</a></li>
+<li class="toctree-l2"><a class="reference internal" href="autoapi/pycram/fluent/index.html">pycram.fluent</a></li>
+<li class="toctree-l2"><a class="reference internal" href="autoapi/pycram/has_parameters/index.html">pycram.has_parameters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="autoapi/pycram/helper/index.html">pycram.helper</a></li>
+<li class="toctree-l2"><a class="reference internal" href="autoapi/pycram/joint_state/index.html">pycram.joint_state</a></li>
+<li class="toctree-l2"><a class="reference internal" href="autoapi/pycram/language/index.html">pycram.language</a></li>
+<li class="toctree-l2"><a class="reference internal" href="autoapi/pycram/motion_executor/index.html">pycram.motion_executor</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="autoapi/pycram/ontomatic/index.html">pycram.ontomatic</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="autoapi/pycram/ontomatic/performables_to_ontology/index.html">pycram.ontomatic.performables_to_ontology</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="autoapi/pycram/orm/index.html">pycram.orm</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="autoapi/pycram/orm/model/index.html">pycram.orm.model</a></li>
+<li class="toctree-l3"><a class="reference internal" href="autoapi/pycram/orm/ormatic_interface/index.html">pycram.orm.ormatic_interface</a></li>
+<li class="toctree-l3"><a class="reference internal" href="autoapi/pycram/orm/utils/index.html">pycram.orm.utils</a></li>
+<li class="toctree-l3"><a class="reference internal" href="autoapi/pycram/orm/views/index.html">pycram.orm.views</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="autoapi/pycram/parameterizer/index.html">pycram.parameterizer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="autoapi/pycram/perception/index.html">pycram.perception</a></li>
+<li class="toctree-l2"><a class="reference internal" href="autoapi/pycram/plan/index.html">pycram.plan</a></li>
+<li class="toctree-l2"><a class="reference internal" href="autoapi/pycram/pose_validator/index.html">pycram.pose_validator</a></li>
+<li class="toctree-l2"><a class="reference internal" href="autoapi/pycram/probabilistic_costmap/index.html">pycram.probabilistic_costmap</a></li>
+<li class="toctree-l2"><a class="reference internal" href="autoapi/pycram/process_module/index.html">pycram.process_module</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="autoapi/pycram/process_modules/index.html">pycram.process_modules</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="autoapi/pycram/process_modules/armar_process_modules/index.html">pycram.process_modules.armar_process_modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="autoapi/pycram/process_modules/boxy_process_modules/index.html">pycram.process_modules.boxy_process_modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="autoapi/pycram/process_modules/default_process_modules/index.html">pycram.process_modules.default_process_modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="autoapi/pycram/process_modules/donbot_process_modules/index.html">pycram.process_modules.donbot_process_modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="autoapi/pycram/process_modules/hsrb_process_modules/index.html">pycram.process_modules.hsrb_process_modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="autoapi/pycram/process_modules/icub3_process_modules/index.html">pycram.process_modules.icub3_process_modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="autoapi/pycram/process_modules/justin_process_modules/index.html">pycram.process_modules.justin_process_modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="autoapi/pycram/process_modules/kevin_process_modules/index.html">pycram.process_modules.kevin_process_modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="autoapi/pycram/process_modules/pr2_process_modules/index.html">pycram.process_modules.pr2_process_modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="autoapi/pycram/process_modules/robotiq_gripper_process_module/index.html">pycram.process_modules.robotiq_gripper_process_module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="autoapi/pycram/process_modules/stretch_process_modules/index.html">pycram.process_modules.stretch_process_modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="autoapi/pycram/process_modules/tiago_process_modules/index.html">pycram.process_modules.tiago_process_modules</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="autoapi/pycram/robot_description/index.html">pycram.robot_description</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="autoapi/pycram/robot_descriptions/index.html">pycram.robot_descriptions</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="autoapi/pycram/robot_descriptions/armar_description/index.html">pycram.robot_descriptions.armar_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="autoapi/pycram/robot_descriptions/boxy_description/index.html">pycram.robot_descriptions.boxy_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="autoapi/pycram/robot_descriptions/donbot_description/index.html">pycram.robot_descriptions.donbot_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="autoapi/pycram/robot_descriptions/hsrb_description/index.html">pycram.robot_descriptions.hsrb_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="autoapi/pycram/robot_descriptions/hsrb_states/index.html">pycram.robot_descriptions.hsrb_states</a></li>
+<li class="toctree-l3"><a class="reference internal" href="autoapi/pycram/robot_descriptions/icub3_description/index.html">pycram.robot_descriptions.icub3_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="autoapi/pycram/robot_descriptions/justin_description/index.html">pycram.robot_descriptions.justin_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="autoapi/pycram/robot_descriptions/kevin_description/index.html">pycram.robot_descriptions.kevin_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="autoapi/pycram/robot_descriptions/panda_description/index.html">pycram.robot_descriptions.panda_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="autoapi/pycram/robot_descriptions/pr2_description/index.html">pycram.robot_descriptions.pr2_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="autoapi/pycram/robot_descriptions/pr2_states/index.html">pycram.robot_descriptions.pr2_states</a></li>
+<li class="toctree-l3"><a class="reference internal" href="autoapi/pycram/robot_descriptions/stretch_description/index.html">pycram.robot_descriptions.stretch_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="autoapi/pycram/robot_descriptions/tiago_description/index.html">pycram.robot_descriptions.tiago_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="autoapi/pycram/robot_descriptions/tracy_description/index.html">pycram.robot_descriptions.tracy_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="autoapi/pycram/robot_descriptions/tracy_states/index.html">pycram.robot_descriptions.tracy_states</a></li>
+<li class="toctree-l3"><a class="reference internal" href="autoapi/pycram/robot_descriptions/turtlebot_description/index.html">pycram.robot_descriptions.turtlebot_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="autoapi/pycram/robot_descriptions/ur5_description/index.html">pycram.robot_descriptions.ur5_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="autoapi/pycram/robot_descriptions/ur5e_controlled_description/index.html">pycram.robot_descriptions.ur5e_controlled_description</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="autoapi/pycram/robot_plans/index.html">pycram.robot_plans</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="autoapi/pycram/robot_plans/actions/index.html">pycram.robot_plans.actions</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="autoapi/pycram/robot_plans/actions/base/index.html">pycram.robot_plans.actions.base</a></li>
+<li class="toctree-l4"><a class="reference internal" href="autoapi/pycram/robot_plans/actions/composite/index.html">pycram.robot_plans.actions.composite</a></li>
+<li class="toctree-l4"><a class="reference internal" href="autoapi/pycram/robot_plans/actions/core/index.html">pycram.robot_plans.actions.core</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="autoapi/pycram/robot_plans/motions/index.html">pycram.robot_plans.motions</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="autoapi/pycram/robot_plans/motions/base/index.html">pycram.robot_plans.motions.base</a></li>
+<li class="toctree-l4"><a class="reference internal" href="autoapi/pycram/robot_plans/motions/container/index.html">pycram.robot_plans.motions.container</a></li>
+<li class="toctree-l4"><a class="reference internal" href="autoapi/pycram/robot_plans/motions/gripper/index.html">pycram.robot_plans.motions.gripper</a></li>
+<li class="toctree-l4"><a class="reference internal" href="autoapi/pycram/robot_plans/motions/misc/index.html">pycram.robot_plans.motions.misc</a></li>
+<li class="toctree-l4"><a class="reference internal" href="autoapi/pycram/robot_plans/motions/navigation/index.html">pycram.robot_plans.motions.navigation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="autoapi/pycram/robot_plans/motions/robot_body/index.html">pycram.robot_plans.motions.robot_body</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="autoapi/pycram/ros/index.html">pycram.ros</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="autoapi/pycram/ros/no_ros/index.html">pycram.ros.no_ros</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="autoapi/pycram/ros/no_ros/action_lib/index.html">pycram.ros.no_ros.action_lib</a></li>
+<li class="toctree-l4"><a class="reference internal" href="autoapi/pycram/ros/no_ros/data_types/index.html">pycram.ros.no_ros.data_types</a></li>
+<li class="toctree-l4"><a class="reference internal" href="autoapi/pycram/ros/no_ros/publisher/index.html">pycram.ros.no_ros.publisher</a></li>
+<li class="toctree-l4"><a class="reference internal" href="autoapi/pycram/ros/no_ros/ros_tools/index.html">pycram.ros.no_ros.ros_tools</a></li>
+<li class="toctree-l4"><a class="reference internal" href="autoapi/pycram/ros/no_ros/service/index.html">pycram.ros.no_ros.service</a></li>
+<li class="toctree-l4"><a class="reference internal" href="autoapi/pycram/ros/no_ros/subscriber/index.html">pycram.ros.no_ros.subscriber</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="autoapi/pycram/ros/ros1/index.html">pycram.ros.ros1</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="autoapi/pycram/ros/ros1/action_lib/index.html">pycram.ros.ros1.action_lib</a></li>
+<li class="toctree-l4"><a class="reference internal" href="autoapi/pycram/ros/ros1/data_types/index.html">pycram.ros.ros1.data_types</a></li>
+<li class="toctree-l4"><a class="reference internal" href="autoapi/pycram/ros/ros1/publisher/index.html">pycram.ros.ros1.publisher</a></li>
+<li class="toctree-l4"><a class="reference internal" href="autoapi/pycram/ros/ros1/ros_tools/index.html">pycram.ros.ros1.ros_tools</a></li>
+<li class="toctree-l4"><a class="reference internal" href="autoapi/pycram/ros/ros1/service/index.html">pycram.ros.ros1.service</a></li>
+<li class="toctree-l4"><a class="reference internal" href="autoapi/pycram/ros/ros1/subscriber/index.html">pycram.ros.ros1.subscriber</a></li>
+<li class="toctree-l4"><a class="reference internal" href="autoapi/pycram/ros/ros1/viz_marker_publisher/index.html">pycram.ros.ros1.viz_marker_publisher</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="autoapi/pycram/ros/ros2/index.html">pycram.ros.ros2</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="autoapi/pycram/ros/ros2/action_lib/index.html">pycram.ros.ros2.action_lib</a></li>
+<li class="toctree-l4"><a class="reference internal" href="autoapi/pycram/ros/ros2/data_types/index.html">pycram.ros.ros2.data_types</a></li>
+<li class="toctree-l4"><a class="reference internal" href="autoapi/pycram/ros/ros2/filter/index.html">pycram.ros.ros2.filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="autoapi/pycram/ros/ros2/publisher/index.html">pycram.ros.ros2.publisher</a></li>
+<li class="toctree-l4"><a class="reference internal" href="autoapi/pycram/ros/ros2/ros_tools/index.html">pycram.ros.ros2.ros_tools</a></li>
+<li class="toctree-l4"><a class="reference internal" href="autoapi/pycram/ros/ros2/service/index.html">pycram.ros.ros2.service</a></li>
+<li class="toctree-l4"><a class="reference internal" href="autoapi/pycram/ros/ros2/subscriber/index.html">pycram.ros.ros2.subscriber</a></li>
+<li class="toctree-l4"><a class="reference internal" href="autoapi/pycram/ros/ros2/viz_marker_publisher/index.html">pycram.ros.ros2.viz_marker_publisher</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="autoapi/pycram/ros_utils/index.html">pycram.ros_utils</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="autoapi/pycram/ros_utils/force_torque_sensor/index.html">pycram.ros_utils.force_torque_sensor</a></li>
+<li class="toctree-l3"><a class="reference internal" href="autoapi/pycram/ros_utils/joint_state_publisher/index.html">pycram.ros_utils.joint_state_publisher</a></li>
+<li class="toctree-l3"><a class="reference internal" href="autoapi/pycram/ros_utils/marker_publisher_base/index.html">pycram.ros_utils.marker_publisher_base</a></li>
+<li class="toctree-l3"><a class="reference internal" href="autoapi/pycram/ros_utils/tf_broadcaster/index.html">pycram.ros_utils.tf_broadcaster</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="autoapi/pycram/testing/index.html">pycram.testing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="autoapi/pycram/tf_transformations/index.html">pycram.tf_transformations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="autoapi/pycram/units/index.html">pycram.units</a></li>
+<li class="toctree-l2"><a class="reference internal" href="autoapi/pycram/utils/index.html">pycram.utils</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="autoapi/pycram/validation/index.html">pycram.validation</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="autoapi/pycram/validation/error_checkers/index.html">pycram.validation.error_checkers</a></li>
+<li class="toctree-l3"><a class="reference internal" href="autoapi/pycram/validation/goal_validator/index.html">pycram.validation.goal_validator</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="autoapi/pycram/visualization/index.html">pycram.visualization</a></li>
+</ul>
+</details></li>
+</ul>
+
+    </div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+
+<div class="sbt-scroll-pixel-helper"></div>
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item"><button class="sidebar-toggle primary-toggle btn btn-sm" title="Toggle primary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <span class="fa-solid fa-bars"></span>
+</button></div>
+      
+    </div>
+  
+  
+    <div class="header-article-items__end">
+      
+        <div class="header-article-item">
+
+<div class="article-header-buttons">
+
+
+
+
+
+<div class="dropdown dropdown-download-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Download this page">
+    <i class="fas fa-download"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="_sources/plan.rst" target="_blank"
+   class="btn btn-sm btn-download-source-button dropdown-item"
+   title="Download source file"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file"></i>
+  </span>
+<span class="btn__text-container">.rst</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li>
+<button onclick="window.print()"
+  class="btn btn-sm btn-download-pdf-button dropdown-item"
+  title="Print to PDF"
+  data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file-pdf"></i>
+  </span>
+<span class="btn__text-container">.pdf</span>
+</button>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+<button onclick="toggleFullScreen()"
+  class="btn btn-sm btn-fullscreen-button"
+  title="Fullscreen mode"
+  data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script>
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script>
+<button class="sidebar-toggle secondary-toggle btn btn-sm" title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</button>
+</div></div>
+      
+    </div>
+  
+</div>
+</div>
+              
+              
+
+<div id="jb-print-docs-body" class="onlyprint">
+    <h1>The PyCRAM Plan</h1>
+    <!-- Table of contents -->
+    <div id="print-main-content">
+        <div id="jb-print-toc">
+            
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#what-is-a-plan">What is a Plan?</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#why-does-the-plan-matter">Why does the Plan matter?</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#how-a-plan-is-shaped-high-level">How a Plan is shaped (high level)</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#plannodes-in-one-sentence">PlanNodes in one sentence</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#how-designators-connect-to-the-plan-conceptually">How Designators connect to the Plan (conceptually)</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#where-the-language-fits">Where the Language fits</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#role-in-the-overall-framework">Role in the overall framework</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#mental-model">Mental model</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#practical-takeaway">Practical takeaway</a></li>
+</ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="the-pycram-plan">
+<h1>The PyCRAM Plan<a class="headerlink" href="#the-pycram-plan" title="Link to this heading">#</a></h1>
+<nav class="contents local" id="contents">
+<span id="plan-header"></span><ul class="simple">
+<li><p><a class="reference internal" href="#what-is-a-plan" id="id1">What is a Plan?</a></p></li>
+<li><p><a class="reference internal" href="#why-does-the-plan-matter" id="id2">Why does the Plan matter?</a></p></li>
+<li><p><a class="reference internal" href="#how-a-plan-is-shaped-high-level" id="id3">How a Plan is shaped (high level)</a></p></li>
+<li><p><a class="reference internal" href="#plannodes-in-one-sentence" id="id4">PlanNodes in one sentence</a></p></li>
+<li><p><a class="reference internal" href="#how-designators-connect-to-the-plan-conceptually" id="id5">How Designators connect to the Plan (conceptually)</a></p></li>
+<li><p><a class="reference internal" href="#where-the-language-fits" id="id6">Where the Language fits</a></p></li>
+<li><p><a class="reference internal" href="#role-in-the-overall-framework" id="id7">Role in the overall framework</a></p></li>
+<li><p><a class="reference internal" href="#mental-model" id="id8">Mental model</a></p></li>
+<li><p><a class="reference internal" href="#practical-takeaway" id="id9">Practical takeaway</a></p></li>
+</ul>
+</nav>
+<section id="what-is-a-plan">
+<h2><a class="toc-backref" href="#id1" role="doc-backlink">What is a Plan?</a><a class="headerlink" href="#what-is-a-plan" title="Link to this heading">#</a></h2>
+<p>A <code class="docutils literal notranslate"><span class="pre">Plan</span></code> is the central coordination structure in PyCRAM. It captures “what to do next” for a robot by arranging
+high‑level task descriptions (Designators), control‑flow (the Language layer), and the current execution context
+(world and robot) into a single, navigable structure.</p>
+<p>Think of a Plan as a living, directed tree of steps. Each step is a node (a <code class="docutils literal notranslate"><span class="pre">PlanNode</span></code>). Some nodes represent
+control‑flow (e.g., do A then B, do A and B in parallel, repeat, monitor). Other nodes represent concrete, executable
+robot activities (e.g., a grasp action or a base motion). Executing a Plan means traversing this tree according to the
+control‑flow nodes and carrying out the actions/motions at the leaves.</p>
+</section>
+<section id="why-does-the-plan-matter">
+<h2><a class="toc-backref" href="#id2" role="doc-backlink">Why does the Plan matter?</a><a class="headerlink" href="#why-does-the-plan-matter" title="Link to this heading">#</a></h2>
+<p>The Plan is the backbone that holds PyCRAM together at run time:</p>
+<ul class="simple">
+<li><p>Integration point: It is where symbolic task specifications (Designators), procedural control‑flow (Language), and
+low‑level execution (Actions and Motions) meet.</p></li>
+<li><p>Single source of truth: It stores the current execution state (which step is running, succeeded, failed, or paused),
+making introspection, debugging, and visualization straightforward.</p></li>
+<li><p>Context carrier: It transports robot and world context through the whole execution, so every step can act with the
+correct scene and embodiment.</p></li>
+<li><p>Composability: Plans can be nested and mounted, letting you build complex behaviors from reusable sub‑plans.</p></li>
+<li><p>Observability and tooling: The Plan supports callbacks, monitoring, and visualization, enabling logging, dashboards,
+and supervision without changing task logic.</p></li>
+</ul>
+</section>
+<section id="how-a-plan-is-shaped-high-level">
+<h2><a class="toc-backref" href="#id3" role="doc-backlink">How a Plan is shaped (high level)</a><a class="headerlink" href="#how-a-plan-is-shaped-high-level" title="Link to this heading">#</a></h2>
+<p>A Plan is usually a tree with a control‑flow (“language”) node at the root and action/motion nodes beneath:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>Plan
+└─ LanguageNode (e.g., Sequential, Parallel, Try, Repeat, Monitor, Code)
+   ├─ Action/Motion Nodes (resolved or to be resolved from Designators)
+   ├─ Mounted Sub‑Plans
+   └─ More LanguageNodes (to structure the subtree)
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>LanguageNodes define the order and concurrency of execution.</p></li>
+<li><p>Action/Motion nodes actually perform work on the robot based on Designators (see below).</p></li>
+</ul>
+</section>
+<section id="plannodes-in-one-sentence">
+<h2><a class="toc-backref" href="#id4" role="doc-backlink">PlanNodes in one sentence</a><a class="headerlink" href="#plannodes-in-one-sentence" title="Link to this heading">#</a></h2>
+<p>A <code class="docutils literal notranslate"><span class="pre">PlanNode</span></code> is a step in the Plan. It knows its status (created/running/succeeded/failed/paused), its position in the
+Plan (parent/children), and—if it is executable—how to perform its part.</p>
+</section>
+<section id="how-designators-connect-to-the-plan-conceptually">
+<h2><a class="toc-backref" href="#id5" role="doc-backlink">How Designators connect to the Plan (conceptually)</a><a class="headerlink" href="#how-designators-connect-to-the-plan-conceptually" title="Link to this heading">#</a></h2>
+<p>Designators are structured task descriptions (“pick up this object”, “move base to that pose”). The Plan turns these into
+executable nodes:</p>
+<ul class="simple">
+<li><p>Unresolved Action Designators become Action nodes that can be resolved at run time (late binding to a concrete
+action instance when more information is available).</p></li>
+<li><p>Resolved Action Designators become concrete Action nodes that execute immediately.</p></li>
+<li><p>Motion Designators (e.g., base/arm motions) become Motion nodes and execute directly.</p></li>
+</ul>
+<p>This bridge lets high‑level reasoning produce Designators while the Plan ensures they are executed in the right order and
+under the right conditions.</p>
+</section>
+<section id="where-the-language-fits">
+<h2><a class="toc-backref" href="#id6" role="doc-backlink">Where the Language fits</a><a class="headerlink" href="#where-the-language-fits" title="Link to this heading">#</a></h2>
+<p>The Language layer provides the control‑flow vocabulary. In Plans, LanguageNodes such as <code class="docutils literal notranslate"><span class="pre">Sequential</span></code>, <code class="docutils literal notranslate"><span class="pre">Parallel</span></code>,
+<code class="docutils literal notranslate"><span class="pre">TryInOrder</span></code>, <code class="docutils literal notranslate"><span class="pre">TryAll</span></code>, <code class="docutils literal notranslate"><span class="pre">Repeat</span></code>, and <code class="docutils literal notranslate"><span class="pre">Monitor</span></code> shape how and when children run. They do not manipulate robot
+hardware themselves—they orchestrate the subtree beneath them.</p>
+</section>
+<section id="role-in-the-overall-framework">
+<h2><a class="toc-backref" href="#id7" role="doc-backlink">Role in the overall framework</a><a class="headerlink" href="#role-in-the-overall-framework" title="Link to this heading">#</a></h2>
+<ul class="simple">
+<li><p>Execution orchestration: Plans are the runtime engine that sequences, parallelizes, retries, and monitors robot
+activities.</p></li>
+<li><p>Context propagation: Every node sees the same world/robot context carried by the Plan, ensuring consistent decision
+making and execution.</p></li>
+<li><p>Abstraction boundary: The Plan is the stable interface between task specification (Designators and Language) and
+concrete execution (Actions/Motions, controllers, and external interfaces).</p></li>
+<li><p>Introspection and visualization: Plans expose structure and status for plotting, logging, and debugging, which is
+essential for real robot deployments.</p></li>
+<li><p>Composable building blocks: Larger behaviors are built by composing Plans (mounting sub‑plans) and mixing language
+constructs with designator‑driven actions.</p></li>
+</ul>
+</section>
+<section id="mental-model">
+<h2><a class="toc-backref" href="#id8" role="doc-backlink">Mental model</a><a class="headerlink" href="#mental-model" title="Link to this heading">#</a></h2>
+<ol class="arabic simple">
+<li><p>You describe what should happen using Designators and Language constructs.</p></li>
+<li><p>The Plan assembles these descriptions into a tree of steps (nodes) bound to the current robot and world.</p></li>
+<li><p>Executing the Plan walks the tree, letting LanguageNodes orchestrate and Action/Motion nodes act.</p></li>
+<li><p>Throughout execution, the Plan tracks state, supports monitoring/callbacks, and makes it easy to inspect or adapt.</p></li>
+</ol>
+</section>
+<section id="practical-takeaway">
+<h2><a class="toc-backref" href="#id9" role="doc-backlink">Practical takeaway</a><a class="headerlink" href="#practical-takeaway" title="Link to this heading">#</a></h2>
+<p>Use Plans to turn high‑level intentions into reliable robot behavior: the Plan is your central, observable, and
+composable execution graph that unifies task descriptions, control‑flow, and robot/world context.</p>
+</section>
+</section>
+
+    <script type="text/x-thebe-config">
+    {
+        requestKernel: true,
+        binderOptions: {
+            repo: "binder-examples/jupyter-stacks-datascience",
+            ref: "master",
+        },
+        codeMirrorConfig: {
+            theme: "abcdef",
+            mode: "python"
+        },
+        kernelOptions: {
+            name: "python3",
+            path: "./."
+        },
+        predefinedOutput: true
+    }
+    </script>
+    <script>kernelName = 'python3'</script>
+
+                </article>
+              
+
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="quickstart.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Quickstart Guide</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="designators.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Designators in PyCRAM</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+  <div class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#what-is-a-plan">What is a Plan?</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#why-does-the-plan-matter">Why does the Plan matter?</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#how-a-plan-is-shaped-high-level">How a Plan is shaped (high level)</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#plannodes-in-one-sentence">PlanNodes in one sentence</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#how-designators-connect-to-the-plan-conceptually">How Designators connect to the Plan (conceptually)</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#where-the-language-fits">Where the Language fits</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#role-in-the-overall-framework">Role in the overall framework</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#mental-model">Mental model</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#practical-takeaway">Practical takeaway</a></li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+<div class="bd-footer-content__inner container">
+  
+  <div class="footer-item">
+    
+<p class="component-author">
+By Jonas Dech
+</p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+
+  <p class="copyright">
+    
+      © Copyright 2025.
+      <br/>
+    
+  </p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+</div>
+          </footer>
+        
+
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+  </footer>
+  </body>
+</html>

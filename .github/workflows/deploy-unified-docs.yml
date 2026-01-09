@@ -195,7 +195,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         sparse-checkout: |
-          docs_index.md
+          docs_index.html
         sparse-checkout-cone-mode: false
 
     - name: Setup index page
@@ -203,8 +203,8 @@ jobs:
         # Create .nojekyll to disable Jekyll processing
         touch _combined_docs/.nojekyll
         
-        # Copy the markdown index file
-        cp docs_index.md _combined_docs/index.md
+        # Copy the HTML index file
+        cp docs_index.html _combined_docs/index.html
 
     - name: Upload Pages artifact
       uses: actions/upload-pages-artifact@v3

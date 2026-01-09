@@ -1,0 +1,923 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Location Designator &#8212; PyCRAM</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/sphinx-book-theme.css?v=eba8b062" />
+    <link rel="stylesheet" type="text/css" href="../_static/togglebutton.css?v=13237357" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/sphinx-thebe.css?v=4fa983c6" />
+    <link rel="stylesheet" type="text/css" href="../_static/proof.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=fd3f3429" />
+    <link rel="stylesheet" type="text/css" href="../_static/sphinx-design.min.css?v=95c83b7e" />
+    <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=5c87bd76" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../_static/documentation_options.js?v=9eb32ce0"></script>
+    <script src="../_static/doctools.js?v=9a2dae69"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../_static/copybutton.js?v=f281be69"></script>
+    <script src="../_static/scripts/sphinx-book-theme.js?v=887ef09a"></script>
+    <script>let toggleHintShow = 'Click to show';</script>
+    <script>let toggleHintHide = 'Click to hide';</script>
+    <script>let toggleOpenOnPrint = 'true';</script>
+    <script src="../_static/togglebutton.js?v=4a39c7ea"></script>
+    <script>var togglebuttonSelector = '.toggle, .admonition.dropdown';</script>
+    <script src="../_static/design-tabs.js?v=f930bc37"></script>
+    <script>const THEBE_JS_URL = "https://unpkg.com/thebe@0.8.2/lib/index.js"; const thebe_selector = ".thebe,.cell"; const thebe_selector_input = "pre"; const thebe_selector_output = ".output, .cell_output"</script>
+    <script async="async" src="../_static/sphinx-thebe.js?v=c100c467"></script>
+    <script>var togglebuttonSelector = '.toggle, .admonition.dropdown';</script>
+    <script>const THEBE_JS_URL = "https://unpkg.com/thebe@0.8.2/lib/index.js"; const thebe_selector = ".thebe,.cell"; const thebe_selector_input = "pre"; const thebe_selector_output = ".output, .cell_output"</script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'notebooks/location_designator';</script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="from pycram.language import SequentialPlan— jupyter: jupytext: text_representation: extension: .md format_name: markdown format_version: ‘1.3’ jupytext_version: 1.16.3 kernelspec: display_name: Python 3 language: python name: python3" href="motion_designator.html" />
+    <link rel="prev" title="Object Designator" href="object_designator.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search..."
+         aria-label="Search..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../_static/new_pycram_logo_clean.svg" class="logo__image only-light" alt="PyCRAM - Home"/>
+    <script>document.write(`<img src="../_static/new_pycram_logo_clean_dark.svg" class="logo__image only-dark" alt="PyCRAM - Home"/>`);</script>
+  
+  
+</a></div>
+        <div class="sidebar-primary-item">
+
+ <script>
+ document.write(`
+   <button class="btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script></div>
+        <div class="sidebar-primary-item"><nav class="bd-links bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item navbar-nav active">
+        <p aria-level="2" class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation Guide</a></li>
+
+
+<li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quickstart Guide</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Concepts</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../plan.html">The PyCRAM Plan</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../designators.html">Designators in PyCRAM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../orm_concept.html">PyCRAM ORM: An Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../abstract_robot.html">Astract Robot Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../process_modules.html">Process Modules in PyCRAM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../costmap.html">Costmaps</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../notebooks.html">Jupyter Notebook Examples</a></li>
+
+
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Adding a new Robot</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../new_robot.html">Adding a new robot to PyCRAM</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Trouble Shooting</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../troubleshooting.html">Troubleshooting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../remarks.html">General Remarks</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Examples</span></p>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="language.html">Plan Language</a></li>
+
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="../designator_example.html">Designators</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="action_designator.html">Action Designator</a></li>
+<li class="toctree-l2"><a class="reference internal" href="object_designator.html">Object Designator</a></li>
+
+<li class="toctree-l2 current active"><a class="current reference internal" href="#">Location Designator</a></li>
+<li class="toctree-l2"><a class="reference internal" href="motion_designator.html">from pycram.language import SequentialPlan—
+jupyter:
+jupytext:
+text_representation:
+extension: .md
+format_name: markdown
+format_version: ‘1.3’
+jupytext_version: 1.16.3
+kernelspec:
+display_name: Python 3
+language: python
+name: python3</a></li>
+
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../orm.html">ORM</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="orm_example.html">from pycram.orm.ormatic_interface import ResolvedActionNodeMappingDAOfrom pycram.orm.model import ResolvedActionNodeMapping—
+jupyter:
+jupytext:
+text_representation:
+extension: .md
+format_name: markdown
+format_version: ‘1.3’
+jupytext_version: 1.16.3
+kernelspec:
+display_name: Python 3
+language: python
+name: python3</a></li>
+
+<li class="toctree-l2"><a class="reference internal" href="orm_querying_examples.html">ORM querying</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../datastructures.html">Datastructure</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="pose.html">Pose</a></li>
+
+</ul>
+</details></li>
+<li class="toctree-l1"><a class="reference internal" href="../ros_utils.html">ROS Utils</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">API</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../autoapi/pycram/index.html">pycram</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../autoapi/pycram/alternative_motion_mappings/index.html">pycram.alternative_motion_mappings</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/pycram/alternative_motion_mappings/hsrb_motion_mapping/index.html">pycram.alternative_motion_mappings.hsrb_motion_mapping</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../autoapi/pycram/config/index.html">pycram.config</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/pycram/config/action_conf/index.html">pycram.config.action_conf</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="../autoapi/pycram/costmaps/index.html">pycram.costmaps</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../autoapi/pycram/datastructures/index.html">pycram.datastructures</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/pycram/datastructures/dataclasses/index.html">pycram.datastructures.dataclasses</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/pycram/datastructures/enums/index.html">pycram.datastructures.enums</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/pycram/datastructures/grasp/index.html">pycram.datastructures.grasp</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/pycram/datastructures/partial_designator/index.html">pycram.datastructures.partial_designator</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/pycram/datastructures/pose/index.html">pycram.datastructures.pose</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="../autoapi/pycram/designator/index.html">pycram.designator</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../autoapi/pycram/designators/index.html">pycram.designators</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/pycram/designators/location_designator/index.html">pycram.designators.location_designator</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/pycram/designators/object_designator/index.html">pycram.designators.object_designator</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../autoapi/pycram/designators/specialized_designators/index.html">pycram.designators.specialized_designators</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/pycram/designators/specialized_designators/action/index.html">pycram.designators.specialized_designators.action</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/pycram/designators/specialized_designators/location/index.html">pycram.designators.specialized_designators.location</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/pycram/designators/specialized_designators/probabilistic/index.html">pycram.designators.specialized_designators.probabilistic</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../autoapi/pycram/external_interfaces/index.html">pycram.external_interfaces</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/pycram/external_interfaces/blum_api/index.html">pycram.external_interfaces.blum_api</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/pycram/external_interfaces/giskard/index.html">pycram.external_interfaces.giskard</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/pycram/external_interfaces/move_base/index.html">pycram.external_interfaces.move_base</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/pycram/external_interfaces/procthor/index.html">pycram.external_interfaces.procthor</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/pycram/external_interfaces/robokudo/index.html">pycram.external_interfaces.robokudo</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/pycram/external_interfaces/tmc/index.html">pycram.external_interfaces.tmc</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="../autoapi/pycram/failure_handling/index.html">pycram.failure_handling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../autoapi/pycram/failures/index.html">pycram.failures</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../autoapi/pycram/filter/index.html">pycram.filter</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../autoapi/pycram/fluent/index.html">pycram.fluent</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../autoapi/pycram/has_parameters/index.html">pycram.has_parameters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../autoapi/pycram/helper/index.html">pycram.helper</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../autoapi/pycram/joint_state/index.html">pycram.joint_state</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../autoapi/pycram/language/index.html">pycram.language</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../autoapi/pycram/motion_executor/index.html">pycram.motion_executor</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../autoapi/pycram/ontomatic/index.html">pycram.ontomatic</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/pycram/ontomatic/performables_to_ontology/index.html">pycram.ontomatic.performables_to_ontology</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../autoapi/pycram/orm/index.html">pycram.orm</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/pycram/orm/model/index.html">pycram.orm.model</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/pycram/orm/ormatic_interface/index.html">pycram.orm.ormatic_interface</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/pycram/orm/utils/index.html">pycram.orm.utils</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/pycram/orm/views/index.html">pycram.orm.views</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="../autoapi/pycram/parameterizer/index.html">pycram.parameterizer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../autoapi/pycram/perception/index.html">pycram.perception</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../autoapi/pycram/plan/index.html">pycram.plan</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../autoapi/pycram/pose_validator/index.html">pycram.pose_validator</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../autoapi/pycram/probabilistic_costmap/index.html">pycram.probabilistic_costmap</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../autoapi/pycram/process_module/index.html">pycram.process_module</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../autoapi/pycram/process_modules/index.html">pycram.process_modules</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/pycram/process_modules/armar_process_modules/index.html">pycram.process_modules.armar_process_modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/pycram/process_modules/boxy_process_modules/index.html">pycram.process_modules.boxy_process_modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/pycram/process_modules/default_process_modules/index.html">pycram.process_modules.default_process_modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/pycram/process_modules/donbot_process_modules/index.html">pycram.process_modules.donbot_process_modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/pycram/process_modules/hsrb_process_modules/index.html">pycram.process_modules.hsrb_process_modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/pycram/process_modules/icub3_process_modules/index.html">pycram.process_modules.icub3_process_modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/pycram/process_modules/justin_process_modules/index.html">pycram.process_modules.justin_process_modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/pycram/process_modules/kevin_process_modules/index.html">pycram.process_modules.kevin_process_modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/pycram/process_modules/pr2_process_modules/index.html">pycram.process_modules.pr2_process_modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/pycram/process_modules/robotiq_gripper_process_module/index.html">pycram.process_modules.robotiq_gripper_process_module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/pycram/process_modules/stretch_process_modules/index.html">pycram.process_modules.stretch_process_modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/pycram/process_modules/tiago_process_modules/index.html">pycram.process_modules.tiago_process_modules</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="../autoapi/pycram/robot_description/index.html">pycram.robot_description</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../autoapi/pycram/robot_descriptions/index.html">pycram.robot_descriptions</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/pycram/robot_descriptions/armar_description/index.html">pycram.robot_descriptions.armar_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/pycram/robot_descriptions/boxy_description/index.html">pycram.robot_descriptions.boxy_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/pycram/robot_descriptions/donbot_description/index.html">pycram.robot_descriptions.donbot_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/pycram/robot_descriptions/hsrb_description/index.html">pycram.robot_descriptions.hsrb_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/pycram/robot_descriptions/hsrb_states/index.html">pycram.robot_descriptions.hsrb_states</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/pycram/robot_descriptions/icub3_description/index.html">pycram.robot_descriptions.icub3_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/pycram/robot_descriptions/justin_description/index.html">pycram.robot_descriptions.justin_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/pycram/robot_descriptions/kevin_description/index.html">pycram.robot_descriptions.kevin_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/pycram/robot_descriptions/panda_description/index.html">pycram.robot_descriptions.panda_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/pycram/robot_descriptions/pr2_description/index.html">pycram.robot_descriptions.pr2_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/pycram/robot_descriptions/pr2_states/index.html">pycram.robot_descriptions.pr2_states</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/pycram/robot_descriptions/stretch_description/index.html">pycram.robot_descriptions.stretch_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/pycram/robot_descriptions/tiago_description/index.html">pycram.robot_descriptions.tiago_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/pycram/robot_descriptions/tracy_description/index.html">pycram.robot_descriptions.tracy_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/pycram/robot_descriptions/tracy_states/index.html">pycram.robot_descriptions.tracy_states</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/pycram/robot_descriptions/turtlebot_description/index.html">pycram.robot_descriptions.turtlebot_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/pycram/robot_descriptions/ur5_description/index.html">pycram.robot_descriptions.ur5_description</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/pycram/robot_descriptions/ur5e_controlled_description/index.html">pycram.robot_descriptions.ur5e_controlled_description</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../autoapi/pycram/robot_plans/index.html">pycram.robot_plans</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../autoapi/pycram/robot_plans/actions/index.html">pycram.robot_plans.actions</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/pycram/robot_plans/actions/base/index.html">pycram.robot_plans.actions.base</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/pycram/robot_plans/actions/composite/index.html">pycram.robot_plans.actions.composite</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/pycram/robot_plans/actions/core/index.html">pycram.robot_plans.actions.core</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../autoapi/pycram/robot_plans/motions/index.html">pycram.robot_plans.motions</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/pycram/robot_plans/motions/base/index.html">pycram.robot_plans.motions.base</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/pycram/robot_plans/motions/container/index.html">pycram.robot_plans.motions.container</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/pycram/robot_plans/motions/gripper/index.html">pycram.robot_plans.motions.gripper</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/pycram/robot_plans/motions/misc/index.html">pycram.robot_plans.motions.misc</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/pycram/robot_plans/motions/navigation/index.html">pycram.robot_plans.motions.navigation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/pycram/robot_plans/motions/robot_body/index.html">pycram.robot_plans.motions.robot_body</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../autoapi/pycram/ros/index.html">pycram.ros</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../autoapi/pycram/ros/no_ros/index.html">pycram.ros.no_ros</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/pycram/ros/no_ros/action_lib/index.html">pycram.ros.no_ros.action_lib</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/pycram/ros/no_ros/data_types/index.html">pycram.ros.no_ros.data_types</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/pycram/ros/no_ros/publisher/index.html">pycram.ros.no_ros.publisher</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/pycram/ros/no_ros/ros_tools/index.html">pycram.ros.no_ros.ros_tools</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/pycram/ros/no_ros/service/index.html">pycram.ros.no_ros.service</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/pycram/ros/no_ros/subscriber/index.html">pycram.ros.no_ros.subscriber</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../autoapi/pycram/ros/ros1/index.html">pycram.ros.ros1</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/pycram/ros/ros1/action_lib/index.html">pycram.ros.ros1.action_lib</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/pycram/ros/ros1/data_types/index.html">pycram.ros.ros1.data_types</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/pycram/ros/ros1/publisher/index.html">pycram.ros.ros1.publisher</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/pycram/ros/ros1/ros_tools/index.html">pycram.ros.ros1.ros_tools</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/pycram/ros/ros1/service/index.html">pycram.ros.ros1.service</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/pycram/ros/ros1/subscriber/index.html">pycram.ros.ros1.subscriber</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/pycram/ros/ros1/viz_marker_publisher/index.html">pycram.ros.ros1.viz_marker_publisher</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../autoapi/pycram/ros/ros2/index.html">pycram.ros.ros2</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/pycram/ros/ros2/action_lib/index.html">pycram.ros.ros2.action_lib</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/pycram/ros/ros2/data_types/index.html">pycram.ros.ros2.data_types</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/pycram/ros/ros2/filter/index.html">pycram.ros.ros2.filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/pycram/ros/ros2/publisher/index.html">pycram.ros.ros2.publisher</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/pycram/ros/ros2/ros_tools/index.html">pycram.ros.ros2.ros_tools</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/pycram/ros/ros2/service/index.html">pycram.ros.ros2.service</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/pycram/ros/ros2/subscriber/index.html">pycram.ros.ros2.subscriber</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../autoapi/pycram/ros/ros2/viz_marker_publisher/index.html">pycram.ros.ros2.viz_marker_publisher</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../autoapi/pycram/ros_utils/index.html">pycram.ros_utils</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/pycram/ros_utils/force_torque_sensor/index.html">pycram.ros_utils.force_torque_sensor</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/pycram/ros_utils/joint_state_publisher/index.html">pycram.ros_utils.joint_state_publisher</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/pycram/ros_utils/marker_publisher_base/index.html">pycram.ros_utils.marker_publisher_base</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/pycram/ros_utils/tf_broadcaster/index.html">pycram.ros_utils.tf_broadcaster</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="../autoapi/pycram/testing/index.html">pycram.testing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../autoapi/pycram/tf_transformations/index.html">pycram.tf_transformations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../autoapi/pycram/units/index.html">pycram.units</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../autoapi/pycram/utils/index.html">pycram.utils</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../autoapi/pycram/validation/index.html">pycram.validation</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/pycram/validation/error_checkers/index.html">pycram.validation.error_checkers</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/pycram/validation/goal_validator/index.html">pycram.validation.goal_validator</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="../autoapi/pycram/visualization/index.html">pycram.visualization</a></li>
+</ul>
+</details></li>
+</ul>
+
+    </div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+
+<div class="sbt-scroll-pixel-helper"></div>
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item"><button class="sidebar-toggle primary-toggle btn btn-sm" title="Toggle primary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <span class="fa-solid fa-bars"></span>
+</button></div>
+      
+    </div>
+  
+  
+    <div class="header-article-items__end">
+      
+        <div class="header-article-item">
+
+<div class="article-header-buttons">
+
+
+
+
+
+<div class="dropdown dropdown-download-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Download this page">
+    <i class="fas fa-download"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="../_sources/notebooks/location_designator.md" target="_blank"
+   class="btn btn-sm btn-download-source-button dropdown-item"
+   title="Download source file"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file"></i>
+  </span>
+<span class="btn__text-container">.md</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li>
+<button onclick="window.print()"
+  class="btn btn-sm btn-download-pdf-button dropdown-item"
+  title="Print to PDF"
+  data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file-pdf"></i>
+  </span>
+<span class="btn__text-container">.pdf</span>
+</button>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+<button onclick="toggleFullScreen()"
+  class="btn btn-sm btn-fullscreen-button"
+  title="Fullscreen mode"
+  data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script>
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script>
+<button class="sidebar-toggle secondary-toggle btn btn-sm" title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</button>
+</div></div>
+      
+    </div>
+  
+</div>
+</div>
+              
+              
+
+<div id="jb-print-docs-body" class="onlyprint">
+    <h1>Location Designator</h1>
+    <!-- Table of contents -->
+    <div id="print-main-content">
+        <div id="jb-print-toc">
+            
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#occupancy">Occupancy</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#reachable">Reachable</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#visible">Visible</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#semantic">Semantic</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#location-designator-as-generator">Location Designator as Generator</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#accessing-locations">Accessing Locations</a></li>
+</ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section class="tex2jax_ignore mathjax_ignore" id="location-designator">
+<h1>Location Designator<a class="headerlink" href="#location-designator" title="Link to this heading">#</a></h1>
+<p>This example will show you what location designators are, how to use them and what they are capable of.</p>
+<p>Location Designators are used to semantically describe locations in the world. You could, for example, create a location
+designator that describes every position where a robot can be placed without colliding with the environment. Location
+designator can describe locations for:</p>
+<ul class="simple">
+<li><p>Visibility</p></li>
+<li><p>Reachability</p></li>
+<li><p>Occupancy</p></li>
+<li><p>URDF Links (for example a table)</p></li>
+</ul>
+<p>To find locations that fit the given constrains, location designator create Costmaps. Costmaps are a 2D distribution
+that have a value greater than 0 for every position that fits the costmap criteria.</p>
+<p>Location designators work similar to other designators, meaning you have to create a location designator description
+which describes the location. This description can then be resolved to the actual 6D pose on runtime.</p>
+<section id="occupancy">
+<h2>Occupancy<a class="headerlink" href="#occupancy" title="Link to this heading">#</a></h2>
+<p>We will start with a simple location designator that describes a location where the robot can be placed without
+colliding with the environment. To do this we need a BulletWorld since the costmaps are mostly created from the current
+state of the BulletWorld.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">pycram.testing</span> <span class="kn">import</span> <span class="n">setup_world</span>
+<span class="kn">from</span> <span class="nn">pycram.datastructures.dataclasses</span> <span class="kn">import</span> <span class="n">Context</span>
+<span class="kn">from</span> <span class="nn">semantic_digital_twin.robots.pr2</span> <span class="kn">import</span> <span class="n">PR2</span>
+
+
+<span class="n">world</span> <span class="o">=</span> <span class="n">setup_world</span><span class="p">()</span>
+<span class="n">pr2_view</span> <span class="o">=</span> <span class="n">PR2</span><span class="o">.</span><span class="n">from_world</span><span class="p">(</span><span class="n">world</span><span class="p">)</span>
+<span class="n">context</span> <span class="o">=</span> <span class="n">Context</span><span class="p">(</span><span class="n">world</span><span class="p">,</span> <span class="n">pr2_view</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Next up we will create the location designator description, the <a class="reference internal" href="../autoapi/pycram/designators/location_designator/index.html#pycram.designators.location_designator.CostmapLocation" title="pycram.designators.location_designator.CostmapLocation"><code class="xref py py-meth docutils literal notranslate"><span class="pre">CostmapLocation()</span></code></a> that we will be using needs a
+target as a parameter. This target describes what the location designator is for, this could either be a pose or object
+that the robot should be able to see or reach.</p>
+<p>In this case we only want poses where the robot can be placed, this is the default behaviour of the location designator
+which we will be extending later.</p>
+<p>Since every designator in PyCRAM needs to be part of a plan we create a simple plan which contains our Location Designator.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># from pycram.designators.location_designator import CostmapLocation</span>
+<span class="c1"># from pycram.language import SequentialPlan</span>
+<span class="c1"># from pycram.robot_plans import NavigateActionDescription</span>
+<span class="c1"># </span>
+<span class="c1"># location_description = CostmapLocation(world.root)</span>
+<span class="c1"># </span>
+<span class="c1"># location_description = SequentialPlan((world, None), pr2_view, NavigateActionDescription(location_description))</span>
+<span class="c1"># </span>
+<span class="c1"># pose = location_description.resolve()</span>
+<span class="c1"># </span>
+<span class="c1"># print(pose)</span>
+</pre></div>
+</div>
+</section>
+<section id="reachable">
+<h2>Reachable<a class="headerlink" href="#reachable" title="Link to this heading">#</a></h2>
+<p>Next we want to have locations from where the robot can reach a specific point, like an object the robot should pick up. This
+can also be done with the <a class="reference internal" href="../autoapi/pycram/designators/location_designator/index.html#pycram.designators.location_designator.CostmapLocation" title="pycram.designators.location_designator.CostmapLocation"><code class="xref py py-meth docutils literal notranslate"><span class="pre">CostmapLocation()</span></code></a> description, but this time we need to provide an additional argument.
+The additional argument is the robot which should be able to reach the pose.</p>
+<p>Since a robot is needed we will use the PR2 and use a milk as a target point for the robot to reach. The torso of the
+PR2 will be set to 0.2 since otherwise the arms of the robot will be too low to reach on the countertop.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">pycram.process_module</span> <span class="kn">import</span> <span class="n">simulated_robot</span>
+<span class="kn">from</span> <span class="nn">pycram.language</span> <span class="kn">import</span> <span class="n">SequentialPlan</span>
+<span class="kn">from</span> <span class="nn">pycram.robot_plans.actions</span> <span class="kn">import</span> <span class="n">ParkArmsActionDescription</span><span class="p">,</span> <span class="n">MoveTorsoActionDescription</span>
+<span class="kn">from</span> <span class="nn">pycram.datastructures.enums</span> <span class="kn">import</span> <span class="n">Arms</span><span class="p">,</span> <span class="n">TorsoState</span>
+
+<span class="k">with</span> <span class="n">simulated_robot</span><span class="p">:</span>
+    <span class="n">SequentialPlan</span><span class="p">(</span><span class="n">context</span><span class="p">,</span> 
+                   <span class="n">ParkArmsActionDescription</span><span class="p">(</span><span class="n">Arms</span><span class="o">.</span><span class="n">BOTH</span><span class="p">),</span>
+                   <span class="n">MoveTorsoActionDescription</span><span class="p">(</span><span class="n">TorsoState</span><span class="o">.</span><span class="n">HIGH</span><span class="p">))</span><span class="o">.</span><span class="n">perform</span><span class="p">()</span>
+
+</pre></div>
+</div>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">pycram.designators.location_designator</span> <span class="kn">import</span> <span class="n">CostmapLocation</span>
+<span class="kn">from</span> <span class="nn">pycram.designators.object_designator</span> <span class="kn">import</span> <span class="n">BelieveObject</span>
+<span class="kn">from</span> <span class="nn">pycram.language</span> <span class="kn">import</span> <span class="n">SequentialPlan</span>
+
+<span class="n">location_description</span> <span class="o">=</span> <span class="n">CostmapLocation</span><span class="p">(</span><span class="n">target</span><span class="o">=</span><span class="n">world</span><span class="o">.</span><span class="n">get_body_by_name</span><span class="p">(</span><span class="s2">&quot;milk.stl&quot;</span><span class="p">),</span> <span class="n">reachable_for</span><span class="o">=</span><span class="n">pr2_view</span><span class="p">)</span>
+
+<span class="n">SequentialPlan</span><span class="p">(</span><span class="n">context</span><span class="p">,</span> <span class="n">location_description</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="n">location_description</span><span class="o">.</span><span class="n">resolve</span><span class="p">())</span>
+</pre></div>
+</div>
+<p>As you can see we get a pose near the countertop where the robot can be placed without colliding with it. Furthermore,
+we get a list of arms with which the robot can reach the given object.</p>
+</section>
+<section id="visible">
+<h2>Visible<a class="headerlink" href="#visible" title="Link to this heading">#</a></h2>
+<p>The <a class="reference internal" href="../autoapi/pycram/designators/location_designator/index.html#pycram.designators.location_designator.CostmapLocation" title="pycram.designators.location_designator.CostmapLocation"><code class="xref py py-meth docutils literal notranslate"><span class="pre">CostmapLocation()</span></code></a> can also find position from which the robot can see a given object or location. This is very
+similar to how reachable locations are described, meaning we provide a object designator or a pose and a robot
+designator but this time we use the <code class="docutils literal notranslate"><span class="pre">visible_for</span></code> parameter.</p>
+<p>For this example we need the milk as well as the PR2, so if you did not spawn them during the previous location
+designator you can spawn them with the following cell.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">pycram.designators.location_designator</span> <span class="kn">import</span> <span class="n">CostmapLocation</span>
+<span class="kn">from</span> <span class="nn">pycram.designators.object_designator</span> <span class="kn">import</span> <span class="n">BelieveObject</span>
+<span class="kn">from</span> <span class="nn">pycram.language</span> <span class="kn">import</span> <span class="n">SequentialPlan</span>
+
+<span class="n">location_description</span> <span class="o">=</span> <span class="n">CostmapLocation</span><span class="p">(</span><span class="n">target</span><span class="o">=</span><span class="n">world</span><span class="o">.</span><span class="n">get_body_by_name</span><span class="p">(</span><span class="s2">&quot;milk.stl&quot;</span><span class="p">),</span> <span class="n">visible_for</span><span class="o">=</span><span class="n">pr2_view</span><span class="p">)</span>
+
+<span class="n">plan</span> <span class="o">=</span> <span class="n">SequentialPlan</span><span class="p">(</span><span class="n">context</span><span class="p">,</span> <span class="n">location_description</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="n">location_description</span><span class="o">.</span><span class="n">resolve</span><span class="p">())</span>
+</pre></div>
+</div>
+</section>
+<section id="semantic">
+<h2>Semantic<a class="headerlink" href="#semantic" title="Link to this heading">#</a></h2>
+<p>Semantic location designator are used to create location descriptions for semantic entities, like a table. An example of
+this is: You have a robot that picked up an object and should place it on a table. Semantic location designator then
+allows to find poses that are on this table.</p>
+<p>Semantic location designator need an object from which the target entity is a part and the URDF link representing the
+entity. In this case we want a position on the kitchen island, so we have to provide the kitchen object designator since
+the island is a part of the kitchen and the link name of the island surface.</p>
+<p>For this example we need the kitchen as well as the milk. If you spawned them in one of the previous examples you don’t
+need to execute the following cell.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">pycram.designators.location_designator</span> <span class="kn">import</span> <span class="n">SemanticCostmapLocation</span>
+<span class="kn">from</span> <span class="nn">pycram.designators.object_designator</span> <span class="kn">import</span> <span class="n">BelieveObject</span>
+
+<span class="n">location_description</span> <span class="o">=</span> <span class="n">SemanticCostmapLocation</span><span class="p">(</span><span class="n">world</span><span class="o">.</span><span class="n">get_body_by_name</span><span class="p">(</span><span class="s2">&quot;island_countertop&quot;</span><span class="p">),</span>
+                                               <span class="n">for_object</span><span class="o">=</span><span class="n">world</span><span class="o">.</span><span class="n">get_body_by_name</span><span class="p">(</span><span class="s2">&quot;milk.stl&quot;</span><span class="p">))</span>
+
+<span class="n">plan</span> <span class="o">=</span> <span class="n">SequentialPlan</span><span class="p">(</span><span class="n">context</span><span class="p">,</span> <span class="n">location_description</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="n">location_description</span><span class="o">.</span><span class="n">resolve</span><span class="p">())</span>
+</pre></div>
+</div>
+<p>ProbabilisticSemanticLocation fulfills te same purpose as the SemanticCostmapLocation, but it uses probabilistic
+circuits and random events to build the costmap and sample from it. This allows more control over the sample space
+as well as overall better quality of samples. One difference to the SemanticCostmapLocation is that it takes a list
+of link names instead of a single link name, which allows us to sample from multiple links at once.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">pycram.designators.location_designator</span> <span class="kn">import</span> <span class="n">ProbabilisticSemanticLocation</span>
+
+<span class="n">location_description</span> <span class="o">=</span> <span class="n">ProbabilisticSemanticLocation</span><span class="p">(</span><span class="n">world</span><span class="o">.</span><span class="n">get_body_by_name</span><span class="p">(</span><span class="s2">&quot;island_countertop&quot;</span><span class="p">),</span>
+                                                    <span class="n">for_object</span><span class="o">=</span><span class="n">world</span><span class="o">.</span><span class="n">get_body_by_name</span><span class="p">(</span><span class="s2">&quot;milk.stl&quot;</span><span class="p">))</span>
+
+<span class="n">plan</span> <span class="o">=</span> <span class="n">SequentialPlan</span><span class="p">(</span><span class="n">context</span><span class="p">,</span> <span class="n">location_description</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="n">location_description</span><span class="o">.</span><span class="n">resolve</span><span class="p">())</span>
+</pre></div>
+</div>
+</section>
+<section id="location-designator-as-generator">
+<h2>Location Designator as Generator<a class="headerlink" href="#location-designator-as-generator" title="Link to this heading">#</a></h2>
+<p>Location designator descriptions implement an iter method, so they can be used as generators which generate valid poses
+for the location described in the description. This can be useful if the first pose does not work for some reason.</p>
+<p>We will see this at the example of a location designator for visibility. For this example we need the milk, if you
+already have a milk spawned in you world you can ignore the following cell.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">pycram.designators.location_designator</span> <span class="kn">import</span> <span class="n">CostmapLocation</span>
+<span class="kn">from</span> <span class="nn">pycram.designators.object_designator</span> <span class="kn">import</span> <span class="n">BelieveObject</span>
+<span class="kn">from</span> <span class="nn">pycram.language</span> <span class="kn">import</span> <span class="n">SequentialPlan</span>
+
+<span class="n">location_description</span> <span class="o">=</span> <span class="n">CostmapLocation</span><span class="p">(</span><span class="n">target</span><span class="o">=</span><span class="n">world</span><span class="o">.</span><span class="n">get_body_by_name</span><span class="p">(</span><span class="s2">&quot;milk.stl&quot;</span><span class="p">),</span> <span class="n">visible_for</span><span class="o">=</span><span class="n">pr2_view</span><span class="p">)</span>
+<span class="n">plan</span> <span class="o">=</span> <span class="n">SequentialPlan</span><span class="p">(</span><span class="n">context</span><span class="p">,</span> <span class="n">location_description</span><span class="p">)</span>
+
+
+<span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">pose</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">location_description</span><span class="p">):</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">pose</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">i</span> <span class="o">&gt;</span> <span class="mi">3</span><span class="p">:</span>
+        <span class="k">break</span>
+</pre></div>
+</div>
+<p>Similar to the ProbabilisticSemanticLocation, the ProbabilisticCostmapLocation can be used as an alternative to the
+CostmapLocation. It uses probabilistic circuits and random events to build the costmap and sample from it, but has the
+same interface as the CostmapLocation.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">pycram.designators.location_designator</span> <span class="kn">import</span> <span class="n">ProbabilisticCostmapLocation</span>
+<span class="kn">from</span> <span class="nn">pycram.designators.object_designator</span> <span class="kn">import</span> <span class="n">BelieveObject</span>
+<span class="kn">from</span> <span class="nn">pycram.language</span> <span class="kn">import</span> <span class="n">SequentialPlan</span>
+
+<span class="n">location_description</span> <span class="o">=</span> <span class="n">ProbabilisticCostmapLocation</span><span class="p">(</span><span class="n">target</span><span class="o">=</span><span class="n">world</span><span class="o">.</span><span class="n">get_body_by_name</span><span class="p">(</span><span class="s2">&quot;milk.stl&quot;</span><span class="p">),</span> <span class="n">visible_for</span><span class="o">=</span><span class="n">pr2_view</span><span class="p">)</span>
+<span class="n">plan</span> <span class="o">=</span> <span class="n">SequentialPlan</span><span class="p">(</span><span class="n">context</span><span class="p">,</span> <span class="n">location_description</span><span class="p">)</span>
+
+<span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">pose</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">location_description</span><span class="p">):</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">pose</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">i</span> <span class="o">&gt;</span> <span class="mi">3</span><span class="p">:</span>
+        <span class="k">break</span>
+</pre></div>
+</div>
+</section>
+<section id="accessing-locations">
+<h2>Accessing Locations<a class="headerlink" href="#accessing-locations" title="Link to this heading">#</a></h2>
+<p>Accessing describes a location from which the robot can open a drawer. The drawer is specified by a ObjetcPart
+designator which describes the handle of the drawer.</p>
+<p>At the moment this location designator only works in the apartment environment, so please remove the kitchen if you
+spawned it in a previous example. Furthermore, we need a robot, so we also spawn the PR2 if it isn’t spawned already.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">pycram.designators.object_designator</span> <span class="kn">import</span> <span class="o">*</span>
+<span class="kn">from</span> <span class="nn">pycram.designators.location_designator</span> <span class="kn">import</span> <span class="o">*</span>
+<span class="kn">from</span> <span class="nn">pycram.language</span> <span class="kn">import</span> <span class="n">SequentialPlan</span>
+
+<span class="n">access_location</span> <span class="o">=</span> <span class="n">AccessingLocation</span><span class="p">(</span><span class="n">world</span><span class="o">.</span><span class="n">get_body_by_name</span><span class="p">(</span><span class="s2">&quot;handle_cab10_t&quot;</span><span class="p">),</span> <span class="n">pr2_view</span><span class="p">)</span>
+<span class="n">plan</span> <span class="o">=</span> <span class="n">SequentialPlan</span><span class="p">(</span><span class="n">context</span><span class="p">,</span> <span class="n">access_location</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="n">access_location</span><span class="o">.</span><span class="n">resolve</span><span class="p">())</span>
+</pre></div>
+</div>
+</section>
+</section>
+
+    <script type="text/x-thebe-config">
+    {
+        requestKernel: true,
+        binderOptions: {
+            repo: "binder-examples/jupyter-stacks-datascience",
+            ref: "master",
+        },
+        codeMirrorConfig: {
+            theme: "abcdef",
+            mode: "python"
+        },
+        kernelOptions: {
+            name: "python3",
+            path: "./notebooks"
+        },
+        predefinedOutput: true
+    }
+    </script>
+    <script>kernelName = 'python3'</script>
+
+                </article>
+              
+
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="object_designator.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Object Designator</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="motion_designator.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">from pycram.language import SequentialPlan—
+jupyter:
+jupytext:
+text_representation:
+extension: .md
+format_name: markdown
+format_version: ‘1.3’
+jupytext_version: 1.16.3
+kernelspec:
+display_name: Python 3
+language: python
+name: python3</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+  <div class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#occupancy">Occupancy</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#reachable">Reachable</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#visible">Visible</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#semantic">Semantic</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#location-designator-as-generator">Location Designator as Generator</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#accessing-locations">Accessing Locations</a></li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+<div class="bd-footer-content__inner container">
+  
+  <div class="footer-item">
+    
+<p class="component-author">
+By Jonas Dech
+</p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+
+  <p class="copyright">
+    
+      © Copyright 2025.
+      <br/>
+    
+  </p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+</div>
+          </footer>
+        
+
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+  </footer>
+  </body>
+</html>
