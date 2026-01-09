@@ -1,6 +1,10 @@
 # .github/workflows/test_notebooks.yml
 name: Test Notebooks
 
+defaults:
+  run:
+    shell: bash -ieo pipefail {0}
+
 on:
   push:
     branches: [ main ]
