@@ -24,7 +24,6 @@ class HSRBMoveMotion(MoveMotion, AlternativeMotion[HSRB]):
             target_pose=self.target.to_spatial_type(),
             base_link=self.robot_view.root,
             action_topic="/hsrb/move_base",
-            node_handle=self.plan.context.ros_node,
             message_type=NavigateToPose,
         )
 
