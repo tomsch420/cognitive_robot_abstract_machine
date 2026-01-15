@@ -172,3 +172,69 @@ def test_parameterize_navigate_action(parameterizer: Parameterizer):
     assert variable_names == expected_variable_names
 
 
+def test_parameterize_robot_plan(parameterizer: Parameterizer):
+    """
+    Test parameterization of a robot plan: MoveTorso - Navigate - MoveTorso.
+    """
+    class_diagram = ClassDiagram(
+        [
+            MoveTorsoAction,
+            NavigateAction,
+            PoseStamped,
+            PyCramPose,
+            PyCramVector3,
+            PyCramQuaternion,
+            Header,
+        ]
+    )
+
+    wrapped_move_torso_1 = class_diagram.get_wrapped_class(MoveTorsoAction)
+    variables_move_torso_1 = parameterizer._parameterize_wrapped_class(
+        wrapped_move_torso_1, prefix="MoveTorsoAction_1"
+    )
+
+    wrapped_navigate = class_diagram.get_wrapped_class(NavigateAction)
+    variables_navigate = parameterizer(wrapped_navigate)
+
+    variables_move_torso_2 = parameterizer._parameterize_wrapped_class(
+        wrapped_move_torso_1, prefix="MoveTorsoAction_2"
+    )
+
+    all_variables = (
+        variables_move_torso_1 + variables_navigate + variables_move_torso_2
+    )
+
+    # Remove Integer variables
+    variables_for_distribution = [
+        v for v in all_variables if not isinstance(v, Integer)
+    ]
+
+    probabilistic_circuit = parameterizer.create_fully_factorized_distribution(
+        variables_for_distribution
+    )
+
+    expected_all_variable_names = {
+        "MoveTorsoAction_1.torso_state",
+        "NavigateAction.target_location.pose.position.x",
+        "NavigateAction.target_location.pose.position.y",
+        "NavigateAction.target_location.pose.position.z",
+        "NavigateAction.target_location.pose.orientation.x",
+        "NavigateAction.target_location.pose.orientation.y",
+        "NavigateAction.target_location.pose.orientation.z",
+        "NavigateAction.target_location.pose.orientation.w",
+        "NavigateAction.target_location.header.sequence",
+        "NavigateAction.keep_joint_states",
+        "MoveTorsoAction_2.torso_state",
+    }
+
+    all_variable_names = {v.name for v in all_variables}
+    assert all_variable_names == expected_all_variable_names
+
+    expected_dist_variable_names = expected_all_variable_names - {
+        "NavigateAction.target_location.header.sequence"
+    }
+
+    variable_names_in_dist = {v.name for v in probabilistic_circuit.variables}
+    assert variable_names_in_dist == expected_dist_variable_names
+
+

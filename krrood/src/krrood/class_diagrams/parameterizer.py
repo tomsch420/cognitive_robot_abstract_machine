@@ -116,25 +116,26 @@ class Parameterizer:
         """
         Create a random event variable from a WrappedField based on its type.
 
-        :param wrapped_field: The field to create a variable for.
-        :param field_name: The name of the variable to create.
-        :return: A random event variable or None if the type is not supported.
+        :return: A random event variable or raise error if the type is not supported.
         """
         endpoint_type = wrapped_field.type_endpoint
 
         if wrapped_field.is_enum:
             return Symbolic(field_name, Set.from_iterable(list(endpoint_type)))
 
-        if endpoint_type is int:
+        elif endpoint_type is int:
             return Integer(field_name)
 
-        if endpoint_type is float:
+        elif endpoint_type is float:
             return Continuous(field_name)
 
-        if endpoint_type is bool:
+        elif endpoint_type is bool:
             return Symbolic(field_name, Set.from_iterable([True, False]))
 
-        return None
+        else:
+            raise NotImplementedError(
+                f"No conversion between {endpoint_type} and random_events.Variable is known."
+            )
 
     def create_fully_factorized_distribution(
         self,
@@ -143,7 +144,6 @@ class Parameterizer:
         """
         Create a fully factorized probabilistic circuit over the given variables.
 
-        :param variables: The list of variables to include in the distribution.
         :return: A fully factorized probabilistic circuit.
         """
         return fully_factorized(
