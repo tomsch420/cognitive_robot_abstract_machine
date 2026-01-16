@@ -23,6 +23,7 @@ from typing_extensions import (
 
 from krrood.adapters.json_serializer import to_json, shallow_diff_json
 from krrood.ormatic.utils import classproperty
+from .position_descriptions import Direction
 from ..datastructures.prefixed_name import PrefixedName
 from ..datastructures.variables import SpatialVariables
 from ..exceptions import (
@@ -33,7 +34,6 @@ from ..exceptions import (
 )
 from ..spatial_types import Point3, HomogeneousTransformationMatrix, Vector3
 from ..spatial_types.derivatives import DerivativeMap
-from .position_descriptions import Direction
 from ..world import World
 from ..world_description.connections import (
     RevoluteConnection,
@@ -66,43 +66,36 @@ if TYPE_CHECKING:
 
 def synchronized_attribute_modification(func):
     """
-    A decorator for SemanticAnnotation methods that synchronizes changes by
-    removing the annotation from the world before execution and adding it
-    back after execution.
+    Decorator to synchronize attribute modifications.
 
-    This ensures that the update is captured in the world's modification history
-    as a removal and a re-addition, which triggers the synchronization protocol.
+    Ensures that any modifications to the attributes of an instance of WorldEntityWithID are properly recorded and any
+    resultant changes are appended to the current model modification block in the world model manager. Keeps track of
+    the pre- and post-modification states of the object to compute the differences and maintain a log of updates.
     """
 
     @wraps(func)
     def wrapper(self: SemanticAnnotation, *args: Any, **kwargs: Any) -> Any:
 
-        current_world = self._world
-
         object_before_change = to_json(self)
-
         result = func(self, *args, **kwargs)
-
         object_after_change = to_json(self)
-
         diff = shallow_diff_json(object_before_change, object_after_change)
 
-        modification_kwargs = {
-            "entity_id": object_after_change["id"],
-            "updated_kwargs": diff,
-        }
-
-        if (
-            current_world.get_world_model_manager().current_model_modification_block
-            is None
-        ):
-            raise MissingWorldModificationContextError(func)
-        current_world.get_world_model_manager().current_model_modification_block.append(
-            AttributeUpdateModification.from_kwargs(modification_kwargs)
+        current_model_modification_block = (
+            self._world.get_world_model_manager().current_model_modification_block
         )
+        if current_model_modification_block is None:
+            raise MissingWorldModificationContextError(func)
 
+        current_model_modification_block.append(
+            AttributeUpdateModification.from_kwargs(
+                {
+                    "entity_id": object_after_change["id"],
+                    "updated_kwargs": diff,
+                }
+            )
+        )
         return result
-
     return wrapper
 
 

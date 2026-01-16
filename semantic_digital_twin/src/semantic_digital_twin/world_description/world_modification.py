@@ -4,29 +4,23 @@ from abc import abstractmethod, ABC
 from dataclasses import dataclass, field
 from uuid import UUID
 
-from krrood.adapters.exceptions import JSON_TYPE_NAME, UUID_TYPE_NAME
-from krrood.adapters.json_serializer import SubclassJSONSerializer, to_json, from_json
 from typing_extensions import (
     List,
     Dict,
     Any,
     Self,
-    Callable,
     TYPE_CHECKING,
 )
 
+from krrood.adapters.exceptions import JSON_TYPE_NAME, UUID_TYPE_NAME
+from krrood.adapters.json_serializer import SubclassJSONSerializer, to_json, from_json
 from .degree_of_freedom import DegreeOfFreedom
 from .world_entity import (
     KinematicStructureEntity,
     SemanticAnnotation,
     Connection,
-    WorldEntity,
     Actuator,
 )
-from ..adapters.world_entity_kwargs_tracker import (
-    WorldEntityWithIDKwargsTracker,
-)
-from ..datastructures.prefixed_name import PrefixedName
 
 if TYPE_CHECKING:
     from ..world import World
@@ -79,29 +73,31 @@ class AttributeUpdateModification(WorldModelModification):
         entity = world.get_world_entity_with_id_by_id(self.entity_id)
         for key, value in self.updated_kwargs.items():
             current_value = getattr(entity, key)
+            if current_value == value:
+                continue
             if isinstance(current_value, list):
-                for item in value.get("remove", []):
-                    if item not in current_value:
-                        continue
-                    if item[JSON_TYPE_NAME] == UUID_TYPE_NAME:
-                        uuid = from_json(item)
-                        entity_to_remove = world.get_world_entity_with_id_by_id(uuid)
-                        current_value.remove(entity_to_remove)
-                    else:
-                        current_value.remove(item)
-                for item in value.get("add", []):
-                    if item in current_value:
-                        continue
-                    if item[JSON_TYPE_NAME] == UUID_TYPE_NAME:
-                        uuid = from_json(item)
-                        entity_to_add = world.get_world_entity_with_id_by_id(uuid)
-                        current_value.append(entity_to_add)
-                    else:
-                        current_value.append(item)
+                self._apply_to_list(world, current_value, value)
             else:
-                if current_value == value:
-                    continue
                 setattr(entity, key, value)
+
+    def _apply_to_list(
+        self, world: World, current_value: List[Any], value: Dict[str, Any]
+    ):
+        for raw in value.get("remove", ()):
+            obj = self._resolve_list_item(world, raw)
+            if obj in current_value:
+                current_value.remove(obj)
+
+        for raw in value.get("add", ()):
+            obj = self._resolve_list_item(world, raw)
+            if obj not in current_value:
+                current_value.append(obj)
+
+    def _resolve_list_item(self, world: World, item: Any):
+        if item.get(JSON_TYPE_NAME) == UUID_TYPE_NAME:
+            uuid = from_json(item)
+            return world.get_world_entity_with_id_by_id(uuid)
+        return from_json(item)
 
     def to_json(self):
         return {
