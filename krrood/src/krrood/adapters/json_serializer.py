@@ -287,9 +287,8 @@ def _compute_attribute_diff(
             return None
         return JSONAttributeDiff(attribute_name=key, add=[from_json(new_value)])
 
-    original, new = set(original_value), set(new_value)
-    add = list(map(from_json, new - original))
-    remove = list(map(from_json, original - new))
+    add = [from_json(x) for x in new_value if x not in original_value]
+    remove = [from_json(x) for x in original_value if x not in new_value]
     if not (add or remove):
         return None
     return JSONAttributeDiff(attribute_name=key, add=add, remove=remove)
