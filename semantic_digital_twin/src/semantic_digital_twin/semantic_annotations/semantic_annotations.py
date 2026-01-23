@@ -230,7 +230,7 @@ class Door(HasHandle, HasHinge):
         scale: Scale = Scale(0.03, 1, 2),
     ) -> Self:
         if not (scale.x < scale.y and scale.x < scale.z):
-            raise InvalidPlaneDimensions(scale)
+            raise InvalidPlaneDimensions(scale, clazz=Door)
 
         door_event = scale.to_simple_event().as_composite_set()
         door_body = Body(name=name)
@@ -294,6 +294,14 @@ class Door(HasHandle, HasHinge):
                 )
                 offset = sign * (scale.y / 2)
                 door_T_hinge = HomogeneousTransformationMatrix.from_xyz_rpy(y=offset)
+            case [1, 0, 0, 0]:
+                sign = (
+                    symbolic_math.sign(-1 * door_P_handle.x)
+                    if door_P_handle.x != 0
+                    else 1
+                )
+                offset = sign * (scale.x / 2)
+                door_T_hinge = HomogeneousTransformationMatrix.from_xyz_rpy(x=offset)
 
             case _:
                 raise InvalidHingeActiveAxis(axis=opening_axis)
@@ -455,7 +463,7 @@ class Wall(HasApertures):
         scale: Scale = Scale(),
     ) -> Self:
         if not (scale.x < scale.y and scale.x < scale.z):
-            raise InvalidPlaneDimensions(scale)
+            raise InvalidPlaneDimensions(scale, clazz=Wall)
 
         wall_body = Body(name=name)
         wall_event = cls._create_wall_event(scale).as_composite_set()

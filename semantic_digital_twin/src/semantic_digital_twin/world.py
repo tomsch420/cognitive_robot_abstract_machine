@@ -1820,7 +1820,9 @@ class World:
 
         ..warning::
             Use this method if you need to live update the forward kinematic inside a with self.modify_world(): block.
-            Use with caution
+            Use with caution, as this only works if the world structure is not currently broken, and thus may lead to
+            crashes if its not the case. Also using this in a method that is called a lot, it may cause performance
+            issues because of unnecessary recompilations.
         """
         self._forward_kinematic_manager.recompile()
         self._forward_kinematic_manager.recompute()

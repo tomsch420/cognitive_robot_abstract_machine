@@ -202,8 +202,13 @@ class InvalidPlaneDimensions(UsageError):
     The scale of the plane.
     """
 
+    clazz: Type
+    """
+    The class for which the dimensions are invalid.
+    """
+
     def __post_init__(self):
-        self.message = f"The depth of a plane must be less than its width or height. This doesnt hold for your door with dimensions {self.scale}"
+        self.message = f"The Dimensions {self.scale} are invalid for the class {self.clazz.__name__}"
 
 
 @dataclass
