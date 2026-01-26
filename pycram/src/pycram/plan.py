@@ -112,11 +112,11 @@ class Plan:
     @property
     def nodes(self) -> List[PlanNode]:
         """
-        Returns all nodes of the plan in depth first order.
+        All nodes of the plan in depth first order.
 
         .. info::
             This will only return nodes that have a path from the root node. Nodes that are part of the plan but do not
-            have a path from the root node will be returned. In that case use all_nodes
+            have a path from the root node will not be returned. In that case use all_nodes
 
         :return: All nodes under the root node in depth first order
         """
@@ -125,7 +125,7 @@ class Plan:
     @property
     def all_nodes(self) -> List[PlanNode]:
         """
-        Returns all nodes that are part of this plan
+        All nodes that are part of this plan
         """
         return self.plan_graph.nodes()
 
@@ -214,6 +214,20 @@ class Plan:
         node_to_insert_after: PlanNode = None,
         node_to_insert_before: PlanNode = None,
     ):
+        """
+        Shits the layer indices of nodes in the layer such that the index for the child node is free and does not collide
+        with another index.
+        If a node_to_insert_after is given the index of all nodes after the given node will be shifted by one.
+        if an node_to_insert_before is given the index of all nodes after the given node will be shifted by one plus the
+        index of the node_to_insert_before.
+        If none is given the child node will be inserted after the last child of the parent node and all indices will
+        be shifter accordingly.
+
+        :param parent_node: The parent node under which the new node will be inserted.
+        :param child_node: The node that will be inserted.
+        :param node_to_insert_after: The node after which the new node will be inserted.
+        :param node_to_insert_before: The node before which the new node will be inserted.
+        """
         if node_to_insert_after:
             child_node.layer_index = node_to_insert_after.layer_index + 1
             for node in self.get_following_nodes(node_to_insert_after, on_layer=True):

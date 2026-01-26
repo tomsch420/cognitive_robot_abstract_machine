@@ -755,8 +755,8 @@ class VisibilityCostmap(Costmap):
             * self.width
         ) + self.width / 2
 
-        r_min = np.minimum(np.around(r_min), self.width - 1).astype("uint16")
-        r_max = np.minimum(np.around(r_max), self.width - 1).astype("uint16")
+        r_min = np.minimum(np.around(r_min), self.width - 1).astype("int16")
+        r_max = np.minimum(np.around(r_max), self.width - 1).astype("int16")
 
         rs = np.dstack((r_min, r_max + 1)).reshape((self.width**2, 2))
         r = np.arange(self.width)
