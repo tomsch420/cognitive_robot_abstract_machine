@@ -1,7 +1,7 @@
 from dataclasses import field, dataclass, InitVar
 from typing import Optional, Dict, List, Tuple, Union, Any
 
-from krrood.adapters.json_serializer import SubclassJSONSerializer
+from krrood.adapters.json_serializer import SubclassJSONSerializer, to_json, from_json
 from typing_extensions import Self
 
 import krrood.symbolic_math.symbolic_math as sm
@@ -55,7 +55,7 @@ class JointState(SubclassJSONSerializer):
         return {
             **super().to_json(),
             "_connections": [
-                connection.name.to_json() for connection in self._connections
+                to_json(connection.name) for connection in self._connections
             ],
             "_target_values": self._target_values,
         }
@@ -64,7 +64,7 @@ class JointState(SubclassJSONSerializer):
     def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
         world: World = kwargs["world"]
         connections = [
-            world.get_connection_by_name(PrefixedName.from_json(name, **kwargs))
+            world.get_connection_by_name(from_json(name, **kwargs))
             for name in data["_connections"]
         ]
         target_values = data["_target_values"]

@@ -937,7 +937,7 @@ class Connection(WorldEntity, SubclassJSONSerializer):
 
     def to_json(self) -> Dict[str, Any]:
         result = super().to_json()
-        result["name"] = self.name.to_json()
+        result["name"] = to_json(self.name)
         result["parent_id"] = to_json(self.parent.id)
         result["child_id"] = to_json(self.child.id)
         result["parent_T_connection_expression"] = (
@@ -951,7 +951,7 @@ class Connection(WorldEntity, SubclassJSONSerializer):
         parent = tracker.get_world_entity_with_id(id=from_json(data["parent_id"]))
         child = tracker.get_world_entity_with_id(id=from_json(data["child_id"]))
         return cls(
-            name=PrefixedName.from_json(data["name"]),
+            name=from_json(data["name"]),
             parent=parent,
             child=child,
             parent_T_connection_expression=HomogeneousTransformationMatrix.from_json(
