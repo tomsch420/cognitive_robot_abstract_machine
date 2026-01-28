@@ -20,6 +20,11 @@ from semantic_digital_twin.adapters.procthor.procthor_resolver import (
     ProcthorResolver,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.pipeline.pipeline import (
+    Pipeline,
+    BodyGeometryAndAnnotationReplacement,
+    mapping,
+)
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Bread,
     Floor,
@@ -367,6 +372,32 @@ class ProcTHORTestCase(unittest.TestCase):
                 "house_987654321.json",
             )
         ).parse()
+
+        assert world is not None
+
+    def test_procthor_ycb_pipeline(self):
+        semantic_digital_twin_database_uri = os.environ.get(
+            "SEMANTIC_DIGITAL_TWIN_DATABASE_URI"
+        )
+
+        # Create database engine and session
+        engine = create_engine(semantic_digital_twin_database_uri)
+        session = Session(engine)
+
+        world = ProcTHORParser.from_file(
+            os.path.join(
+                resource_filename("semantic_digital_twin", "../../"),
+                "resources",
+                "procthor_json",
+                "house_1.json",
+            ),
+            session=session,
+        ).parse()
+
+        pipeline = Pipeline(
+            [BodyGeometryAndAnnotationReplacement(object_mappings=mapping)]
+        )
+        pipeline.apply(world)
 
         assert world is not None
 

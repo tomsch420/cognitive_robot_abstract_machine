@@ -1,13 +1,33 @@
 import logging
+import random
 import re
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import List, Callable, Dict, Type
 
 import numpy as np
 
 from ..adapters.mesh import STLParser
 from ..semantic_annotations.mixins import HasRootKinematicStructureEntity, HasRootBody
+from ..semantic_annotations.semantic_annotations import (
+    Bottle,
+    Apple,
+    Potato,
+    Orange,
+    Tomato,
+    Plate,
+    Bowl,
+    Fork,
+    Knife,
+    Mug,
+    Cup,
+    Pan,
+    PanLid,
+    Pencil,
+    Ball,
+    Baseball,
+    SprayBottle,
+)
 from ..spatial_types import Point3
 from ..spatial_types.spatial_types import HomogeneousTransformationMatrix
 from ..world import World
@@ -176,23 +196,32 @@ class BodyGeometryAndAnnotation:
 @dataclass
 class BodyGeometryAndAnnotationReplacement(Step):
 
-    object_mappings: Dict[str, BodyGeometryAndAnnotation]
+    object_mappings: Dict[str, List[BodyGeometryAndAnnotation]]
     """
     A list of mappings specifying object names and their corresponding replacement geometry.
     """
 
     def _apply(self, world: World) -> World:
-        for body in world.bodies:
+        for body in world.bodies_with_enabled_collision:
+
             body_name = body.name
-            replacement_map = next(
+            print(body_name)
+
+            replacement_maps = next(
                 (
-                    replacement_map
-                    for object_name, replacement_map in self.object_mappings.items()
-                    if object_name in body_name.name
+                    replacement_maps
+                    for object_name, replacement_maps in self.object_mappings.items()
+                    if body_name.name.startswith(object_name)
                 ),
                 None,
             )
+            if replacement_maps is None:
+                continue
+
+            replacement_map = random.choice(replacement_maps)
+
             parent_C_body = body.parent_connection
+
             new_body_world = STLParser(
                 file_path=replacement_map.object_geometry_file
             ).parse()
@@ -201,10 +230,42 @@ class BodyGeometryAndAnnotationReplacement(Step):
                     root=new_body_world.bodies[0]
                 )
                 new_body_world.add_semantic_annotation(new_semantic_annotation)
-
             with world.modify_world():
                 world.remove_connection(parent_C_body)
                 world.remove_kinematic_structure_entity(body)
+                parent_C_body.child = new_body_world.bodies[0]
                 world.merge_world(new_body_world, parent_C_body)
 
         return world
+
+
+mapping = {
+    "bottle_1": [BodyGeometryAndAnnotation("mustard_bottle.stl", Bottle)],
+    "apple": [
+        BodyGeometryAndAnnotation("apple.stl", Apple),
+        BodyGeometryAndAnnotation("orange.stl", Orange),
+    ],
+    "plate": [BodyGeometryAndAnnotation("plate.stl", Plate)],
+    "bowl": [BodyGeometryAndAnnotation("bowl.stl", Bowl)],
+    "fork": [BodyGeometryAndAnnotation("fork.stl", Fork)],
+    "robothor_butter_knife": [BodyGeometryAndAnnotation("knife.stl", Knife)],
+    "mug": [BodyGeometryAndAnnotation("mug.stl", Mug)],
+    "cup": [BodyGeometryAndAnnotation("cup_a.stl", Cup)],
+    "pan": [BodyGeometryAndAnnotation("skillet.stl", Pan)],
+    "pan_lid": [BodyGeometryAndAnnotation("skillet_lid.stl", PanLid)],
+    "robothor_pencil": [
+        BodyGeometryAndAnnotation("small_marker.stl", Pencil),
+        BodyGeometryAndAnnotation("large_marker.stl", Pencil),
+    ],
+    "robothor_basketball": [
+        BodyGeometryAndAnnotation("softball.stl", Ball),
+        BodyGeometryAndAnnotation("baseball.stl", Baseball),
+        BodyGeometryAndAnnotation("tennisball.stl", Ball),
+        BodyGeometryAndAnnotation("racequetball.stl", Ball),
+        BodyGeometryAndAnnotation("golfball.stl", Ball),
+        BodyGeometryAndAnnotation("mini_soccerball.stl", Ball),
+    ],
+    "robothor_spray_bottle": [
+        BodyGeometryAndAnnotation("spraybottle.stl", SprayBottle)
+    ],
+}

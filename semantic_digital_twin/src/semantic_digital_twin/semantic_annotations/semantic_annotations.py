@@ -957,7 +957,14 @@ class Pen(HasRootBody):
 
 
 @dataclass(eq=False)
-class Baseball(HasRootBody):
+class Ball(HasRootBody):
+    """
+    A Ball.
+    """
+
+
+@dataclass(eq=False)
+class Baseball(Ball):
     """
     A baseball.
     """

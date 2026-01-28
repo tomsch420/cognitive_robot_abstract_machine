@@ -19,7 +19,7 @@ class ProcthorResolver:
 
     classes: List[Type[HasRootBody]] = field(default_factory=list)
 
-    def resolve(self, name: str) -> Optional[Type[SemanticAnnotation]]:
+    def resolve(self, name: str) -> Optional[Type[HasRootBody]]:
         """
         Resolve a given name to a class based on the number of matching tokens
         with the class name tokens or synonyms. The method preprocesses the

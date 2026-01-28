@@ -116,7 +116,7 @@ def parse_fbx_file_to_world_mapping_daos(fbx_file_path: str) -> List[WorldMappin
         resolved = resolver.resolve(world.name)
         if resolved:
             with world.modify_world():
-                world.add_semantic_annotation(resolved(body=world.root))
+                world.add_semantic_annotation(resolved(root=world.root))
 
     return [to_dao(world) for world in worlds]
 
