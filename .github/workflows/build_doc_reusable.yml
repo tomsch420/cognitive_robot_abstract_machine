@@ -103,7 +103,6 @@ jobs:
         working-directory: ${{ inputs.lib }}
         run: |
           jupyter-book build ${{ inputs.doc_path }}
-          ls -R ${{ inputs.doc_path }}/_build/html
 
       - name: Build the book (Container)
         if: ${{ inputs.use_container }}
