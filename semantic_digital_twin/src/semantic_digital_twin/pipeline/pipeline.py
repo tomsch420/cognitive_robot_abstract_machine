@@ -2,6 +2,7 @@ import logging
 import random
 import re
 from abc import ABC, abstractmethod
+from copy import deepcopy
 from dataclasses import dataclass
 from typing import List, Callable, Dict, Type
 
@@ -229,16 +230,12 @@ class BodyGeometryAndAnnotationReplacement(Step):
             new_body_world = STLParser(
                 file_path=replacement_map.object_geometry_file
             ).parse()
-            with new_body_world.modify_world():
-                new_semantic_annotation = replacement_map.semantic_annotation(
-                    root=new_body_world.bodies[0]
-                )
-                new_body_world.add_semantic_annotation(new_semantic_annotation)
+            new_geometry = deepcopy(new_body_world.bodies[0].collision)
             with world.modify_world():
-                world.remove_connection(parent_C_body)
-                world.remove_kinematic_structure_entity(body)
-                parent_C_body.child = new_body_world.bodies[0]
-                world.merge_world(new_body_world, parent_C_body)
+                new_semantic_annotation = replacement_map.semantic_annotation(root=body)
+                world.add_semantic_annotation(new_semantic_annotation)
+                body.collision = new_geometry
+                body.visual = new_geometry
 
         return world
 
