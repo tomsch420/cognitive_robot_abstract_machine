@@ -125,6 +125,21 @@ class WorldEntityWithID(WorldEntity, SubclassJSONSerializer):
     def __hash__(self):
         return self._hash
 
+    def regenerate_id(self):
+        """
+        Regenerates the unique identifier for the entity.
+
+        This method assigns a new UUID to the `id` attribute and updates the hash value
+        of the entity. If the entity belongs to a world, it ensures that the
+        world's internal hash table is updated to reflect these changes.
+        """
+        if self._world:
+            self._world._world_entity_hash_table.pop(self._hash, None)
+        self.id = uuid4()
+        del self._hash
+        if self._world:
+            self._world._world_entity_hash_table[hash(self)] = self
+
     def add_to_world(self, world: World):
         super().add_to_world(world)
 

@@ -1,6 +1,7 @@
 import json
 import logging
 import math
+import uuid
 from dataclasses import dataclass, field
 from functools import cached_property
 from pathlib import Path
@@ -560,7 +561,8 @@ class ProcthorObject:
                 f"Could not find asset {asset_id} in the database. Skipping object and its children."
             )
             return None
-
+        for kse in body_world.kinematic_structure_entities:
+            kse.regenerate_id()
         with body_world.modify_world():
 
             for child in self.object_dict.get("children", {}):

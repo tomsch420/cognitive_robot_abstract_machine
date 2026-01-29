@@ -202,10 +202,12 @@ class BodyGeometryAndAnnotationReplacement(Step):
     """
 
     def _apply(self, world: World) -> World:
-        for body in world.bodies_with_enabled_collision:
+        for body in reversed(world.bodies_topologically_sorted):
+
+            if not body.collision:
+                continue
 
             body_name = body.name
-            print(body_name)
 
             replacement_maps = next(
                 (
@@ -221,6 +223,8 @@ class BodyGeometryAndAnnotationReplacement(Step):
             replacement_map = random.choice(replacement_maps)
 
             parent_C_body = body.parent_connection
+            print(body_name)
+            print(body.collision)
 
             new_body_world = STLParser(
                 file_path=replacement_map.object_geometry_file
