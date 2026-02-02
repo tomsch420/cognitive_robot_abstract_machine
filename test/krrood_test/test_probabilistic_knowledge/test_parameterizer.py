@@ -5,7 +5,7 @@ from random_events.variable import Continuous, Integer, Symbolic
 from random_events.product_algebra import Event, SimpleEvent
 from krrood.class_diagrams.class_diagram import ClassDiagram
 from krrood.probabilistic_knowledge.parameterizer import Parameterizer
-from pycram.datastructures.enums import TorsoState, Arms
+from pycram.datastructures.enums import Arms
 from pycram.robot_plans import MoveTorsoAction
 from pycram.robot_plans.actions.core.navigation import NavigateAction
 from pycram.robot_plans.actions.core.pick_up import PickUpAction
@@ -19,6 +19,8 @@ from pycram.datastructures.pose import (
     PyCramQuaternion,
     Header,
 )
+
+from semantic_digital_twin.datastructures.definitions import TorsoState
 from test.krrood_test.dataset.example_classes import (
     Position,
     Orientation,

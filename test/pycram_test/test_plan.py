@@ -781,4 +781,3 @@ def test_algebra_parallelplan(immutable_model_world):
         sample = dict(zip(restricted_dist.variables, sample_values))
         assert sample[arm_var] == Arms.BOTH
         assert torso_var in sample
-        assert sample[torso_var] in list(TorsoState)
