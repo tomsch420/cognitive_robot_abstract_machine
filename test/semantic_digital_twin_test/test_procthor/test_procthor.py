@@ -22,13 +22,19 @@ from semantic_digital_twin.adapters.procthor.procthor_resolver import (
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.pipeline.pipeline import (
     Pipeline,
-    BodyGeometryAndAnnotationReplacement,
+    SemanticAnnotationGeometryReplacement,
     mapping,
+    MergeParentWithChildIfCorrectChildSubname,
 )
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Bread,
     Floor,
     Door,
+    Mug,
+    Cup,
+    Bowl,
+    SoapBottle,
+    Kettle,
 )
 from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
@@ -395,11 +401,19 @@ class ProcTHORTestCase(unittest.TestCase):
         ).parse()
 
         pipeline = Pipeline(
-            [BodyGeometryAndAnnotationReplacement(object_mappings=mapping)]
+            [
+                MergeParentWithChildIfCorrectChildSubname(matching_subname="volume"),
+                SemanticAnnotationGeometryReplacement(object_mappings=mapping),
+            ]
         )
         pipeline.apply(world)
 
-        assert world is not None
+        mugs = world.get_semantic_annotations_by_type(Mug)
+        assert len(mugs) == 2
+        cups = world.get_semantic_annotations_by_type(Cup)
+        assert len(cups) == 1
+        bowls = world.get_semantic_annotations_by_type(Bowl)
+        assert len(bowls) == 2
 
     def test_procthor_views(self):
         """

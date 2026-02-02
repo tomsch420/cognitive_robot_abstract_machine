@@ -47,6 +47,7 @@ import pycram.robot_plans.motions.misc
 import pycram.robot_plans.motions.navigation
 import pycram.robot_plans.motions.robot_body
 import semantic_digital_twin.callbacks.callback
+import semantic_digital_twin.datastructures.joint_state
 import semantic_digital_twin.datastructures.prefixed_name
 import semantic_digital_twin.mixin
 import semantic_digital_twin.orm.model
@@ -92,6 +93,15 @@ executiondatadao_added_world_modifications_association = Table(
     Column(
         "target_worldmodelmodificationblockdao_id",
         ForeignKey("WorldModelModificationBlockDAO.database_id"),
+    ),
+)
+jointstatedao_connections_association = Table(
+    "jointstatedao_connections_association",
+    Base.metadata,
+    Column("source_jointstatedao_id", ForeignKey("JointStateDAO.database_id")),
+    Column(
+        "target_activeconnection1dofdao_id",
+        ForeignKey("ActiveConnection1DOFDAO.database_id"),
     ),
 )
 movetcpwaypointsmotiondao_waypoints_association = Table(
@@ -291,6 +301,15 @@ hsrbdao_arms_association = Table(
     Base.metadata,
     Column("source_hsrbdao_id", ForeignKey("HSRBDAO.database_id")),
     Column("target_armdao_id", ForeignKey("ArmDAO.database_id")),
+)
+semanticrobotannotationdao_joint_states_association = Table(
+    "semanticrobotannotationdao_joint_states_association",
+    Base.metadata,
+    Column(
+        "source_semanticrobotannotationdao_id",
+        ForeignKey("SemanticRobotAnnotationDAO.database_id"),
+    ),
+    Column("target_jointstatedao_id", ForeignKey("JointStateDAO.database_id")),
 )
 kinematicchaindao_sensors_association = Table(
     "kinematicchaindao_sensors_association",
@@ -1131,6 +1150,45 @@ class JerkVariableDAO(
         uselist=False,
         foreign_keys=[dof_id],
         post_update=True,
+    )
+
+
+class JointStateDAO(
+    Base, DataAccessObject[semantic_digital_twin.datastructures.joint_state.JointState]
+):
+
+    __tablename__ = "JointStateDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    target_values: Mapped[typing.List[builtins.float]] = mapped_column(
+        JSON, nullable=False, use_existing_column=True
+    )
+    state_type: Mapped[
+        semantic_digital_twin.datastructures.definitions.JointStateType
+    ] = mapped_column(
+        krrood.ormatic.custom_types.PolymorphicEnumType,
+        nullable=False,
+        use_existing_column=True,
+    )
+
+    name_id: Mapped[int] = mapped_column(
+        ForeignKey("PrefixedNameDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    connections: Mapped[builtins.list[ActiveConnection1DOFDAO]] = relationship(
+        "ActiveConnection1DOFDAO",
+        secondary="jointstatedao_connections_association",
+        primaryjoin="JointStateDAO.database_id == jointstatedao_connections_association.c.source_jointstatedao_id",
+        secondaryjoin="ActiveConnection1DOFDAO.database_id == jointstatedao_connections_association.c.target_activeconnection1dofdao_id",
+        cascade="save-update, merge",
+    )
+    name: Mapped[PrefixedNameDAO] = relationship(
+        "PrefixedNameDAO", uselist=False, foreign_keys=[name_id], post_update=True
     )
 
 
@@ -4469,14 +4527,14 @@ class HasRootBodyDAO(
     }
 
 
-class BaseballDAO(
+class BallDAO(
     HasRootBodyDAO,
     DataAccessObject[
-        semantic_digital_twin.semantic_annotations.semantic_annotations.Baseball
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Ball
     ],
 ):
 
-    __tablename__ = "BaseballDAO"
+    __tablename__ = "BallDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
         ForeignKey(HasRootBodyDAO.database_id),
@@ -4485,8 +4543,27 @@ class BaseballDAO(
     )
 
     __mapper_args__ = {
-        "polymorphic_identity": "BaseballDAO",
+        "polymorphic_identity": "BallDAO",
         "inherit_condition": database_id == HasRootBodyDAO.database_id,
+    }
+
+
+class BaseballDAO(
+    BallDAO,
+    DataAccessObject[
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Baseball
+    ],
+):
+
+    __tablename__ = "BaseballDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(BallDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "BaseballDAO",
+        "inherit_condition": database_id == BallDAO.database_id,
     }
 
 
@@ -6700,9 +6777,13 @@ class SemanticRobotAnnotationDAO(
         use_existing_column=True,
     )
 
-    joint_states: Mapped[
-        typing.List[semantic_digital_twin.datastructures.joint_state.JointState]
-    ] = mapped_column(JSON, nullable=False, use_existing_column=True)
+    joint_states: Mapped[builtins.list[JointStateDAO]] = relationship(
+        "JointStateDAO",
+        secondary="semanticrobotannotationdao_joint_states_association",
+        primaryjoin="SemanticRobotAnnotationDAO.database_id == semanticrobotannotationdao_joint_states_association.c.source_semanticrobotannotationdao_id",
+        secondaryjoin="JointStateDAO.database_id == semanticrobotannotationdao_joint_states_association.c.target_jointstatedao_id",
+        cascade="save-update, merge",
+    )
 
     __mapper_args__ = {
         "polymorphic_identity": "SemanticRobotAnnotationDAO",

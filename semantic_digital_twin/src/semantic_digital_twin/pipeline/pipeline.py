@@ -33,7 +33,7 @@ from ..spatial_types import Point3
 from ..spatial_types.spatial_types import HomogeneousTransformationMatrix
 from ..world import World
 from ..world_description.geometry import TriangleMesh, FileMesh
-from ..world_description.world_entity import Body
+from ..world_description.world_entity import Body, SemanticAnnotation
 
 
 @dataclass
@@ -188,85 +188,89 @@ class BodyFactoryReplace(Step):
 
 
 @dataclass
-class BodyGeometryAndAnnotation:
-    object_geometry_file: str
-
-    semantic_annotation: Type[HasRootBody]
-
-
-@dataclass
-class BodyGeometryAndAnnotationReplacement(Step):
-
-    object_mappings: Dict[str, List[BodyGeometryAndAnnotation]]
+class MergeParentWithChildIfCorrectChildSubname(Step):
     """
-    A list of mappings specifying object names and their corresponding replacement geometry.
+    Merges the parent body with the child body if the child body has the substring in its name.
+    The resulting body will have the geometry of both the parent and child, and the name of the parent.
+    """
+
+    matching_subname: str
+    """
+    The substring the child body must have in its name to be merged with the parent.
     """
 
     def _apply(self, world: World) -> World:
-        for body in reversed(world.bodies_topologically_sorted):
+        bodies_topologically_sorted = reversed(world.bodies_topologically_sorted)
+        for child_body in bodies_topologically_sorted:
 
-            if not body.collision:
+            parent_connection = child_body.parent_connection
+            if parent_connection is None:
+                continue
+            parent_body = parent_connection.parent
+            if not isinstance(child_body, Body) or not isinstance(parent_body, Body):
                 continue
 
-            body_name = body.name
-
-            replacement_maps = next(
-                (
-                    replacement_maps
-                    for object_name, replacement_maps in self.object_mappings.items()
-                    if body_name.name.startswith(object_name)
-                ),
-                None,
-            )
-            if replacement_maps is None:
+            child_name = child_body.name.name
+            if not self.matching_subname in child_name:
                 continue
 
-            replacement_map = random.choice(replacement_maps)
-
-            parent_C_body = body.parent_connection
-            print(body_name)
-            print(body.collision)
-
-            new_body_world = STLParser(
-                file_path=replacement_map.object_geometry_file
-            ).parse()
-            new_geometry = deepcopy(new_body_world.bodies[0].collision)
-            with world.modify_world():
-                new_semantic_annotation = replacement_map.semantic_annotation(root=body)
-                world.add_semantic_annotation(new_semantic_annotation)
-                body.collision = new_geometry
-                body.visual = new_geometry
-
+            parent_shape = parent_body.collision
+            child_shape = child_body.collision
+            parent_shape.merge(child_shape)
+            parent_C_child = child_body.parent_connection
+            world.remove_connection(parent_C_child)
+            world.remove_kinematic_structure_entity(child_body)
         return world
 
 
+@dataclass
+class SemanticAnnotationGeometryReplacement(Step):
+
+    object_mappings: Dict[Type[SemanticAnnotation], List[str]]
+    """
+    A dictionary mapping semantic annotations to a list of file paths to STL files that should be used as collision geometries for the semantic annotation.
+    """
+
+    def _apply(self, world: World) -> World:
+
+        for mapped_semantic_annotation in self.object_mappings.keys():
+
+            semantic_annotations = world.get_semantic_annotations_by_type(
+                mapped_semantic_annotation
+            )
+
+            for semantic_annotation in semantic_annotations:
+                if isinstance(semantic_annotation, HasRootBody):
+                    file_path = random.choice(
+                        self.object_mappings[mapped_semantic_annotation]
+                    )
+
+                    new_body_world = STLParser(file_path=file_path).parse()
+                    new_geometry = deepcopy(new_body_world.bodies[0].collision)
+                    semantic_annotation.root.collision = new_geometry
+                    semantic_annotation.root.visual = new_geometry
+
+
 mapping = {
-    "bottle_1": [BodyGeometryAndAnnotation("mustard_bottle.stl", Bottle)],
-    "apple": [
-        BodyGeometryAndAnnotation("apple.stl", Apple),
-        BodyGeometryAndAnnotation("orange.stl", Orange),
+    Bottle: ["mustard_bottle.stl"],
+    Apple: ["apple.stl"],
+    Plate: ["plate.stl"],
+    Bowl: ["bowl.stl"],
+    Fork: ["fork.stl"],
+    Knife: ["knife.stl"],
+    Mug: ["mug.stl"],
+    Cup: ["cup_a.stl"],
+    Pan: ["skillet.stl"],
+    PanLid: ["skillet_lid.stl"],
+    Pencil: ["small_marker.stl", "large_marker.stl"],
+    Ball: [
+        "softball.stl",
+        "baseball.stl",
+        "tennisball.stl",
+        "racequetball.stl",
+        "golfball.stl",
+        "mini_soccerball.stl",
     ],
-    "plate": [BodyGeometryAndAnnotation("plate.stl", Plate)],
-    "bowl": [BodyGeometryAndAnnotation("bowl.stl", Bowl)],
-    "fork": [BodyGeometryAndAnnotation("fork.stl", Fork)],
-    "robothor_butter_knife": [BodyGeometryAndAnnotation("knife.stl", Knife)],
-    "mug": [BodyGeometryAndAnnotation("mug.stl", Mug)],
-    "cup": [BodyGeometryAndAnnotation("cup_a.stl", Cup)],
-    "pan": [BodyGeometryAndAnnotation("skillet.stl", Pan)],
-    "pan_lid": [BodyGeometryAndAnnotation("skillet_lid.stl", PanLid)],
-    "robothor_pencil": [
-        BodyGeometryAndAnnotation("small_marker.stl", Pencil),
-        BodyGeometryAndAnnotation("large_marker.stl", Pencil),
-    ],
-    "robothor_basketball": [
-        BodyGeometryAndAnnotation("softball.stl", Ball),
-        BodyGeometryAndAnnotation("baseball.stl", Baseball),
-        BodyGeometryAndAnnotation("tennisball.stl", Ball),
-        BodyGeometryAndAnnotation("racequetball.stl", Ball),
-        BodyGeometryAndAnnotation("golfball.stl", Ball),
-        BodyGeometryAndAnnotation("mini_soccerball.stl", Ball),
-    ],
-    "robothor_spray_bottle": [
-        BodyGeometryAndAnnotation("spraybottle.stl", SprayBottle)
-    ],
+    Baseball: ["baseball.stl"],
+    SprayBottle: ["spraybottle.stl"],
 }

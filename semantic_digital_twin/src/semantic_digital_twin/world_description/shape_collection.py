@@ -191,6 +191,11 @@ class ShapeCollection(SubclassJSONSerializer):
             .scale
         )
 
+    def merge(self, other: ShapeCollection) -> ShapeCollection:
+        self.shapes.extend(other.shapes)
+        self.transform_all_shapes_to_own_frame()
+        return self
+
 
 @dataclass
 class BoundingBoxCollection(ShapeCollection):
