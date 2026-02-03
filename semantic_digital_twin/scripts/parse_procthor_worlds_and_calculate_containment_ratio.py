@@ -8,21 +8,21 @@ from sqlalchemy.orm import Session
 
 import semantic_digital_twin.adapters.procthor.procthor_resolver
 from krrood.entity_query_language.symbol_graph import SymbolGraph
-from krrood.ormatic.dao import to_dao, ToDAOState
-from krrood.ormatic.utils import classes_of_module, create_engine
+from krrood.ormatic.dao import to_dao, ToDataAccessObjectState
+from krrood.ormatic.utils import classes_of_module, create_engine, drop_database
 from semantic_digital_twin.adapters.procthor.procthor_parser import ProcTHORParser
 from semantic_digital_twin.adapters.procthor.procthor_resolver import (
     ProcthorResolver,
 )
 from semantic_digital_twin.orm.ormatic_interface import *
+from semantic_digital_twin.orm.utils import semantic_digital_twin_sessionmaker
 from semantic_digital_twin.reasoning.predicates import InsideOf
 from semantic_digital_twin.world_description.world_entity import SemanticAnnotation
 
 
-def parse_procthor_worlds_and_calculate_containment_ratio():
-    semantic_world_database_uri = os.environ.get("SEMANTIC_DIGITAL_TWIN_DATABASE_URI")
-    semantic_world_engine = create_engine(semantic_world_database_uri, echo=False)
-    semantic_world_session = Session(semantic_world_engine)
+def parse_procthor_worlds_and_calculate_containment_ratio(world_parsing_start_index: int = 0,
+                                                          drop_existing_procthor_database: bool = True):
+    semantic_world_session = semantic_digital_twin_sessionmaker()()
 
     procthor_experiments_database_uri = os.environ.get(
         "PROCTHOR_EXPERIMENTS_DATABASE_URI"
@@ -30,8 +30,10 @@ def parse_procthor_worlds_and_calculate_containment_ratio():
     procthor_experiments_engine = create_engine(
         procthor_experiments_database_uri, echo=False
     )
-    # drop_database(procthor_experiments_engine)
-    # Base.metadata.create_all(procthor_experiments_engine)
+
+    if drop_existing_procthor_database:
+        drop_database(procthor_experiments_engine)
+        Base.metadata.create_all(procthor_experiments_engine)
     procthor_experiments_session = Session(procthor_experiments_engine)
 
     dataset = prior.load_dataset("procthor-10k")
@@ -40,7 +42,7 @@ def parse_procthor_worlds_and_calculate_containment_ratio():
     for index, house in enumerate(
         tqdm.tqdm(dataset["train"], desc="Parsing Procthor worlds")
     ):
-        if index < 5058:
+        if index < world_parsing_start_index:
             continue
         try:
             parser = ProcTHORParser(f"house_{index}", house, semantic_world_session)
@@ -66,7 +68,7 @@ def parse_procthor_worlds_and_calculate_containment_ratio():
                         resolved(body=body), skip_duplicates=True
                     )
 
-        state = ToDAOState()
+        state = ToDataAccessObjectState()
         daos = []
 
         world_dao = to_dao(world, state=state)
@@ -89,4 +91,5 @@ def parse_procthor_worlds_and_calculate_containment_ratio():
 
 
 if __name__ == "__main__":
-    parse_procthor_worlds_and_calculate_containment_ratio()
+    parse_procthor_worlds_and_calculate_containment_ratio(world_parsing_start_index=0,
+                                                          drop_existing_procthor_database=False)
