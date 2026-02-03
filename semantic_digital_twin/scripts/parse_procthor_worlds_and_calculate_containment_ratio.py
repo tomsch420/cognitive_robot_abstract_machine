@@ -10,7 +10,7 @@ import semantic_digital_twin.adapters.procthor.procthor_resolver
 from krrood.entity_query_language.symbol_graph import SymbolGraph
 from krrood.ormatic.dao import to_dao, ToDataAccessObjectState
 from krrood.ormatic.utils import classes_of_module, create_engine, drop_database
-from semantic_digital_twin.adapters.procthor.procthor_parser import ProcTHORParser
+from semantic_digital_twin.adapters.procthor.procthor_parser import ProcTHORParser, procthor_sessionmaker
 from semantic_digital_twin.adapters.procthor.procthor_resolver import (
     ProcthorResolver,
 )
@@ -23,18 +23,11 @@ from semantic_digital_twin.world_description.world_entity import SemanticAnnotat
 def parse_procthor_worlds_and_calculate_containment_ratio(world_parsing_start_index: int = 0,
                                                           drop_existing_procthor_database: bool = True):
     semantic_world_session = semantic_digital_twin_sessionmaker()()
-
-    procthor_experiments_database_uri = os.environ.get(
-        "PROCTHOR_EXPERIMENTS_DATABASE_URI"
-    )
-    procthor_experiments_engine = create_engine(
-        procthor_experiments_database_uri, echo=False
-    )
+    procthor_experiments_session = procthor_sessionmaker()()
 
     if drop_existing_procthor_database:
-        drop_database(procthor_experiments_engine)
-        Base.metadata.create_all(procthor_experiments_engine)
-    procthor_experiments_session = Session(procthor_experiments_engine)
+        drop_database(procthor_experiments_session.bind)
+        Base.metadata.create_all(procthor_experiments_session.bind)
 
     dataset = prior.load_dataset("procthor-10k")
 
