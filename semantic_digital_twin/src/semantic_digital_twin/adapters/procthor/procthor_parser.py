@@ -1,19 +1,22 @@
 import json
 import logging
 import math
+import os
 from dataclasses import dataclass, field
-from functools import cached_property
+from functools import cached_property, lru_cache
 from pathlib import Path
 from typing import Dict, Tuple, Union, Set, Optional, List, Any, Self
 
 import numpy as np
 from sqlalchemy import select
 from sqlalchemy.exc import NoResultFound, MultipleResultsFound
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, sessionmaker
 from typing_extensions import assert_never
 
+from krrood.ormatic.utils import create_engine
 from ...datastructures.prefixed_name import PrefixedName
 from ...datastructures.variables import SpatialVariables
+from ...orm.exceptions import DatabaseNotAvailableError
 from ...orm.ormatic_interface import *
 from ...semantic_annotations.position_descriptions import (
     SemanticPositionDescription,
@@ -827,3 +830,15 @@ def get_world_by_asset_id(session: Session, asset_id: str) -> Optional[World]:
             )
 
     return world_mapping.from_dao() if world_mapping else None
+
+@lru_cache
+def procthor_sessionmaker():
+    """
+    Creates a session maker for the procthor experiments database.
+    This requires the environment variable `PROCTHOR_EXPERIMENTS_DATABASE_URI` to be set to a reachable database.
+    """
+    uri = os.environ.get("PROCTHOR_EXPERIMENTS_DATABASE_URI=")
+    if uri is None:
+        raise DatabaseNotAvailableError()
+    engine = create_engine(uri)
+    return sessionmaker(bind=engine)
