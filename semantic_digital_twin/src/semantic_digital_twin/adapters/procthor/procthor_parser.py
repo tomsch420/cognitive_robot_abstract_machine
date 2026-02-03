@@ -837,7 +837,7 @@ def procthor_sessionmaker():
     Creates a session maker for the procthor experiments database.
     This requires the environment variable `PROCTHOR_EXPERIMENTS_DATABASE_URI` to be set to a reachable database.
     """
-    uri = os.environ.get("PROCTHOR_EXPERIMENTS_DATABASE_URI=")
+    uri = os.environ.get("PROCTHOR_EXPERIMENTS_DATABASE_URI")
     if uri is None:
         raise DatabaseNotAvailableError()
     engine = create_engine(uri)

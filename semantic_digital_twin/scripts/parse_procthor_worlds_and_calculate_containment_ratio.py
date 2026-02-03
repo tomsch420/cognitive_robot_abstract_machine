@@ -84,5 +84,5 @@ def parse_procthor_worlds_and_calculate_containment_ratio(world_parsing_start_in
 
 
 if __name__ == "__main__":
-    parse_procthor_worlds_and_calculate_containment_ratio(world_parsing_start_index=0,
+    parse_procthor_worlds_and_calculate_containment_ratio(world_parsing_start_index=1087,
                                                           drop_existing_procthor_database=False)
