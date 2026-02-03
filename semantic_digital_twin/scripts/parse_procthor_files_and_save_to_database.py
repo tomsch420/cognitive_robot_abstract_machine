@@ -6,33 +6,32 @@ import time
 from typing import List
 
 import tqdm
-from sqlalchemy.orm import Session
 
-from krrood.entity_query_language.symbol_graph import SymbolGraph
 from krrood.ormatic.dao import to_dao
-from krrood.ormatic.utils import drop_database, create_engine
+from krrood.ormatic.utils import drop_database
 from krrood.utils import recursive_subclasses
-from semantic_digital_twin.world import World
-
-sg = SymbolGraph()
-
 from semantic_digital_twin.adapters.fbx import FBXParser
 from semantic_digital_twin.adapters.procthor.procthor_pipelines import (
     dresser_from_body_in_world,
 )
-from semantic_digital_twin.orm.ormatic_interface import *
 from semantic_digital_twin.adapters.procthor.procthor_resolver import (
     ProcthorResolver,
 )
-from semantic_digital_twin.semantic_annotations.mixins import (
-    HasRootBody,
-)
+from semantic_digital_twin.orm.ormatic_interface import *
+from semantic_digital_twin.orm.utils import semantic_digital_twin_sessionmaker
 from semantic_digital_twin.pipeline.pipeline import (
     Pipeline,
     BodyFilter,
     BodyFactoryReplace,
     CenterLocalGeometryAndPreserveWorldPose,
 )
+from semantic_digital_twin.semantic_annotations.mixins import (
+    HasRootBody,
+)
+from semantic_digital_twin.world import World
+
+
+# sg = SymbolGraph()
 
 
 def remove_root_and_move_children_into_new_worlds(world: World) -> List[World]:
@@ -116,7 +115,7 @@ def parse_fbx_file_to_world_mapping_daos(fbx_file_path: str) -> List[WorldMappin
         resolved = resolver.resolve(world.name)
         if resolved:
             with world.modify_world():
-                world.add_semantic_annotation(resolved(body=world.root))
+                world.add_semantic_annotation(resolved(root=world.root))
 
     return [to_dao(world) for world in worlds]
 
@@ -130,15 +129,9 @@ def parse_procthor_files_and_save_to_database(
     Currently, only grp files are parsed, and some files and names are excluded.
     TODO: Ensure all relevant files, even those not inside a grp, are parsed.
     """
-    semantic_digital_twin_database_uri = os.environ.get(
-        "SEMANTIC_DIGITAL_TWIN_DATABASE_URI"
-    )
-    assert (
-        semantic_digital_twin_database_uri is not None
-    ), "Please set the SEMANTIC_DIGITAL_TWIN_DATABASE_URI environment variable."
 
     procthor_root = os.path.join(os.path.expanduser("~"), "ai2thor")
-    procthor_root = os.path.join(os.path.expanduser("~"), "work", "ai2thor")
+    # procthor_root = os.path.join(os.path.expanduser("~"), "work", "ai2thor")
 
     files = []
     for root, dirs, filenames in os.walk(procthor_root):
@@ -162,19 +155,18 @@ def parse_procthor_files_and_save_to_database(
         if not any([e in f for e in excluded_words]) and fbx_file_pattern.fullmatch(f)
     ]
     # Create database engine and session
-    engine = create_engine(semantic_digital_twin_database_uri)
-    session = Session(engine)
+    session = semantic_digital_twin_sessionmaker()()
 
     if drop_existing_database:
-        drop_database(engine)
-        Base.metadata.create_all(engine)
+        drop_database(session.bind)
+        Base.metadata.create_all(session.bind)
 
     start_time = time.time_ns()
 
     dao_names = []
     daos = []
 
-    for i, fbx_file in tqdm.tqdm(enumerate(fbx_files)):
+    for i, fbx_file in enumerate(tqdm.tqdm(fbx_files)):
         for dao in parse_fbx_file_to_world_mapping_daos(fbx_file):
             # Some item names (for example "bowl_19") were used for multiple items. For now the solution is to just
             # skip duplicate names.
