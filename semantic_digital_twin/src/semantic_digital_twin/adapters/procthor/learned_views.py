@@ -3,11 +3,14 @@ from typing import List, Self
 
 from sqlalchemy.orm import Session
 
-from semantic_digital_twin.orm.ormatic_interface import InsideOfDAO, RootedSemanticAnnotationDAO
+from semantic_digital_twin.orm.ormatic_interface import (
+    InsideOfDAO,
+    RootedSemanticAnnotationDAO,
+)
 
 
 @dataclass
-class AnnotatedInsideOfDAO:
+class AnnotatedInsideOfView:
     """
     An enrichment to the InsideOfDAO that also contains the semantic annotations of the two sides of the relation.
     This is aggregated from a database.
@@ -18,12 +21,16 @@ class AnnotatedInsideOfDAO:
     The raw inside of relation.
     """
 
-    body_side_semantic_annotation: List[RootedSemanticAnnotationDAO] = field(default_factory=list)
+    body_side_semantic_annotation: List[RootedSemanticAnnotationDAO] = field(
+        default_factory=list
+    )
     """
     The annotations that involve the `self.inside_of_dao.body` side of the relation.
     """
 
-    other_side_semantic_annotation: List[RootedSemanticAnnotationDAO] = field(default_factory=list)
+    other_side_semantic_annotation: List[RootedSemanticAnnotationDAO] = field(
+        default_factory=list
+    )
     """
     The annotations that involve the `self.inside_of_dao.other` side of the relation.
     """
@@ -33,4 +40,3 @@ class AnnotatedInsideOfDAO:
         """
         Construct a list of AnnotatedInsideOfDAO objects from the database.
         """
-
