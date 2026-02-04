@@ -38,5 +38,6 @@ class AnnotatedInsideOfView:
     @classmethod
     def from_database(cls, session: Session) -> List[Self]:
         """
-        Construct a list of AnnotatedInsideOfDAO objects from the database.
+        :param session: The SQLAlchemy session to query the database
+        :return: a list of AnnotatedInsideOfDAO objects from the database.
         """
