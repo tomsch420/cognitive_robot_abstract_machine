@@ -10,7 +10,10 @@ import semantic_digital_twin.adapters.procthor.procthor_resolver
 from krrood.entity_query_language.symbol_graph import SymbolGraph
 from krrood.ormatic.dao import to_dao, ToDataAccessObjectState
 from krrood.ormatic.utils import classes_of_module, create_engine, drop_database
-from semantic_digital_twin.adapters.procthor.procthor_parser import ProcTHORParser, procthor_sessionmaker
+from semantic_digital_twin.adapters.procthor.procthor_parser import (
+    ProcTHORParser,
+    procthor_sessionmaker,
+)
 from semantic_digital_twin.adapters.procthor.procthor_resolver import (
     ProcthorResolver,
 )
@@ -20,8 +23,9 @@ from semantic_digital_twin.reasoning.predicates import InsideOf
 from semantic_digital_twin.world_description.world_entity import SemanticAnnotation
 
 
-def parse_procthor_worlds_and_calculate_containment_ratio(world_parsing_start_index: int = 0,
-                                                          drop_existing_procthor_database: bool = True):
+def parse_procthor_worlds_and_calculate_containment_ratio(
+    world_parsing_start_index: int = 0, drop_existing_procthor_database: bool = True
+):
     semantic_world_session = semantic_digital_twin_sessionmaker()()
     procthor_experiments_session = procthor_sessionmaker()()
 
@@ -84,5 +88,6 @@ def parse_procthor_worlds_and_calculate_containment_ratio(world_parsing_start_in
 
 
 if __name__ == "__main__":
-    parse_procthor_worlds_and_calculate_containment_ratio(world_parsing_start_index=1087,
-                                                          drop_existing_procthor_database=False)
+    parse_procthor_worlds_and_calculate_containment_ratio(
+        world_parsing_start_index=0, drop_existing_procthor_database=True
+    )
