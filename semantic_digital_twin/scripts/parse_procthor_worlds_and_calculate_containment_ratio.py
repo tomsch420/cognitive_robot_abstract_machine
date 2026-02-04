@@ -48,22 +48,22 @@ def parse_procthor_worlds_and_calculate_containment_ratio(
             logging.error(f"Error parsing house {index}: {e}")
             continue
         # resolve views
-        resolver = ProcthorResolver(
-            [
-                cls
-                for cls in classes_of_module(
-                    semantic_digital_twin.adapters.procthor.procthor_resolver
-                )
-                if issubclass(cls, SemanticAnnotation)
-            ]
-        )
-        for body in world.bodies:
-            resolved = resolver.resolve(body.name.name)
-            if resolved:
-                with world.modify_world():
-                    world.add_semantic_annotation(
-                        resolved(body=body), skip_duplicates=True
-                    )
+        # resolver = ProcthorResolver(
+        #     [
+        #         cls
+        #         for cls in classes_of_module(
+        #             semantic_digital_twin.adapters.procthor.procthor_resolver
+        #         )
+        #         if issubclass(cls, SemanticAnnotation)
+        #     ]
+        # )
+        # for body in world.bodies:
+        #     resolved = resolver.resolve(body.name.name)
+        #     if resolved:
+        #         with world.modify_world():
+        #             world.add_semantic_annotation(
+        #                 resolved(body=body), skip_duplicates=True
+        #             )
 
         state = ToDataAccessObjectState()
         daos = []

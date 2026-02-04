@@ -1,10 +1,12 @@
+import itertools
 from dataclasses import dataclass, field
 from functools import lru_cache
-from typing import List, Self, Type, Dict, Tuple
+from typing import List, Self, Type, Dict, Tuple, Set
 
 import tqdm
 from sqlalchemy.orm import Session
 
+from krrood.ormatic.dao import DataAccessObject, AlternativeMapping
 from krrood.ormatic.utils import get_classes_of_ormatic_interface
 import semantic_digital_twin.orm.ormatic_interface
 from semantic_digital_twin.orm.ormatic_interface import (
@@ -12,6 +14,7 @@ from semantic_digital_twin.orm.ormatic_interface import (
     RootedSemanticAnnotationDAO,
     HasRootBodyDAO,
 )
+from sqlalchemy import or_
 import numpy as np
 from krrood.class_diagrams import ClassDiagram
 from krrood.class_diagrams.utils import classes_of_module
@@ -66,16 +69,12 @@ class AnnotatedInsideOfView:
     The raw inside of relation.
     """
 
-    body_side_semantic_annotation: List[RootedSemanticAnnotationDAO] = field(
-        default_factory=list
-    )
+    body_side_semantic_annotation: List[HasRootBodyDAO] = field(default_factory=list)
     """
     The annotations that involve the `self.inside_of_dao.body` side of the relation.
     """
 
-    other_side_semantic_annotation: List[RootedSemanticAnnotationDAO] = field(
-        default_factory=list
-    )
+    other_side_semantic_annotation: List[HasRootBodyDAO] = field(default_factory=list)
     """
     The annotations that involve the `self.inside_of_dao.other` side of the relation.
     """
@@ -86,25 +85,44 @@ class AnnotatedInsideOfView:
         :param session: The SQLAlchemy session to query the database
         :return: a list of AnnotatedInsideOfDAO objects from the database.
         """
-        inside_ofs = session.query(InsideOfDAO).all()
-        all_annotations = session.query(HasRootBodyDAO).all()
-
-        results = []
-        for inside_of in tqdm.tqdm(inside_ofs):
-            body_annotations = [
-                ann for ann in all_annotations if ann.root_id == inside_of.body_id
-            ]
-            other_annotations = [
-                ann for ann in all_annotations if ann.root_id == inside_of.other_id
-            ]
-            results.append(
-                cls(
-                    inside_of_dao=inside_of,
-                    body_side_semantic_annotation=body_annotations,
-                    other_side_semantic_annotation=other_annotations,
-                )
+        results = (
+            session.query(InsideOfDAO, HasRootBodyDAO)
+            .outerjoin(
+                HasRootBodyDAO,
+                or_(
+                    HasRootBodyDAO.root_id == InsideOfDAO.body_id,
+                    HasRootBodyDAO.root_id == InsideOfDAO.other_id,
+                ),
             )
-        return results
+            .all()
+        )
+
+        inside_of_to_body_annotations = {}
+        inside_of_to_other_annotations = {}
+        inside_ofs = []
+        seen_inside_ofs = set()
+
+        for inside_of, annotation in results:
+            if id(inside_of) not in seen_inside_ofs:
+                inside_ofs.append(inside_of)
+                seen_inside_ofs.add(id(inside_of))
+                inside_of_to_body_annotations[id(inside_of)] = []
+                inside_of_to_other_annotations[id(inside_of)] = []
+
+            if annotation:
+                if annotation.root_id == inside_of.body_id:
+                    inside_of_to_body_annotations[id(inside_of)].append(annotation)
+                if annotation.root_id == inside_of.other_id:
+                    inside_of_to_other_annotations[id(inside_of)].append(annotation)
+
+        return [
+            cls(
+                inside_of_dao=io,
+                body_side_semantic_annotation=inside_of_to_body_annotations[id(io)],
+                other_side_semantic_annotation=inside_of_to_other_annotations[id(io)],
+            )
+            for io in inside_ofs
+        ]
 
 
 @dataclass
@@ -115,13 +133,39 @@ class SemanticInsideOfView:
     containment_ratio: float
 
     @classmethod
-    def from_annotated_inside_of_view(cls, view: AnnotatedInsideOfView) -> Self:
+    def _from_annotated_inside_of_view(cls, view: AnnotatedInsideOfView) -> List[Self]:
         class_variable, possible_sets = create_variable_for_type_hierarchy()
-
-        body_side_atomic_types = list(
-            map(possible_sets.__getitem__, view.body_side_semantic_annotation)
+        body_side_atomic_types = re_set_union(
+            [
+                possible_sets[get_original_class(a)]
+                for a in view.body_side_semantic_annotation
+            ]
         )
-        print(body_side_atomic_types)
+        other_side_atomic_types = re_set_union(
+            [
+                possible_sets[get_original_class(a)]
+                for a in view.other_side_semantic_annotation
+            ]
+        )
+        return [
+            cls(
+                body_type=body_type.element,
+                other_type=other_type.element,
+                containment_ratio=view.inside_of_dao.containment_ratio,
+            )
+            for body_type, other_type in itertools.product(
+                body_side_atomic_types.simple_sets, other_side_atomic_types.simple_sets
+            )
+        ]
+
+    @classmethod
+    def from_annotated_inside_of_views(
+        cls, views: List[AnnotatedInsideOfView]
+    ) -> List[Self]:
+        results = []
+        for view in tqdm.tqdm(views):
+            results.extend(cls._from_annotated_inside_of_view(view))
+        return results
 
 
 def re_set_union(sets: List[Set]) -> Set:
@@ -129,3 +173,13 @@ def re_set_union(sets: List[Set]) -> Set:
     for s in sets[1:]:
         r = r | s
     return r
+
+
+def get_original_class(
+    clazz: DataAccessObject, resolve_alternative_mappings: bool = True
+) -> Type:
+    original_class = clazz.original_class()
+    if issubclass(original_class, AlternativeMapping) and resolve_alternative_mappings:
+        return original_class.original_class()
+    else:
+        return original_class
