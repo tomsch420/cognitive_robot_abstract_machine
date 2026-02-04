@@ -13,4 +13,4 @@ def test_getting_all_inside_of_relations():
     session = procthor_sessionmaker()()
 
     data = AnnotatedInsideOfView.from_database(session)
-    print(data)
+    # print(data)
