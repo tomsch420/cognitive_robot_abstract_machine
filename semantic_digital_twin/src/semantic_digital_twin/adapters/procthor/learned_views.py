@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from functools import lru_cache
 from typing import List, Self, Type, Dict, Tuple
 
 import tqdm
@@ -9,6 +10,7 @@ import semantic_digital_twin.orm.ormatic_interface
 from semantic_digital_twin.orm.ormatic_interface import (
     InsideOfDAO,
     RootedSemanticAnnotationDAO,
+    HasRootBodyDAO,
 )
 import numpy as np
 from krrood.class_diagrams import ClassDiagram
@@ -26,9 +28,8 @@ classes, _, _ = get_classes_of_ormatic_interface(
 class_diagram = ClassDiagram(classes)
 
 
-def create_variable_for_type_hierarchy(
-    class_diagram: ClassDiagram,
-) -> Tuple[Symbolic, Dict[Type, Set]]:
+@lru_cache
+def create_variable_for_type_hierarchy() -> Tuple[Symbolic, Dict[Type, Set]]:
     """
     Create a symbolic variable for the type hierarchy containing only the leaf types as possible values.
     Additionally, create a dict that maps every type to the leaf types that this can be replaced by.
@@ -86,7 +87,7 @@ class AnnotatedInsideOfView:
         :return: a list of AnnotatedInsideOfDAO objects from the database.
         """
         inside_ofs = session.query(InsideOfDAO).all()
-        all_annotations = session.query(RootedSemanticAnnotationDAO).all()
+        all_annotations = session.query(HasRootBodyDAO).all()
 
         results = []
         for inside_of in tqdm.tqdm(inside_ofs):
@@ -114,4 +115,17 @@ class SemanticInsideOfView:
     containment_ratio: float
 
     @classmethod
-    def from_annotated_inside_of_view(cls, view: AnnotatedInsideOfView) -> Self: ...
+    def from_annotated_inside_of_view(cls, view: AnnotatedInsideOfView) -> Self:
+        class_variable, possible_sets = create_variable_for_type_hierarchy()
+
+        body_side_atomic_types = list(
+            map(possible_sets.__getitem__, view.body_side_semantic_annotation)
+        )
+        print(body_side_atomic_types)
+
+
+def re_set_union(sets: List[Set]) -> Set:
+    r = sets[0]
+    for s in sets[1:]:
+        r = r | s
+    return r

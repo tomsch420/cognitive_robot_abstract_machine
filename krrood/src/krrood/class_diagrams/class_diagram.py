@@ -567,6 +567,15 @@ class ClassDiagram:
                 )
                 self.add_relation(relation)
 
+    @property
+    def inheritance_subgraph_without_unreachable_nodes(self):
+        """
+        :return: The subgraph containing only inheritance relations and their incident nodes.
+        """
+        return self._dependency_graph.edge_subgraph(
+            [(r.source.index, r.target.index) for r in self.inheritance_relations]
+        )
+
     def _build_rxnode_tree(self, add_association_relations: bool = False) -> RWXNode:
         """
         Convert the class diagram graph to RWXNode tree structure for visualization.
