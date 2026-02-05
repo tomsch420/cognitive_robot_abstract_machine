@@ -97,6 +97,10 @@ class DegreeOfFreedomLimits:
     Upper limits of the degree of freedom.
     """
 
+    def __post_init__(self):
+        self.lower = self.lower or DerivativeMap()
+        self.upper = self.upper or DerivativeMap()
+
     def __deepcopy__(self, memo):
         return DegreeOfFreedomLimits(
             lower=deepcopy(self.lower), upper=deepcopy(self.upper)
@@ -137,6 +141,7 @@ class DegreeOfFreedom(WorldEntityWithID, SubclassJSONSerializer):
     """
 
     def __post_init__(self):
+        self.limits = self.limits or DegreeOfFreedomLimits()
         lower = self.limits.lower.position
         upper = self.limits.upper.position
         if lower is not None and upper is not None and lower > upper:

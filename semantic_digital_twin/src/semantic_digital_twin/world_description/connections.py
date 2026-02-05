@@ -202,6 +202,7 @@ class ActiveConnection1DOF(ActiveConnection, ABC):
                  its DOF added to the world.
         """
         name = name or cls._generate_default_name(parent=parent, child=child)
+
         dof = DegreeOfFreedom(name=PrefixedName("dof", str(name)), limits=dof_limits)
         world.add_degree_of_freedom(dof)
         connection = cls(

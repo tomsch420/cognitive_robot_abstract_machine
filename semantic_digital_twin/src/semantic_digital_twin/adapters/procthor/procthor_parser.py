@@ -36,6 +36,7 @@ from ...semantic_annotations.semantic_annotations import (
     Bathroom,
     LivingRoom,
 )
+from ...spatial_types.derivatives import DerivativeMap
 from ...spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
     Point3,
@@ -43,6 +44,7 @@ from ...spatial_types.spatial_types import (
 )
 from ...world import World
 from ...world_description.connections import FixedConnection
+from ...world_description.degree_of_freedom import DegreeOfFreedomLimits
 from ...world_description.geometry import Scale
 from ...world_description.world_entity import Body
 
@@ -225,7 +227,7 @@ class ProcthorDoor:
             scale.to_simple_event().as_composite_set().marginal(SpatialVariables.yz)
         )
         door_T_handle = HomogeneousTransformationMatrix.from_xyz_rpy(
-            x=scale.x / 2, y=sampled_2d_point[0], z=sampled_2d_point[1]
+            x=-(scale.x / 2), y=sampled_2d_point[0], z=sampled_2d_point[1], yaw=np.pi
         )
 
         world_T_door = world_T_door or self.world_T_parent_wall @ self.wall_T_door
@@ -248,12 +250,23 @@ class ProcthorDoor:
             door.add_handle(handle)
 
         with world.modify_world():
+            lower_limits = DerivativeMap()
+            lower_limits.position = 0
+            lower_limits.velocity = -1
+            upper_limits = DerivativeMap()
+            upper_limits.position = np.pi*1.5
+            upper_limits.velocity = 1
+
             world_T_hinge = door.calculate_world_T_hinge_based_on_handle(Vector3.Z())
             hinge = Hinge.create_with_new_body_in_world(
                 name=PrefixedName(f"{name.name}_hinge", name.prefix),
                 world=world,
                 world_root_T_self=world_T_hinge,
                 active_axis=Vector3.Z(),
+                connection_limits=DegreeOfFreedomLimits(
+                    lower=lower_limits,
+                    upper=upper_limits,
+                ),
             )
 
             door.add_hinge(hinge)

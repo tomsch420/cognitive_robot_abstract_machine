@@ -74,7 +74,7 @@ class Handle(HasRootBody):
         connection_multiplier: float = 1.0,
         connection_offset: float = 0.0,
         *,
-        scale: Scale = Scale(0.1, 0.02, 0.02),
+        scale: Scale = Scale(0.05, 0.1, 0.02),
         thickness: float = 0.005,
     ) -> Self:
         handle_event = cls._create_handle_geometry(scale=scale).as_composite_set()
@@ -106,7 +106,7 @@ class Handle(HasRootBody):
         :param thickness: The thickness of the handle walls.
         """
 
-        x_interval = closed(0, scale.x - thickness)
+        x_interval = closed(-(scale.x - thickness), 0)
         y_interval = closed(
             -scale.y / 2 + thickness,
             scale.y / 2 - thickness,

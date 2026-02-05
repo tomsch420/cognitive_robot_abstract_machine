@@ -31,9 +31,6 @@ from semantic_digital_twin.semantic_annotations.mixins import (
 from semantic_digital_twin.world import World
 
 
-# sg = SymbolGraph()
-
-
 def remove_root_and_move_children_into_new_worlds(world: World) -> List[World]:
     """
     Remove the root of the given world and move its children into new worlds.

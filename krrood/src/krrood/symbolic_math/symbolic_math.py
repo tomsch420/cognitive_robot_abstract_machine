@@ -1735,6 +1735,8 @@ def limit(
     :param upper_limit: The upper bound.
     :return: The clamped expression.
     """
+    if upper_limit is None:
+        ...
     return max(lower_limit, min(upper_limit, x))
 
 
