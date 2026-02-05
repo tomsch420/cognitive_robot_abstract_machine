@@ -251,6 +251,19 @@ class GenericClassAssociationDAO(
         Integer, primary_key=True, use_existing_column=True
     )
 
+    associated_value_id: Mapped[int] = mapped_column(
+        ForeignKey("GenericClassDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    associated_value: Mapped[GenericClassDAO] = relationship(
+        "GenericClassDAO",
+        uselist=False,
+        foreign_keys=[associated_value_id],
+        post_update=True,
+    )
+
 
 class InheritanceBaseWithoutSymbolButAlternativelyMappedMappingDAO(
     Base,

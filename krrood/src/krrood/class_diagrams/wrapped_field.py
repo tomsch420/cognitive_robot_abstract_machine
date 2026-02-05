@@ -212,9 +212,11 @@ class WrappedField:
     @cached_property
     def type_endpoint(self) -> Type:
         if self.is_container or self.is_optional:
-            return self.contained_type
+            t = self.contained_type
         else:
-            return self.resolved_type
+            t = self.resolved_type
+        origin = get_origin(t)
+        return origin or t
 
     @cached_property
     def is_role_taker(self) -> bool:

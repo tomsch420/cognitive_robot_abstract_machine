@@ -732,3 +732,9 @@ def test_polymorphic_enum(session, database):
 
 def test_generic_class(session, database):
     assert GenericClassAssociationDAO.associated_value
+
+    obj = GenericClassAssociation(GenericClass(1))
+    dao = to_dao(obj)
+    assert dao.associated_value
+    session.add(dao)
+    session.commit()
