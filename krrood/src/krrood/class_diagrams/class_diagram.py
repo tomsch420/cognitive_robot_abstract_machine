@@ -23,6 +23,8 @@ from typing_extensions import (
     Iterable,
     Type,
     TYPE_CHECKING,
+    get_origin,
+    get_args,
 )
 
 
@@ -167,6 +169,13 @@ class WrappedClass:
     @property
     def name(self):
         """Return a unique display name composed of class name and node index."""
+        origin = get_origin(self.clazz)
+        if origin is not None:
+            args = get_args(self.clazz)
+            arg_names = [arg.__name__ for arg in args if hasattr(arg, "__name__")]
+            if arg_names:
+                return f"{origin.__name__}_{'_'.join(arg_names)}{self.index}"
+
         return self.clazz.__name__ + str(self.index)
 
     def __hash__(self):
@@ -545,27 +554,68 @@ class ClassDiagram:
 
         :raises: This method does not explicitly raise any exceptions.
         """
-        for clazz in self.wrapped_classes:
-            for wrapped_field in clazz.fields:
-                target_type = wrapped_field.type_endpoint
+        # We use a while loop because adding synthetic nodes might discover more associations
+        # that need synthetic nodes.
+        processed_fields = set()
 
-                try:
-                    wrapped_target_class = self.get_wrapped_class(target_type)
-                except ClassIsUnMappedInClassDiagram:
-                    continue
+        while True:
+            new_node_added = False
+            for clazz in list(self.wrapped_classes):
+                for wrapped_field in clazz.fields:
+                    if (clazz, wrapped_field) in processed_fields:
+                        continue
 
-                association_type = Association
-                if wrapped_field.is_role_taker and issubclass(clazz.clazz, Role):
-                    role_taker_type = get_generic_type_param(clazz.clazz, Role)[0]
-                    if role_taker_type is target_type:
-                        association_type = HasRoleTaker
+                    target_type = wrapped_field.resolved_type
+                    if wrapped_field.is_container or wrapped_field.is_optional:
+                        target_type = wrapped_field.contained_type
 
-                relation = association_type(
-                    field=wrapped_field,
-                    source=clazz,
-                    target=wrapped_target_class,
-                )
-                self.add_relation(relation)
+                    origin = get_origin(target_type)
+
+                    # Check if it's a parameterized generic class
+                    if origin is not None and hasattr(origin, "__parameters__") and len(get_args(target_type)) > 0:
+                        # Ensure the origin class is in the diagram
+                        try:
+                            self.get_wrapped_class(origin)
+                        except ClassIsUnMappedInClassDiagram:
+                            # If origin is not mapped, we don't create synthetic nodes for its instantiations
+                            processed_fields.add((clazz, wrapped_field))
+                            continue
+
+                        # Create or get synthetic node
+                        if target_type not in self._cls_wrapped_cls_map:
+                            synthetic_wrapped = WrappedClass(clazz=target_type)
+                            self.add_node(synthetic_wrapped)
+                            # Add Inheritance relation from origin to synthetic node
+                            origin_wrapped = self.get_wrapped_class(origin)
+                            self.add_relation(Inheritance(source=origin_wrapped, target=synthetic_wrapped))
+                            new_node_added = True
+
+                        target_type = target_type
+                    else:
+                        target_type = wrapped_field.type_endpoint
+
+                    try:
+                        wrapped_target_class = self.get_wrapped_class(target_type)
+                    except ClassIsUnMappedInClassDiagram:
+                        processed_fields.add((clazz, wrapped_field))
+                        continue
+
+                    association_type = Association
+                    if wrapped_field.is_role_taker and issubclass(clazz.clazz, Role):
+                        role_taker_type = get_generic_type_param(clazz.clazz, Role)[0]
+                        if role_taker_type is target_type:
+                            association_type = HasRoleTaker
+
+                    relation = association_type(
+                        field=wrapped_field,
+                        source=clazz,
+                        target=wrapped_target_class,
+                    )
+                    self.add_relation(relation)
+                    processed_fields.add((clazz, wrapped_field))
+
+            if not new_node_added:
+                break
 
     @property
     def inheritance_subgraph_without_unreachable_nodes(self):

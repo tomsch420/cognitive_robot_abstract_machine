@@ -641,7 +641,11 @@ class DataAccessObject(HasGeneric[T]):
             setattr(self, relationship.key, None)
             return
 
-        dao_instance = self._get_or_queue_dao(value, state)
+        # Prefer the explicit target DAO class declared on the relationship.
+        # This is important for synthetic DAOs of parameterized generics where
+        # type(source_object) alone is not specific enough.
+        target_dao_class = relationship.mapper.class_
+        dao_instance = self._get_or_queue_dao_as(value, target_dao_class, state)
         setattr(self, relationship.key, dao_instance)
 
     def _extract_collection_relationship(
@@ -658,16 +662,39 @@ class DataAccessObject(HasGeneric[T]):
         :param state: The conversion state.
         """
         source_collection = getattr(source_object, relationship.key)
-        dao_collection = [self._get_or_queue_dao(v, state) for v in source_collection]
+        target_dao_class = relationship.mapper.class_
+        dao_collection = [
+            self._get_or_queue_dao_as(v, target_dao_class, state) for v in source_collection
+        ]
         setattr(self, relationship.key, type(source_collection)(dao_collection))
 
     def _get_or_queue_dao(
         self, source_object: Any, state: ToDataAccessObjectState
     ) -> DataAccessObject:
         """
-        Resolve a source object to a DAO, queuing it if necessary.
+        Resolve a source object to a DAO, queuing it if necessary using
+        the DAO inferred from the source object's type.
 
         :param source_object: The object to resolve.
+        :param state: The conversion state.
+        :return: The corresponding DAO instance.
+        """
+        dao_clazz = get_dao_class(type(source_object))
+        if dao_clazz is None:
+            raise NoDAOFoundDuringParsingError(source_object, type(self), None)
+        return self._get_or_queue_dao_as(source_object, dao_clazz, state)
+
+    def _get_or_queue_dao_as(
+        self,
+        source_object: Any,
+        dao_clazz: Type[DataAccessObject],
+        state: ToDataAccessObjectState,
+    ) -> DataAccessObject:
+        """
+        Resolve a source object to a specific DAO class, queuing it if necessary.
+
+        :param source_object: The object to resolve.
+        :param dao_clazz: The DAO class to construct/lookup.
         :param state: The conversion state.
         :return: The corresponding DAO instance.
         """
@@ -676,11 +703,7 @@ class DataAccessObject(HasGeneric[T]):
         if existing is not None:
             return existing
 
-        dao_clazz = get_dao_class(type(source_object))
-        if dao_clazz is None:
-            raise NoDAOFoundDuringParsingError(source_object, type(self), None)
-
-        # Check for alternative mapping
+        # Check for alternative mapping relative to the chosen DAO class
         mapped_object = state.apply_alternative_mapping_if_needed(
             dao_clazz, source_object
         )
@@ -688,7 +711,7 @@ class DataAccessObject(HasGeneric[T]):
             state.register(source_object, mapped_object)
             return mapped_object
 
-        # Create new DAO instance
+        # Create new DAO instance of the requested class
         result = dao_clazz()
         state.register(source_object, result)
         if id(source_object) != id(mapped_object):

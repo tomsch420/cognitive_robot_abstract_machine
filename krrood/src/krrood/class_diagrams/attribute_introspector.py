@@ -52,10 +52,16 @@ class DataclassOnlyIntrospector(AttributeIntrospector):
     """Discover only public dataclass fields (no leading underscore)."""
 
     def discover(self, owner_cls: Type) -> List[DiscoveredAttribute]:
-        if is_dataclass(owner_cls):
+        from typing_extensions import get_origin
+        target_cls = owner_cls
+        origin = get_origin(owner_cls)
+        if origin is not None:
+            target_cls = origin
+
+        if is_dataclass(target_cls):
             return [
                 DiscoveredAttribute(public_name=f.name, field=f)
-                for f in dc_fields(owner_cls)
+                for f in dc_fields(target_cls)
                 if not self.skip_field(f)
             ]
         else:

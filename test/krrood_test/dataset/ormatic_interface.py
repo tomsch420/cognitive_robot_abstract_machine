@@ -239,6 +239,28 @@ class GenericClassDAO(
         Integer, primary_key=True, use_existing_column=True
     )
 
+    polymorphic_type: Mapped[str] = mapped_column(
+        String(255), nullable=False, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_on": "polymorphic_type",
+        "polymorphic_identity": "GenericClassDAO",
+    }
+
+
+class GenericClass_floatDAO(
+    Base, DataAccessObject[test.krrood_test.dataset.example_classes.GenericClass]
+):
+
+    __tablename__ = "GenericClass_floatDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    value: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+
 
 class GenericClassAssociationDAO(
     Base,
@@ -252,13 +274,13 @@ class GenericClassAssociationDAO(
     )
 
     associated_value_id: Mapped[int] = mapped_column(
-        ForeignKey("GenericClassDAO.database_id", use_alter=True),
+        ForeignKey("GenericClass_floatDAO.database_id", use_alter=True),
         nullable=True,
         use_existing_column=True,
     )
 
-    associated_value: Mapped[GenericClassDAO] = relationship(
-        "GenericClassDAO",
+    associated_value: Mapped[GenericClass_floatDAO] = relationship(
+        "GenericClass_floatDAO",
         uselist=False,
         foreign_keys=[associated_value_id],
         post_update=True,

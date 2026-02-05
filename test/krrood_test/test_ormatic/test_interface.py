@@ -734,7 +734,15 @@ def test_generic_class(session, database):
     assert GenericClassAssociationDAO.associated_value
 
     obj = GenericClassAssociation(GenericClass(1))
-    dao = to_dao(obj)
-    assert dao.associated_value
+    dao: GenericClassAssociationDAO = to_dao(obj)
+    assert isinstance(dao.associated_value, GenericClass_floatDAO)
+    assert dao.associated_value.value == 1
+
     session.add(dao)
     session.commit()
+
+    q = session.scalar(select(GenericClassAssociationDAO))
+    assert q.associated_value.value == 1
+
+    reconstructed = q.from_dao()
+    assert reconstructed == obj

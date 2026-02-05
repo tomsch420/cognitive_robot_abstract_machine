@@ -93,9 +93,6 @@ all_classes |= set(
 )
 all_classes |= set(classes_of_module(semantic_digital_twin.callbacks.callback))
 
-all_classes |= {
-    DerivativeMap,
-}
 
 # remove classes that should not be mapped
 all_classes -= {
@@ -138,7 +135,6 @@ def generate_orm():
         type_mappings=TypeDict(
             {
                 trimesh.Trimesh: semantic_digital_twin.orm.model.TrimeshType,
-                DerivativeMap[float]: sqlalchemy.types.JSON
             }
         ),
         alternative_mappings=alternative_mappings,

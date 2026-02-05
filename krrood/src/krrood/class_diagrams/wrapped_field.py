@@ -21,6 +21,7 @@ from typing_extensions import (
     TYPE_CHECKING,
     Optional,
     Union,
+    get_type_hints as typing_get_type_hints,
 )
 
 from .failures import MissingContainedTypeOfContainer
@@ -105,14 +106,52 @@ class WrappedField:
         """
         local_namespace = self._build_initial_namespace()
 
+        # Handle synthetic classes (GenericAlias)
+        clazz = self.clazz.clazz
+        origin = get_origin(clazz)
+        
+        # Determine the class to use for get_type_hints
+        hints_clazz = clazz
+        if origin is not None:
+            # For GenericAlias, we use the origin class to resolve hints
+            # but we'll need to map them back if we wanted the concrete types.
+            # Actually, get_type_hints(clazz) should work on GenericAlias in 3.10+, 
+            # but it seems to fail here. 
+            hints_clazz = origin
+
         while True:
             try:
-                return get_type_hints(self.clazz.clazz, localns=local_namespace)[
-                    self.field.name
-                ]
+                hints = typing_get_type_hints(hints_clazz, localns=local_namespace)
+                resolved = hints[self.field.name]
+
+                # If it's a synthetic class, we might need to substitute type parameters
+                if origin is not None:
+                    from typing import TypeVar
+                    type_params = origin.__parameters__
+                    type_args = get_args(clazz)
+                    substitution = dict(zip(type_params, type_args))
+
+                    def substitute(t):
+                        if isinstance(t, TypeVar):
+                            return substitution.get(t, t)
+                        origin_t = get_origin(t)
+                        if origin_t is not None:
+                            args = get_args(t)
+                            new_args = tuple(substitute(a) for a in args)
+                            return origin_t[new_args]
+                        return t
+
+                    resolved = substitute(resolved)
+
+                return resolved
             except NameError as e:
                 found_class = self._find_class_by_name(e.name)
                 local_namespace[e.name] = found_class
+            except Exception as e:
+                # In some cases get_type_hints might fail on GenericAlias in older python versions
+                # or if some types are not resolvable.
+                logging.error(f"Error resolving type for {self.clazz.clazz}.{self.field.name}: {e}")
+                raise
 
     def _build_initial_namespace(self) -> dict:
         """
@@ -215,8 +254,7 @@ class WrappedField:
             t = self.contained_type
         else:
             t = self.resolved_type
-        origin = get_origin(t)
-        return origin or t
+        return t
 
     @cached_property
     def is_role_taker(self) -> bool:

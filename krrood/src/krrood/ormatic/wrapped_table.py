@@ -4,7 +4,7 @@ import logging
 from dataclasses import dataclass, field
 from functools import cached_property, lru_cache
 
-from typing_extensions import List, Dict, TYPE_CHECKING, Optional, Set, Type
+from typing_extensions import List, Dict, TYPE_CHECKING, Optional, Set, Type, get_origin, get_args
 
 from .dao import AlternativeMapping
 from .utils import InheritanceStrategy
@@ -241,7 +241,15 @@ class WrappedTable:
 
     @cached_property
     def tablename(self):
-        result = self.wrapped_clazz.clazz.__name__
+        clazz = self.wrapped_clazz.clazz
+        origin = get_origin(clazz)
+        if origin is not None:
+            args = get_args(clazz)
+            arg_names = [arg.__name__ for arg in args if hasattr(arg, "__name__")]
+            if arg_names:
+                return f"{origin.__name__}_{'_'.join(arg_names)}DAO"
+
+        result = clazz.__name__
         result += "DAO"
         return result
 
@@ -289,6 +297,9 @@ class WrappedTable:
         """
         # Get the actual class from wrapped_clazz
         current_class = self.wrapped_clazz.clazz
+        origin = get_origin(current_class)
+        if origin is not None:
+            current_class = origin
 
         # Iterate through MRO, skipping the first element (the class itself)
         for parent_class in current_class.__mro__[1:]:
@@ -359,7 +370,12 @@ class WrappedTable:
         ``wrapped_tables`` are keyed by the original class nodes, even if an
         alternative mapping is used. This ensures we always use the correct key.
         """
-        if issubclass(wrapped.clazz, AlternativeMapping):
+        clazz = wrapped.clazz
+        origin = get_origin(clazz)
+        if origin is not None:
+            clazz = origin
+
+        if issubclass(clazz, AlternativeMapping):
             for rel in self.ormatic.alternatively_maps_relations:
                 if rel.source == wrapped:
                     return rel.target
@@ -367,18 +383,31 @@ class WrappedTable:
 
     @property
     def is_alternatively_mapped(self):
-        return issubclass(self.wrapped_clazz.clazz, AlternativeMapping)
+        clazz = self.wrapped_clazz.clazz
+        origin = get_origin(clazz)
+        if origin is not None:
+            clazz = origin
+        return issubclass(clazz, AlternativeMapping)
 
     @cached_property
     def fields(self) -> List[WrappedField]:
         """
         :return: The list of fields specified only in this associated dataclass that should be mapped.
         """
+        clazz = self.wrapped_clazz.clazz
+        origin = get_origin(clazz)
 
         # Collect all inherited field names up the chain
         inherited_names: set[str] = set()
         p = self.parent_table
         while p is not None:
+            # Special case for synthetic nodes of generic classes
+            # They should not "inherit" fields from their origin class for table column purposes
+            # because we want them to redefine these fields with concrete types.
+            if origin is not None and p.wrapped_clazz.clazz is origin:
+                p = p.parent_table
+                continue
+
             # Use the original dataclass fields of each ancestor
             inherited_names.update(f.field.name for f in p.wrapped_clazz.fields)
             p = p.parent_table

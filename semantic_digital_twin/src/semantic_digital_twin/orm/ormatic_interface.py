@@ -30,7 +30,6 @@ import semantic_digital_twin.robots.abstract_robot
 import semantic_digital_twin.robots.hsrb
 import semantic_digital_twin.semantic_annotations.mixins
 import semantic_digital_twin.semantic_annotations.semantic_annotations
-import semantic_digital_twin.spatial_types.derivatives
 import semantic_digital_twin.world
 import semantic_digital_twin.world_description.connections
 import semantic_digital_twin.world_description.degree_of_freedom
@@ -52,7 +51,6 @@ from krrood.ormatic.custom_types import TypeType
 class Base(DeclarativeBase):
     type_mappings = {
         trimesh.base.Trimesh: semantic_digital_twin.orm.model.TrimeshType,
-        semantic_digital_twin.spatial_types.derivatives.DerivativeMap: sqlalchemy.sql.sqltypes.JSON,
         typing.Type: krrood.ormatic.custom_types.TypeType,
         enum.Enum: krrood.ormatic.custom_types.PolymorphicEnumType,
         krrood.adapters.json_serializer.SubclassJSONSerializer: sqlalchemy.sql.sqltypes.JSON,
@@ -434,18 +432,6 @@ class DegreeOfFreedomLimitsDAO(
 ):
 
     __tablename__ = "DegreeOfFreedomLimitsDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        Integer, primary_key=True, use_existing_column=True
-    )
-
-
-class DerivativeMapDAO(
-    Base,
-    DataAccessObject[semantic_digital_twin.spatial_types.derivatives.DerivativeMap],
-):
-
-    __tablename__ = "DerivativeMapDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
         Integer, primary_key=True, use_existing_column=True
