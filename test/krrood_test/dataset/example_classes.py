@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum, auto
 from types import FunctionType
-from typing import Set
+from typing import Set, Generic
 
 from sqlalchemy import types, TypeDecorator, JSON
 from typing_extensions import Dict, Any, Sequence, Self
@@ -674,3 +674,11 @@ class ChildEnum2(PolymorphicEnum):
 @dataclass
 class PolymorphicEnumAssociation:
     value: PolymorphicEnum
+
+@dataclass
+class GenericClass(Generic[T]):
+    value: T
+
+@dataclass
+class GenericClassAssociation:
+    associated_value: GenericClass[float]

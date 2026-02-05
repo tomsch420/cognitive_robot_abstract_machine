@@ -87,12 +87,12 @@ class DegreeOfFreedomLimits:
     A class representing the limits of a degree of freedom.
     """
 
-    lower: DerivativeMap[float] = field(default_factory=DerivativeMap)
+    lower: DerivativeMap[float] = field(default=None)
     """
     Lower limits of the degree of freedom.
     """
 
-    upper: DerivativeMap[float] = field(default_factory=DerivativeMap)
+    upper: DerivativeMap[float] = field(default=None)
     """
     Upper limits of the degree of freedom.
     """
@@ -117,7 +117,7 @@ class DegreeOfFreedom(WorldEntityWithID, SubclassJSONSerializer):
     and provides methods to get and set limits for these derivatives.
     """
 
-    limits: DegreeOfFreedomLimits = field(default_factory=DegreeOfFreedomLimits)
+    limits: DegreeOfFreedomLimits = field(default=None)
     """
     Lower and upper bounds for each derivative
     """

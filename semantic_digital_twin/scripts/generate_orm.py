@@ -7,6 +7,7 @@
 # ----------------------------------------------------------------------------------------------------------------------
 from __future__ import annotations
 
+import logging
 import os
 import uuid
 from dataclasses import is_dataclass
@@ -81,7 +82,6 @@ all_classes |= set(
 all_classes |= set(classes_of_module(semantic_digital_twin.robots.abstract_robot))
 all_classes |= set(classes_of_module(semantic_digital_twin.datastructures.definitions))
 all_classes |= set(classes_of_module(semantic_digital_twin.robots.hsrb))
-# classes |= set(recursive_subclasses(ViewFactory))
 all_classes |= {SimulatorAdditionalProperty}
 all_classes |= set(classes_of_module(semantic_digital_twin.reasoning.predicates))
 all_classes |= set(classes_of_module(semantic_digital_twin.semantic_annotations.mixins))
@@ -92,6 +92,10 @@ all_classes |= set(
     classes_of_module(semantic_digital_twin.world_description.world_modification)
 )
 all_classes |= set(classes_of_module(semantic_digital_twin.callbacks.callback))
+
+all_classes |= {
+    DerivativeMap,
+}
 
 # remove classes that should not be mapped
 all_classes -= {
@@ -123,6 +127,8 @@ def generate_orm():
     """
     Generate the ORM classes for the pycram package.
     """
+
+
     class_diagram = ClassDiagram(
         list(sorted(all_classes, key=lambda c: c.__name__, reverse=True))
     )
@@ -132,11 +138,14 @@ def generate_orm():
         type_mappings=TypeDict(
             {
                 trimesh.Trimesh: semantic_digital_twin.orm.model.TrimeshType,
+                DerivativeMap[float]: sqlalchemy.types.JSON
             }
         ),
         alternative_mappings=alternative_mappings,
     )
 
+    logging.basicConfig(level=logging.INFO)
+    logging.getLogger("krrood").setLevel(logging.INFO)
     instance.make_all_tables()
 
     script_dir = os.path.dirname(os.path.abspath(__file__))
