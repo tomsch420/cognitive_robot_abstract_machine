@@ -4216,6 +4216,82 @@ class RoomDAO(
     }
 
 
+class BathroomDAO(
+    RoomDAO,
+    DataAccessObject[
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Bathroom
+    ],
+):
+
+    __tablename__ = "BathroomDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(RoomDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "BathroomDAO",
+        "inherit_condition": database_id == RoomDAO.database_id,
+    }
+
+
+class BedroomDAO(
+    RoomDAO,
+    DataAccessObject[
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Bedroom
+    ],
+):
+
+    __tablename__ = "BedroomDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(RoomDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "BedroomDAO",
+        "inherit_condition": database_id == RoomDAO.database_id,
+    }
+
+
+class KitchenDAO(
+    RoomDAO,
+    DataAccessObject[
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Kitchen
+    ],
+):
+
+    __tablename__ = "KitchenDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(RoomDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "KitchenDAO",
+        "inherit_condition": database_id == RoomDAO.database_id,
+    }
+
+
+class LivingRoomDAO(
+    RoomDAO,
+    DataAccessObject[
+        semantic_digital_twin.semantic_annotations.semantic_annotations.LivingRoom
+    ],
+):
+
+    __tablename__ = "LivingRoomDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(RoomDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "LivingRoomDAO",
+        "inherit_condition": database_id == RoomDAO.database_id,
+    }
+
+
 class RootedSemanticAnnotationDAO(
     SemanticAnnotationDAO,
     DataAccessObject[
