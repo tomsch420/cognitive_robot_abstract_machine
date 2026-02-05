@@ -87,19 +87,15 @@ class DegreeOfFreedomLimits:
     A class representing the limits of a degree of freedom.
     """
 
-    lower: DerivativeMap[float] = field(default=None)
+    lower: DerivativeMap[float] = field(default_factory=DerivativeMap)
     """
     Lower limits of the degree of freedom.
     """
 
-    upper: DerivativeMap[float] = field(default=None)
+    upper: DerivativeMap[float] = field(default_factory=DerivativeMap)
     """
     Upper limits of the degree of freedom.
     """
-
-    def __post_init__(self):
-        self.lower = self.lower or DerivativeMap()
-        self.upper = self.upper or DerivativeMap()
 
     def __deepcopy__(self, memo):
         return DegreeOfFreedomLimits(
@@ -117,7 +113,7 @@ class DegreeOfFreedom(WorldEntityWithID, SubclassJSONSerializer):
     and provides methods to get and set limits for these derivatives.
     """
 
-    limits: DegreeOfFreedomLimits = field(default=None)
+    limits: DegreeOfFreedomLimits = field(default_factory=DegreeOfFreedomLimits)
     """
     Lower and upper bounds for each derivative
     """
@@ -141,7 +137,6 @@ class DegreeOfFreedom(WorldEntityWithID, SubclassJSONSerializer):
     """
 
     def __post_init__(self):
-        self.limits = self.limits or DegreeOfFreedomLimits()
         lower = self.limits.lower.position
         upper = self.limits.upper.position
         if lower is not None and upper is not None and lower > upper:
