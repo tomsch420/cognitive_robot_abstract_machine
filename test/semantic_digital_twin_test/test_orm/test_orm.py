@@ -9,8 +9,10 @@ from sqlalchemy.orm import Session
 
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.orm.utils import semantic_digital_twin_sessionmaker
+from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import RevoluteConnection
+from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedomLimits
 from semantic_digital_twin.world_description.geometry import Box, Scale, Color
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types.spatial_types import (
@@ -117,3 +119,16 @@ def test_insert(session):
 def test_sessionmaker():
     s = semantic_digital_twin_sessionmaker()()
     assert s is not None
+
+def test_degree_of_freedom_limits(session):
+    lower = DerivativeMap()
+    lower.position = -2
+    lower.jerk = 1
+
+    upper = DerivativeMap()
+    upper.position = 2
+    upper.velocity = 3
+    obj = DegreeOfFreedomLimits(lower=lower, upper=upper)
+    dao = to_dao(obj)
+    reconstructed = dao.from_dao()
+    assert reconstructed == obj
