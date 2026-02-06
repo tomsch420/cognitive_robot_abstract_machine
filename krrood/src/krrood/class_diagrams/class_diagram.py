@@ -33,7 +33,6 @@ from typing_extensions import (
 from .attribute_introspector import (
     AttributeIntrospector,
     DataclassOnlyIntrospector,
-    SpecializedGenericDataclassIntrospector,
 )
 from .utils import Role, get_generic_type_param
 from .wrapped_field import WrappedField
