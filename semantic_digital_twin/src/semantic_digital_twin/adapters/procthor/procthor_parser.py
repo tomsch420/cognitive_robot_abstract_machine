@@ -270,10 +270,6 @@ class ProcthorDoor:
                     upper=upper_limits,
                 ),
             )
-
-        with world.modify_world():
-            aperture = door.entry_way
-
             door.add_hinge(hinge)
         return door
 
@@ -478,7 +474,7 @@ class ProcthorRoom:
 
     centered_polytope: List[Point3] = field(init=False)
     """
-    Polytope representing the room's floor world_T_parent_wallpolygon, centered around its local 0, 0, 0 coordinate
+    Polytope representing the room's floor polygon, centered around its local 0, 0, 0 coordinate
     """
 
     def __post_init__(self):
