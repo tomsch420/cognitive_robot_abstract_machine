@@ -156,7 +156,6 @@ class ProcthorDoor:
         Parses the parameters according to the double door assumptions, and returns a double door factory.
         """
         one_door_scale = Scale(self.thickness, self.scale.y * 0.5, self.scale.z)
-        x_direction: float = one_door_scale.x / 2
         y_direction: float = one_door_scale.y / 2
         handle_directions = [Vector3.Y(), Vector3.NEGATIVE_Y()]
 
@@ -181,7 +180,6 @@ class ProcthorDoor:
             )
 
             door_T_single_door = HomogeneousTransformationMatrix.from_xyz_rpy(
-                x=x_direction,
                 y=(
                     (-y_direction)
                     if np.allclose(direction, Vector3.Y())
@@ -229,7 +227,11 @@ class ProcthorDoor:
             scale.to_simple_event().as_composite_set().marginal(SpatialVariables.yz)
         )
         door_T_handle = HomogeneousTransformationMatrix.from_xyz_rpy(
-            x=-(scale.x / 2), y=sampled_2d_point[0], z=sampled_2d_point[1], yaw=np.pi
+            x=-(scale.x / 2),
+            y=sampled_2d_point[0],
+            z=sampled_2d_point[1],
+            yaw=np.pi,
+            roll=np.pi / 2,
         )
 
         world_T_door = world_T_door or self.world_T_parent_wall @ self.wall_T_door
