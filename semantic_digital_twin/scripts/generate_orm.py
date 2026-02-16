@@ -56,6 +56,7 @@ from semantic_digital_twin.world_description.world_modification import (
     AttributeUpdateModification,
 )
 import semantic_digital_twin.robots.hsrb
+import semantic_digital_twin.robots.pr2
 
 all_classes = set(
     classes_of_module(semantic_digital_twin.world_description.world_entity)
@@ -82,6 +83,8 @@ all_classes |= set(
 all_classes |= set(classes_of_module(semantic_digital_twin.robots.abstract_robot))
 all_classes |= set(classes_of_module(semantic_digital_twin.datastructures.definitions))
 all_classes |= set(classes_of_module(semantic_digital_twin.robots.hsrb))
+all_classes |= set(classes_of_module(semantic_digital_twin.robots.pr2))
+# classes |= set(recursive_subclasses(ViewFactory))
 all_classes |= {SimulatorAdditionalProperty}
 all_classes |= set(classes_of_module(semantic_digital_twin.reasoning.predicates))
 all_classes |= set(classes_of_module(semantic_digital_twin.semantic_annotations.mixins))
@@ -92,7 +95,6 @@ all_classes |= set(
     classes_of_module(semantic_digital_twin.world_description.world_modification)
 )
 all_classes |= set(classes_of_module(semantic_digital_twin.callbacks.callback))
-
 
 # remove classes that should not be mapped
 all_classes -= {
@@ -125,6 +127,8 @@ def generate_orm():
     Generate the ORM classes for the pycram package.
     """
 
+    logging.basicConfig(level=logging.INFO)  # Or your preferred config
+    logging.getLogger("krrood").setLevel(logging.DEBUG)
 
     class_diagram = ClassDiagram(
         list(sorted(all_classes, key=lambda c: c.__name__, reverse=True))
@@ -139,9 +143,6 @@ def generate_orm():
         ),
         alternative_mappings=alternative_mappings,
     )
-
-    logging.basicConfig(level=logging.INFO)
-    logging.getLogger("krrood").setLevel(logging.INFO)
     instance.make_all_tables()
 
     script_dir = os.path.dirname(os.path.abspath(__file__))

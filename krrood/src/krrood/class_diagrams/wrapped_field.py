@@ -8,8 +8,10 @@ from collections.abc import Sequence
 from dataclasses import dataclass, Field, MISSING
 from datetime import datetime
 from functools import cached_property, lru_cache
-from types import NoneType
+from inspect import isclass
+from types import NoneType, GenericAlias
 from copy import copy
+from typing import Generic
 
 from typing_extensions import (
     get_type_hints,
@@ -21,7 +23,6 @@ from typing_extensions import (
     TYPE_CHECKING,
     Optional,
     Union,
-    get_type_hints as typing_get_type_hints,
 )
 
 from .failures import MissingContainedTypeOfContainer
@@ -100,58 +101,31 @@ class WrappedField:
         """
         Resolve the type hint for this field.
 
-        Handles forward references by iteratively building a namespace with
-        classes from the class diagram and sys.modules until all references
-        are resolved.
+        If the field's type is already a concrete (non-string) type hint,
+        return it directly. Otherwise, resolve forward references by
+        iteratively building a namespace with classes from the class diagram
+        and sys.modules until all references are resolved.
         """
+        # Fast path: already-resolved type (e.g., provided by specialized generic introspector)
+        if not isinstance(self.field.type, str):
+            return self.field.type
+
         local_namespace = self._build_initial_namespace()
 
-        # Handle synthetic classes (GenericAlias)
+        # If it's a specialized generic, use its origin for get_type_hints
         clazz = self.clazz.clazz
+        # If the class itself is a specialized generic (typing.GenericAlias),
+        # get_type_hints will fail. We use the origin class instead.
         origin = get_origin(clazz)
-        
-        # Determine the class to use for get_type_hints
-        hints_clazz = clazz
-        if origin is not None:
-            # For GenericAlias, we use the origin class to resolve hints
-            # but we'll need to map them back if we wanted the concrete types.
-            # Actually, get_type_hints(clazz) should work on GenericAlias in 3.10+, 
-            # but it seems to fail here. 
-            hints_clazz = origin
+        if origin is not None and not isinstance(clazz, type):
+            clazz = origin
 
         while True:
             try:
-                hints = typing_get_type_hints(hints_clazz, localns=local_namespace)
-                resolved = hints[self.field.name]
-
-                # If it's a synthetic class, we might need to substitute type parameters
-                if origin is not None:
-                    from typing import TypeVar
-                    type_params = origin.__parameters__
-                    type_args = get_args(clazz)
-                    substitution = dict(zip(type_params, type_args))
-
-                    def substitute(t):
-                        if isinstance(t, TypeVar):
-                            return substitution.get(t, t)
-                        origin_t = get_origin(t)
-                        if origin_t is not None:
-                            args = get_args(t)
-                            new_args = tuple(substitute(a) for a in args)
-                            return origin_t[new_args]
-                        return t
-
-                    resolved = substitute(resolved)
-
-                return resolved
+                return get_type_hints(clazz, localns=local_namespace)[self.field.name]
             except NameError as e:
                 found_class = self._find_class_by_name(e.name)
                 local_namespace[e.name] = found_class
-            except Exception as e:
-                # In some cases get_type_hints might fail on GenericAlias in older python versions
-                # or if some types are not resolvable.
-                logging.error(f"Error resolving type for {self.clazz.clazz}.{self.field.name}: {e}")
-                raise
 
     def _build_initial_namespace(self) -> dict:
         """
@@ -251,10 +225,9 @@ class WrappedField:
     @cached_property
     def type_endpoint(self) -> Type:
         if self.is_container or self.is_optional:
-            t = self.contained_type
+            return self.contained_type
         else:
-            t = self.resolved_type
-        return t
+            return self.resolved_type
 
     @cached_property
     def is_role_taker(self) -> bool:
@@ -264,6 +237,43 @@ class WrappedField:
             and self.field.default == MISSING
             and self.field.default_factory == MISSING
         )
+
+    @cached_property
+    def is_instantiation_of_generic_class(self) -> bool:
+        """
+        Check if a type hint is a full parameterization of a generic class.
+        For example, `GenericClass[int]` is a full parameterization, but `GenericClass` is not.
+
+        :return: True if the type hint is a full parameterization of a generic class.
+        """
+        origin = get_origin(self.type_endpoint)
+        if origin is None:
+            return False
+        if not isclass(origin) or not issubclass(origin, Generic):
+            return False
+        return len(get_args(self.type_endpoint)) > 0
+
+    @cached_property
+    def is_underspecified_generic(self) -> bool:
+        """
+        Check if a type hint is an underspecified generic class.
+        For example, `GenericClass` is underspecified, but `GenericClass[int]` is not.
+
+        :return: True if the type hint is an underspecified generic class.
+        """
+        # If it's a class and it inherits from Generic but has no arguments
+        if inspect.isclass(self.type_endpoint) and issubclass(
+            self.type_endpoint, Generic
+        ):
+            return True
+
+        # Also check if it's a GenericAlias with empty args (though usually origin is used then)
+        origin = get_origin(self.type_endpoint)
+
+        if origin is None or not isclass(origin):
+            return False
+
+        return issubclass(origin, Generic) and len(get_args(self.type_endpoint)) == 0
 
 
 @lru_cache(maxsize=None)
