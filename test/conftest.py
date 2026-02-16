@@ -14,10 +14,7 @@ from krrood.ontomatic.property_descriptor.attribute_introspector import (
     DescriptorAwareIntrospector,
 )
 from krrood.utils import recursive_subclasses
-try:
-    from pycram.datastructures.dataclasses import Context  # type: ignore
-except Exception:  # pragma: no cover - optional dependency may be missing in isolated runs
-    Context = None
+from pycram.datastructures.dataclasses import Context  # type: ignore
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
