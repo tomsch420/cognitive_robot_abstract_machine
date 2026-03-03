@@ -62,6 +62,56 @@ query = entity(r)
 If you need to select multiple variables at once, use {py:func}`~krrood.entity_query_language.factories.set_of` instead.
 ```
 
+## Aliasing and Named Results
+
+When selecting multiple variables or complex expressions using `set_of()`, the query returns a result set where each item is a dictionary-like object (`UnificationDict`). To make it easier to refer to these results—both within the query and when iterating over results—you can use **aliasing**.
+
+EQL supports both the walrus operator (`:=`) and standard Python assignment (`=`) for this purpose.
+
+### 1. Inline Aliasing with the Walrus Operator (`:=`)
+The walrus operator (available in Python 3.8+) is the most concise way to alias an expression directly within the selection function.
+
+```python
+from krrood.entity_query_language.factories import set_of, count
+
+# Alias the count(r) expression to 'c' inline
+query = set_of(r.type, c := count(r)).grouped_by(r.type)
+
+for result in query.evaluate():
+    # Use the alias 'c' to index the result dictionary
+    print(f"Type: {result[r.type]} | Count: {result[c]}")
+```
+
+### 2. Aliasing with Normal Assignment (`=`)
+Alternatively, you can assign a symbolic expression to a Python variable before passing it to the query:
+
+```python
+# Define the alias before the query
+avg_batt = average(r.battery)
+query = set_of(r.type, avg_batt).grouped_by(r.type)
+
+for result in query.evaluate():
+    # Use the 'avg_batt' variable to access the result
+    print(f"Type: {result[r.type]} | Average Battery: {result[avg_batt]}%")
+```
+
+### Why use Aliasing?
+1.  **Readability**: Shorter names make complex queries easier to follow.
+2.  **Result Access**: It provides a clear handle for retrieving values from the result dictionary.
+3.  **Code Reuse**: You can define an expression once and use it in multiple parts of the query, such as in `.where()`, `.having()`, or `.ordered_by()`.
+
+```python
+# Using an alias in multiple places
+query = set_of(r.type, c := count(r)) \
+    .grouped_by(r.type) \
+    .having(c > 5) \
+    .ordered_by(c, descending=True)
+```
+
+```{note}
+Aliasing is especially powerful when combined with {doc}`aggregations <aggregators>`, as it allows you to name the summary statistics you calculate.
+```
+
 ## Adding Filters with `.where()`
 
 The `.where()` method is used to add constraints to your query. You can pass multiple conditions, which are treated as
