@@ -121,7 +121,9 @@ class ProbabilisticBackend(GenerativeBackend):
         example_instance = self._generate_instance_from_match(expression)
 
         # translate where conditions to random event
-        random_events_translator = QueryToRandomEventTranslator(expression.expression)
+        random_events_translator = QueryToRandomEventTranslator(
+            expression.expression._conditions_root_
+        )
         truncation_event = random_events_translator.translate()
 
         # generate parameters from example instance values

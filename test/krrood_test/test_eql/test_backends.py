@@ -51,7 +51,7 @@ def test_same_query_multiple_domains(session, database):
 
     prob_q = underspecified_pose(
         position=underspecified(Position)(x=..., y=..., z=...),
-        orientation=underspecified(Orientation)(x=0.0, y=0.0, z=0.0, w=1.0),
+        orientation=Orientation(x=0.0, y=0.0, z=0.0, w=1.0),
     ).where(underspecified_pose.variable.position.x > 0.5)
 
     parameters = MatchParameterizer(
