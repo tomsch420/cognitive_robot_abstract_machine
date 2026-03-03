@@ -19,7 +19,7 @@ Entity Query Language (EQL) embraces the relational model. It rethinks relationa
 EQL does not attempt to replace Python with a domain-specific language. It makes Python itself the query language.
 
 Where SQL requires explicit joins and table navigation, EQL treats relationships as natural object references.
-Traversal replaces joins. Structure replaces ceremony.
+Traversal replaces joins. Structure replaces boilerplate.
 
 ## EQL is Pythonic First
 
@@ -28,18 +28,19 @@ EQL is not a string-based query system. Queries are written directly in Python s
 There is no artificial boundary between “query language” and “application language.”
 If you can write a Python function, you can use it inside a query.
 
-EQL assumes that Python is expressive enough — and builds on that expressiveness rather than hiding it.
+EQL takes the expressivity of Python and builds on that rather than hiding it.
 
 ## EQL Eliminates the Representation Layer
 
-Traditional systems often introduce an additional abstraction layer such as an ORM. EQL does not.
+Traditional systems often introduce an additional abstraction layer (a DDL) and another intermediary that links between
+these two representations (e.g., ORM). EQL does not.
 
 EQL operates directly on user-defined objects.
 There is no need to map entities into tables, nor to maintain a separate relational representation.
 
 Objects remain objects. The data model you design is the data model you query.
 
-## EQL Prefers Intent Over Ceremony
+## EQL is Declarative (What not How you want it)
 
 The core principle of EQL is minimal extra detail.
 
