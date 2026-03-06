@@ -74,7 +74,7 @@ class Handle(HasRootBody):
         connection_multiplier: float = 1.0,
         connection_offset: float = 0.0,
         *,
-        scale: Scale = Scale(0.05, 0.1, 0.02),
+        scale: Scale = Scale(0.05, 0.02, 0.1),
         thickness: float = 0.005,
     ) -> Self:
         handle_event = cls._create_handle_geometry(scale=scale).as_composite_set()
@@ -108,11 +108,11 @@ class Handle(HasRootBody):
 
         x_interval = closed(-(scale.x - thickness), 0)
         y_interval = closed(
-            -scale.y / 2 + thickness,
-            scale.y / 2 - thickness,
+            -scale.y / 2,
+            scale.y / 2,
         )
 
-        z_interval = closed(-scale.z / 2, scale.z / 2)
+        z_interval = closed(-scale.z / 2 + thickness, scale.z / 2 - thickness)
 
         return SimpleEvent(
             {
@@ -247,6 +247,7 @@ class Door(HasHandle, HasHinge):
             name=entry_way_region_name,
             area=ShapeCollection([TriangleMesh(mesh=door_body.combined_mesh)]),
         )
+        entry_way_region.area.transform_all_shapes_to_own_frame()
         entry_way = EntryWay(name=entry_way_name, root=entry_way_region)
         world.add_region(entry_way.root)
         world.add_connection(FixedConnection(door_body, entry_way.root))
