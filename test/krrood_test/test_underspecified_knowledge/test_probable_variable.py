@@ -188,8 +188,7 @@ def test_underspecified_with_list():
 
     q._update_kwargs_from_literal_values()
 
-    print(q.kwargs)
-    print(q.kwargs["positions"][0].kwargs)
-
+    assert q.kwargs["positions"][0].kwargs == {"x": 1.0, "y": 0.0, "z": 0.0}
+    assert q.factory == Positions
     r = q.construct_instance()
-    assert r == Positions([Position(0.0, 0.0, 0.0), Position(1, 2, 3)], ["a", "b"])
+    assert r == Positions([Position(1.0, 0.0, 0.0), Position(1, 2, 3)], ["a", "b"])

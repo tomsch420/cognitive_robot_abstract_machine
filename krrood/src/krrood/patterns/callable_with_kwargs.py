@@ -39,10 +39,10 @@ class HasFactoryAndKwargs(Generic[T]):
                     self._recurse_construct_instance_and_get_value(element)
                     for element in value
                 )
-
-            constructed_kwargs[key] = self._recurse_construct_instance_and_get_value(
-                value
-            )
+            else:
+                constructed_kwargs[key] = (
+                    self._recurse_construct_instance_and_get_value(value)
+                )
         return self.factory(**constructed_kwargs)
 
     def _recurse_construct_instance_and_get_value(self, value: Any):

@@ -496,9 +496,16 @@ class AttributeMatch(AbstractMatchExpression[T]):
                 assert_never(step)
 
         final_step = self.variable._access_path_[-1]
-        final_step._apply_final_operation_set_external_instance_value_(
-            current_value, self.assigned_variable._value_
-        )
+
+        if isinstance(final_step, Attribute):
+            current_value.kwargs[final_step._attribute_name_] = (
+                self.assigned_variable._value_
+            )
+        else:
+
+            final_step._apply_final_operation_set_external_instance_value_(
+                current_value, self.assigned_variable._value_
+            )
 
 
 def construct_graph_and_get_root(
