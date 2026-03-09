@@ -17,7 +17,7 @@ from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
 )
 from semantic_digital_twin.spatial_types.spatial_types import Quaternion, Pose
-from semantic_digital_twin.world import World
+from semantic_digital_twin.world import World, WorldModelManager
 from semantic_digital_twin.world_description.connections import Connection
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 from semantic_digital_twin.world_description.world_entity import (

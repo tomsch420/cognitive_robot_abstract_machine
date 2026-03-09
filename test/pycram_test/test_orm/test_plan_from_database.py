@@ -5,7 +5,7 @@ from sqlalchemy import select, text
 # The alternative mapping needs to be imported for the stretch to work properly
 import pycram.alternative_motion_mappings.stretch_motion_mapping  # type: ignore
 import pycram.alternative_motion_mappings.tiago_motion_mapping  # type: ignore
-from krrood.ormatic.dao import to_dao
+from krrood.ormatic.dao import to_dao, get_dao_class
 from pycram.datastructures.dataclasses import Context
 from pycram.datastructures.enums import (
     ApproachDirection,
@@ -35,6 +35,7 @@ from pycram.robot_plans import (
     PlaceAction,
 )
 from semantic_digital_twin.datastructures.definitions import TorsoState, GripperState
+from semantic_digital_twin.world import World
 
 
 def test_pick_up_action_and_replay_from_db(pycram_testing_session, mutable_model_world):
@@ -68,8 +69,14 @@ def test_pick_up_action_and_replay_from_db(pycram_testing_session, mutable_model
             ),
         )
         sp.perform()
-    dao = to_dao(sp)
+
+    dao: PlanMappingDAO = to_dao(sp)
+
     session.add(dao)
     session.commit()
     result = session.scalars(select(PlanMappingDAO)).first()
-    print(result)
+
+    world_from_database: World = result.context.world.from_dao()
+    assert len(world_from_database._model_manager.model_modification_blocks) == len(
+        world._model_manager.model_modification_blocks
+    )

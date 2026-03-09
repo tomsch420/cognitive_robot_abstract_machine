@@ -62,6 +62,7 @@ import semantic_digital_twin.robots.pr2
 import semantic_digital_twin.semantic_annotations.mixins
 import semantic_digital_twin.semantic_annotations.semantic_annotations
 import semantic_digital_twin.spatial_types.derivatives
+import semantic_digital_twin.world
 import semantic_digital_twin.world_description.connections
 import semantic_digital_twin.world_description.degree_of_freedom
 import semantic_digital_twin.world_description.geometry
@@ -93,7 +94,7 @@ class Base(DeclarativeBase):
 # Association tables for many-to-many relationships
 class CollisionGroupDAO_bodies_association(Base, AssociationDataAccessObject):
 
-    __tablename__ = "CollisionGroupDAO_bodies_association"
+    __tablename__ = "_6651560701151009658"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     source_collisiongroupdao_id: Mapped[int] = mapped_column(
@@ -108,7 +109,7 @@ class CollisionMatrixDAO_collision_checks_association(
     Base, AssociationDataAccessObject
 ):
 
-    __tablename__ = "CollisionMatrixDAO_collision_checks_association"
+    __tablename__ = "_-4438850945533142970"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     source_collisionmatrixdao_id: Mapped[int] = mapped_column(
@@ -127,7 +128,7 @@ class AllowAlwaysInCollisionDAO_collision_checks_association(
     Base, AssociationDataAccessObject
 ):
 
-    __tablename__ = "AllowAlwaysInCollisionDAO_collision_checks_association"
+    __tablename__ = "_-1041169016181290690"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     source_allowalwaysincollisiondao_id: Mapped[int] = mapped_column(
@@ -146,7 +147,7 @@ class AllowCollisionBetweenGroupsDAO_body_group_a_association(
     Base, AssociationDataAccessObject
 ):
 
-    __tablename__ = "AllowCollisionBetweenGroupsDAO_body_group_a_association"
+    __tablename__ = "_6118959141192919777"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     source_allowcollisionbetweengroupsdao_id: Mapped[int] = mapped_column(
@@ -161,7 +162,7 @@ class AllowCollisionBetweenGroupsDAO_body_group_b_association(
     Base, AssociationDataAccessObject
 ):
 
-    __tablename__ = "AllowCollisionBetweenGroupsDAO_body_group_b_association"
+    __tablename__ = "_128745082299541496"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     source_allowcollisionbetweengroupsdao_id: Mapped[int] = mapped_column(
@@ -176,7 +177,7 @@ class AllowCollisionForBodiesDAO_allowed_collision_bodies_association(
     Base, AssociationDataAccessObject
 ):
 
-    __tablename__ = "AllowCollisionForBodiesDAO_allowed_collision_bodies_association"
+    __tablename__ = "_-8396057250776889163"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     source_allowcollisionforbodiesdao_id: Mapped[int] = mapped_column(
@@ -189,7 +190,7 @@ class AllowCollisionForBodiesDAO_allowed_collision_bodies_association(
 
 class AllowDefaultInCollisionDAO_bodies_association(Base, AssociationDataAccessObject):
 
-    __tablename__ = "AllowDefaultInCollisionDAO_bodies_association"
+    __tablename__ = "_8773484732103159150"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     source_allowdefaultincollisiondao_id: Mapped[int] = mapped_column(
@@ -204,7 +205,7 @@ class AllowNeverInCollisionDAO_collision_checks_association(
     Base, AssociationDataAccessObject
 ):
 
-    __tablename__ = "AllowNeverInCollisionDAO_collision_checks_association"
+    __tablename__ = "_8717764659907089533"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     source_allowneverincollisiondao_id: Mapped[int] = mapped_column(
@@ -223,7 +224,7 @@ class AvoidCollisionBetweenGroupsDAO_body_group_a_association(
     Base, AssociationDataAccessObject
 ):
 
-    __tablename__ = "AvoidCollisionBetweenGroupsDAO_body_group_a_association"
+    __tablename__ = "_2870514893568066758"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     source_avoidcollisionbetweengroupsdao_id: Mapped[int] = mapped_column(
@@ -238,7 +239,7 @@ class AvoidCollisionBetweenGroupsDAO_body_group_b_association(
     Base, AssociationDataAccessObject
 ):
 
-    __tablename__ = "AvoidCollisionBetweenGroupsDAO_body_group_b_association"
+    __tablename__ = "_-248624949773371819"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     source_avoidcollisionbetweengroupsdao_id: Mapped[int] = mapped_column(
@@ -253,7 +254,7 @@ class ExecutionDataDAO_added_world_modifications_association(
     Base, AssociationDataAccessObject
 ):
 
-    __tablename__ = "ExecutionDataDAO_added_world_modifications_association"
+    __tablename__ = "_-6022619246544885834"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     source_executiondatadao_id: Mapped[int] = mapped_column(
@@ -271,7 +272,7 @@ class ExecutionDataDAO_added_world_modifications_association(
 
 class JointStateDAO_connections_association(Base, AssociationDataAccessObject):
 
-    __tablename__ = "JointStateDAO_connections_association"
+    __tablename__ = "_780666265237530544"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     source_jointstatedao_id: Mapped[int] = mapped_column(
@@ -290,7 +291,7 @@ class MaxAvoidedCollisionsOverrideDAO_bodies_association(
     Base, AssociationDataAccessObject
 ):
 
-    __tablename__ = "MaxAvoidedCollisionsOverrideDAO_bodies_association"
+    __tablename__ = "_1959281119843475317"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     source_maxavoidedcollisionsoverridedao_id: Mapped[int] = mapped_column(
@@ -305,7 +306,7 @@ class MoveTCPWaypointsMotionDAO_waypoints_association(
     Base, AssociationDataAccessObject
 ):
 
-    __tablename__ = "MoveTCPWaypointsMotionDAO_waypoints_association"
+    __tablename__ = "_1336268579263624595"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     source_movetcpwaypointsmotiondao_id: Mapped[int] = mapped_column(
@@ -322,7 +323,7 @@ class MoveTCPWaypointsMotionDAO_waypoints_association(
 
 class PlanMappingDAO_nodes_association(Base, AssociationDataAccessObject):
 
-    __tablename__ = "PlanMappingDAO_nodes_association"
+    __tablename__ = "_-230110649413181348"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     source_planmappingdao_id: Mapped[int] = mapped_column(
@@ -339,7 +340,7 @@ class PlanMappingDAO_nodes_association(Base, AssociationDataAccessObject):
 
 class PlanMappingDAO_edges_association(Base, AssociationDataAccessObject):
 
-    __tablename__ = "PlanMappingDAO_edges_association"
+    __tablename__ = "_4070386673011774172"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     source_planmappingdao_id: Mapped[int] = mapped_column(
@@ -358,7 +359,7 @@ class ShapeDAO_simulator_additional_properties_association(
     Base, AssociationDataAccessObject
 ):
 
-    __tablename__ = "ShapeDAO_simulator_additional_properties_association"
+    __tablename__ = "_125630589827914232"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     source_shapedao_id: Mapped[int] = mapped_column(ForeignKey("ShapeDAO.database_id"))
@@ -374,7 +375,7 @@ class ShapeDAO_simulator_additional_properties_association(
 
 class ShapeCollectionDAO_shapes_association(Base, AssociationDataAccessObject):
 
-    __tablename__ = "ShapeCollectionDAO_shapes_association"
+    __tablename__ = "_-7581312489435577068"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     source_shapecollectiondao_id: Mapped[int] = mapped_column(
@@ -391,7 +392,7 @@ class WorldMappingDAO_kinematic_structure_entities_association(
     Base, AssociationDataAccessObject
 ):
 
-    __tablename__ = "WorldMappingDAO_kinematic_structure_entities_association"
+    __tablename__ = "_2444944903114132013"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     source_worldmappingdao_id: Mapped[int] = mapped_column(
@@ -409,7 +410,7 @@ class WorldMappingDAO_kinematic_structure_entities_association(
 
 class WorldMappingDAO_connections_association(Base, AssociationDataAccessObject):
 
-    __tablename__ = "WorldMappingDAO_connections_association"
+    __tablename__ = "_-1872327633523489750"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     source_worldmappingdao_id: Mapped[int] = mapped_column(
@@ -428,7 +429,7 @@ class WorldMappingDAO_semantic_annotations_association(
     Base, AssociationDataAccessObject
 ):
 
-    __tablename__ = "WorldMappingDAO_semantic_annotations_association"
+    __tablename__ = "_-1131372042945498537"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     source_worldmappingdao_id: Mapped[int] = mapped_column(
@@ -445,7 +446,7 @@ class WorldMappingDAO_semantic_annotations_association(
 
 class WorldMappingDAO_degrees_of_freedom_association(Base, AssociationDataAccessObject):
 
-    __tablename__ = "WorldMappingDAO_degrees_of_freedom_association"
+    __tablename__ = "_-8370389418079273036"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     source_worldmappingdao_id: Mapped[int] = mapped_column(
@@ -464,7 +465,7 @@ class ConnectionDAO_simulator_additional_properties_association(
     Base, AssociationDataAccessObject
 ):
 
-    __tablename__ = "ConnectionDAO_simulator_additional_properties_association"
+    __tablename__ = "_-2526724337773864218"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     source_connectiondao_id: Mapped[int] = mapped_column(
@@ -484,7 +485,7 @@ class WorldEntityWithSimulatorPropertiesDAO_simulator_additional_properties_asso
     Base, AssociationDataAccessObject
 ):
 
-    __tablename__ = "WorldEntityWithSimulatorPropertiesDAO_simulator_additional_properties_association"
+    __tablename__ = "_4911595069299988821"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     source_worldentitywithsimulatorpropertiesdao_id: Mapped[int] = mapped_column(
@@ -502,7 +503,7 @@ class WorldEntityWithSimulatorPropertiesDAO_simulator_additional_properties_asso
 
 class HasDoorsDAO_doors_association(Base, AssociationDataAccessObject):
 
-    __tablename__ = "HasDoorsDAO_doors_association"
+    __tablename__ = "_-697725993190245345"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     source_hasdoorsdao_id: Mapped[int] = mapped_column(
@@ -515,7 +516,7 @@ class HasDoorsDAO_doors_association(Base, AssociationDataAccessObject):
 
 class HasDrawersDAO_drawers_association(Base, AssociationDataAccessObject):
 
-    __tablename__ = "HasDrawersDAO_drawers_association"
+    __tablename__ = "_-2380775003227754700"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     source_hasdrawersdao_id: Mapped[int] = mapped_column(
@@ -534,7 +535,7 @@ class SpoonDAO_simulator_additional_properties_association(
     Base, AssociationDataAccessObject
 ):
 
-    __tablename__ = "SpoonDAO_simulator_additional_properties_association"
+    __tablename__ = "_5726685465338604624"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     source_spoondao_id: Mapped[int] = mapped_column(ForeignKey("SpoonDAO.database_id"))
@@ -552,7 +553,7 @@ class CupDAO_simulator_additional_properties_association(
     Base, AssociationDataAccessObject
 ):
 
-    __tablename__ = "CupDAO_simulator_additional_properties_association"
+    __tablename__ = "_2825586223077075516"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     source_cupdao_id: Mapped[int] = mapped_column(ForeignKey("CupDAO.database_id"))
@@ -570,7 +571,7 @@ class CandyDAO_simulator_additional_properties_association(
     Base, AssociationDataAccessObject
 ):
 
-    __tablename__ = "CandyDAO_simulator_additional_properties_association"
+    __tablename__ = "_-1555257929545171421"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     source_candydao_id: Mapped[int] = mapped_column(ForeignKey("CandyDAO.database_id"))
@@ -588,7 +589,7 @@ class CerealDAO_simulator_additional_properties_association(
     Base, AssociationDataAccessObject
 ):
 
-    __tablename__ = "CerealDAO_simulator_additional_properties_association"
+    __tablename__ = "_3908286222490783809"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     source_cerealdao_id: Mapped[int] = mapped_column(
@@ -608,7 +609,7 @@ class MilkDAO_simulator_additional_properties_association(
     Base, AssociationDataAccessObject
 ):
 
-    __tablename__ = "MilkDAO_simulator_additional_properties_association"
+    __tablename__ = "_4157181896337063920"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     source_milkdao_id: Mapped[int] = mapped_column(ForeignKey("MilkDAO.database_id"))
@@ -626,7 +627,7 @@ class NoodlesDAO_simulator_additional_properties_association(
     Base, AssociationDataAccessObject
 ):
 
-    __tablename__ = "NoodlesDAO_simulator_additional_properties_association"
+    __tablename__ = "_1351740870929279392"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     source_noodlesdao_id: Mapped[int] = mapped_column(
@@ -644,7 +645,7 @@ class NoodlesDAO_simulator_additional_properties_association(
 
 class HasAperturesDAO_apertures_association(Base, AssociationDataAccessObject):
 
-    __tablename__ = "HasAperturesDAO_apertures_association"
+    __tablename__ = "_-3232812774942572862"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     source_hasaperturesdao_id: Mapped[int] = mapped_column(
@@ -661,7 +662,7 @@ class HasAperturesDAO_apertures_association(Base, AssociationDataAccessObject):
 
 class HasStorageSpaceDAO_objects_association(Base, AssociationDataAccessObject):
 
-    __tablename__ = "HasStorageSpaceDAO_objects_association"
+    __tablename__ = "_-4282409017622480032"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     source_hasstoragespacedao_id: Mapped[int] = mapped_column(
@@ -680,7 +681,7 @@ class BowlDAO_simulator_additional_properties_association(
     Base, AssociationDataAccessObject
 ):
 
-    __tablename__ = "BowlDAO_simulator_additional_properties_association"
+    __tablename__ = "_-5539395521015743743"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     source_bowldao_id: Mapped[int] = mapped_column(ForeignKey("BowlDAO.database_id"))
@@ -696,7 +697,7 @@ class BowlDAO_simulator_additional_properties_association(
 
 class BowlDAO_objects_association(Base, AssociationDataAccessObject):
 
-    __tablename__ = "BowlDAO_objects_association"
+    __tablename__ = "_-5830270850977264037"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     source_bowldao_id: Mapped[int] = mapped_column(ForeignKey("BowlDAO.database_id"))
@@ -711,7 +712,7 @@ class BowlDAO_objects_association(Base, AssociationDataAccessObject):
 
 class CupboardDAO_objects_association(Base, AssociationDataAccessObject):
 
-    __tablename__ = "CupboardDAO_objects_association"
+    __tablename__ = "_3182044663443775082"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     source_cupboarddao_id: Mapped[int] = mapped_column(
@@ -728,7 +729,7 @@ class CupboardDAO_objects_association(Base, AssociationDataAccessObject):
 
 class DresserDAO_drawers_association(Base, AssociationDataAccessObject):
 
-    __tablename__ = "DresserDAO_drawers_association"
+    __tablename__ = "_-5312681828181590184"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     source_dresserdao_id: Mapped[int] = mapped_column(
@@ -745,7 +746,7 @@ class DresserDAO_drawers_association(Base, AssociationDataAccessObject):
 
 class DresserDAO_objects_association(Base, AssociationDataAccessObject):
 
-    __tablename__ = "DresserDAO_objects_association"
+    __tablename__ = "_-4299712136370836475"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     source_dresserdao_id: Mapped[int] = mapped_column(
@@ -762,7 +763,7 @@ class DresserDAO_objects_association(Base, AssociationDataAccessObject):
 
 class FridgeDAO_doors_association(Base, AssociationDataAccessObject):
 
-    __tablename__ = "FridgeDAO_doors_association"
+    __tablename__ = "_-8529573607278201019"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     source_fridgedao_id: Mapped[int] = mapped_column(
@@ -775,7 +776,7 @@ class FridgeDAO_doors_association(Base, AssociationDataAccessObject):
 
 class FridgeDAO_objects_association(Base, AssociationDataAccessObject):
 
-    __tablename__ = "FridgeDAO_objects_association"
+    __tablename__ = "_4481788974592076711"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     source_fridgedao_id: Mapped[int] = mapped_column(
@@ -792,7 +793,7 @@ class FridgeDAO_objects_association(Base, AssociationDataAccessObject):
 
 class WardrobeDAO_drawers_association(Base, AssociationDataAccessObject):
 
-    __tablename__ = "WardrobeDAO_drawers_association"
+    __tablename__ = "_-5168544338523440005"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     source_wardrobedao_id: Mapped[int] = mapped_column(
@@ -809,7 +810,7 @@ class WardrobeDAO_drawers_association(Base, AssociationDataAccessObject):
 
 class WardrobeDAO_objects_association(Base, AssociationDataAccessObject):
 
-    __tablename__ = "WardrobeDAO_objects_association"
+    __tablename__ = "_4219943315831355822"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     source_wardrobedao_id: Mapped[int] = mapped_column(
@@ -828,7 +829,7 @@ class SaltContainerDAO_simulator_additional_properties_association(
     Base, AssociationDataAccessObject
 ):
 
-    __tablename__ = "SaltContainerDAO_simulator_additional_properties_association"
+    __tablename__ = "_-5598172038830018670"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     source_saltcontainerdao_id: Mapped[int] = mapped_column(
@@ -846,7 +847,7 @@ class SaltContainerDAO_simulator_additional_properties_association(
 
 class AbstractRobotDAO_manipulators_association(Base, AssociationDataAccessObject):
 
-    __tablename__ = "AbstractRobotDAO_manipulators_association"
+    __tablename__ = "_303925157427889656"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     source_abstractrobotdao_id: Mapped[int] = mapped_column(
@@ -863,7 +864,7 @@ class AbstractRobotDAO_manipulators_association(Base, AssociationDataAccessObjec
 
 class AbstractRobotDAO_sensors_association(Base, AssociationDataAccessObject):
 
-    __tablename__ = "AbstractRobotDAO_sensors_association"
+    __tablename__ = "_-3813434918447732859"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     source_abstractrobotdao_id: Mapped[int] = mapped_column(
@@ -882,7 +883,7 @@ class AbstractRobotDAO_manipulator_chains_association(
     Base, AssociationDataAccessObject
 ):
 
-    __tablename__ = "AbstractRobotDAO_manipulator_chains_association"
+    __tablename__ = "_-4841278871265261557"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     source_abstractrobotdao_id: Mapped[int] = mapped_column(
@@ -899,7 +900,7 @@ class AbstractRobotDAO_manipulator_chains_association(
 
 class AbstractRobotDAO_sensor_chains_association(Base, AssociationDataAccessObject):
 
-    __tablename__ = "AbstractRobotDAO_sensor_chains_association"
+    __tablename__ = "_-8283775769146477590"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     source_abstractrobotdao_id: Mapped[int] = mapped_column(
@@ -916,7 +917,7 @@ class AbstractRobotDAO_sensor_chains_association(Base, AssociationDataAccessObje
 
 class HSRBDAO_arms_association(Base, AssociationDataAccessObject):
 
-    __tablename__ = "HSRBDAO_arms_association"
+    __tablename__ = "_5299355808488764519"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     source_hsrbdao_id: Mapped[int] = mapped_column(ForeignKey("HSRBDAO.database_id"))
@@ -927,7 +928,7 @@ class HSRBDAO_arms_association(Base, AssociationDataAccessObject):
 
 class PR2DAO_arms_association(Base, AssociationDataAccessObject):
 
-    __tablename__ = "PR2DAO_arms_association"
+    __tablename__ = "_2719334858249378111"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     source_pr2dao_id: Mapped[int] = mapped_column(ForeignKey("PR2DAO.database_id"))
@@ -940,7 +941,7 @@ class SemanticRobotAnnotationDAO_joint_states_association(
     Base, AssociationDataAccessObject
 ):
 
-    __tablename__ = "SemanticRobotAnnotationDAO_joint_states_association"
+    __tablename__ = "_3934660925234895276"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     source_semanticrobotannotationdao_id: Mapped[int] = mapped_column(
@@ -957,7 +958,7 @@ class SemanticRobotAnnotationDAO_joint_states_association(
 
 class KinematicChainDAO_sensors_association(Base, AssociationDataAccessObject):
 
-    __tablename__ = "KinematicChainDAO_sensors_association"
+    __tablename__ = "_-8920616077488331408"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     source_kinematicchaindao_id: Mapped[int] = mapped_column(
@@ -972,11 +973,67 @@ class KinematicChainDAO_sensors_association(Base, AssociationDataAccessObject):
     )
 
 
+class HumanoidGripperDAO_fingers_association(Base, AssociationDataAccessObject):
+
+    __tablename__ = "_7884920682015161081"
+
+    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    source_humanoidgripperdao_id: Mapped[int] = mapped_column(
+        ForeignKey("HumanoidGripperDAO.database_id")
+    )
+    target_fingerdao_id: Mapped[int] = mapped_column(
+        ForeignKey("FingerDAO.database_id")
+    )
+
+    target: Mapped[FingerDAO] = relationship(
+        "FingerDAO", foreign_keys=[target_fingerdao_id]
+    )
+
+
+class WorldModelManagerDAO_model_modification_blocks_association(
+    Base, AssociationDataAccessObject
+):
+
+    __tablename__ = "_-6783781151778158816"
+
+    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    source_worldmodelmanagerdao_id: Mapped[int] = mapped_column(
+        ForeignKey("WorldModelManagerDAO.database_id")
+    )
+    target_worldmodelmodificationblockdao_id: Mapped[int] = mapped_column(
+        ForeignKey("WorldModelModificationBlockDAO.database_id")
+    )
+
+    target: Mapped[WorldModelModificationBlockDAO] = relationship(
+        "WorldModelModificationBlockDAO",
+        foreign_keys=[target_worldmodelmodificationblockdao_id],
+    )
+
+
+class AttributeUpdateModificationDAO_updated_kwargs_association(
+    Base, AssociationDataAccessObject
+):
+
+    __tablename__ = "_-668631998265100057"
+
+    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    source_attributeupdatemodificationdao_id: Mapped[int] = mapped_column(
+        ForeignKey("AttributeUpdateModificationDAO.database_id")
+    )
+    target_jsonattributediffdao_id: Mapped[int] = mapped_column(
+        ForeignKey("JSONAttributeDiffDAO.database_id")
+    )
+
+    target: Mapped[JSONAttributeDiffDAO] = relationship(
+        "JSONAttributeDiffDAO", foreign_keys=[target_jsonattributediffdao_id]
+    )
+
+
 class WorldModelModificationBlockDAO_modifications_association(
     Base, AssociationDataAccessObject
 ):
 
-    __tablename__ = "WorldModelModificationBlockDAO_modifications_association"
+    __tablename__ = "_-8372674429764530389"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     source_worldmodelmodificationblockdao_id: Mapped[int] = mapped_column(
@@ -1716,6 +1773,41 @@ class ColorDAO(
     A: Mapped[builtins.float] = mapped_column(use_existing_column=True)
 
 
+class ContextDAO(Base, DataAccessObject[pycram.datastructures.dataclasses.Context]):
+
+    __tablename__ = "ContextDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    world_id: Mapped[int] = mapped_column(
+        ForeignKey("WorldMappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    robot_id: Mapped[int] = mapped_column(
+        ForeignKey("AbstractRobotDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    super_plan_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
+        ForeignKey("PlanMappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    world: Mapped[WorldMappingDAO] = relationship(
+        "WorldMappingDAO", uselist=False, foreign_keys=[world_id], post_update=True
+    )
+    robot: Mapped[AbstractRobotDAO] = relationship(
+        "AbstractRobotDAO", uselist=False, foreign_keys=[robot_id], post_update=True
+    )
+    super_plan: Mapped[PlanMappingDAO] = relationship(
+        "PlanMappingDAO", uselist=False, foreign_keys=[super_plan_id], post_update=True
+    )
+
+
 class DegreeOfFreedomLimitsDAO(
     Base,
     DataAccessObject[
@@ -2433,6 +2525,21 @@ class IsPerceivableDAO(
         "polymorphic_on": "polymorphic_type",
         "polymorphic_identity": "IsPerceivableDAO",
     }
+
+
+class JSONAttributeDiffDAO(
+    Base, DataAccessObject[krrood.adapters.json_serializer.JSONAttributeDiff]
+):
+
+    __tablename__ = "JSONAttributeDiffDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    attribute_name: Mapped[builtins.str] = mapped_column(
+        String(255), use_existing_column=True
+    )
 
 
 class JerkVariableDAO(
@@ -3419,6 +3526,12 @@ class PlanMappingDAO(Base, DataAccessObject[pycram.orm.model.PlanMapping]):
         String(255), nullable=False, use_existing_column=True
     )
 
+    context_id: Mapped[int] = mapped_column(
+        ForeignKey("ContextDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
     nodes: Mapped[builtins.list[PlanMappingDAO_nodes_association]] = relationship(
         "PlanMappingDAO_nodes_association",
         collection_class=builtins.list,
@@ -3430,6 +3543,9 @@ class PlanMappingDAO(Base, DataAccessObject[pycram.orm.model.PlanMapping]):
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[PlanMappingDAO_edges_association.source_planmappingdao_id]",
+    )
+    context: Mapped[ContextDAO] = relationship(
+        "ContextDAO", uselist=False, foreign_keys=[context_id], post_update=True
     )
 
     __mapper_args__ = {
@@ -5292,6 +5408,11 @@ class WorldMappingDAO(
         nullable=True,
         use_existing_column=True,
     )
+    model_manager_id: Mapped[int] = mapped_column(
+        ForeignKey("WorldModelManagerDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
 
     kinematic_structure_entities: Mapped[
         builtins.list[WorldMappingDAO_kinematic_structure_entities_association]
@@ -5327,6 +5448,12 @@ class WorldMappingDAO(
     )
     state: Mapped[WorldStateMappingDAO] = relationship(
         "WorldStateMappingDAO", uselist=False, foreign_keys=[state_id], post_update=True
+    )
+    model_manager: Mapped[WorldModelManagerDAO] = relationship(
+        "WorldModelManagerDAO",
+        uselist=False,
+        foreign_keys=[model_manager_id],
+        post_update=True,
     )
 
 
@@ -5786,23 +5913,6 @@ class CallbackDAO(
     __mapper_args__ = {
         "polymorphic_identity": "CallbackDAO",
         "inherit_condition": database_id == WorldEntityWithClassBasedIDDAO.database_id,
-    }
-
-
-class ModelChangeCallbackDAO(
-    CallbackDAO,
-    DataAccessObject[semantic_digital_twin.callbacks.callback.ModelChangeCallback],
-):
-
-    __tablename__ = "ModelChangeCallbackDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(CallbackDAO.database_id), primary_key=True, use_existing_column=True
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "ModelChangeCallbackDAO",
-        "inherit_condition": database_id == CallbackDAO.database_id,
     }
 
 
@@ -9057,6 +9167,43 @@ class ManipulatorDAO(
     }
 
 
+class HumanoidGripperDAO(
+    ManipulatorDAO,
+    DataAccessObject[semantic_digital_twin.robots.abstract_robot.HumanoidGripper],
+):
+
+    __tablename__ = "HumanoidGripperDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(ManipulatorDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    thumb_id: Mapped[int] = mapped_column(
+        ForeignKey("FingerDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    fingers: Mapped[builtins.list[HumanoidGripperDAO_fingers_association]] = (
+        relationship(
+            "HumanoidGripperDAO_fingers_association",
+            collection_class=builtins.list,
+            cascade="all, delete-orphan",
+            foreign_keys="[HumanoidGripperDAO_fingers_association.source_humanoidgripperdao_id]",
+        )
+    )
+    thumb: Mapped[FingerDAO] = relationship(
+        "FingerDAO", uselist=False, foreign_keys=[thumb_id], post_update=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "HumanoidGripperDAO",
+        "inherit_condition": database_id == ManipulatorDAO.database_id,
+    }
+
+
 class ParallelGripperDAO(
     ManipulatorDAO,
     DataAccessObject[semantic_digital_twin.robots.abstract_robot.ParallelGripper],
@@ -9155,6 +9302,28 @@ class CameraDAO(
         "polymorphic_identity": "CameraDAO",
         "inherit_condition": database_id == SensorDAO.database_id,
     }
+
+
+class WorldModelManagerDAO(
+    Base, DataAccessObject[semantic_digital_twin.world.WorldModelManager]
+):
+
+    __tablename__ = "WorldModelManagerDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    version: Mapped[builtins.int] = mapped_column(use_existing_column=True)
+
+    model_modification_blocks: Mapped[
+        builtins.list[WorldModelManagerDAO_model_modification_blocks_association]
+    ] = relationship(
+        "WorldModelManagerDAO_model_modification_blocks_association",
+        collection_class=builtins.list,
+        cascade="all, delete-orphan",
+        foreign_keys="[WorldModelManagerDAO_model_modification_blocks_association.source_worldmodelmanagerdao_id]",
+    )
 
 
 class WorldModelModificationDAO(
@@ -9337,6 +9506,40 @@ class AddSemanticAnnotationModificationDAO(
 
     __mapper_args__ = {
         "polymorphic_identity": "AddSemanticAnnotationModificationDAO",
+        "inherit_condition": database_id == WorldModelModificationDAO.database_id,
+    }
+
+
+class AttributeUpdateModificationDAO(
+    WorldModelModificationDAO,
+    DataAccessObject[
+        semantic_digital_twin.world_description.world_modification.AttributeUpdateModification
+    ],
+):
+
+    __tablename__ = "AttributeUpdateModificationDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(WorldModelModificationDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    entity_id: Mapped[uuid.UUID] = mapped_column(
+        sqlalchemy.sql.sqltypes.UUID, nullable=False, use_existing_column=True
+    )
+
+    updated_kwargs: Mapped[
+        builtins.list[AttributeUpdateModificationDAO_updated_kwargs_association]
+    ] = relationship(
+        "AttributeUpdateModificationDAO_updated_kwargs_association",
+        collection_class=builtins.list,
+        cascade="all, delete-orphan",
+        foreign_keys="[AttributeUpdateModificationDAO_updated_kwargs_association.source_attributeupdatemodificationdao_id]",
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "AttributeUpdateModificationDAO",
         "inherit_condition": database_id == WorldModelModificationDAO.database_id,
     }
 

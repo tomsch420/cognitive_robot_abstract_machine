@@ -35,6 +35,7 @@ from krrood.ormatic.ormatic import ORMatic
 from krrood.ormatic.type_dict import TypeDict
 from krrood.ormatic.utils import classes_of_module
 from krrood.utils import recursive_subclasses
+from semantic_digital_twin.callbacks.callback import ModelChangeCallback
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.mixin import SimulatorAdditionalProperty
 from semantic_digital_twin.orm.model import *  # type: ignore
@@ -103,8 +104,8 @@ all_classes |= set(
         semantic_digital_twin.collision_checking.collision_variable_managers
     )
 )
-# classes |= set(recursive_subclasses(ViewFactory))
-all_classes |= {SimulatorAdditionalProperty}
+
+
 all_classes |= set(classes_of_module(semantic_digital_twin.reasoning.predicates))
 all_classes |= set(classes_of_module(semantic_digital_twin.semantic_annotations.mixins))
 all_classes |= set(
@@ -114,19 +115,20 @@ all_classes |= set(
     classes_of_module(semantic_digital_twin.world_description.world_modification)
 )
 all_classes |= set(classes_of_module(semantic_digital_twin.callbacks.callback))
-
+all_classes |= {
+    SimulatorAdditionalProperty,
+    AttributeUpdateModification,
+    JSONAttributeDiff,
+}
 # remove classes that should not be mapped
 all_classes -= {
     ResetStateContextManager,
     WorldModelUpdateContextManager,
-    HasUpdateState,
     ForwardKinematicsManager,
-    WorldModelManager,
     semantic_digital_twin.adapters.procthor.procthor_resolver.ProcthorResolver,
     ContainsType,
     SemanticDirection,
-    JSONAttributeDiff,
-    AttributeUpdateModification,
+    ModelChangeCallback,
 }
 # keep only dataclasses that are NOT AlternativeMapping subclasses
 all_classes = {

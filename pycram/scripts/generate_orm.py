@@ -2,26 +2,19 @@ import logging
 import os
 from dataclasses import is_dataclass
 
+import pycram.datastructures.pose
+import pycram.language
 import semantic_digital_twin.orm.ormatic_interface
 from krrood.class_diagrams import ClassDiagram
+from krrood.ormatic.helper import get_classes_of_ormatic_interface
 from krrood.ormatic.ormatic import ORMatic
 from krrood.ormatic.type_dict import TypeDict
 from krrood.ormatic.utils import classes_of_module
-from krrood.ormatic.helper import get_classes_of_ormatic_interface
 from krrood.utils import recursive_subclasses
-from pycram.plan import BaseActionNode
-from semantic_digital_twin.world import WorldModelManager
-from semantic_digital_twin.world_description.world_entity import Body
-from semantic_digital_twin.world_description.world_modification import (
-    WorldModelModificationBlock,
-    WorldModelModification,
-)
-
-import pycram.datastructures.pose
-import pycram.language
 from pycram.datastructures import grasp
 from pycram.language import SequentialNode, RepeatNode, LanguageNode
 from pycram.orm.model import *
+from pycram.plan import BaseActionNode
 from pycram.robot_plans.actions.composite import (
     facing,
     searching,
@@ -44,12 +37,19 @@ from pycram.robot_plans.motions import (
     misc as motion_misc,
     robot_body as motion_robot_body,
 )
+from semantic_digital_twin.world import WorldModelManager
+from semantic_digital_twin.world_description.world_entity import Body
+from semantic_digital_twin.world_description.world_modification import (
+    WorldModelModificationBlock,
+    WorldModelModification,
+)
 
 # ----------------------------------------------------------------------------------------------------------------------
 # This script generates the ORM classes for the pycram package
 # Classes that are self_mapped and explicitly_mapped are already mapped in the model.py file. Look there for more
 # information on how to map them.
 # ----------------------------------------------------------------------------------------------------------------------
+
 
 # import classes from the existing interface
 classes, alternative_mappings, type_mappings = get_classes_of_ormatic_interface(
@@ -66,7 +66,7 @@ classes = set(classes)
 
 # create of classes that should be mapped
 classes |= set(classes_of_module(pycram.datastructures.pose))
-classes |= {ExecutionData}
+classes |= {ExecutionData, Context}
 # classes |= set(classes_of_module(action_designator)) | {ActionDescription}
 classes |= set(classes_of_module(facing))
 classes |= set(classes_of_module(searching))
@@ -105,7 +105,6 @@ classes |= {
     BaseActionNode,
 }
 classes |= set(classes_of_module(pycram.language))
-classes -= {WorldModelManager}
 
 alternative_mappings += [am for am in recursive_subclasses(AlternativeMapping)]
 alternative_mappings = list(set(alternative_mappings))
@@ -133,6 +132,7 @@ def generate_orm():
     """
     Generate the ORM classes for the pycram package.
     """
+
     # Create an ORMatic object with the classes to be mapped
     ormatic = ORMatic(
         class_diagram,

@@ -7,12 +7,18 @@ from krrood.ormatic.dao import AlternativeMapping, T, to_dao
 from sqlalchemy import TypeDecorator, types
 from typing_extensions import Optional
 
-from pycram.datastructures.dataclasses import ExecutionData
+from pycram.datastructures.dataclasses import ExecutionData, Context
 from pycram.datastructures.enums import TaskStatus
 from pycram.datastructures.pose import PyCramQuaternion
 from pycram.designator import DesignatorDescription
 from pycram.failures import PlanFailure
-from pycram.language import TryInOrderNode, ParallelNode, TryAllNode, CodeNode, MonitorNode
+from pycram.language import (
+    TryInOrderNode,
+    ParallelNode,
+    TryAllNode,
+    CodeNode,
+    MonitorNode,
+)
 from pycram.plan import (
     ActionDescriptionNode,
     MotionNode,
@@ -22,7 +28,6 @@ from pycram.plan import (
     Plan,
 )
 from pycram.robot_plans import ActionDescription, BaseMotion
-
 
 # ----------------------------------------------------------------------------------------------------------------------
 #            Map all Designators, that are not self-mapping, here.
@@ -170,12 +175,14 @@ class PlanEdge:
 class PlanMapping(AlternativeMapping[Plan]):
     nodes: List[PlanNode]
     edges: List[PlanEdge]
+    context: Context
 
     @classmethod
     def from_domain_object(cls, obj: Plan):
         return cls(
             nodes=obj.nodes,
             edges=[PlanEdge(edge[0], edge[1]) for edge in obj.edges],
+            context=obj.context,
         )
 
     def to_domain_object(self) -> T:
