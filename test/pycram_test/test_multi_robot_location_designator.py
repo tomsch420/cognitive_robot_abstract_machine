@@ -12,6 +12,7 @@ from pycram.datastructures.pose import PoseStamped
 from pycram.locations.locations import (
     CostmapLocation,
     AccessingLocation,
+    GiskardLocation,
 )
 from pycram.motion_executor import simulated_robot
 from pycram.plans.factories import sequential, execute_single
@@ -236,35 +237,38 @@ def test_accessing_location(immutable_model_world):
 def test_giskard_location_pose(immutable_model_world):
     world, robot_view, context = immutable_model_world
     location_desig = GiskardLocation(
-        PoseStamped.from_list([1.9, 2, 1], frame=world.root), Arms.RIGHT
-    )
-    plan = SequentialPlan(
-        context,
-        NavigateActionDescription(location_desig),
+        PoseStamped.from_list([1.9, 2, 1], frame=world.root),
+        Arms.RIGHT,
+        context=context,
     )
 
-    location = location_desig.resolve()
+    location = next(iter(location_desig))
+
     assert len(location.position.to_list()) == 3
     assert len(location.orientation.to_list()) == 4
 
 
 def test_costmap_location_last_result(immutable_multiple_robot_simple_apartment):
     world, robot_view, context = immutable_multiple_robot_simple_apartment
-    plan = SequentialPlan(
+    plan = sequential(
+        [
+            ParkArmsAction(Arms.BOTH),
+            MoveTorsoAction(TorsoState.HIGH),
+        ],
         context,
-        ParkArmsActionDescription(Arms.BOTH),
-        MoveTorsoActionDescription(TorsoState.HIGH),
     )
     with simulated_robot:
         plan.perform()
     world.notify_state_change()
     location_desig = CostmapLocation(
         PoseStamped.from_list([-2.2, 0, 1], [0, 0, 0, 1], world.root),
-        reachable_for=robot_view,
+        reachable=True,
+        context=context,
+        reachable_arm=Arms.BOTH,
     )
-    plan = SequentialPlan(context, NavigateActionDescription(location_desig))
-    location = location_desig.resolve()
-    last_result = next(location_desig.last_result)
+
+    location = next(iter(location_desig))
+    last_result = location_desig._last_result
 
     assert len(last_result.position.to_list()) == 3
     assert len(last_result.orientation.to_list()) == 4
