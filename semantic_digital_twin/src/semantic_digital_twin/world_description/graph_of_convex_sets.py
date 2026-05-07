@@ -830,3 +830,20 @@ def translate_free_space_to_where_condition(
                 )
 
     return chained_logic(OR, *simple_event_conditions)
+
+
+def create_virtual_body_at_z_position_with_only_yaw_from_body(
+    body: Body, z_P_body: float = 0.0
+) -> Body:
+    """
+    Create a new body in the world as a child of `body.parent` that is at the same x,y but different `z` position.
+    This new body is like a keypoint that ignores the roll and pitch but keeps the yaw.
+
+    :param body: The body to create the virtual body from.
+    :param z_P_body: The z position of the virtual body, w. r. t. the body.
+    :return: The newly created virtual body.
+    """
+    parent = body.parent_connection.parent
+    if parent is None:
+        raise ValueError("The body to create the virtual body from must have a parent.")
+    new_body = Body(name=PrefixedName(prefix=str(body.name), name="base_with_yaw"))

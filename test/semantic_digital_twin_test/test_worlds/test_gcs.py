@@ -1,9 +1,14 @@
+import numpy as np
 import plotly.graph_objects as go
 import pytest
 from dataclasses import dataclass
 
 from random_events.interval import SimpleInterval
 from random_events.product_algebra import SimpleEvent
+from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
+    VizMarkerPublisher,
+)
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.variables import SpatialVariables
 from semantic_digital_twin.exceptions import PointOccupiedError
 from semantic_digital_twin.spatial_types import Point3
@@ -11,7 +16,8 @@ from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
 )
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.geometry import BoundingBox
+from semantic_digital_twin.world_description.connections import FixedConnection
+from semantic_digital_twin.world_description.geometry import BoundingBox, Box, Scale
 from semantic_digital_twin.world_description.graph_of_convex_sets import (
     GraphOfConvexSets,
 )
@@ -162,3 +168,72 @@ def test_navigation_map_from_world(table_world: World):
     )
     assert len(graph_of_convex_sets.graph.nodes()) > 0
     assert len(graph_of_convex_sets.graph.edges()) > 0
+
+
+def test_from_world_with_rotated_box(rclpy_node):
+    """
+    Verify if a path can be found in a world with two boxes, where one is rotated.
+    """
+    world = World()
+    with world.modify_world():
+        root_body = Body(name=PrefixedName("map"))
+        world.add_kinematic_structure_entity(root_body)
+
+        # Box 1: at origin
+        axis_aligned_box_body = Body(name=PrefixedName("box_one"))
+        world.add_connection(
+            FixedConnection.create_with_dofs(world, root_body, axis_aligned_box_body)
+        )
+        axis_aligned_box = Box(scale=Scale(1, 1, 1))
+        axis_aligned_box_body.collision.append(axis_aligned_box)
+
+        # Box 2: at (2, 0, 0) rotated 45 deg around Z
+        rotated_box_body = Body(name=PrefixedName("box_two"))
+        rotated_box_body_pose = HomogeneousTransformationMatrix.from_xyz_rpy(
+            2, 0, 0, 0, np.pi / 4, np.pi / 4, reference_frame=root_body
+        )
+        world.add_connection(
+            FixedConnection.create_with_dofs(
+                world,
+                root_body,
+                rotated_box_body,
+                parent_T_connection_expression=rotated_box_body_pose,
+            )
+        )
+        rotated_box = Box(scale=Scale(1, 1, 1))
+        rotated_box_body.collision.append(rotated_box)
+
+    search_space = BoundingBoxCollection(
+        [
+            BoundingBox(
+                min_x=-5,
+                max_x=5,
+                min_y=-5,
+                max_y=5,
+                min_z=0,
+                max_z=2,
+                origin=HomogeneousTransformationMatrix(
+                    reference_frame=rotated_box_body
+                ),
+            )
+        ],
+        reference_frame=rotated_box_body,
+    )
+
+    graph_of_convex_sets = GraphOfConvexSets.free_space_from_world(
+        world, search_space=search_space
+    )
+
+    VizMarkerPublisher(_world=world, node=rclpy_node).with_tf_publisher()
+
+    region = graph_of_convex_sets.spawn_as_region()
+
+    assert graph_of_convex_sets is not None
+    assert len(graph_of_convex_sets.graph.nodes()) > 0
+
+    start = Point3(-1, 0, 0.5, reference_frame=world.root)
+    target = Point3(4, 0, 0.5, reference_frame=world.root)
+
+    path = graph_of_convex_sets.path_from_to(start, target)
+    assert path is not None
+    assert len(path) > 1
