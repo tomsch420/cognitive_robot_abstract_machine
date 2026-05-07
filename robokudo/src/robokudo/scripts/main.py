@@ -18,7 +18,7 @@ import rclpy.impl.logging_severity
 import rclpy.logging
 from py_trees.blackboard import Blackboard
 from py_trees.common import Status
-from rclpy.executors import SingleThreadedExecutor, MultiThreadedExecutor
+from rclpy.executors import MultiThreadedExecutor, SingleThreadedExecutor
 from rclpy.parameter import Parameter
 from typing_extensions import TYPE_CHECKING
 
@@ -52,7 +52,7 @@ def run_ae(
     blackboard.set("CAS", None)
     tick_count = 0
 
-    def tick_tree() -> None:
+    def tick_tree() -> bool:
         nonlocal tick_count
         try:
             logger.debug(f"--------- Tick {tick_count} ---------")
@@ -66,10 +66,12 @@ def run_ae(
             ):
                 # If your top-level child fails, maybe shut down
                 rclpy.shutdown()
+                return False
             tick_count += 1
         except Exception as e:
             logger.error(f"Exception: {e}")
             logger.error("Traceback:\n" + traceback.format_exc())
+        return True
 
     interval = 1.0 / tickrate
     next_tick = time.monotonic()
@@ -79,7 +81,8 @@ def run_ae(
         elapsed = current_time - next_tick
 
         if elapsed >= interval:
-            tick_tree()
+            if not tick_tree():
+                break
             next_tick = current_time
         else:
             time.sleep(interval - elapsed)
