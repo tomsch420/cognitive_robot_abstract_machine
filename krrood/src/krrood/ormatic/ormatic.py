@@ -216,6 +216,14 @@ class ORMatic:
         for table in self.wrapped_tables.values():
             table.parse_fields()
 
+    @classmethod
+    def get_type_mappings(cls) -> TypeDict:
+        """
+        :return: The default type mappings that are used by ORMatic.
+        """
+        ormatic = cls(ClassDiagram([]))
+        return ormatic.type_mappings
+
     def foreign_key_name(self, wrapped_field: WrappedField) -> str:
         """
         :return: A foreign key name for the given field.

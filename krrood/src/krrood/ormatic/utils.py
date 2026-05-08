@@ -234,12 +234,12 @@ def get_python_type_from_sqlalchemy_column(column: Column):
     :param column: The sqlalchemy column.
     :return: The python type of the column.
     """
-    from krrood_test.dataset.ormatic_interface import Base
+    from krrood.ormatic.ormatic import ORMatic
 
-    if type(column.type) in Base.type_mappings.values():
+    if type(column.type) in ORMatic.get_type_mappings().values():
         python_type = [
             key
-            for key, value in Base.type_mappings.items()
+            for key, value in ORMatic.get_type_mappings().items()
             if value == type(column.type)
         ]
     else:
