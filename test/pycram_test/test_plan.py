@@ -475,7 +475,12 @@ def test_motion_order_pick_up(mutable_model_world):
 
         all_motions.extend(motion_executor.motions)
 
-        motion_executor._execute_for_simulation()
+        if len(motion_executor.motions) == 0:
+            return
+
+        motion_executor.construct_execution_list()
+        for e in motion_executor.execution_queue:
+            e.perform()
 
     MotionExecutor.execute = exec_wrapper
 
@@ -532,7 +537,12 @@ def test_motion_order_place(mutable_model_world):
 
         all_motions.extend(motion_executor.motions)
 
-        motion_executor._execute_for_simulation()
+        if len(motion_executor.motions) == 0:
+            return
+
+        motion_executor.construct_execution_list()
+        for e in motion_executor.execution_queue:
+            e.perform()
 
     MotionExecutor.execute = exec_wrapper
 

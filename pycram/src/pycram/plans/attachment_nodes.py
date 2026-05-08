@@ -6,11 +6,17 @@ from semantic_digital_twin.world_description.world_entity import Body
 
 
 @dataclass
-class AttachNode(PlanNode):
-
+class ModelChangeNode(PlanNode):
     body: Body = field(kw_only=True)
 
     new_parent: Body = field(kw_only=True)
+
+    def _perform(self):
+        pass
+
+
+@dataclass
+class AttachNode(ModelChangeNode):
 
     def _perform(self):
         # Attach the object to the end effector
@@ -21,10 +27,7 @@ class AttachNode(PlanNode):
 
 
 @dataclass
-class DetachNode(PlanNode):
-    body: Body = field(kw_only=True)
-
-    new_parent: Body = field(kw_only=True)
+class DetachNode(ModelChangeNode):
 
     def _perform(self):
         # Detaches the object from the robot
