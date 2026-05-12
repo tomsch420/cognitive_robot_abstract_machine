@@ -207,7 +207,7 @@ class SIFTComparator(FeatureComparator):
     def compute_similarity(self, query_value: Any, obj_value: Any) -> float:
         """Compute similarity between SIFT annotations based on Lowe's ratio test and kNN matching ratio."""
         all_matches = self._matcher.knnMatch(
-            query_value.descriptor, obj_value.descriptors, k=2
+            query_value.descriptors, obj_value.descriptors, k=2
         )
         matches = [
             m
