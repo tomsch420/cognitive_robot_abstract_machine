@@ -1333,7 +1333,9 @@ class MultiSimBuilder(ABC):
     The world to be built.
     """
 
-    _ignore_connection_types: ClassVar[Tuple[FixedConnection, OmniDrive, DifferentialDrive]]
+    _ignore_connection_types: ClassVar[
+        Tuple[FixedConnection, OmniDrive, DifferentialDrive]
+    ]
     """
     A list of connection types to ignore when building connections in the simulator.
     FixedConnection is ignored because in MuJoCo, all bodies that are not connected by a joint are implicitly fixed to the parent body.
