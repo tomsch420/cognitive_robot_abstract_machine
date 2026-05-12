@@ -12,6 +12,8 @@ from ..dataset.semantic_world_like_classes import (
     PrismaticConnection,
     Handle,
     Container,
+    MoveAction,
+    GraspConfig,
 )
 from ..dataset.ormatic_interface import (
     KRROODPositionDAO,
@@ -20,6 +22,8 @@ from ..dataset.ormatic_interface import (
     FixedConnectionDAO,
     PrismaticConnectionDAO,
     BodyDAO,
+    MoveActionDAO,
+    GraspConfigDAO,
     ContainerDAO,
     HandleDAO,
 )
@@ -836,5 +840,38 @@ def test_set_of_transitive_attributes(session):
         '"ActionDescriptionDAO".database_id JOIN "GraspDescriptionDAO" AS '
         '"GraspDescriptionDAO_1" ON "GraspDescriptionDAO_1".database_id = '
         '"PickUpActionDAO".grasp_description_id'
+    )
+    assert str(translator.sql_query) == expected_sql
+
+def test_set_of_move_action_transitive(session):
+    """
+    Verify that set_of with both direct and transitive attributes generates correct JOINs.
+    This simulates the pattern of MoveToReachDAO.robot_x and
+    MoveToReachDAO.grasp_description.rotate_gripper from pycram.
+    """
+    move = variable(type_=MoveAction, domain=[])
+    query = an(set_of(
+        move.robot_x,
+        move.robot_y,
+        move.hip_rotation,
+        move.grasp_config.rotate_gripper,
+        move.grasp_config.approach_direction,
+        move.grasp_config.manipulation_offset,
+    ))
+
+    translator = eql_to_sql(query, session)
+    expected_sql = (
+        'SELECT "MoveActionDAO".robot_x, "MoveActionDAO".robot_y, '
+        '"MoveActionDAO".hip_rotation, "GraspConfigDAO_1".rotate_gripper, '
+        '"GraspConfigDAO_1".approach_direction, '
+        '"GraspConfigDAO_1".manipulation_offset \n'
+        'FROM "SymbolDAO" JOIN "WorldEntityDAO" ON "WorldEntityDAO".database_id = '
+        '"SymbolDAO".database_id JOIN "MoveActionDAO" ON '
+        '"MoveActionDAO".database_id = "WorldEntityDAO".database_id JOIN '
+        '("SymbolDAO" AS "SymbolDAO_1" JOIN "WorldEntityDAO" AS '
+        '"WorldEntityDAO_1" ON "WorldEntityDAO_1".database_id = '
+        '"SymbolDAO_1".database_id JOIN "GraspConfigDAO" AS "GraspConfigDAO_1" '
+        'ON "GraspConfigDAO_1".database_id = "WorldEntityDAO_1".database_id) ON '
+        '"GraspConfigDAO_1".database_id = "MoveActionDAO".grasp_config_id'
     )
     assert str(translator.sql_query) == expected_sql
