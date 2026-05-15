@@ -80,6 +80,9 @@ class Role(Symbol, SubClassSafeGeneric[T], ABC):
                     role_taker_name,
                     self.get_role_taker_type()(**role_taker_init_kwargs),
                 )
+                for k, v in init_kwargs.items():
+                    if k not in self.role_taker_field_names:
+                        setattr(self, k, v)
                 return
             setattr(self, role_taker_name, init_kwargs.pop(role_taker_name))
             for k, v in init_kwargs.items():
