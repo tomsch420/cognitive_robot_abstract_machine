@@ -1,5 +1,3 @@
-from krrood.patterns.role import Rolefrom krrood.patterns.role import Rolefrom krrood.patterns.role import Rolefrom krrood.patterns.role import Rolefrom krrood.patterns.role import Role
-
 # Role Pattern
 
 ## What is it?
