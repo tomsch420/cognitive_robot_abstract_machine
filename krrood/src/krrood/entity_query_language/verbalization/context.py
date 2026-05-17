@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime
 import uuid
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -141,4 +142,8 @@ class VerbalizationContext:
             return value.__name__
         if isinstance(value, tuple) and all(isinstance(v, type) for v in value):
             return " or ".join(v.__name__ for v in value)
+        if isinstance(value, datetime.datetime):
+            if value.time() == datetime.time.min:
+                return value.strftime("%B %-d, %Y")
+            return value.strftime("%B %-d, %Y at %H:%M")
         return repr(value)

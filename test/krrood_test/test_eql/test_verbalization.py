@@ -15,7 +15,7 @@ Coverage:
 
 from __future__ import annotations
 
-from abc import abstractmethod
+import datetime
 from dataclasses import dataclass
 from typing import List, Any
 
@@ -59,11 +59,12 @@ class _Robot:
     name: str
     battery: int
     tasks: List[_Task]
+
+
 from ..dataset.semantic_world_like_classes import (
     Apple,
     Body,
     Cabinet,
-    Connection,
     Container,
     ContainsType,
     Drawer,
@@ -72,6 +73,17 @@ from ..dataset.semantic_world_like_classes import (
     Handle,
     PrismaticConnection,
 )
+
+
+@dataclass
+class AmountDetails:
+    amount: float
+
+
+@dataclass
+class BankTransaction:
+    amount_details: AmountDetails
+    booking_date: datetime.datetime
 
 
 # ── Unit tests: leaves ─────────────────────────────────────────────────────────
@@ -320,7 +332,7 @@ def test_verbalize_not_complex_fallback():
 def test_verbalize_count():
     x = variable(int, [1, 2])
     text = verbalize_expression(eql.count(x))
-    assert "count" in text and "ints" in text
+    assert "number of" in text and "ints" in text
 
 
 def test_verbalize_average():
@@ -403,7 +415,7 @@ def test_verbalize_order_by_aggregation(handles_and_containers_world):
     assert "Cabinet" in text
     assert "grouped by" in text
     assert "ordered by" in text
-    assert "count" in text
+    assert "number" in text
     assert "Cabinets'" in text
     assert "drawers" in text
     assert "descending" in text
@@ -759,6 +771,7 @@ def test_verbalize_double_nested_constraint_stack(doors_and_drawers_world):
     Entity sub-query constraints.  The inner 'such that' must not leak into the outer
     verbalization — each level keeps its own constraint frame.
     """
+
     @dataclass
     class Wrapper:
         drawer: Any
@@ -789,6 +802,7 @@ def test_verbalize_double_nested_with_outer_entity(doors_and_drawers_world):
     Wrapper has both an inner InstantiatedVariable (Drawer) and its own direct
     Entity binding.  The inner and outer constraint frames must remain separate.
     """
+
     @dataclass
     class Wrapper:
         drawer: Any
@@ -863,6 +877,7 @@ def test_verbalize_2arg_predicate_camel_converted():
 
 def test_verbalize_1arg_predicate_generic_fallback():
     """1-arg Predicate without template still uses generic constructor-like fallback."""
+
     @dataclass(eq=False)
     class IsActive(Predicate):
         entity: Any
@@ -923,6 +938,28 @@ def test_single_type_variable_not_numbered():
     text = verbalize_expression(emp)
     assert "an Employee" in text, f"Expected 'an Employee' in: {text!r}"
     assert "Employee 1" not in text, f"Did not expect numbering in: {text!r}"
+
+
+def test_number_of_business_transactions():
+    @dataclass
+    class BankTransaction:
+        amount: float
+        date: str
+
+    t = variable(BankTransaction, domain=None)
+    query = an(entity(eql.count(t)))
+    text = verbalize_expression(query)
+    assert "BankTransaction" in text, f"Expected 'BankTransaction' in: {text!r}"
+    assert "number of" in text, f"Expected 'number of' in: {text!r}"
+
+
+def test_search_by_booking_date_and_aggregate():
+    t = variable(BankTransaction, domain=None)
+    query = an(entity(eql.sum(t.amount_details.amount)).where(t.booking_date < datetime.datetime(2024, 5, 17)))
+
+    text = verbalize_expression(query)
+    assert "BankTransaction" in text, f"Expected 'BankTransaction' in: {text!r}"
+    assert "sum of" in text, f"Expected 'sum of' in: {text!r}"
 
 
 # ── Fixture ────────────────────────────────────────────────────────────────────

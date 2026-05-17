@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime as _dt
 import operator
 import re
 from typing import Optional
@@ -87,6 +88,42 @@ _NEGATED_OP_WORDS_COMPACT = {
     operator.ne: "equals",
     operator.contains: "does not contain",
     not_contains: "contains",
+}
+
+_OP_WORDS_TEMPORAL = {
+    operator.lt: "is before",
+    operator.gt: "is after",
+    operator.le: "is no later than",
+    operator.ge: "is no earlier than",
+    operator.eq: "is at",
+    operator.ne: "is not at",
+}
+
+_OP_WORDS_TEMPORAL_COMPACT = {
+    operator.lt: "before",
+    operator.gt: "after",
+    operator.le: "no later than",
+    operator.ge: "no earlier than",
+    operator.eq: "at",
+    operator.ne: "not at",
+}
+
+_NEGATED_OP_WORDS_TEMPORAL = {
+    operator.lt: "is no earlier than",
+    operator.gt: "is no later than",
+    operator.le: "is after",
+    operator.ge: "is before",
+    operator.eq: "is not at",
+    operator.ne: "is at",
+}
+
+_NEGATED_OP_WORDS_TEMPORAL_COMPACT = {
+    operator.lt: "no earlier than",
+    operator.gt: "no later than",
+    operator.le: "after",
+    operator.ge: "before",
+    operator.eq: "not at",
+    operator.ne: "at",
 }
 
 
@@ -390,8 +427,13 @@ class EQLVerbalizer:
         if isinstance(child, Comparator):
             left = self.verbalize(child.left, ctx)
             right = self.verbalize(child.right, ctx)
-            neg_table = _NEGATED_OP_WORDS_COMPACT if ctx.compact_predicates else _NEGATED_OP_WORDS
-            fallback_table = _OP_WORDS_COMPACT if ctx.compact_predicates else _OP_WORDS
+            is_temporal = self._is_temporal_(child.left) or self._is_temporal_(child.right)
+            if is_temporal:
+                neg_table = _NEGATED_OP_WORDS_TEMPORAL_COMPACT if ctx.compact_predicates else _NEGATED_OP_WORDS_TEMPORAL
+                fallback_table = _OP_WORDS_TEMPORAL_COMPACT if ctx.compact_predicates else _OP_WORDS_TEMPORAL
+            else:
+                neg_table = _NEGATED_OP_WORDS_COMPACT if ctx.compact_predicates else _NEGATED_OP_WORDS
+                fallback_table = _OP_WORDS_COMPACT if ctx.compact_predicates else _OP_WORDS
             op_word = neg_table.get(
                 child.operation, f"not {fallback_table.get(child.operation, child._name_)}"
             )
@@ -428,17 +470,34 @@ class EQLVerbalizer:
 
     # ── Comparators ────────────────────────────────────────────────────────────
 
+    def _is_temporal_(self, expr) -> bool:
+        """Return True if *expr* is or produces a datetime.datetime value."""
+        if isinstance(expr, Literal):
+            return isinstance(expr._value_, _dt.datetime)
+        if isinstance(expr, Variable):
+            return getattr(expr, "_type_", None) is _dt.datetime
+        if isinstance(expr, MappedVariable):
+            chain, current = [], expr
+            while isinstance(current, MappedVariable):
+                chain.append(current)
+                current = current._child_
+            return bool(chain) and getattr(chain[-1], "_type_", None) is _dt.datetime
+        return False
+
     def _v_Comparator_(self, expr: Comparator, ctx: VerbalizationContext) -> str:
         left = self.verbalize(expr.left, ctx)
         right = self.verbalize(expr.right, ctx)
-        table = _OP_WORDS_COMPACT if ctx.compact_predicates else _OP_WORDS
+        if self._is_temporal_(expr.left) or self._is_temporal_(expr.right):
+            table = _OP_WORDS_TEMPORAL_COMPACT if ctx.compact_predicates else _OP_WORDS_TEMPORAL
+        else:
+            table = _OP_WORDS_COMPACT if ctx.compact_predicates else _OP_WORDS
         op_word = table.get(expr.operation, expr._name_)
         return f"{left} {op_word} {right}"
 
     # ── Aggregators ────────────────────────────────────────────────────────────
 
     def _v_Count_(self, expr: Count, ctx: VerbalizationContext) -> str:
-        return self._verbalize_aggregator_(expr, ctx, "count of {}")
+        return self._verbalize_aggregator_(expr, ctx, "number of {}")
 
     def _v_CountAll_(self, expr: CountAll, ctx: VerbalizationContext) -> str:
         return "count of all"
