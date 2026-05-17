@@ -460,10 +460,13 @@ def test_verbalize_nested_rule(doors_and_drawers_world):
     assert "a FixedConnection's parent" in text
     # Second mention uses definite article (same entity, different field)
     assert "the FixedConnection's child" in text
-    # Sub-query constraints appear after binding section
+    # Sub-query constraints reuse established binding names, not raw structural paths
     assert "such that" in text
-    assert "a PrismaticConnection's child" in text
-    assert "a Handle" in text
+    assert "the Drawer's container is a PrismaticConnection's child" in text
+    assert "the Drawer's handle is a Handle" in text
+    # Raw structural paths must not appear in the constraints
+    assert "the FixedConnection's parent" not in text.split("such that")[1]
+    assert "the FixedConnection's child" not in text.split("such that")[1]
     # Original bugs must be absent
     assert "Handle's parent" not in text
     assert "container=Find" not in text
@@ -983,7 +986,10 @@ def test_cabinet_rule_verbalization(handles_and_containers_world):
     assert "drawers is" not in text, f"Did not expect 'drawers is' in: {text!r}"
     # grouped-by must name what is being grouped and by what
     assert "Drawers are grouped by" in text, f"Expected 'Drawers are grouped by' in: {text!r}"
-    assert "PrismaticConnection's parent" in text, f"Expected group key in: {text!r}"
+    # group key must use the established binding name, not the raw structural path
+    assert "grouped by the Cabinet's container" in text, f"Expected 'grouped by the Cabinet's container' in: {text!r}"
+    # binding clause still names the structural origin
+    assert "PrismaticConnection's parent" in text, f"Expected binding definition in: {text!r}"
 
 
 def test_plural_field_binding_uses_are(handles_and_containers_world):

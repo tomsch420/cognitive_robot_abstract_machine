@@ -79,6 +79,13 @@ class VerbalizationContext:
     Types with a single variable keep the plain type name; types with multiple variables
     get ``"TypeName 1"``, ``"TypeName 2"``, … labels."""
 
+    binding_aliases: Dict[str, str] = field(default_factory=dict)
+    """Maps the definite-form verbalization of a binding value to its field reference.
+
+    Populated by ``_v_InstantiatedVariable_`` as it processes each binding and read by
+    ``_verbalize_query_body_`` so that WHERE / grouped-by / having / ordered-by clauses
+    refer to already-established field names rather than raw structural paths."""
+
     @classmethod
     def from_expression(cls, expr) -> "VerbalizationContext":
         """Create a context pre-loaded with a disambiguation map for *expr*."""

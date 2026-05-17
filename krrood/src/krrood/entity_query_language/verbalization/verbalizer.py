@@ -149,6 +149,16 @@ def _plural_possessive(word: str) -> str:
     return plural + "'" if plural.endswith("s") else plural + "'s"
 
 
+def _apply_binding_aliases(text: str, alias_map: dict[str, str]) -> str:
+    """Replace each verbalized binding value in *text* with its established field reference.
+
+    Longer aliases are tried first to avoid partial replacements.
+    """
+    for value, field_ref in sorted(alias_map.items(), key=lambda kv: -len(kv[0])):
+        text = text.replace(value, field_ref)
+    return text
+
+
 class EQLVerbalizer:
     """
     Visitor-based verbalizer: maps an EQL expression tree to readable English.
@@ -390,19 +400,31 @@ class EQLVerbalizer:
         ctx.push_constraint_frame()
 
         binding_parts: list[str] = []
+        binding_alias_map: dict[str, str] = {}
         for field_name, child_expr in expr._child_vars_.items():
+            field_ref = f"the {type_name}'s {field_name}"
             if _engine.singular_noun(field_name):
                 plural_value = self._verbalize_plural_(child_expr, ctx)
-                binding_parts.append(f"the {type_name}'s {field_name} are {plural_value}")
+                binding_parts.append(f"{field_ref} are {plural_value}")
             else:
                 value_text = (
                     ctx.type_name_of_value(child_expr._value_)
                     if isinstance(child_expr, Literal)
                     else self.verbalize(child_expr, ctx)
                 )
-                binding_parts.append(f"the {type_name}'s {field_name} is {value_text}")
+                binding_parts.append(f"{field_ref} is {value_text}")
+                # Map the definite form of the value → the field reference so that
+                # deferred constraints (which re-mention the value with "the") are
+                # rewritten to use the already-established binding name instead.
+                definite_value = re.sub(r"^(a|an) ", "the ", value_text)
+                if definite_value.startswith("the ") and definite_value not in binding_alias_map:
+                    binding_alias_map[definite_value] = field_ref
 
         constraints = ctx.pop_constraint_frame()
+
+        ctx.binding_aliases.update(binding_alias_map)
+        if constraints and binding_alias_map:
+            constraints = [_apply_binding_aliases(c, binding_alias_map) for c in constraints]
 
         result = f"{_article(type_name)} {type_name}"
         if binding_parts:
@@ -656,12 +678,18 @@ class EQLVerbalizer:
         grouped_expr = expr._grouped_by_expression_
         having_expr = expr._having_expression_
 
+        aliases = ctx.binding_aliases
+
         if where_expr is not None:
-            parts.append(f"such that {self.verbalize(where_expr.condition, ctx)}")
+            where_text = _apply_binding_aliases(self.verbalize(where_expr.condition, ctx), aliases)
+            parts.append(f"such that {where_text}")
 
         if grouped_expr is not None and grouped_expr.variables_to_group_by:
             group_key_root_ids = self._root_var_ids_(grouped_expr.variables_to_group_by)
-            groups = [self.verbalize(v, ctx) for v in grouped_expr.variables_to_group_by]
+            groups = [
+                _apply_binding_aliases(self.verbalize(v, ctx), aliases)
+                for v in grouped_expr.variables_to_group_by
+            ]
             aggregated = self._aggregated_noun_phrases_(expr, group_key_root_ids, ctx)
             groups_str = self.combine_in_a_bracket(groups)
             if aggregated:
@@ -674,14 +702,15 @@ class EQLVerbalizer:
 
         if having_expr is not None:
             ctx.compact_predicates = True
-            having_text = self.verbalize(having_expr.condition, ctx)
+            having_text = _apply_binding_aliases(self.verbalize(having_expr.condition, ctx), aliases)
             ctx.compact_predicates = False
             parts.append(f"having {having_text}")
 
         ob = expr._ordered_by_builder_
         if ob is not None:
             direction = "descending" if ob.descending else "ascending"
-            parts.append(f"ordered by {self.verbalize(ob.variable, ctx)} ({direction})")
+            ordered_text = _apply_binding_aliases(self.verbalize(ob.variable, ctx), aliases)
+            parts.append(f"ordered by {ordered_text} ({direction})")
 
         return ", ".join(parts)
 
