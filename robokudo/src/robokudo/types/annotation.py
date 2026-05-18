@@ -337,3 +337,37 @@ class SIFTAnnotation(Annotation):
 
     def cv2_keypoints(self) -> List[cv2.KeyPoint]:
         return [KeyPoint.to_cv(k) for k in self.keypoints]
+
+
+class TSDFAnnotation(Annotation):
+    """A TSDF Volume annotation."""
+
+    volume: o3d.pipelines.integration.ScalableTSDFVolume
+    """The Open3D TSDF Volume object."""
+
+    transform: npt.NDArray[np.float64]
+    """The transform from the reference frame to the object frame."""
+
+    def get_coordinate_frame(self) -> o3d.geometry.TriangleMesh:
+        """Get the coordinate frame of the TSDF volume."""
+        frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.25)
+        frame.transform(self.transform)
+        return frame
+
+    def get_mesh(self) -> o3d.geometry.TriangleMesh:
+        """Get the mesh representation of the TSDF volume."""
+        mesh = self.volume.extract_triangle_mesh()
+        mesh.transform(self.transform)
+        return mesh
+
+    def get_point_cloud(self) -> o3d.geometry.PointCloud:
+        """Get the point cloud representation of the TSDF volume."""
+        pcd = self.volume.extract_point_cloud()
+        pcd.transform(self.transform)
+        return pcd
+
+    def get_voxel_point_cloud(self) -> o3d.geometry.PointCloud:
+        """Get the voxel point cloud representation of the TSDF volume."""
+        pcd = self.volume.extract_voxel_point_cloud()
+        pcd.transform(self.transform)
+        return pcd

@@ -14,6 +14,7 @@ from robokudo.types.annotation import (
     SemanticColor,
     ColorHistogram,
     SIFTAnnotation,
+    TSDFAnnotation,
 )
 from robokudo.types.cv import TSDFAnnotation
 from robokudo.types.scene import ObjectHypothesis
