@@ -1205,6 +1205,34 @@ def test_type_availability_in_mapped_variables(handles_and_containers_world):
     assert first_drawer_handle._type_ is Handle
 
 
+def test_root_caches_all_descendant_ids_for_nested_queries():
+    """
+    Test that the root of a query has all descendant IDs in its _expression_id_cache_,
+    including those from nested sub-queries.
+    """
+    var = variable(int, [1, 2, 3, 4])
+
+    # Single-level query: root should cache all descendants
+    inner = the(entity(var).where(var == 2))
+    outer = an(entity(var).where(var != inner))
+    root = outer._root_
+    for descendant in root._descendants_:
+        assert descendant._id_ in root._expression_id_cache_, (
+            f"{descendant} (id={descendant._id_}) missing from root._expression_id_cache_"
+        )
+
+    # Doubly-nested: the inside the inside an
+    var2 = variable(int, [1, 2, 3, 4])
+    innermost = the(entity(var2).where(var2 == 1))
+    middle = the(entity(var2).where(var2 != innermost))
+    outermost = an(entity(var2).where(var2 != middle))
+    root2 = outermost._root_
+    for descendant in root2._descendants_:
+        assert descendant._id_ in root2._expression_id_cache_, (
+            f"{descendant} (id={descendant._id_}) missing from root2._expression_id_cache_"
+        )
+
+
 def test_indexing_on_dict_field():
     @dataclass
     class ItemWithDictionary:

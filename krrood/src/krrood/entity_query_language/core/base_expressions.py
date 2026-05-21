@@ -104,6 +104,10 @@ class SymbolicExpression(ABC):
     """
     The maximum number of results to return during evaluation.
     """
+    _expression_id_cache_: dict[uuid.UUID, SymbolicExpression] = field(init=False, repr=False, default_factory=dict, compare=False)
+    """
+    Cache of expressions by their unique identifier.
+    """
 
     def __post_init__(self):
         self._expression_ = self
@@ -115,31 +119,33 @@ class SymbolicExpression(ABC):
         :param id_: The unique identifier of the expression to retrieve.
         :return: The expression with the specified ID, or raises NoExpressionFoundForGivenID if not found.
         """
-        # Per-instance cache stored in __dict__ so it is collected with the expression object.
+        # Per-instance cache stored in _expression_id_cache_ so it is collected with the expression object.
         # A class-level @lru_cache would hold strong refs to `self` indefinitely, keeping
         # query trees (and their domain data) alive well beyond the query's lifetime.
-        cache: dict = self.__dict__.setdefault('_expression_id_cache_', {})
-        if id_ not in cache:
+        if id_ not in self._expression_id_cache_:
             try:
-                cache[id_] = next(
+                self._expression_id_cache_[id_] = next(
                     expression
                     for expression in self._all_expressions_
                     if expression._id_ == id_
                 )
             except StopIteration:
                 raise NoExpressionFoundForGivenID(self, id_)
-        return cache[id_]
+        return self._expression_id_cache_[id_]
 
 
-    def tolist(self):
+    def tolist(self) -> list[TypingUnion[T, Dict[TypingUnion[T, SymbolicExpression], T]]]:
         """
         Evaluate and return the results as a list.
         """
         return make_list(self.evaluate())
 
-    def first(self):
+    def first(self) -> TypingUnion[T, Dict[TypingUnion[T, SymbolicExpression], T]]:
         """
         Evaluate and return the first result of the query object descriptor.
+
+        :return: The first result of the query object descriptor.
+        :raises StopIteration: If no results are found.
         """
         return next(self.evaluate())
 
@@ -216,6 +222,17 @@ class SymbolicExpression(ABC):
         for v in children:
             v._parent_ = self
         return tuple(v._expression_ for v in children)
+
+    def _ensure_children_ids_are_cached_(self, *children: SymbolicExpression) -> None:
+        """
+        Ensure that the IDs of the provided children expressions are cached within the current expression.
+
+        :param children: The children expressions to cache IDs for.
+        """
+        for child in children:
+            if child._id_ not in self._expression_id_cache_:
+                self._expression_id_cache_[child._id_] = child
+                child._ensure_children_ids_are_cached_(*child._children_)
 
     def _process_result_(self, result: OperationResult) -> Any:
         """
@@ -344,6 +361,7 @@ class SymbolicExpression(ABC):
 
         if value is not None and value._id_ not in [v._id_ for v in self._parents_]:
             self._parents_.append(value)
+            value._ensure_children_ids_are_cached_(self)
 
         if value is not None and self._id_ not in [v._id_ for v in value._children_]:
             value._children_.append(self)
