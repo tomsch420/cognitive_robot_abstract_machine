@@ -28,7 +28,7 @@ The simplest way to verbalize any EQL expression is `verbalize_expression`.
 ```{code-cell} ipython3
 from dataclasses import dataclass
 from krrood.entity_query_language.factories import variable, entity, an
-from krrood.entity_query_language.verbalization import verbalize_expression
+from krrood.entity_query_language.verbalization.verbalizer import verbalize_expression
 
 @dataclass
 class Robot:
@@ -75,8 +75,8 @@ print(verbalize_expression(query))
 For richer output in a terminal, use `VerbalizationPipeline.ansi()`. Each part of the sentence is
 color-coded by its semantic role.
 
-```python
-from krrood.entity_query_language.verbalization import VerbalizationPipeline
+```{code-cell} ipython3
+from krrood.entity_query_language.verbalization.pipeline import VerbalizationPipeline
 
 pipeline = VerbalizationPipeline.ansi()
 print(pipeline.verbalize(query))
@@ -99,7 +99,7 @@ Color legend:
 
 ```{code-cell} ipython3
 from IPython.display import HTML
-from krrood.entity_query_language.verbalization import VerbalizationPipeline
+from krrood.entity_query_language.verbalization.pipeline import VerbalizationPipeline
 
 pipeline = VerbalizationPipeline.html()
 HTML(pipeline.verbalize(query))
@@ -119,7 +119,7 @@ Verbalization really shines on rule trees. The if/then structure is rendered cle
 
 ```{code-cell} ipython3
 from krrood.entity_query_language.factories import (
-    variable, entity, an, deduced_variable, add, inference, refinement
+    variable, entity, an, deduced_variable, add, inference, refinement, Symbol
 )
 
 @dataclass
@@ -129,7 +129,7 @@ class Connection:
     is_fixed: bool
 
 @dataclass
-class View:
+class View(Symbol):
     root: Robot
 
 @dataclass
@@ -164,17 +164,36 @@ on its own line, indented under the relevant clause.
 Because EQL tracks *how* inferences were made, you can verbalize the query that produced any
 inferred result — not just hand-written queries.
 
-```python
-from krrood.entity_query_language.explanation import explain_inference
-from krrood.entity_query_language.verbalization import verbalize_expression
+```{code-cell} ipython3
+from krrood.entity_query_language.explanation.explanation import explain_inference
 
-# inferred_object was produced by a rule tree earlier
+inferred_views = list(rule_query.evaluate())
+inferred_object = inferred_views[0]
+
 explanation = explain_inference(inferred_object)
 print(verbalize_expression(explanation.query_root))
 ```
 
 This outputs the exact query that matched and produced `inferred_object`, described in English.
 It is directly useful for displaying *why* a robot perceives something as a Drawer, a Door, etc.
+
+## Hyperlinks in Notebook Output
+
+Pass a `link_resolver` to `VerbalizationPipeline.html()` and class and attribute names become
+clickable links — navigating directly to the source definition.
+
+```{code-cell} ipython3
+from _demo_domain import Robot as LinkedRobot
+from krrood.entity_query_language.factories import variable, entity, an
+from krrood.entity_query_language.verbalization.pipeline import VerbalizationPipeline
+from krrood.entity_query_language.verbalization.rendering.source_link_resolver import FileURLResolver
+
+linked_robots = [LinkedRobot("R2D2", 95), LinkedRobot("C3PO", 20)]
+lr = variable(LinkedRobot, domain=linked_robots)
+linked_query = an(entity(lr).where(lr.battery > 50))
+
+VerbalizationPipeline.html(link_resolver=FileURLResolver()).display(linked_query)
+```
 
 ## API Reference
 
@@ -185,3 +204,5 @@ It is directly useful for displaying *why* a robot perceives something as a Draw
   - `.ansi(hierarchical=True)` — indented bullet structure, ANSI
   - `.html()` — HTML `<span>` colors, paragraph prose
   - `.html(hierarchical=True)` — HTML, indented bullet structure
+  - `.html(link_resolver=...)` — adds clickable hyperlinks to class and attribute names
+  - `.display(expr)` — renders inline in Jupyter or opens a browser tab elsewhere
