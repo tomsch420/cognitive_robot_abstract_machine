@@ -1370,10 +1370,6 @@ class MultiprocessedViewer3D(object):
             return
         if geometries is None:
             return
-        if isinstance(geometries, list) and len(geometries) == 0:
-            return
-        if isinstance(geometries, dict) and len(geometries) == 0:
-            return
 
         write_manager = self._write_manager
 
