@@ -1,9 +1,46 @@
+import random
+
 import numpy as np
 import open3d as o3d
+from typing_extensions import Type, Any, List, Dict
 from robokudo.vis.multiprocessed_o3d_visualizer import (
     Geometry3DMemoryMapFactory,
     SharedMemoryManager,
 )
+
+
+def get_random_mesh(type: Type) -> Any:
+    if type == o3d.geometry.TriangleMesh:
+        input_mesh = o3d.geometry.TriangleMesh()
+        input_mesh.vertices = o3d.utility.Vector3dVector(np.random.rand(1000, 3))
+        input_mesh.vertex_colors = o3d.utility.Vector3dVector(np.random.rand(1000, 3))
+        input_mesh.vertex_normals = o3d.utility.Vector3dVector(np.random.rand(1000, 3))
+        input_mesh.triangles = o3d.utility.Vector3iVector(np.random.rand(1000, 3))
+        input_mesh.triangle_normals = o3d.utility.Vector3dVector(
+            np.random.rand(1000, 3)
+        )
+        input_mesh.triangle_uvs = o3d.utility.Vector2dVector(np.random.rand(1000, 2))
+        input_mesh.triangle_material_ids = o3d.utility.IntVector(
+            np.random.randint(0, 10, size=1000, dtype=np.int32)
+        )
+        input_mesh.adjacency_list = [{3, 8, 9}, {0, 4}, {0, 2, 4}]
+        input_mesh.textures = [
+            o3d.geometry.Image(
+                np.random.randint(0, 255, size=(512, 512), dtype=np.uint8)
+            ),
+            o3d.geometry.Image(
+                np.random.randint(0, 255, size=(512, 512), dtype=np.uint8)
+            ),
+        ]
+    elif type == o3d.geometry.TetraMesh:
+        input_mesh = o3d.geometry.TetraMesh()
+        input_mesh.vertices = o3d.utility.Vector3dVector(np.random.rand(1000, 3))
+        input_mesh.vertex_colors = o3d.utility.Vector3dVector(np.random.rand(1000, 3))
+        input_mesh.vertex_normals = o3d.utility.Vector3dVector(np.random.rand(1000, 3))
+        input_mesh.tetras = o3d.utility.Vector4iVector(np.random.rand(1000, 4))
+    else:
+        raise ValueError(f"Unknown mesh type: {type}")
+    return input_mesh
 
 
 def assert_mesh_equal(mesh1, mesh2) -> None:
@@ -159,33 +196,7 @@ class TestVisGeometryMaps(object):
 
         input_meshes = []
         for _ in range(iterations):
-            input_mesh = o3d.geometry.TriangleMesh()
-            input_mesh.vertices = o3d.utility.Vector3dVector(np.random.rand(1000, 3))
-            input_mesh.vertex_colors = o3d.utility.Vector3dVector(
-                np.random.rand(1000, 3)
-            )
-            input_mesh.vertex_normals = o3d.utility.Vector3dVector(
-                np.random.rand(1000, 3)
-            )
-            input_mesh.triangles = o3d.utility.Vector3iVector(np.random.rand(1000, 3))
-            input_mesh.triangle_normals = o3d.utility.Vector3dVector(
-                np.random.rand(1000, 3)
-            )
-            input_mesh.triangle_uvs = o3d.utility.Vector2dVector(
-                np.random.rand(1000, 2)
-            )
-            input_mesh.triangle_material_ids = o3d.utility.IntVector(
-                np.random.randint(0, 10, size=1000, dtype=np.int32)
-            )
-            input_mesh.adjacency_list = [{3, 8, 9}, {0, 4}, {0, 2, 4}]
-            input_mesh.textures = [
-                o3d.geometry.Image(
-                    np.random.randint(0, 255, size=(512, 512), dtype=np.uint8)
-                ),
-                o3d.geometry.Image(
-                    np.random.randint(0, 255, size=(512, 512), dtype=np.uint8)
-                ),
-            ]
+            input_mesh = get_random_mesh(o3d.geometry.TriangleMesh)
 
             memory_map = Geometry3DMemoryMapFactory.from_geometry(
                 "TriangleMesh", input_mesh
@@ -216,15 +227,7 @@ class TestVisGeometryMaps(object):
 
         input_meshes = []
         for _ in range(iterations):
-            input_mesh = o3d.geometry.TetraMesh()
-            input_mesh.vertices = o3d.utility.Vector3dVector(np.random.rand(1000, 3))
-            input_mesh.vertex_colors = o3d.utility.Vector3dVector(
-                np.random.rand(1000, 3)
-            )
-            input_mesh.vertex_normals = o3d.utility.Vector3dVector(
-                np.random.rand(1000, 3)
-            )
-            input_mesh.tetras = o3d.utility.Vector4iVector(np.random.rand(1000, 4))
+            input_mesh = get_random_mesh(o3d.geometry.TetraMesh)
 
             memory_map = Geometry3DMemoryMapFactory.from_geometry(
                 "TetraMesh", input_mesh
@@ -400,6 +403,10 @@ class TestVisGeometryMaps(object):
 
     def test_maps_from_geometry_dict(self) -> None:
         """Test writing and reading triangle meshes with the shared memory manager."""
+        rng = np.random.default_rng(seed=42)
+
+        m_width, m_height = 16, 9
+
         iterations = 3
 
         mesh_size = (
@@ -409,52 +416,82 @@ class TestVisGeometryMaps(object):
         ) * 1000 + ((np.dtype(np.uint8).itemsize * (512 * 512)) * 2)
         write_manager = SharedMemoryManager.with_shm(mesh_size * iterations)
 
-        input_meshes = []
+        input_dicts: List[Dict] = []
         for _ in range(iterations):
-            input_mesh = o3d.geometry.TriangleMesh()
-            input_mesh.vertices = o3d.utility.Vector3dVector(np.random.rand(1000, 3))
-            input_mesh.vertex_colors = o3d.utility.Vector3dVector(
-                np.random.rand(1000, 3)
-            )
-            input_mesh.vertex_normals = o3d.utility.Vector3dVector(
-                np.random.rand(1000, 3)
-            )
-            input_mesh.triangles = o3d.utility.Vector3iVector(np.random.rand(1000, 3))
-            input_mesh.triangle_normals = o3d.utility.Vector3dVector(
-                np.random.rand(1000, 3)
-            )
-            input_mesh.triangle_uvs = o3d.utility.Vector2dVector(
-                np.random.rand(1000, 2)
-            )
-            input_mesh.triangle_material_ids = o3d.utility.IntVector(
-                np.random.randint(0, 10, size=1000, dtype=np.int32)
-            )
-            input_mesh.adjacency_list = [{3, 8, 9}, {0, 4}, {0, 2, 4}]
-            input_mesh.textures = [
-                o3d.geometry.Image(
-                    np.random.randint(0, 255, size=(512, 512), dtype=np.uint8)
-                ),
-                o3d.geometry.Image(
-                    np.random.randint(0, 255, size=(512, 512), dtype=np.uint8)
-                ),
-            ]
+            input_mesh = get_random_mesh(o3d.geometry.TriangleMesh)
 
-            memory_map = Geometry3DMemoryMapFactory.from_geometry_dict(
-                {
-                    "name": "TriangleMesh",
-                    "geometry": input_mesh,
-                    "material": o3d.visualization.rendering.MaterialRecord(),
-                    "group": "TriangleMesh",
-                    "time": 1337.420,
-                    "is_visible": True,
-                }
+            material = o3d.visualization.rendering.MaterialRecord()
+            material.absorption_color = rng.random(3)
+            material.absorption_distance = rng.random()
+            material.albedo_img = o3d.geometry.Image(
+                rng.integers(0, 256, (m_height, m_width, 3), dtype=np.uint8)
             )
-            write_manager.write_geometry(input_mesh, memory_map)
+            material.anisotropy_img = o3d.geometry.Image(
+                rng.integers(0, 256, (m_height, m_width, 3), dtype=np.uint8)
+            )
+            material.ao_img = o3d.geometry.Image(
+                rng.integers(0, 256, (m_height, m_width, 3), dtype=np.uint8)
+            )
+            material.ao_rough_metal_img = o3d.geometry.Image(
+                rng.integers(0, 256, (m_height, m_width, 3), dtype=np.uint8)
+            )
+            material.aspect_ratio = rng.random()
+            material.base_anisotropy = rng.random()
+            material.base_clearcoat = rng.random()
+            material.base_clearcoat_roughness = rng.random()
+            material.base_color = rng.random(4)
+            material.base_metallic = rng.random()
+            material.base_reflectance = rng.random()
+            material.base_roughness = rng.random()
+            material.clearcoat_img = o3d.geometry.Image(
+                rng.integers(0, 256, (m_height, m_width, 3), dtype=np.uint8)
+            )
+            material.clearcoat_roughness_img = o3d.geometry.Image(
+                rng.integers(0, 256, (m_height, m_width, 3), dtype=np.uint8)
+            )
+            material.emissive_color = rng.random(4)
+            # material.generic_imgs =
+            # material.generic_params =
+            # material.gradient =
+            material.ground_plane_axis = rng.random()
+            material.has_alpha = rng.random() > 0.5
+            material.metallic_img = o3d.geometry.Image(
+                rng.integers(0, 256, (m_height, m_width, 3), dtype=np.uint8)
+            )
+            material.normal_img = o3d.geometry.Image(
+                rng.integers(0, 256, (m_height, m_width, 3), dtype=np.uint8)
+            )
+            material.point_size = rng.random()
+            material.reflectance_img = o3d.geometry.Image(
+                rng.integers(0, 256, (m_height, m_width, 3), dtype=np.uint8)
+            )
+            material.roughness_img = o3d.geometry.Image(
+                rng.integers(0, 256, (m_height, m_width, 3), dtype=np.uint8)
+            )
+            material.sRGB_color = rng.random() > 0.5
+            material.scalar_max = rng.random()
+            material.scalar_min = rng.random()
+            material.shader = "non-default-shader"
+            material.thickness = rng.random()
+            material.transmission = rng.random()
 
-            input_meshes.append(input_mesh)
+            input_dict = {
+                "name": "TriangleMesh",
+                "geometry": input_mesh,
+                "material": material,
+                "group": "TriangleMesh",
+                "time": 698592787,
+                "is_visible": True,
+            }
+
+            memory_map = Geometry3DMemoryMapFactory.from_geometry_dict(input_dict)
+            write_manager.write_geometry(input_dict, memory_map)
+
+            input_dicts.append(input_dict)
 
         for i, geometry_dict in enumerate(write_manager.read_geometries()):
-            input_mesh = input_meshes[i]
+            input_dict = input_dicts[i]
+            input_mesh = input_dict["geometry"]
             output_mesh = geometry_dict["geometry"]
 
             assert (
@@ -462,3 +499,61 @@ class TestVisGeometryMaps(object):
             ), "Output and input meshes should be different objects"
 
             assert_mesh_equal(output_mesh, input_mesh)
+
+            assert input_dict["name"] == geometry_dict["name"]
+            assert input_dict["is_visible"] == geometry_dict["is_visible"]
+            assert input_dict["time"] == geometry_dict["time"]
+            assert input_dict["is_visible"] == geometry_dict["is_visible"]
+
+            input_material = input_dict["material"]
+            output_material = geometry_dict["material"]
+
+            for attribute in [
+                "absorption_distance",
+                "aspect_ratio",
+                "base_anisotropy",
+                "base_clearcoat",
+                "base_clearcoat_roughness",
+                "base_metallic",
+                "base_reflectance",
+                "base_roughness",
+                "ground_plane_axis",
+                "has_alpha",
+                "point_size",
+                "sRGB_color",
+                "scalar_max",
+                "scalar_min",
+                "shader",
+                "thickness",
+                "transmission",
+            ]:
+                assert getattr(input_material, attribute) == getattr(
+                    output_material, attribute
+                )
+
+            for attribute in [
+                "absorption_color",
+                "base_color",
+                "emissive_color",
+            ]:
+                assert np.all(
+                    getattr(input_material, attribute)
+                    == getattr(output_material, attribute)
+                )
+
+            for attribute in [
+                "albedo_img",
+                "anisotropy_img",
+                "ao_img",
+                "ao_rough_metal_img",
+                "clearcoat_img",
+                "clearcoat_roughness_img",
+                "metallic_img",
+                "normal_img",
+                "reflectance_img",
+                "roughness_img",
+            ]:
+                assert np.all(
+                    np.asarray(getattr(input_material, attribute))
+                    == np.asarray(getattr(output_material, attribute))
+                )

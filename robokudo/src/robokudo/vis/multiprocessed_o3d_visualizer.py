@@ -494,7 +494,7 @@ class Geometry3DMemoryMap(ObjectMemoryMap):
         self,
         write_buf: memoryview,
         write_idx: int,
-        geometry: o3d.geometry.Geometry3D,
+        geometry: Union[o3d.geometry.Geometry3D, Dict],
     ) -> int:
         """Write the given geometry to the shared memory using the memory map.
 
@@ -503,7 +503,20 @@ class Geometry3DMemoryMap(ObjectMemoryMap):
         :param geometry: The geometry to write.
         :return: The byte index after writing.
         """
-        return self.write_mapped_attributes(geometry, write_buf, write_idx)
+
+        if isinstance(geometry, dict):
+            write_idx = self.write_mapped_attributes(
+                geometry["geometry"], write_buf, write_idx
+            )
+
+            if self.material is not None:
+                write_idx = self.material.write_object(
+                    write_buf, write_idx, geometry["material"]
+                )
+        else:
+            write_idx = self.write_mapped_attributes(geometry, write_buf, write_idx)
+
+        return write_idx
 
     def read_geometry(
         self, read_buf: memoryview, read_idx: int
@@ -807,6 +820,27 @@ class MaterialRecordMemoryMap(ObjectMemoryMap):
         """
         geometry = o3d.visualization.rendering.MaterialRecord()
         read_idx = self.read_mapped_attributes_to_object(geometry, read_buf, read_idx)
+
+        for attribute in [
+            "absorption_distance",
+            "aspect_ratio",
+            "base_anisotropy",
+            "base_clearcoat",
+            "base_clearcoat_roughness",
+            "base_metallic",
+            "base_reflectance",
+            "base_roughness",
+            "ground_plane_axis",
+            "has_alpha",
+            "point_size",
+            "sRGB_color",
+            "scalar_max",
+            "scalar_min",
+            "shader",
+            "thickness",
+            "transmission",
+        ]:
+            setattr(geometry, attribute, getattr(self, attribute))
         return geometry, read_idx
 
 
@@ -1107,7 +1141,9 @@ class SharedMemoryManager(object):
             )
 
     def write_geometry(
-        self, geometry: o3d.geometry.Geometry, memory_map: Geometry3DMemoryMap
+        self,
+        geometry_dict: Union[Dict, o3d.geometry.Geometry3D],
+        memory_map: Geometry3DMemoryMap,
     ) -> None:
         """Write a geometry to the shared memory using the given memory map.
 
@@ -1119,7 +1155,7 @@ class SharedMemoryManager(object):
             raise RuntimeError("The shared memory buffer is None")
         if memory_map not in self.memory_maps:
             self.append(memory_map)
-        memory_map.write_geometry(write_buf, self.write_cursor, geometry)
+        memory_map.write_geometry(write_buf, self.write_cursor, geometry_dict)
         self.write_cursor += memory_map.byte_size
 
     def read_geometries(self) -> Iterator[Dict]:
@@ -1401,17 +1437,17 @@ class MultiprocessedViewer3D(object):
 
             try:
                 if isinstance(g, dict):
-                    geometry = g["geometry"]
-                    memory_map = Geometry3DMemoryMapFactory.from_geometry_dict(g)
+                    geometry_dict = g
                 else:
-                    geometry = g
-                    name = "Object " + str(n)
-                    memory_map = Geometry3DMemoryMapFactory.from_geometry(name, g)
+                    geometry_dict = {"name": "Object " + str(n), "geometry": g}
+                memory_map = Geometry3DMemoryMapFactory.from_geometry_dict(
+                    geometry_dict
+                )
             except KeyError as e:
                 self.rk_logger.warning(f"Could not create a memory map for {g}: {e}")
                 return
 
-            write_manager.write_geometry(geometry, memory_map)
+            write_manager.write_geometry(geometry_dict, memory_map)
 
         write_manager.reset()
 
