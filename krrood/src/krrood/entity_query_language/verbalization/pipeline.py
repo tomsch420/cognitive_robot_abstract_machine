@@ -73,12 +73,9 @@ class VerbalizationPipeline:
     * :meth:`html`   — HTML ``<span>`` colours, paragraph prose or hierarchical
 
     All factory methods accept an optional *link_resolver* that maps class and
-    attribute names to hyperlinks.  Built-in resolvers:
+    attribute names to hyperlinks.  Built-in resolver:
 
-    * :class:`~krrood.entity_query_language.verbalization.rendering.source_link_resolver.FileURLResolver` — ``file://`` local paths
-    * :class:`~krrood.entity_query_language.verbalization.rendering.source_link_resolver.JetBrainsResolver` — ``jetbrains://`` IDE URI scheme
-    * :class:`~krrood.entity_query_language.verbalization.rendering.source_link_resolver.VSCodeResolver` — ``vscode://`` IDE URI scheme
-    * :class:`~krrood.entity_query_language.verbalization.rendering.source_link_resolver.AutoAPIResolver` — Sphinx AutoAPI documentation pages
+    * :class:`~krrood.entity_query_language.verbalization.rendering.source_link_resolver.AutoAPIResolver` — Sphinx AutoAPI documentation pages (local build or GitHub Pages)
     """
 
     def __init__(self, renderer: FragmentRenderer = ParagraphRenderer()):

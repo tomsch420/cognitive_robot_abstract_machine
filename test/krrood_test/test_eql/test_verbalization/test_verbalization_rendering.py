@@ -673,3 +673,4 @@ def test_pipeline_ansi_hierarchical_has_newlines_on_rule(doors_and_drawers_world
         print("\n" + text)
     assert "\n" in text
     assert "<br>" not in text
+

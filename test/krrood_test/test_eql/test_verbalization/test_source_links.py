@@ -3,10 +3,6 @@ Tests for source-link hyperlink support in EQL verbalization.
 
 Coverage:
 - SourceRef: frozen dataclass, cls-only and cls+attribute forms
-- _find_attribute_line: AnnAssign lookup, MRO walk, missing attribute
-- FileURLResolver: file:// URLs for class and attribute
-- JetBrainsResolver: jetbrains://python/navigate/reference?... URI scheme
-- VSCodeResolver: vscode://file/... URI scheme
 - AutoAPIResolver: Sphinx AutoAPI URL structure; for_package() auto-detection
 - Formatter.wrap_link: PlainFormatter (no-op), HTMLFormatter (<a>), ANSIFormatter (OSC 8)
 - ANSIFormatter OSC 8 detection: enabled / disabled paths
@@ -19,7 +15,6 @@ Coverage:
 
 from __future__ import annotations
 
-import inspect
 from dataclasses import dataclass
 from typing import Optional
 from unittest.mock import patch
@@ -49,10 +44,6 @@ from krrood.entity_query_language.verbalization.rendering.renderer import (
 )
 from krrood.entity_query_language.verbalization.rendering.source_link_resolver import (
     AutoAPIResolver,
-    FileURLResolver,
-    JetBrainsResolver,
-    VSCodeResolver,
-    _find_attribute_line,
 )
 from krrood.entity_query_language.verbalization.verbalizer import EQLVerbalizer
 
@@ -69,7 +60,7 @@ class _Sensor:
 
 @dataclass
 class _SensorChild(_Sensor):
-    """Subclass to verify MRO walking in _find_attribute_line."""
+    """Subclass to verify MRO walking (kept for potential future use)."""
     extra: str
 
 
@@ -115,194 +106,6 @@ def test_source_ref_equality():
     assert SourceRef(cls=_Sensor) == SourceRef(cls=_Sensor)
     assert SourceRef(cls=_Sensor, attribute="level") == SourceRef(cls=_Sensor, attribute="level")
     assert SourceRef(cls=_Sensor) != SourceRef(cls=_Sensor, attribute="level")
-
-
-# ── _find_attribute_line ──────────────────────────────────────────────────────
-
-
-def test_find_attribute_line_returns_int_for_known_field():
-    line = _find_attribute_line(_Sensor, "level")
-    assert isinstance(line, int)
-    assert line > 0
-
-
-def test_find_attribute_line_points_to_correct_line():
-    """The returned line must contain the attribute annotation."""
-    line = _find_attribute_line(_Sensor, "level")
-    assert line is not None
-    source_file = inspect.getfile(_Sensor)
-    with open(source_file) as f:
-        lines = f.readlines()
-    target_line = lines[line - 1]  # line numbers are 1-based
-    assert "level" in target_line
-
-
-def test_find_attribute_line_returns_none_for_missing_field():
-    assert _find_attribute_line(_Sensor, "nonexistent_field") is None
-
-
-def test_find_attribute_line_walks_mro_for_inherited_field():
-    line = _find_attribute_line(_SensorChild, "level")
-    assert line is not None
-    assert line > 0
-
-
-def test_find_attribute_line_finds_child_own_field():
-    line = _find_attribute_line(_SensorChild, "extra")
-    assert line is not None
-    assert line > 0
-
-
-# ── FileURLResolver ────────────────────────────────────────────────────────────
-
-
-def test_file_url_resolver_class_starts_with_file():
-    r = FileURLResolver()
-    url = r.resolve(SourceRef(cls=_Sensor))
-    assert url is not None
-    assert url.startswith("file://")
-
-
-def test_file_url_resolver_class_url_contains_filename():
-    r = FileURLResolver()
-    url = r.resolve(SourceRef(cls=_Sensor))
-    assert url is not None
-    assert "test_source_links" in url
-
-
-def test_file_url_resolver_class_url_has_line_anchor():
-    r = FileURLResolver()
-    url = r.resolve(SourceRef(cls=_Sensor))
-    assert url is not None
-    assert "#" in url
-
-
-def test_file_url_resolver_attribute_url_has_line_anchor():
-    r = FileURLResolver()
-    url = r.resolve(SourceRef(cls=_Sensor, attribute="level"))
-    assert url is not None
-    assert "#" in url
-
-
-def test_file_url_resolver_attribute_line_differs_from_class_line():
-    r = FileURLResolver()
-    class_url = r.resolve(SourceRef(cls=_Sensor))
-    attr_url = r.resolve(SourceRef(cls=_Sensor, attribute="level"))
-    assert class_url is not None and attr_url is not None
-    assert class_url != attr_url
-
-
-def test_file_url_resolver_returns_none_for_builtin():
-    r = FileURLResolver()
-    assert r.resolve(SourceRef(cls=int)) is None
-
-
-# ── JetBrainsResolver ─────────────────────────────────────────────────────────
-
-
-def test_jetbrains_resolver_uses_jetbrains_scheme():
-    r = JetBrainsResolver()
-    url = r.resolve(SourceRef(cls=_Sensor))
-    assert url is not None
-    assert url.startswith("jetbrains://python/navigate/reference?project=.&path=")
-
-
-def test_jetbrains_resolver_class_url_contains_path():
-    r = JetBrainsResolver()
-    url = r.resolve(SourceRef(cls=_Sensor))
-    assert url is not None
-    assert "test_source_links" in url
-
-
-def test_jetbrains_resolver_class_url_has_line_suffix():
-    r = JetBrainsResolver()
-    url = r.resolve(SourceRef(cls=_Sensor))
-    assert url is not None
-    # Format: ...?project=.&path=/abs/path/file.py:LINE
-    line_part = url.split(":")[-1]
-    assert int(line_part) > 0
-
-
-def test_jetbrains_resolver_attribute_url_has_line_suffix():
-    r = JetBrainsResolver()
-    url = r.resolve(SourceRef(cls=_Sensor, attribute="level"))
-    assert url is not None
-    line_part = url.split(":")[-1]
-    assert int(line_part) > 0
-
-
-def test_jetbrains_resolver_attribute_line_differs_from_class_line():
-    r = JetBrainsResolver()
-    class_url = r.resolve(SourceRef(cls=_Sensor))
-    attr_url = r.resolve(SourceRef(cls=_Sensor, attribute="level"))
-    assert class_url is not None and attr_url is not None
-    assert class_url != attr_url
-
-
-def test_jetbrains_resolver_returns_none_for_builtin():
-    r = JetBrainsResolver()
-    assert r.resolve(SourceRef(cls=int)) is None
-
-
-# ── VSCodeResolver ────────────────────────────────────────────────────────────
-
-
-def test_vscode_resolver_uses_vscode_scheme():
-    r = VSCodeResolver()
-    url = r.resolve(SourceRef(cls=_Sensor))
-    assert url is not None
-    assert url.startswith("vscode://file/")
-
-
-def test_vscode_resolver_class_url_contains_path():
-    r = VSCodeResolver()
-    url = r.resolve(SourceRef(cls=_Sensor))
-    assert url is not None
-    assert "test_source_links" in url
-
-
-def test_vscode_resolver_class_url_has_line_suffix():
-    r = VSCodeResolver()
-    url = r.resolve(SourceRef(cls=_Sensor))
-    assert url is not None
-    line_part = url.split(":")[-1]
-    assert int(line_part) > 0
-
-
-def test_vscode_resolver_attribute_url_has_line_suffix():
-    r = VSCodeResolver()
-    url = r.resolve(SourceRef(cls=_Sensor, attribute="level"))
-    assert url is not None
-    line_part = url.split(":")[-1]
-    assert int(line_part) > 0
-
-
-def test_vscode_resolver_attribute_line_differs_from_class_line():
-    r = VSCodeResolver()
-    class_url = r.resolve(SourceRef(cls=_Sensor))
-    attr_url = r.resolve(SourceRef(cls=_Sensor, attribute="level"))
-    assert class_url is not None and attr_url is not None
-    assert class_url != attr_url
-
-
-def test_vscode_resolver_returns_none_for_builtin():
-    r = VSCodeResolver()
-    assert r.resolve(SourceRef(cls=int)) is None
-
-
-def test_vscode_resolver_end_to_end_html():
-    x = variable(_Sensor, [])
-    text = VerbalizationPipeline.html(link_resolver=VSCodeResolver()).verbalize(an(entity(x)))
-    assert 'href="vscode://file/' in text
-    assert "_Sensor" in text
-
-
-def test_vscode_resolver_end_to_end_ansi():
-    x = variable(_Sensor, [])
-    with patch.dict("os.environ", {"VTE_VERSION": "6800"}, clear=False):
-        text = VerbalizationPipeline.ansi(link_resolver=VSCodeResolver()).verbalize(an(entity(x)))
-    assert "\033]8;;vscode://file/" in text
-    assert "_Sensor" in text
 
 
 # ── AutoAPIResolver ────────────────────────────────────────────────────────────
@@ -703,41 +506,16 @@ def test_comparator_fragment_has_both_class_and_attr_refs():
     assert attr_refs, "Expected a SourceRef for _Sensor.level"
 
 
-# ── Resolver end-to-end with verbalizer ───────────────────────────────────────
-
-
-def test_file_url_resolver_end_to_end_html():
-    x = variable(_Sensor, [])
-    text = VerbalizationPipeline.html(link_resolver=FileURLResolver()).verbalize(an(entity(x)))
-    assert 'href="file://' in text
-    assert "_Sensor" in text
-
-
-def test_jetbrains_resolver_end_to_end_ansi():
-    x = variable(_Sensor, [])
-    with patch.dict("os.environ", {"VTE_VERSION": "6800"}, clear=False):
-        text = VerbalizationPipeline.ansi(link_resolver=JetBrainsResolver()).verbalize(an(entity(x)))
-    assert "\033]8;;jetbrains://python/navigate/reference?" in text
-    assert "_Sensor" in text
-
-
-def test_jetbrains_resolver_end_to_end_html():
-    x = variable(_Sensor, [])
-    text = VerbalizationPipeline.html(link_resolver=JetBrainsResolver()).verbalize(an(entity(x)))
-    assert 'href="jetbrains://python/navigate/reference?' in text
-    assert "_Sensor" in text
-
-
 # ── VerbalizationPipeline.display / display_fragment ──────────────────────────
 
 
 def test_display_opens_browser_outside_jupyter():
     """Outside Jupyter, display() writes a temp HTML file and calls webbrowser.open."""
-    from unittest.mock import MagicMock, patch as _patch
+    from unittest.mock import patch as _patch
     import krrood.entity_query_language.verbalization.pipeline as pipeline_mod
 
     x = variable(_Sensor, [])
-    pipeline = VerbalizationPipeline.html(link_resolver=FileURLResolver())
+    pipeline = VerbalizationPipeline.html(link_resolver=_ConstantResolver())
     with _patch.object(pipeline_mod, "_is_ipython", return_value=False):
         with _patch("webbrowser.open") as mock_open:
             pipeline.display(an(entity(x)))
@@ -780,7 +558,7 @@ def test_display_in_jupyter_calls_ipython_display():
     import krrood.entity_query_language.verbalization.pipeline as pipeline_mod
 
     x = variable(_Sensor, [])
-    pipeline = VerbalizationPipeline.html(link_resolver=JetBrainsResolver())
+    pipeline = VerbalizationPipeline.html(link_resolver=_ConstantResolver())
     mock_html_cls = MagicMock()
     mock_ipython_display = MagicMock()
     pipeline.display(an(entity(x)))

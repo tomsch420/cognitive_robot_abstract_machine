@@ -11,7 +11,7 @@ kernelspec:
   name: python3
 ---
 
-# Query Verbalization
+# Verbalization
 
 EQL queries are Python objects — they can be inspected, composed, stored, and now: **read aloud**.
 
@@ -178,80 +178,52 @@ It is directly useful for displaying *why* a robot perceives something as a Draw
 
 ## Hyperlinks to Source Code
 
-Pass a `link_resolver` to any pipeline factory and class and attribute names become
-clickable links — navigating directly to the source definition.  Four built-in resolvers
-are available; pick the one that matches your editor and environment:
+Pass `link_resolver=AutoAPIResolver(...)` to any pipeline factory and class and attribute
+names become clickable links — opening the corresponding Sphinx AutoAPI documentation page.
 
-| Resolver | URI scheme | Best for |
+`AutoAPIResolver` works in two modes:
+
+| Mode | How to construct | When it works |
 |---|---|---|
-| `FileURLResolver` | `file:///path#line` | Any editor that handles `file://` URIs |
-| `JetBrainsResolver` | `jetbrains://python/navigate/reference?…` | PyCharm / IntelliJ IDEA (any OS) |
-| `VSCodeResolver` | `vscode://file/path:line` | Visual Studio Code (any OS) |
-| `AutoAPIResolver` | `https://…/autoapi/…` | Sphinx AutoAPI documentation sites |
+| **Local** | `AutoAPIResolver.for_package("krrood")` | After `sphinx-build doc doc/_build/html` |
+| **GitHub Pages** | `AutoAPIResolver(base_url="https://cram2.github.io/…/krrood")` | Always, no local build needed |
 
-### Terminal (ANSI) — JetBrains
+The demo below uses `verbalization_domain.Robot` and `verbalization_domain.Mission` — classes
+defined in `doc/eql/user/verbalization_domain.py` whose mock API page is committed alongside
+this notebook and deployed with the docs.
 
 ```{code-cell} ipython3
 :tags: [remove-cell]
 
 import sys
 from pathlib import Path
-# _demo_domain.py lives next to this notebook (doc/eql/user/).
-# Add its directory to sys.path so the import works regardless of where
-# jupyter-book launches the kernel (book root vs. notebook directory).
-for _candidate in [Path("doc/eql/user"), Path("eql/user"), Path(".")]:
-    if (_candidate / "_demo_domain.py").exists():
+# verbalization_domain.py lives in doc/eql/user/.
+# When the notebook kernel runs from test_tmp/, Path("..") resolves there.
+for _candidate in [Path("doc/eql/user"), Path("eql/user"), Path(".."), Path(".")]:
+    if (_candidate / "verbalization_domain.py").exists():
         sys.path.insert(0, str(_candidate.resolve()))
         break
 ```
 
 ```{code-cell} ipython3
-from _demo_domain import Robot as LinkedRobot
+from verbalization_domain import Robot, Mission
 from krrood.entity_query_language.factories import variable, entity, an
 from krrood.entity_query_language.verbalization.pipeline import VerbalizationPipeline
-from krrood.entity_query_language.verbalization.rendering.source_link_resolver import JetBrainsResolver
-
-linked_robots = [LinkedRobot("R2D2", 95), LinkedRobot("C3PO", 20)]
-lr = variable(LinkedRobot, domain=linked_robots)
-linked_query = an(entity(lr).where(lr.battery > 50))
-
-# Ctrl+click any class or attribute name in the terminal to jump to its definition.
-print(VerbalizationPipeline.ansi(link_resolver=JetBrainsResolver()).verbalize(linked_query))
-```
-
-### Terminal (ANSI) — VS Code
-
-```{code-cell} ipython3
-from krrood.entity_query_language.verbalization.rendering.source_link_resolver import VSCodeResolver
-
-print(VerbalizationPipeline.ansi(link_resolver=VSCodeResolver()).verbalize(linked_query))
-```
-
-### Jupyter Notebook — HTML with IDE links
-
-```{code-cell} ipython3
-from IPython.display import HTML
-
-# JetBrains: clicking a class/attribute name in the notebook opens it in PyCharm.
-VerbalizationPipeline.html(link_resolver=JetBrainsResolver()).display(linked_query)
-```
-
-### Sphinx AutoAPI documentation
-
-`AutoAPIResolver.for_package()` auto-detects the locally built Sphinx docs for a package and
-constructs the correct URL for the JetBrains IDE built-in HTTP server.
-
-```{code-cell} ipython3
 from krrood.entity_query_language.verbalization.rendering.source_link_resolver import AutoAPIResolver
 
-# Build the docs first: sphinx-build doc doc/_build/html
-resolver = AutoAPIResolver.for_package("krrood")   # port=63342 by default
+vd_robots = [Robot("R2D2", 95), Robot("C3PO", 20)]
+vd_missions = [Mission(vd_robots[0], 3)]
+r = variable(Robot, domain=vd_robots)
+m = variable(Mission, domain=vd_missions)
+linked_query = an(entity(r).where(m.assigned_to == r, m.priority > 2))
+
+# Local — requires docs to be built first: sphinx-build doc doc/_build/html
+resolver = AutoAPIResolver.for_package("krrood")
 VerbalizationPipeline.html(link_resolver=resolver).display(linked_query)
 ```
 
-You can also point `AutoAPIResolver` at a remote docs site by passing `base_url` directly:
-
 ```{code-cell} ipython3
+# GitHub Pages — always available, no local build needed.
 resolver = AutoAPIResolver(base_url="https://cram2.github.io/cognitive_robot_abstract_machine/krrood")
 VerbalizationPipeline.html(link_resolver=resolver).display(linked_query)
 ```

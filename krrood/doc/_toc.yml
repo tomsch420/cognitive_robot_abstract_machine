@@ -21,6 +21,7 @@ parts:
         - file: eql/user/eql_for_sql_experts
         - file: eql/user/writing_rule_trees
         - file: eql/user/inference_explanation
+        - file: eql/user/verbalization
     - file: eql/developer/index
       sections:
         - file: eql/developer/architecture_overview
