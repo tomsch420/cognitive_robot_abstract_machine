@@ -430,6 +430,52 @@ def test_max_re_mention_in_having():
     assert text.count("the maximum of") >= 2, f"Expected ≥2 occurrences of 'the maximum of' in: {text!r}"
 
 
+# ── Nested sub-queries as values (the imperative "Find" is reserved for the top level) ──
+
+
+def test_nested_unconstrained_aggregation_no_second_find():
+    """An aggregation sub-query used as a comparison value must not emit a second 'Find'."""
+    t1 = variable(BankTransaction, domain=None)
+    t2 = variable(BankTransaction, domain=None)
+    query = eql.the(
+        entity(t1).where(t1.amount_details.amount == an(entity(eql.max(t2.amount_details.amount))))
+    )
+    text = verbalize_expression(query)
+    assert text.count("Find") == 1, f"Expected exactly one 'Find' in: {text!r}"
+    assert "maximum" in text, f"Got: {text!r}"
+
+
+def test_nested_non_aggregation_entity_no_second_find():
+    """A nested non-aggregation entity sub-query renders as a noun phrase, not a second 'Find'."""
+    t1 = variable(BankTransaction, domain=None)
+    t2 = variable(BankTransaction, domain=None)
+    query = eql.the(
+        entity(t1).where(t1 == an(entity(t2).where(t2.amount_details.amount > 100)))
+    )
+    text = verbalize_expression(query)
+    assert text.count("Find") == 1, f"Expected exactly one 'Find' in: {text!r}"
+    assert "where" in text, f"Got: {text!r}"
+
+
+def test_nested_constrained_aggregation_preserves_filter():
+    """A constrained aggregation sub-query keeps its filter when verbalized."""
+    t1 = variable(BankTransaction, domain=None)
+    t2 = variable(BankTransaction, domain=None)
+    query = eql.the(
+        entity(t1).where(
+            t1.amount_details.amount
+            == an(
+                entity(eql.max(t2.amount_details.amount)).where(
+                    t2.booking_date < datetime.datetime(2024, 1, 1)
+                )
+            )
+        )
+    )
+    text = verbalize_expression(query)
+    assert "booking_date" in text, f"Got: {text!r}"
+    assert "before" in text, f"Got: {text!r}"
+
+
 # ── Integration: target test cases ────────────────────────────────────────────
 
 

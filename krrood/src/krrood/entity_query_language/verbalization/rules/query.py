@@ -38,14 +38,20 @@ class EntityRule(VerbalizationRule):
     @classmethod
     def transform(cls, expr: "Entity", ctx: "VerbalizationContext", delegate: "EQLVerbalizer") -> VerbFragment:
         """
-        Delegate to :meth:`~krrood.entity_query_language.verbalization.entity_verbalizer.EntityVerbalizer.verbalize_query`.
+        Render the imperative *"Find … such that …"* form at the top level
+        (:attr:`~krrood.entity_query_language.verbalization.context.VerbalizationContext.query_depth`
+        ``== 0``), or delegate to
+        :meth:`~krrood.entity_query_language.verbalization.entity_verbalizer.EntityVerbalizer.verbalize_nested`
+        for a nested sub-query used as a value.
 
         :param expr: Entity expression.
         :param ctx: Shared verbalization state.
         :param delegate: Parent verbalizer.
-        :returns: Full query fragment.
+        :returns: Full query fragment (top level) or noun-phrase fragment (nested).
         :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment
         """
+        if ctx.query_depth > 0:
+            return delegate._entity.verbalize_nested(expr, ctx)
         return delegate._entity.verbalize_query(expr, ctx)
 
 

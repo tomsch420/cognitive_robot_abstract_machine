@@ -92,29 +92,76 @@ class EntityVerbalizer:
         if self._d._rule.can_handle(expr):
             return self._d._rule.verbalize(expr, ctx)
 
-        is_the = (
-            expr._quantifier_builder_ is not None
-            and expr._quantifier_builder_.type is The
+        ctx.query_depth += 1
+        try:
+            is_the = (
+                expr._quantifier_builder_ is not None
+                and expr._quantifier_builder_.type is The
+            )
+            var = expr.selected_variable
+
+            if isinstance(var, Entity):
+                selected = self.as_noun(var, ctx)
+            elif var is None:
+                selected_type = FallbackNouns.ENTITY.text
+                ctx.seen[expr._id_] = selected_type
+                selected = FallbackNouns.ENTITY.plural_fragment()
+            elif is_the:
+                selected_type = var._type_.__name__ if getattr(var, "_type_", None) else FallbackNouns.ENTITY.text
+                ctx.seen[var._id_] = selected_type
+                ctx.seen[expr._id_] = selected_type
+                selected = _phrase(Articles.THE_UNIQUE.as_fragment(), _role(selected_type, SemanticRole.VARIABLE))
+            else:
+                selected = self._d.build(var, ctx)
+                selected_type = ctx.seen.get(getattr(var, "_id_", None), FallbackNouns.ENTITY.text)
+                ctx.seen[expr._id_] = selected_type
+
+            return self._verbalize_query_body_(expr, ctx, selected)
+        finally:
+            ctx.query_depth -= 1
+
+    def verbalize_nested(self, expr: "Entity", ctx: "VerbalizationContext") -> VerbFragment:
+        """
+        Noun-phrase form for an :class:`~krrood.entity_query_language.query.query.Entity`
+        used as a *value* (e.g. an operand of a comparator) rather than as the
+        top-level request.  Never emits the imperative *"Find …"* prefix.
+
+        Dispatch:
+
+        * **Unconstrained aggregation subquery** (``entity(max(t.amount))``) — a
+          noun naming a computed value.  Rendered via the aggregator itself
+          (Layer B collapses this to *"the maximum amount"*).
+        * **Constrained aggregation subquery** (aggregation plus a ``WHERE`` /
+          ``HAVING`` / ``GROUP BY``) — the filter is load-bearing, so the full
+          query form is retained to preserve it.
+        * **Any other nested entity** — delegated to :meth:`as_noun`
+          (*"a Robot where …"*).
+
+        :param expr: A nested :class:`~krrood.entity_query_language.query.query.Entity`.
+        :param ctx: Shared verbalization state.
+        :returns: A noun-phrase fragment for *expr*.
+        :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment
+        """
+        from krrood.entity_query_language.verbalization.subquery import (
+            is_aggregation_subquery,
+            is_collapsible_aggregation_subquery,
         )
-        var = expr.selected_variable
 
-        if isinstance(var, Entity):
-            selected = self.as_noun(var, ctx)
-        elif var is None:
-            selected_type = FallbackNouns.ENTITY.text
-            ctx.seen[expr._id_] = selected_type
-            selected = FallbackNouns.ENTITY.plural_fragment()
-        elif is_the:
-            selected_type = var._type_.__name__ if getattr(var, "_type_", None) else FallbackNouns.ENTITY.text
-            ctx.seen[var._id_] = selected_type
-            ctx.seen[expr._id_] = selected_type
-            selected = _phrase(Articles.THE_UNIQUE.as_fragment(), _role(selected_type, SemanticRole.VARIABLE))
-        else:
-            selected = self._d.build(var, ctx)
-            selected_type = ctx.seen.get(getattr(var, "_id_", None), FallbackNouns.ENTITY.text)
-            ctx.seen[expr._id_] = selected_type
+        if expr._id_ in ctx.seen:
+            return _phrase(Articles.THE.as_fragment(), _role(ctx.seen[expr._id_], SemanticRole.VARIABLE))
 
-        return self._verbalize_query_body_(expr, ctx, selected)
+        expr.build()
+
+        if is_aggregation_subquery(expr):
+            if is_collapsible_aggregation_subquery(expr):
+                ctx.query_depth += 1
+                try:
+                    return self._d.build(expr.selected_variable, ctx)
+                finally:
+                    ctx.query_depth -= 1
+            return self.verbalize_query(expr, ctx)
+
+        return self.as_noun(expr, ctx)
 
     def as_noun(self, expr: "Entity", ctx: "VerbalizationContext") -> VerbFragment:
         """
@@ -157,7 +204,12 @@ class EntityVerbalizer:
 
         where_expr = expr._where_expression_
         if where_expr is not None:
-            return _phrase(article_noun, Keywords.WHERE.as_fragment(), self._d.build(where_expr.condition, ctx))
+            ctx.query_depth += 1
+            try:
+                condition = self._d.build(where_expr.condition, ctx)
+            finally:
+                ctx.query_depth -= 1
+            return _phrase(article_noun, Keywords.WHERE.as_fragment(), condition)
         return article_noun
 
     def as_inline_noun(self, entity: "Entity", ctx: "VerbalizationContext") -> VerbFragment:
@@ -209,13 +261,17 @@ class EntityVerbalizer:
         :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment
         """
         expr.build()
-        var_frags = [self._d.build(v, ctx) for v in expr._selected_variables_]
-        vars_phrase = PhraseFragment(parts=var_frags, separator=", ")
-        prefix = _phrase(
-            Keywords.FIND_SETS_OF.as_fragment(),
-            PhraseFragment(parts=[_word("("), vars_phrase, _word(")")], separator=""),
-        )
-        return self._verbalize_query_body_(expr, ctx, prefix)
+        ctx.query_depth += 1
+        try:
+            var_frags = [self._d.build(v, ctx) for v in expr._selected_variables_]
+            vars_phrase = PhraseFragment(parts=var_frags, separator=", ")
+            prefix = _phrase(
+                Keywords.FIND_SETS_OF.as_fragment(),
+                PhraseFragment(parts=[_word("("), vars_phrase, _word(")")], separator=""),
+            )
+            return self._verbalize_query_body_(expr, ctx, prefix)
+        finally:
+            ctx.query_depth -= 1
 
     # ── Query body assembly ────────────────────────────────────────────────────
 

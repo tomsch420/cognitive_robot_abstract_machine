@@ -101,6 +101,12 @@ class VerbalizationContext:
         Populated by ``_verbalize_instantiated_natural`` and checked by
         :meth:`~krrood.entity_query_language.verbalization.rule_engine.RuleEngine.build`
         before any rule dispatches.
+    :ivar query_depth: Number of enclosing query/noun renderings currently on the
+        stack.  ``0`` means the next
+        :class:`~krrood.entity_query_language.query.query.Entity` is the top-level
+        request and is rendered in the imperative *"Find … such that …"* form;
+        ``> 0`` means the Entity is nested (a sub-query used as a value) and is
+        rendered as a noun phrase instead.
     """
 
     seen: dict = field(default_factory=dict)
@@ -108,6 +114,7 @@ class VerbalizationContext:
     constraint_exprs: List[List["SymbolicExpression"]] = field(default_factory=list)
     disambiguation_map: Dict[uuid.UUID, str] = field(default_factory=dict)
     binding_overrides: Dict[uuid.UUID, "VerbFragment"] = field(default_factory=dict)
+    query_depth: int = 0
 
     @classmethod
     def from_expression(cls, expr) -> "VerbalizationContext":
