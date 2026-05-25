@@ -20,6 +20,7 @@ import krrood.entity_query_language.factories as eql
 from krrood.entity_query_language.factories import (
     an,
     and_,
+    or_,
     entity,
     variable,
     inference,
@@ -91,7 +92,9 @@ def _collect_role_texts(fragment: VerbFragment, role: SemanticRole) -> list[str]
             return [t for p in parts for t in _collect_role_texts(p, role)]
         case BlockFragment(header=header, items=items):
             result = _collect_role_texts(header, role) if header else []
-            return result + [t for item in items for t in _collect_role_texts(item, role)]
+            return result + [
+                t for item in items for t in _collect_role_texts(item, role)
+            ]
         case _:
             return []
 
@@ -135,14 +138,16 @@ def test_query_where_carries_keyword_role():
     r = variable(_Robot, [])
     frag = EQLVerbalizer().build(an(entity(r).where(r.battery > 50)))
     keyword_texts = _collect_role_texts(frag, SemanticRole.KEYWORD)
-    assert any("such that" in t for t in keyword_texts)
+    assert any("whose" in t for t in keyword_texts)
 
 
 def test_rule_if_then_carry_keyword_role(doors_and_drawers_world):
     world = doors_and_drawers_world
     handle = variable(Handle, world.bodies)
     pc = variable(PrismaticConnection, world.connections)
-    fc = match_variable(FixedConnection, world.connections)(parent=pc.child, child=handle)
+    fc = match_variable(FixedConnection, world.connections)(
+        parent=pc.child, child=handle
+    )
     drawer_var = inference(Drawer)(container=fc.parent, handle=fc.child)
     frag = EQLVerbalizer().build(entity(drawer_var))
     keyword_texts = _collect_role_texts(frag, SemanticRole.KEYWORD)
@@ -158,6 +163,7 @@ def test_logical_for_all_carries_logical_role():
 
 def test_literal_carries_literal_role():
     from krrood.entity_query_language.core.variable import Literal
+
     lit = Literal(_value_=42)
     frag = EQLVerbalizer().build(lit)
     assert SemanticRole.LITERAL in _collect_roles(frag)
@@ -182,10 +188,14 @@ def test_where_clause_condition_preserves_semantic_roles():
 
     robot = variable(_Robot, [])
     mission = variable(_Mission, [])
-    q = an(entity(robot).where(and_(
-        mission.assigned_to == robot,
-        mission.priority > 2,
-    )))
+    q = an(
+        entity(robot).where(
+            and_(
+                mission.assigned_to == robot,
+                mission.priority > 2,
+            )
+        )
+    )
     frag = EQLVerbalizer().build(q)
 
     op_texts = _collect_role_texts(frag, SemanticRole.OPERATOR)
@@ -217,7 +227,9 @@ def test_rule_is_block_fragment(doors_and_drawers_world):
     world = doors_and_drawers_world
     handle = variable(Handle, world.bodies)
     pc = variable(PrismaticConnection, world.connections)
-    fc = match_variable(FixedConnection, world.connections)(parent=pc.child, child=handle)
+    fc = match_variable(FixedConnection, world.connections)(
+        parent=pc.child, child=handle
+    )
     drawer_var = inference(Drawer)(container=fc.parent, handle=fc.child)
     frag = EQLVerbalizer().build(entity(drawer_var))
     assert isinstance(frag, BlockFragment)
@@ -368,7 +380,9 @@ def test_paragraph_renderer_block_flattens_to_prose():
     block = BlockFragment(
         header=RoleFragment("Find", SemanticRole.KEYWORD),
         items=[
-            PhraseFragment([RoleFragment("such that", SemanticRole.KEYWORD), WordFragment("x > 5")]),
+            PhraseFragment(
+                [RoleFragment("such that", SemanticRole.KEYWORD), WordFragment("x > 5")]
+            ),
         ],
     )
     result = r.render(block)
@@ -411,7 +425,9 @@ def test_hierarchical_renderer_block_has_header_line():
 
 
 def test_hierarchical_renderer_items_are_indented():
-    r = HierarchicalRenderer(PlainFormatter(), indent_size=IndentSize.TWO_SPACES, bullet=BulletStyle.DASH)
+    r = HierarchicalRenderer(
+        PlainFormatter(), indent_size=IndentSize.TWO_SPACES, bullet=BulletStyle.DASH
+    )
     block = BlockFragment(
         header=RoleFragment("Find", SemanticRole.KEYWORD),
         items=[WordFragment("a Robot"), WordFragment("b Something")],
@@ -424,7 +440,9 @@ def test_hierarchical_renderer_items_are_indented():
 
 
 def test_hierarchical_renderer_nested_block_deepens_indent():
-    r = HierarchicalRenderer(PlainFormatter(), indent_size=IndentSize.TWO_SPACES, bullet=BulletStyle.DASH)
+    r = HierarchicalRenderer(
+        PlainFormatter(), indent_size=IndentSize.TWO_SPACES, bullet=BulletStyle.DASH
+    )
     inner = BlockFragment(
         header=RoleFragment("such that", SemanticRole.KEYWORD),
         items=[WordFragment("battery > 50")],
@@ -529,8 +547,10 @@ def test_paragraph_html_aggregation_is_colored():
 
 def test_hierarchical_plain_query_structure():
     r = variable(_Robot, [])
+    # An OR condition stays a residual "such that" bullet (it is not a groupable
+    # single-hop subject predicate), so the hierarchical indentation is exercised.
     text = VerbalizationPipeline(HierarchicalRenderer(PlainFormatter())).verbalize(
-        an(entity(r).where(r.battery > 50))
+        an(entity(r).where(or_(r.battery > 50, r.battery < 10)))
     )
     lines = text.splitlines()
     assert any("Find" in l for l in lines)
@@ -539,17 +559,23 @@ def test_hierarchical_plain_query_structure():
     # where clause must be indented relative to Find
     find_line = next(l for l in lines if "Find" in l)
     where_line = next(l for l in lines if "such that" in l)
-    assert len(where_line) - len(where_line.lstrip()) > len(find_line) - len(find_line.lstrip())
+    assert len(where_line) - len(where_line.lstrip()) > len(find_line) - len(
+        find_line.lstrip()
+    )
 
 
 def test_hierarchical_plain_rule_structure(doors_and_drawers_world):
     world = doors_and_drawers_world
     handle = variable(Handle, world.bodies)
     pc = variable(PrismaticConnection, world.connections)
-    fc = match_variable(FixedConnection, world.connections)(parent=pc.child, child=handle)
+    fc = match_variable(FixedConnection, world.connections)(
+        parent=pc.child, child=handle
+    )
     drawer_var = inference(Drawer)(container=fc.parent, handle=fc.child)
 
-    text = VerbalizationPipeline(HierarchicalRenderer(PlainFormatter())).verbalize(entity(drawer_var))
+    text = VerbalizationPipeline(HierarchicalRenderer(PlainFormatter())).verbalize(
+        entity(drawer_var)
+    )
     lines = text.splitlines()
     assert any("If" in l for l in lines)
     assert any("then" in l for l in lines)
@@ -560,7 +586,9 @@ def test_hierarchical_plain_rule_structure(doors_and_drawers_world):
 # ── Rule fragment structure tests ─────────────────────────────────────────────
 
 
-def _find_block_with_keyword(fragment: VerbFragment, keyword: str) -> BlockFragment | None:
+def _find_block_with_keyword(
+    fragment: VerbFragment, keyword: str
+) -> BlockFragment | None:
     """Return the first BlockFragment whose header text contains keyword."""
     if not isinstance(fragment, BlockFragment):
         return None
@@ -577,7 +605,9 @@ def _drawer_rule_fragment(doors_and_drawers_world) -> VerbFragment:
     world = doors_and_drawers_world
     handle = variable(Handle, world.bodies)
     pc = variable(PrismaticConnection, world.connections)
-    fc = match_variable(FixedConnection, world.connections)(parent=pc.child, child=handle)
+    fc = match_variable(FixedConnection, world.connections)(
+        parent=pc.child, child=handle
+    )
     drawer_var = inference(Drawer)(container=fc.parent, handle=fc.child)
     return EQLVerbalizer().build(entity(drawer_var))
 
@@ -606,10 +636,16 @@ def test_rule_if_antecedent_is_block_fragment(doors_and_drawers_world):
     frag = _drawer_rule_fragment(doors_and_drawers_world)
     if_block = _find_block_with_keyword(frag, "If")
     assert if_block is not None
-    antecedent_blocks = [item for item in if_block.items if isinstance(item, BlockFragment)]
-    assert antecedent_blocks, "IF clause must contain at least one antecedent BlockFragment"
+    antecedent_blocks = [
+        item for item in if_block.items if isinstance(item, BlockFragment)
+    ]
+    assert (
+        antecedent_blocks
+    ), "IF clause must contain at least one antecedent BlockFragment"
     for block in antecedent_blocks:
-        assert isinstance(block.header, PhraseFragment), "antecedent intro must be a PhraseFragment"
+        assert isinstance(
+            block.header, PhraseFragment
+        ), "antecedent intro must be a PhraseFragment"
         assert block.items, "antecedent block must have condition items"
 
 
@@ -617,10 +653,14 @@ def test_rule_then_consequent_is_block_fragment(doors_and_drawers_world):
     frag = _drawer_rule_fragment(doors_and_drawers_world)
     then_block = _find_block_with_keyword(frag, "then")
     assert then_block is not None
-    assert len(then_block.items) == 1, "THEN clause must contain exactly one consequent BlockFragment"
+    assert (
+        len(then_block.items) == 1
+    ), "THEN clause must contain exactly one consequent BlockFragment"
     consequent = then_block.items[0]
     assert isinstance(consequent, BlockFragment), "THEN item must be a BlockFragment"
-    assert isinstance(consequent.header, PhraseFragment), "consequent intro must be a PhraseFragment"
+    assert isinstance(
+        consequent.header, PhraseFragment
+    ), "consequent intro must be a PhraseFragment"
     assert "Drawer" in _str(consequent.header)
     assert consequent.items, "consequent block must have binding items"
 
@@ -629,7 +669,10 @@ def test_rule_then_consequent_is_block_fragment(doors_and_drawers_world):
 
 
 def test_pipeline_plain_matches_verbalize_expression():
-    from krrood.entity_query_language.verbalization.verbalizer import verbalize_expression
+    from krrood.entity_query_language.verbalization.verbalizer import (
+        verbalize_expression,
+    )
+
     r = variable(_Robot, [])
     q = an(entity(r).where(r.battery > 50))
     assert VerbalizationPipeline.plain().verbalize(q) == verbalize_expression(q)
@@ -656,9 +699,13 @@ def test_pipeline_html_hierarchical_has_br():
     # assert "<br>" in text
 
 
-def test_pipeline_html_hierarchical_has_br_between_items_on_rule(doors_and_drawers_world):
+def test_pipeline_html_hierarchical_has_br_between_items_on_rule(
+    doors_and_drawers_world,
+):
     drawer_fragment = _drawer_rule_fragment(doors_and_drawers_world)
-    text = VerbalizationPipeline.html(hierarchical=True).verbalize_fragment(drawer_fragment)
+    text = VerbalizationPipeline.html(hierarchical=True).verbalize_fragment(
+        drawer_fragment
+    )
     print_ = False
     if print_:
         print("\n" + text)
@@ -667,10 +714,11 @@ def test_pipeline_html_hierarchical_has_br_between_items_on_rule(doors_and_drawe
 
 def test_pipeline_ansi_hierarchical_has_newlines_on_rule(doors_and_drawers_world):
     drawer_fragment = _drawer_rule_fragment(doors_and_drawers_world)
-    text = VerbalizationPipeline.ansi(hierarchical=True).verbalize_fragment(drawer_fragment)
+    text = VerbalizationPipeline.ansi(hierarchical=True).verbalize_fragment(
+        drawer_fragment
+    )
     print_ = True
     if print_:
         print("\n" + text)
     assert "\n" in text
     assert "<br>" not in text
-

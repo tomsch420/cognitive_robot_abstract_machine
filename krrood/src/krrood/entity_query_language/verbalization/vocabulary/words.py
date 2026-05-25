@@ -98,7 +98,7 @@ class ChildForm(Enum):
       *"maximum of the amount of the amount_details of a BankTransaction"*.
     """
 
-    PLURAL      = "plural"
+    PLURAL = "plural"
     SINGULAR_OF = "singular_of"
 
 
@@ -119,6 +119,16 @@ class OperatorWord(RoleWord):
     """Comparison operator phrase with :attr:`~SemanticRole.OPERATOR` role."""
 
     _role_ = SemanticRole.OPERATOR
+
+
+class PronounWord(RoleWord):
+    """
+    A coreference pronoun (e.g. *"its"*) standing in for a previously introduced
+    variable.  Carries the :attr:`~SemanticRole.VARIABLE` role so it is coloured
+    like the variable it refers to.
+    """
+
+    _role_ = SemanticRole.VARIABLE
 
 
 @dataclass(frozen=True)

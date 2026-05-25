@@ -16,6 +16,7 @@ disambiguation pre-scan
 and the nested-entity renderer
 (:meth:`~krrood.entity_query_language.verbalization.entity_verbalizer.EntityVerbalizer.verbalize_nested`).
 """
+
 from __future__ import annotations
 
 from typing import Optional, TYPE_CHECKING
@@ -54,6 +55,34 @@ def is_aggregation_subquery(entity) -> bool:
     :rtype: bool
     """
     return selected_aggregator(entity) is not None
+
+
+def is_calculation_value(expr) -> bool:
+    """
+    Return ``True`` when *expr* denotes a *calculation* — an
+    :class:`~krrood.entity_query_language.operators.aggregators.Aggregator` or an
+    aggregation sub-query (an :class:`~krrood.entity_query_language.query.query.Entity`
+    selecting one), possibly wrapped in
+    :class:`~krrood.entity_query_language.query.quantifiers.ResultQuantifier` s.
+
+    Used to decide equality wording: ``==`` against a calculation reads
+    *"is equal to"*, while ``==`` against a plain object/value reads *"is"*.
+
+    :param expr: Candidate operand expression.
+    :rtype: bool
+    """
+    from krrood.entity_query_language.operators.aggregators import Aggregator
+    from krrood.entity_query_language.query.quantifiers import ResultQuantifier
+    from krrood.entity_query_language.query.query import Entity
+
+    inner = expr
+    while isinstance(inner, ResultQuantifier):
+        inner = inner._child_
+    if isinstance(inner, Aggregator):
+        return True
+    if isinstance(inner, Entity):
+        return is_aggregation_subquery(inner)
+    return False
 
 
 def is_constrained_query(entity) -> bool:

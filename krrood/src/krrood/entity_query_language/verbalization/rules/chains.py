@@ -2,7 +2,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from krrood.entity_query_language.core.mapped_variable import FlatVariable, MappedVariable
+from krrood.entity_query_language.core.mapped_variable import (
+    Attribute,
+    FlatVariable,
+    MappedVariable,
+)
+from krrood.entity_query_language.verbalization.chain_utils import walk_chain
 from krrood.entity_query_language.verbalization.fragments.base import VerbFragment
 from krrood.entity_query_language.verbalization.rule_engine import VerbalizationRule
 
@@ -28,7 +33,12 @@ class MappedVariableRule(VerbalizationRule):
         return isinstance(expr, MappedVariable)
 
     @classmethod
-    def transform(cls, expr: "MappedVariable", ctx: "VerbalizationContext", delegate: "EQLVerbalizer") -> VerbFragment:
+    def transform(
+        cls,
+        expr: "MappedVariable",
+        ctx: "VerbalizationContext",
+        delegate: "EQLVerbalizer",
+    ) -> VerbFragment:
         """
         Delegate to :meth:`~krrood.entity_query_language.verbalization.chain_verbalizer.ChainVerbalizer.verbalize_mapped`.
 
@@ -39,6 +49,53 @@ class MappedVariableRule(VerbalizationRule):
         :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment
         """
         return delegate._chain.verbalize_mapped(expr, ctx)
+
+
+class PronominalChainRule(MappedVariableRule):
+    """
+    Verbalizes a :class:`~krrood.entity_query_language.core.mapped_variable.MappedVariable`
+    chain whose root is the current coreference subject using a possessive pronoun:
+    *"the amount of its amount_details"* / *"its booking_date"* instead of
+    *"… of the BankTransaction"*.
+
+    Precondition (declarative): the chain has a non-boolean terminal attribute and its
+    root is the unambiguous, already-introduced subject — i.e.
+    :meth:`~krrood.entity_query_language.verbalization.context.VerbalizationContext.pronoun_for`
+    returns a fragment.  Takes priority over :class:`MappedVariableRule` via MRO depth;
+    when the precondition fails it falls through to the plain possessive-path form.
+    """
+
+    @classmethod
+    def applies(cls, expr, ctx: "VerbalizationContext") -> bool:
+        """Return ``True`` for a non-bool chain rooted at the current pronoun-eligible subject."""
+        if not isinstance(expr, MappedVariable) or isinstance(expr, FlatVariable):
+            return False
+        chain, root = walk_chain(expr)
+        if not chain:
+            return False
+        terminal = chain[-1]
+        if isinstance(terminal, Attribute) and terminal._type_ is bool:
+            return False
+        return ctx.pronoun_for(root) is not None
+
+    @classmethod
+    def transform(
+        cls,
+        expr: "MappedVariable",
+        ctx: "VerbalizationContext",
+        delegate: "EQLVerbalizer",
+    ) -> VerbFragment:
+        """
+        Delegate to :meth:`~krrood.entity_query_language.verbalization.chain_verbalizer.ChainVerbalizer.verbalize_possessive`.
+
+        :param expr: Root of a MappedVariable chain rooted at the current subject.
+        :param ctx: Shared verbalization state.
+        :param delegate: Parent verbalizer.
+        :returns: Possessive chain fragment using the *"its"* pronoun.
+        :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment
+        """
+        _chain, root = walk_chain(expr)
+        return delegate._chain.verbalize_possessive(expr, ctx, ctx.pronoun_for(root))
 
 
 class FlatVariableRule(MappedVariableRule):
@@ -58,7 +115,12 @@ class FlatVariableRule(MappedVariableRule):
         return isinstance(expr, FlatVariable)
 
     @classmethod
-    def transform(cls, expr: "FlatVariable", ctx: "VerbalizationContext", delegate: "EQLVerbalizer") -> VerbFragment:
+    def transform(
+        cls,
+        expr: "FlatVariable",
+        ctx: "VerbalizationContext",
+        delegate: "EQLVerbalizer",
+    ) -> VerbFragment:
         """
         Delegate to :meth:`~krrood.entity_query_language.verbalization.chain_verbalizer.ChainVerbalizer.verbalize_flat`.
 

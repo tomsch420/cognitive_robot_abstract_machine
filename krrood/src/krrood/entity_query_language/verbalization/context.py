@@ -25,8 +25,8 @@ class ArticleSelection(Enum):
     :cvar INDEFINITE: First mention of a single-typed variable → ``"a"`` / ``"an"``.
     """
 
-    NONE       = auto()  # numbered variable — no article
-    DEFINITE   = auto()  # subsequent mention → "the"
+    NONE = auto()  # numbered variable — no article
+    DEFINITE = auto()  # subsequent mention → "the"
     INDEFINITE = auto()  # first mention → "a" / "an"
 
 
@@ -89,7 +89,11 @@ def _build_disambiguation_map(expr) -> Dict[uuid.UUID, str]:
         if isinstance(node, Variable) and not isinstance(node, Literal):
             if node._id_ in suppressed:
                 continue
-            type_name = node._type_.__name__ if getattr(node, "_type_", None) else node.__class__.__name__
+            type_name = (
+                node._type_.__name__
+                if getattr(node, "_type_", None)
+                else node.__class__.__name__
+            )
             if node._id_ not in seen_ids:
                 seen_ids.add(node._id_)
                 type_to_ids[type_name].append(node._id_)
@@ -143,6 +147,11 @@ class VerbalizationContext:
         request and is rendered in the imperative *"Find … such that …"* form;
         ``> 0`` means the Entity is nested (a sub-query used as a value) and is
         rendered as a noun phrase instead.
+    :ivar coref_subjects: Stack of subject variable ``_id_`` s (or ``None`` when the
+        enclosing clause has no single coreference subject, e.g. ``SetOf``).  A chain
+        rooted at the top-of-stack subject is eligible for pronominalisation — see
+        :meth:`pronoun_for`.  Pushed/popped by the entity and instantiated-variable
+        verbalizers around the clauses that describe a subject.
     """
 
     seen: dict = field(default_factory=dict)
@@ -151,6 +160,7 @@ class VerbalizationContext:
     disambiguation_map: Dict[uuid.UUID, str] = field(default_factory=dict)
     binding_overrides: Dict[uuid.UUID, "VerbFragment"] = field(default_factory=dict)
     query_depth: int = 0
+    coref_subjects: List[uuid.UUID] = field(default_factory=list)
 
     @classmethod
     def from_expression(cls, expr) -> "VerbalizationContext":
@@ -204,6 +214,64 @@ class VerbalizationContext:
         if self.constraint_exprs:
             self.constraint_exprs[-1].append(expr)
 
+    def push_subject(self, var) -> None:
+        """
+        Push *var* as the current coreference subject.
+
+        Stores the variable's ``_id_`` when *var* is a single
+        :class:`~krrood.entity_query_language.core.variable.Variable`; otherwise
+        stores ``None`` so no pronoun fires (e.g. a ``SetOf`` with several subjects).
+        Always pushes exactly one frame so callers can pair it with
+        :meth:`pop_subject` unconditionally.
+
+        :param var: The subject variable being described, or any non-Variable.
+        """
+        from krrood.entity_query_language.core.variable import Variable
+
+        self.coref_subjects.append(var._id_ if isinstance(var, Variable) else None)
+
+    def pop_subject(self) -> None:
+        """Pop the current coreference subject pushed by :meth:`push_subject`."""
+        if self.coref_subjects:
+            self.coref_subjects.pop()
+
+    @property
+    def current_subject_id(self):
+        """``_id_`` of the current coreference subject, or ``None`` when there is none."""
+        return self.coref_subjects[-1] if self.coref_subjects else None
+
+    def pronoun_for(self, root) -> "Optional[VerbFragment]":
+        """
+        Return the possessive-pronoun fragment (*"its"*) for *root* when it is the
+        current, unambiguous, already-introduced coreference subject; else ``None``.
+
+        Eligibility (all required):
+
+        * *root* is a :class:`~krrood.entity_query_language.core.variable.Variable`;
+        * ``root._id_`` is the top of :attr:`coref_subjects`;
+        * *root* is not numbered in :attr:`disambiguation_map` (a numbered variable
+          such as ``BankTransaction 2`` would make a pronoun ambiguous);
+        * *root* has already been mentioned (is in :attr:`seen`).
+
+        :param root: Candidate chain-root expression.
+        :returns: The *"its"* fragment, or ``None`` when pronominalisation is unsafe.
+        :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment or None
+        """
+        from krrood.entity_query_language.core.variable import Variable
+        from krrood.entity_query_language.verbalization.vocabulary.english import (
+            Pronouns,
+        )
+
+        if not isinstance(root, Variable):
+            return None
+        if root._id_ != self.current_subject_id or root._id_ not in self.seen:
+            return None
+        type_name = root._type_.__name__ if getattr(root, "_type_", None) else None
+        label = self.disambiguation_map.get(root._id_, type_name)
+        if type_name is not None and label != type_name:
+            return None
+        return Pronouns.ITS.as_fragment()
+
     def noun_for_parts(self, var) -> "tuple[ArticleSelection, str]":
         """
         Return ``(ArticleSelection, label)`` for *var*.
@@ -219,13 +287,21 @@ class VerbalizationContext:
         :returns: Tuple of ``(ArticleSelection, display_label)``.
         :rtype: tuple
         """
-        type_name = var._type_.__name__ if getattr(var, "_type_", None) else var.__class__.__name__
+        type_name = (
+            var._type_.__name__
+            if getattr(var, "_type_", None)
+            else var.__class__.__name__
+        )
         label = self.disambiguation_map.get(var._id_, type_name)
         is_numbered = label != type_name
         if var._id_ in self.seen:
-            return (ArticleSelection.NONE if is_numbered else ArticleSelection.DEFINITE), label
+            return (
+                ArticleSelection.NONE if is_numbered else ArticleSelection.DEFINITE
+            ), label
         self.seen[var._id_] = label
-        return (ArticleSelection.NONE if is_numbered else ArticleSelection.INDEFINITE), label
+        return (
+            ArticleSelection.NONE if is_numbered else ArticleSelection.INDEFINITE
+        ), label
 
     def flatten_same_type(self, expr, operator_type) -> List:
         """

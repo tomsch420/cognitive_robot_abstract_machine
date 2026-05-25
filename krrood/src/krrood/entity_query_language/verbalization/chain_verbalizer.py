@@ -4,13 +4,23 @@ ChainVerbalizer — all MappedVariable chain rendering logic.
 Handles Attribute, Index, Call, and FlatVariable expressions, plus the
 boolean-predicate and possessive path forms they produce.
 """
+
 from __future__ import annotations
 
 import datetime as _dt
 from typing import Callable, Optional, TYPE_CHECKING
 
-from krrood.entity_query_language.core.mapped_variable import Attribute, Call, FlatVariable, Index, MappedVariable
-from krrood.entity_query_language.verbalization.chain_utils import build_path_parts, walk_chain
+from krrood.entity_query_language.core.mapped_variable import (
+    Attribute,
+    Call,
+    FlatVariable,
+    Index,
+    MappedVariable,
+)
+from krrood.entity_query_language.verbalization.chain_utils import (
+    build_path_parts,
+    walk_chain,
+)
 from krrood.entity_query_language.verbalization.fragments.base import (
     PhraseFragment,
     RoleFragment,
@@ -31,6 +41,7 @@ if TYPE_CHECKING:
 
 def _word(text: str):
     from krrood.entity_query_language.verbalization.fragments.base import WordFragment
+
     return WordFragment(text=text)
 
 
@@ -71,7 +82,9 @@ class ChainVerbalizer:
 
     # ── Dispatch entry points ──────────────────────────────────────────────────
 
-    def verbalize_mapped(self, expr: MappedVariable, ctx: "VerbalizationContext") -> VerbFragment:
+    def verbalize_mapped(
+        self, expr: MappedVariable, ctx: "VerbalizationContext"
+    ) -> VerbFragment:
         """
         Verbalize a :class:`~krrood.entity_query_language.core.mapped_variable.MappedVariable`
         chain in affirmative form.
@@ -88,7 +101,9 @@ class ChainVerbalizer:
         """
         return self._verbalize_mapped_chain_(expr, ctx)
 
-    def verbalize_mapped_negated(self, expr: MappedVariable, ctx: "VerbalizationContext") -> VerbFragment:
+    def verbalize_mapped_negated(
+        self, expr: MappedVariable, ctx: "VerbalizationContext"
+    ) -> VerbFragment:
         """
         Verbalize a :class:`~krrood.entity_query_language.core.mapped_variable.MappedVariable`
         chain in negated form.
@@ -105,7 +120,38 @@ class ChainVerbalizer:
         """
         return self._verbalize_mapped_chain_(expr, ctx, negated=True)
 
-    def verbalize_flat(self, expr: FlatVariable, ctx: "VerbalizationContext") -> VerbFragment:
+    def verbalize_possessive(
+        self,
+        expr: MappedVariable,
+        ctx: "VerbalizationContext",
+        pronoun_frag: VerbFragment,
+    ) -> VerbFragment:
+        """
+        Verbalize a :class:`~krrood.entity_query_language.core.mapped_variable.MappedVariable`
+        chain whose root is the current coreference subject, replacing the trailing
+        *"of the Root"* with a leading possessive pronoun.
+
+        *"the amount of the amount_details of the BankTransaction"* becomes
+        *"the amount of its amount_details"*; a single-hop *"the booking_date of the
+        BankTransaction"* becomes *"its booking_date"*.
+
+        The decision to use this form (subject eligibility) is made by
+        :class:`~krrood.entity_query_language.verbalization.rules.coreference.PronominalChainRule`
+        via :meth:`~krrood.entity_query_language.verbalization.context.VerbalizationContext.pronoun_for`;
+        this method only renders.
+
+        :param expr: Root node of a non-boolean MappedVariable chain.
+        :param ctx: Shared verbalization state.
+        :param pronoun_frag: The possessive pronoun fragment (e.g. *"its"*).
+        :returns: Possessive path fragment.
+        :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment
+        """
+        chain, _leaf = walk_chain(expr)
+        return self._render_possessive_path_(build_path_parts(chain), pronoun_frag)
+
+    def verbalize_flat(
+        self, expr: FlatVariable, ctx: "VerbalizationContext"
+    ) -> VerbFragment:
         """
         Verbalize a :class:`~krrood.entity_query_language.core.mapped_variable.FlatVariable`
         by delegating to its child expression.
@@ -147,17 +193,44 @@ class ChainVerbalizer:
             _role(first_name, SemanticRole.ATTRIBUTE, first_ref),
         ]
         for attr_name, attr_ref in reversed_parts[1:]:
-            frag_parts.extend([
-                Prepositions.OF_THE.as_fragment(),
-                _role(attr_name, SemanticRole.ATTRIBUTE, attr_ref),
-            ])
+            frag_parts.extend(
+                [
+                    Prepositions.OF_THE.as_fragment(),
+                    _role(attr_name, SemanticRole.ATTRIBUTE, attr_ref),
+                ]
+            )
         frag_parts.extend([Prepositions.OF.as_fragment(), root_frag])
+        return PhraseFragment(parts=frag_parts, separator=" ")
+
+    def _render_possessive_path_(
+        self, parts: list[tuple[str, Optional[SourceRef]]], pronoun_frag: VerbFragment
+    ) -> VerbFragment:
+        if not parts:
+            return pronoun_frag
+        reversed_parts = list(reversed(parts))
+        last = len(reversed_parts) - 1
+        frag_parts: list[VerbFragment] = []
+        for idx, (attr_name, attr_ref) in enumerate(reversed_parts):
+            attr_frag = _role(attr_name, SemanticRole.ATTRIBUTE, attr_ref)
+            if idx == 0 and idx != last:
+                frag_parts.extend([Articles.THE.as_fragment(), attr_frag])
+            elif idx == 0:  # single attribute → "its booking_date"
+                frag_parts.extend([pronoun_frag, attr_frag])
+            elif (
+                idx == last
+            ):  # attribute adjacent to the (elided) root → "of its amount_details"
+                frag_parts.extend(
+                    [Prepositions.OF.as_fragment(), pronoun_frag, attr_frag]
+                )
+            else:
+                frag_parts.extend([Prepositions.OF_THE.as_fragment(), attr_frag])
         return PhraseFragment(parts=frag_parts, separator=" ")
 
     def _verbalize_chain_root_(self, leaf, ctx: VerbalizationContext) -> VerbFragment:
         """Noun phrase for the root of an attribute chain; unwraps ResultQuantifier wrappers."""
         from krrood.entity_query_language.query.quantifiers import ResultQuantifier
         from krrood.entity_query_language.query.query import Entity
+
         inner = leaf
         while isinstance(inner, ResultQuantifier):
             inner = inner._child_
@@ -174,7 +247,12 @@ class ChainVerbalizer:
         if isinstance(nav_chain[-1], Index) and isinstance(nav_chain[-1]._key_, int):
             ordinal = _ordinal(nav_chain[-1]._key_)
             pre_frag = self._render_path_(build_path_parts(nav_chain[:-1]), root_frag)
-            return _phrase(Articles.THE.as_fragment(), _word(ordinal), Prepositions.OF.as_fragment(), pre_frag)
+            return _phrase(
+                Articles.THE.as_fragment(),
+                _word(ordinal),
+                Prepositions.OF.as_fragment(),
+                pre_frag,
+            )
         return self._render_path_(build_path_parts(nav_chain), root_frag)
 
     def _verbalize_bool_attribute_chain_(
@@ -204,6 +282,7 @@ class ChainVerbalizer:
         :rtype: bool
         """
         from krrood.entity_query_language.core.variable import Literal, Variable
+
         if isinstance(expr, Literal):
             return isinstance(expr._value_, _dt.datetime)
         if isinstance(expr, Variable):

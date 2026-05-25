@@ -5,6 +5,7 @@ Handles the full query form ("Find X such that …"), the inline-noun form
 (constraint-deferring), and the standalone-noun form used when an Entity is
 the selected variable of an outer query.
 """
+
 from __future__ import annotations
 
 from typing import Optional, TYPE_CHECKING
@@ -12,7 +13,10 @@ from typing import Optional, TYPE_CHECKING
 from krrood.entity_query_language.core.variable import InstantiatedVariable, Variable
 from krrood.entity_query_language.query.quantifiers import An, ResultQuantifier, The
 from krrood.entity_query_language.query.query import Entity, Query, SetOf
-from krrood.entity_query_language.verbalization.chain_utils import chain_root, verbalize_plural
+from krrood.entity_query_language.verbalization.chain_utils import (
+    chain_root,
+    verbalize_plural,
+)
 from krrood.entity_query_language.verbalization.fragments.base import (
     BlockFragment,
     oxford_and,
@@ -35,6 +39,8 @@ from krrood.entity_query_language.verbalization.vocabulary.english import (
 
 if TYPE_CHECKING:
     from krrood.entity_query_language.verbalization.context import VerbalizationContext
+
+_UNSET = object()
 
 
 def _word(text: str) -> WordFragment:
@@ -66,11 +72,18 @@ class EntityVerbalizer:
     """
 
     def __init__(self, delegate) -> None:
+        from krrood.entity_query_language.verbalization.restriction import (
+            RestrictionClauseBuilder,
+        )
+
         self._d = delegate
+        self._restrictions = RestrictionClauseBuilder(delegate)
 
     # ── Public entry points ────────────────────────────────────────────────────
 
-    def verbalize_query(self, expr: "Entity", ctx: "VerbalizationContext") -> VerbFragment:
+    def verbalize_query(
+        self, expr: "Entity", ctx: "VerbalizationContext"
+    ) -> VerbFragment:
         """
         Full query form: *"Find X such that …"*.
 
@@ -87,7 +100,10 @@ class EntityVerbalizer:
         :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment
         """
         if expr._id_ in ctx.seen:
-            return _phrase(Articles.THE.as_fragment(), _role(ctx.seen[expr._id_], SemanticRole.VARIABLE))
+            return _phrase(
+                Articles.THE.as_fragment(),
+                _role(ctx.seen[expr._id_], SemanticRole.VARIABLE),
+            )
 
         expr.build()
 
@@ -103,26 +119,47 @@ class EntityVerbalizer:
             var = expr.selected_variable
 
             if isinstance(var, Entity):
-                selected = self.as_noun(var, ctx)
-            elif var is None:
-                selected_type = FallbackNouns.ENTITY.text
-                ctx.seen[expr._id_] = selected_type
-                selected = FallbackNouns.ENTITY.plural_fragment()
-            elif is_the:
-                selected_type = var._type_.__name__ if getattr(var, "_type_", None) else FallbackNouns.ENTITY.text
-                ctx.seen[var._id_] = selected_type
-                ctx.seen[expr._id_] = selected_type
-                selected = _phrase(Articles.THE_UNIQUE.as_fragment(), _role(selected_type, SemanticRole.VARIABLE))
-            else:
-                selected = self._d.build(var, ctx)
-                selected_type = ctx.seen.get(getattr(var, "_id_", None), FallbackNouns.ENTITY.text)
-                ctx.seen[expr._id_] = selected_type
+                return self._verbalize_query_body_(expr, ctx, self.as_noun(var, ctx))
+            if var is None:
+                ctx.seen[expr._id_] = FallbackNouns.ENTITY.text
+                return self._verbalize_query_body_(
+                    expr, ctx, FallbackNouns.ENTITY.plural_fragment()
+                )
 
-            return self._verbalize_query_body_(expr, ctx, selected)
+            ctx.push_subject(var)
+            try:
+                if is_the:
+                    selected_type = (
+                        var._type_.__name__
+                        if getattr(var, "_type_", None)
+                        else FallbackNouns.ENTITY.text
+                    )
+                    ctx.seen[var._id_] = selected_type
+                    ctx.seen[expr._id_] = selected_type
+                    selected = _phrase(
+                        Articles.THE_UNIQUE.as_fragment(),
+                        _role(selected_type, SemanticRole.VARIABLE),
+                    )
+                else:
+                    selected = self._d.build(var, ctx)
+                    selected_type = ctx.seen.get(
+                        getattr(var, "_id_", None), FallbackNouns.ENTITY.text
+                    )
+                    ctx.seen[expr._id_] = selected_type
+                selected, where_item = self._apply_subject_restrictions_(
+                    expr, var, selected, ctx
+                )
+                return self._verbalize_query_body_(
+                    expr, ctx, selected, where_item=where_item
+                )
+            finally:
+                ctx.pop_subject()
         finally:
             ctx.query_depth -= 1
 
-    def verbalize_nested(self, expr: "Entity", ctx: "VerbalizationContext") -> VerbFragment:
+    def verbalize_nested(
+        self, expr: "Entity", ctx: "VerbalizationContext"
+    ) -> VerbFragment:
         """
         Noun-phrase form for an :class:`~krrood.entity_query_language.query.query.Entity`
         used as a *value* (e.g. an operand of a comparator) rather than as the
@@ -144,10 +181,15 @@ class EntityVerbalizer:
         :returns: A noun-phrase fragment for *expr*.
         :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment
         """
-        from krrood.entity_query_language.verbalization.subquery import is_aggregation_subquery
+        from krrood.entity_query_language.verbalization.subquery import (
+            is_aggregation_subquery,
+        )
 
         if expr._id_ in ctx.seen:
-            return _phrase(Articles.THE.as_fragment(), _role(ctx.seen[expr._id_], SemanticRole.VARIABLE))
+            return _phrase(
+                Articles.THE.as_fragment(),
+                _role(ctx.seen[expr._id_], SemanticRole.VARIABLE),
+            )
 
         expr.build()
 
@@ -156,7 +198,9 @@ class EntityVerbalizer:
 
         return self.as_noun(expr, ctx)
 
-    def _verbalize_aggregation_value_(self, expr: "Entity", ctx: "VerbalizationContext") -> VerbFragment:
+    def _verbalize_aggregation_value_(
+        self, expr: "Entity", ctx: "VerbalizationContext"
+    ) -> VerbFragment:
         """
         Render an aggregation sub-query as a compact aggregate noun phrase.
 
@@ -178,13 +222,17 @@ class EntityVerbalizer:
         :returns: Aggregate noun-phrase fragment.
         :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment
         """
-        from krrood.entity_query_language.verbalization.rules.aggregators import _AGGREGATION_KIND
+        from krrood.entity_query_language.verbalization.rules.aggregators import (
+            _AGGREGATION_KIND,
+        )
         from krrood.entity_query_language.verbalization.subquery import (
             aggregation_leaf_attribute,
             is_constrained_query,
             selected_aggregator,
         )
-        from krrood.entity_query_language.verbalization.vocabulary.words import ChildForm
+        from krrood.entity_query_language.verbalization.vocabulary.words import (
+            ChildForm,
+        )
 
         aggregator = selected_aggregator(expr)
         leaf = aggregation_leaf_attribute(expr)
@@ -197,8 +245,12 @@ class EntityVerbalizer:
 
         agg_kind = _AGGREGATION_KIND[type(aggregator)]
         plural_leaf = agg_kind.value.child_form == ChildForm.PLURAL
-        leaf_frag = RoleFragment.for_attribute(leaf._owner_class_, leaf._attribute_name_, plural=plural_leaf)
-        aggregate = _phrase(Articles.THE.as_fragment(), agg_kind.as_fragment(), leaf_frag)
+        leaf_frag = RoleFragment.for_attribute(
+            leaf._owner_class_, leaf._attribute_name_, plural=plural_leaf
+        )
+        aggregate = _phrase(
+            Articles.THE.as_fragment(), agg_kind.as_fragment(), leaf_frag
+        )
 
         if aggregator._id_ not in ctx.seen:
             ctx.seen[aggregator._id_] = _str(_phrase(agg_kind.as_fragment(), leaf_frag))
@@ -219,7 +271,9 @@ class EntityVerbalizer:
         :returns: Aggregate phrase extended with its scope and filter.
         :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment
         """
-        from krrood.entity_query_language.verbalization.subquery import aggregation_source_root
+        from krrood.entity_query_language.verbalization.subquery import (
+            aggregation_source_root,
+        )
 
         source = aggregation_source_root(expr)
         source_frag = (
@@ -233,10 +287,15 @@ class EntityVerbalizer:
         if where_expr is not None:
             ctx.query_depth += 1
             try:
-                condition = self._d.build(where_expr.condition, ctx)
+                whose, residual = self._restrictions.build(
+                    source, where_expr.condition, ctx
+                )
             finally:
                 ctx.query_depth -= 1
-            parts += [Keywords.SUCH_THAT.as_fragment(), condition]
+            if whose is not None:
+                parts.append(whose)
+            if residual is not None:
+                parts += [Keywords.SUCH_THAT.as_fragment(), residual]
 
         having_expr = expr._having_expression_
         if having_expr is not None:
@@ -267,7 +326,10 @@ class EntityVerbalizer:
         :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment
         """
         if expr._id_ in ctx.seen:
-            return _phrase(Articles.THE.as_fragment(), _role(ctx.seen[expr._id_], SemanticRole.VARIABLE))
+            return _phrase(
+                Articles.THE.as_fragment(),
+                _role(ctx.seen[expr._id_], SemanticRole.VARIABLE),
+            )
 
         expr.build()
         is_the = (
@@ -275,14 +337,19 @@ class EntityVerbalizer:
             and expr._quantifier_builder_.type is The
         )
         var = expr.selected_variable
-        selected_type = var._type_.__name__ if var and getattr(var, "_type_", None) else FallbackNouns.ENTITY.text
+        selected_type = (
+            var._type_.__name__
+            if var and getattr(var, "_type_", None)
+            else FallbackNouns.ENTITY.text
+        )
         ctx.seen[expr._id_] = selected_type
         if var is not None:
             ctx.seen[var._id_] = selected_type
 
         if is_the:
             article_noun: VerbFragment = _phrase(
-                Articles.THE_UNIQUE.as_fragment(), RoleFragment.for_variable(selected_type, var)
+                Articles.THE_UNIQUE.as_fragment(),
+                RoleFragment.for_variable(selected_type, var),
             )
         else:
             article_noun = _phrase(
@@ -291,16 +358,25 @@ class EntityVerbalizer:
             )
 
         where_expr = expr._where_expression_
-        if where_expr is not None:
-            ctx.query_depth += 1
-            try:
-                condition = self._d.build(where_expr.condition, ctx)
-            finally:
-                ctx.query_depth -= 1
-            return _phrase(article_noun, Keywords.WHERE.as_fragment(), condition)
-        return article_noun
+        if where_expr is None:
+            return article_noun
+        ctx.query_depth += 1
+        ctx.push_subject(var)
+        try:
+            whose, residual = self._restrictions.build(var, where_expr.condition, ctx)
+        finally:
+            ctx.pop_subject()
+            ctx.query_depth -= 1
+        result = article_noun
+        if whose is not None:
+            result = _phrase(result, whose)
+        if residual is not None:
+            result = _phrase(result, Keywords.WHERE.as_fragment(), residual)
+        return result
 
-    def as_inline_noun(self, entity: "Entity", ctx: "VerbalizationContext") -> VerbFragment:
+    def as_inline_noun(
+        self, entity: "Entity", ctx: "VerbalizationContext"
+    ) -> VerbFragment:
         """
         Inline-noun form used as a chain root inside an
         :class:`~krrood.entity_query_language.core.variable.InstantiatedVariable`.
@@ -318,7 +394,10 @@ class EntityVerbalizer:
         :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment
         """
         if entity._id_ in ctx.seen:
-            return _phrase(Articles.THE.as_fragment(), _role(ctx.seen[entity._id_], SemanticRole.VARIABLE))
+            return _phrase(
+                Articles.THE.as_fragment(),
+                _role(ctx.seen[entity._id_], SemanticRole.VARIABLE),
+            )
 
         entity.build()
         var = entity.selected_variable
@@ -332,9 +411,13 @@ class EntityVerbalizer:
         if where_expr is not None:
             ctx.defer_constraint(where_expr.condition)
 
-        return _phrase(Articles.indefinite(type_name), RoleFragment.for_variable(type_name, var))
+        return _phrase(
+            Articles.indefinite(type_name), RoleFragment.for_variable(type_name, var)
+        )
 
-    def verbalize_set_of(self, expr: "SetOf", ctx: "VerbalizationContext") -> VerbFragment:
+    def verbalize_set_of(
+        self, expr: "SetOf", ctx: "VerbalizationContext"
+    ) -> VerbFragment:
         """
         Verbalize a :class:`~krrood.entity_query_language.query.query.SetOf` query.
 
@@ -355,7 +438,9 @@ class EntityVerbalizer:
             vars_phrase = PhraseFragment(parts=var_frags, separator=", ")
             prefix = _phrase(
                 Keywords.FIND_SETS_OF.as_fragment(),
-                PhraseFragment(parts=[_word("("), vars_phrase, _word(")")], separator=""),
+                PhraseFragment(
+                    parts=[_word("("), vars_phrase, _word(")")], separator=""
+                ),
             )
             return self._verbalize_query_body_(expr, ctx, prefix)
         finally:
@@ -363,8 +448,39 @@ class EntityVerbalizer:
 
     # ── Query body assembly ────────────────────────────────────────────────────
 
+    def _apply_subject_restrictions_(
+        self, expr, var, selected: VerbFragment, ctx: "VerbalizationContext"
+    ) -> "tuple[VerbFragment, object]":
+        """
+        For a single plain-:class:`~krrood.entity_query_language.core.variable.Variable`
+        subject with a ``WHERE`` clause, fold single-hop attribute predicates into a
+        *"whose …"* modifier appended to *selected* and return the residual as the
+        *"such that"* item.
+
+        Returns ``(selected, _UNSET)`` when no grouping applies, so
+        :meth:`_verbalize_query_body_` computes the WHERE clause itself as before.
+        """
+        from krrood.entity_query_language.core.variable import Variable
+
+        where_expr = expr._where_expression_
+        if where_expr is None or not isinstance(var, Variable):
+            return selected, _UNSET
+        whose, residual = self._restrictions.build(var, where_expr.condition, ctx)
+        if whose is not None:
+            selected = _phrase(selected, whose)
+        where_item = (
+            _phrase(Keywords.SUCH_THAT.as_fragment(), residual)
+            if residual is not None
+            else None
+        )
+        return selected, where_item
+
     def _verbalize_query_body_(
-        self, expr, ctx: "VerbalizationContext", selection: VerbFragment
+        self,
+        expr,
+        ctx: "VerbalizationContext",
+        selection: VerbFragment,
+        where_item=_UNSET,
     ) -> VerbFragment:
         """
         Assemble the full *"Find <selection> such that … grouped by … having … ordered by …"* block.
@@ -372,20 +488,30 @@ class EntityVerbalizer:
         :param expr: Entity or SetOf expression supplying the clause expressions.
         :param ctx: Shared verbalization state.
         :param selection: Pre-built fragment for the selected variable(s).
+        :param where_item: Precomputed WHERE-clause fragment (or ``None`` for no clause).
+            When ``_UNSET`` (the default), the WHERE clause is built from *expr* — used by
+            ``SetOf`` and the non-grouping subject paths.
         :returns: A :class:`~krrood.entity_query_language.verbalization.fragments.base.BlockFragment`
             with the selection as header and clause items.
         :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment
         """
         header = _phrase(Keywords.FIND.as_fragment(), selection)
-        clauses = [c for c in [
-            self._where_clause(expr, ctx),
-            self._grouped_by_clause(expr, ctx),
-            self._having_clause(expr, ctx),
-            self._ordered_by_clause(expr, ctx),
-        ] if c is not None]
+        where = self._where_clause(expr, ctx) if where_item is _UNSET else where_item
+        clauses = [
+            c
+            for c in [
+                where,
+                self._grouped_by_clause(expr, ctx),
+                self._having_clause(expr, ctx),
+                self._ordered_by_clause(expr, ctx),
+            ]
+            if c is not None
+        ]
         return BlockFragment(header=header, items=clauses)
 
-    def _where_clause(self, expr, ctx: "VerbalizationContext") -> Optional[VerbFragment]:
+    def _where_clause(
+        self, expr, ctx: "VerbalizationContext"
+    ) -> Optional[VerbFragment]:
         """
         Build the *"such that <condition>"* fragment, or ``None`` when no WHERE expression exists.
 
@@ -397,9 +523,13 @@ class EntityVerbalizer:
         where_expr = expr._where_expression_
         if where_expr is None:
             return None
-        return _phrase(Keywords.SUCH_THAT.as_fragment(), self._d.build(where_expr.condition, ctx))
+        return _phrase(
+            Keywords.SUCH_THAT.as_fragment(), self._d.build(where_expr.condition, ctx)
+        )
 
-    def _grouped_by_clause(self, expr, ctx: "VerbalizationContext") -> Optional[VerbFragment]:
+    def _grouped_by_clause(
+        self, expr, ctx: "VerbalizationContext"
+    ) -> Optional[VerbFragment]:
         """
         Build the *"and the <aggregated> are grouped by <keys>"* fragment, or ``None``.
 
@@ -412,11 +542,15 @@ class EntityVerbalizer:
         if grouped_expr is None or not grouped_expr.variables_to_group_by:
             return None
         group_key_root_ids = self._root_var_ids_(grouped_expr.variables_to_group_by)
-        group_frags = [self._d.build(v, ctx) for v in grouped_expr.variables_to_group_by]
+        group_frags = [
+            self._d.build(v, ctx) for v in grouped_expr.variables_to_group_by
+        ]
         groups_phrase = PhraseFragment(parts=group_frags, separator=", ")
         aggregated_frags = self._aggregated_noun_frags_(expr, group_key_root_ids, ctx)
         if aggregated_frags:
-            aggregated_phrase = oxford_and(aggregated_frags, Conjunctions.AND.as_fragment())
+            aggregated_phrase = oxford_and(
+                aggregated_frags, Conjunctions.AND.as_fragment()
+            )
             return _phrase(
                 Conjunctions.AND.as_fragment(),
                 Articles.THE.as_fragment(),
@@ -427,7 +561,9 @@ class EntityVerbalizer:
             )
         return _phrase(Keywords.GROUPED_BY.as_fragment(), groups_phrase)
 
-    def _having_clause(self, expr, ctx: "VerbalizationContext") -> Optional[VerbFragment]:
+    def _having_clause(
+        self, expr, ctx: "VerbalizationContext"
+    ) -> Optional[VerbFragment]:
         """
         Build the *"having <condition>"* fragment with compact comparators, or ``None``.
 
@@ -447,7 +583,9 @@ class EntityVerbalizer:
         ctx.compact_predicates = False
         return _phrase(Keywords.HAVING.as_fragment(), having_frag)
 
-    def _ordered_by_clause(self, expr, ctx: "VerbalizationContext") -> Optional[VerbFragment]:
+    def _ordered_by_clause(
+        self, expr, ctx: "VerbalizationContext"
+    ) -> Optional[VerbFragment]:
         """
         Build the *"ordered by <variable> (ascending|descending)"* fragment, or ``None``.
 
@@ -465,7 +603,9 @@ class EntityVerbalizer:
             else SortDirections.ASCENDING.as_fragment()
         )
         ordered_frag = self._d.build(ob.variable, ctx)
-        paren_frag = PhraseFragment(parts=[_word("("), direction_frag, _word(")")], separator="")
+        paren_frag = PhraseFragment(
+            parts=[_word("("), direction_frag, _word(")")], separator=""
+        )
         return _phrase(Keywords.ORDERED_BY.as_fragment(), ordered_frag, paren_frag)
 
     # ── Grouping helpers ──────────────────────────────────────────────────────
@@ -481,7 +621,9 @@ class EntityVerbalizer:
 
     @staticmethod
     def _aggregated_expressions_(query_expr, group_key_root_ids: set) -> list:
-        selected_var = query_expr.selected_variable if isinstance(query_expr, Entity) else None
+        selected_var = (
+            query_expr.selected_variable if isinstance(query_expr, Entity) else None
+        )
         if isinstance(selected_var, InstantiatedVariable):
             result = []
             for child in selected_var._child_vars_.values():
@@ -490,7 +632,11 @@ class EntityVerbalizer:
                     result.append(child)
             return result
         if isinstance(query_expr, Query):
-            return [v for v in query_expr._selected_variables_ if v._id_ not in group_key_root_ids]
+            return [
+                v
+                for v in query_expr._selected_variables_
+                if v._id_ not in group_key_root_ids
+            ]
         return []
 
     def _aggregated_noun_frags_(

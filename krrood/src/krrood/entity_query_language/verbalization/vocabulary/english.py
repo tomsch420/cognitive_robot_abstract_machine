@@ -40,6 +40,7 @@ from krrood.entity_query_language.verbalization.vocabulary.words import (
     OperatorPhrase,
     OperatorWord,
     PlainWord,
+    PronounWord,
     VocabEnum,
 )
 
@@ -102,7 +103,9 @@ class PluralExistential(PlainWord):
         return PhraseFragment(
             parts=[
                 self.as_fragment(),
-                RoleFragment(text=_ensure_plural(type_name), role=SemanticRole.VARIABLE),
+                RoleFragment(
+                    text=_ensure_plural(type_name), role=SemanticRole.VARIABLE
+                ),
             ],
             separator=" ",
         )
@@ -167,39 +170,39 @@ class CommonGroupKeyWord(PlainWord):
 class Keywords(VocabEnum):
     """EQL structural keywords (IF, THEN, FIND, WHERE, etc.)."""
 
-    IF           = KeyWord("If")
-    THEN         = KeyWord("then")
-    FIND         = KeyWord("Find")
+    IF = KeyWord("If")
+    THEN = KeyWord("then")
+    FIND = KeyWord("Find")
     FIND_SETS_OF = KeyWord("Find sets of")
-    SUCH_THAT    = KeyWord("such that")
-    WHERE        = KeyWord("where")
-    WHOSE        = KeyWord("whose")
-    GROUPED_BY   = KeyWord("grouped by")
-    GROUPED      = KeyWord("grouped")
-    HAVING       = KeyWord("having")
-    ORDERED_BY   = KeyWord("ordered by")
-    TRUE         = KeyWord("true")
+    SUCH_THAT = KeyWord("such that")
+    WHERE = KeyWord("where")
+    WHOSE = KeyWord("whose")
+    GROUPED_BY = KeyWord("grouped by")
+    GROUPED = KeyWord("grouped")
+    HAVING = KeyWord("having")
+    ORDERED_BY = KeyWord("ordered by")
+    TRUE = KeyWord("true")
 
 
 class Logicals(VocabEnum):
     """Logical connectives (NOT, FOR ALL, THERE EXISTS, EITHER)."""
 
-    NOT          = LogicalWord("not")
-    EITHER       = LogicalWord("either")
-    FOR_ALL      = LogicalWord("for all")
+    NOT = LogicalWord("not")
+    EITHER = LogicalWord("either")
+    FOR_ALL = LogicalWord("for all")
     THERE_EXISTS = LogicalWord("there exists")
 
 
 class Aggregations(VocabEnum):
     """Aggregation function phrases (number of, sum of, average of, etc.)."""
 
-    COUNT      = AggregationWord("number of")
-    COUNT_ALL  = AggregationWord("count of all")
-    SUM        = AggregationWord("sum of")
-    AVERAGE    = AggregationWord("average of")
-    MAX        = AggregationWord("maximum",   child_form=ChildForm.SINGULAR_OF)
-    MIN        = AggregationWord("minimum",   child_form=ChildForm.SINGULAR_OF)
-    MODE       = AggregationWord("mode of")
+    COUNT = AggregationWord("number of")
+    COUNT_ALL = AggregationWord("count of all")
+    SUM = AggregationWord("sum of")
+    AVERAGE = AggregationWord("average of")
+    MAX = AggregationWord("maximum", child_form=ChildForm.SINGULAR_OF)
+    MIN = AggregationWord("minimum", child_form=ChildForm.SINGULAR_OF)
+    MODE = AggregationWord("mode of")
     MULTI_MODE = AggregationWord("all modes of")
 
 
@@ -207,30 +210,49 @@ class Copulas(VocabEnum):
     """Copula verbs (IS, IS NOT, ARE). Role is OPERATOR — copulas appear alongside comparators visually."""
 
     # role = OPERATOR — copulas appear alongside comparison operators visually
-    IS     = OperatorWord("is")
+    IS = OperatorWord("is")
     IS_NOT = OperatorWord("is not")
-    ARE    = OperatorWord("are")
+    ARE = OperatorWord("are")
 
 
 class Prepositions(VocabEnum):
     """Prepositions used in possessive path phrases (OF, OF THE) and aggregate scopes (AMONG)."""
 
-    OF     = PlainWord("of")
+    OF = PlainWord("of")
     OF_THE = PlainWord("of the")
-    AMONG  = PlainWord("among")
+    AMONG = PlainWord("among")
 
 
 class Conjunctions(VocabEnum):
     """Coordinating conjunctions (AND, OR)."""
 
     AND = PlainWord("and")
-    OR  = PlainWord("or")
+    OR = PlainWord("or")
+
+
+class Pronouns(VocabEnum):
+    """Coreference pronouns standing in for a previously introduced variable."""
+
+    ITS = PronounWord("its")
+
+
+class RangePhrases(VocabEnum):
+    """
+    Range (``between``) operator phrases produced when a lower-bound and an
+    upper-bound comparison on the same attribute are folded together.
+
+    * :attr:`IS_BETWEEN` — standard form keeping the copula (*"is between"*).
+    * :attr:`BETWEEN` — copula-less form for HAVING / post-nominal use (*"between"*).
+    """
+
+    IS_BETWEEN = OperatorWord("is between")
+    BETWEEN = OperatorWord("between")
 
 
 class SortDirections(VocabEnum):
     """Sort direction words for ORDERED BY clauses."""
 
-    ASCENDING  = PlainWord("ascending")
+    ASCENDING = PlainWord("ascending")
     DESCENDING = PlainWord("descending")
 
 
@@ -239,7 +261,7 @@ class Articles(VocabEnum):
     Definite articles (THE, THE UNIQUE) and a static helper for indefinite articles.
     """
 
-    THE        = PlainWord("the")
+    THE = PlainWord("the")
     THE_UNIQUE = PlainWord("the unique")
 
     @staticmethod
@@ -265,7 +287,7 @@ class ExistentialPhrase(VocabEnum):
     """
 
     THERE_IS_A = SingularExistential("there's")
-    THERE_ARE  = PluralExistential("there are")
+    THERE_ARE = PluralExistential("there are")
 
     def build_phrase(self, type_name: str) -> VerbFragment:
         """
@@ -332,48 +354,82 @@ class Operators(Enum):
     """
 
     EQ = OperatorPhrase(
-        standard="is",           compact="equals",
-        negated="is not",        negated_compact="does not equal",
-        temporal="is at",        temporal_compact="at",
-        temporal_negated="is not at", temporal_negated_compact="not at",
+        standard="is",
+        compact="equals",
+        negated="is not",
+        negated_compact="does not equal",
+        temporal="is at",
+        temporal_compact="at",
+        temporal_negated="is not at",
+        temporal_negated_compact="not at",
     )
     NE = OperatorPhrase(
-        standard="is not",       compact="does not equal",
-        negated="is",            negated_compact="equals",
-        temporal="is not at",    temporal_compact="not at",
-        temporal_negated="is at", temporal_negated_compact="at",
+        standard="is not",
+        compact="does not equal",
+        negated="is",
+        negated_compact="equals",
+        temporal="is not at",
+        temporal_compact="not at",
+        temporal_negated="is at",
+        temporal_negated_compact="at",
     )
     LT = OperatorPhrase(
-        standard="is less than",     compact="less than",
-        negated="is not less than",  negated_compact="not less than",
-        temporal="is before",        temporal_compact="before",
-        temporal_negated="is no earlier than", temporal_negated_compact="no earlier than",
+        standard="is less than",
+        compact="less than",
+        negated="is not less than",
+        negated_compact="not less than",
+        temporal="is before",
+        temporal_compact="before",
+        temporal_negated="is no earlier than",
+        temporal_negated_compact="no earlier than",
     )
     LE = OperatorPhrase(
-        standard="is at most",   compact="at most",
-        negated="is not at most", negated_compact="not at most",
-        temporal="is no later than",  temporal_compact="no later than",
-        temporal_negated="is after",  temporal_negated_compact="after",
+        standard="is at most",
+        compact="at most",
+        negated="is not at most",
+        negated_compact="not at most",
+        temporal="is no later than",
+        temporal_compact="no later than",
+        temporal_negated="is after",
+        temporal_negated_compact="after",
     )
     GT = OperatorPhrase(
-        standard="is greater than",     compact="greater than",
-        negated="is not greater than",  negated_compact="not greater than",
-        temporal="is after",            temporal_compact="after",
-        temporal_negated="is no later than", temporal_negated_compact="no later than",
+        standard="is greater than",
+        compact="greater than",
+        negated="is not greater than",
+        negated_compact="not greater than",
+        temporal="is after",
+        temporal_compact="after",
+        temporal_negated="is no later than",
+        temporal_negated_compact="no later than",
     )
     GE = OperatorPhrase(
-        standard="is at least",   compact="at least",
-        negated="is not at least", negated_compact="not at least",
-        temporal="is no earlier than",  temporal_compact="no earlier than",
-        temporal_negated="is before",   temporal_negated_compact="before",
+        standard="is at least",
+        compact="at least",
+        negated="is not at least",
+        negated_compact="not at least",
+        temporal="is no earlier than",
+        temporal_compact="no earlier than",
+        temporal_negated="is before",
+        temporal_negated_compact="before",
+    )
+    CALC_EQ = OperatorPhrase(
+        standard="is equal to",
+        compact="equals",
+        negated="is not equal to",
+        negated_compact="does not equal",
     )
     CONTAINS = OperatorPhrase(
-        standard="contains",          compact="contains",
-        negated="does not contain",   negated_compact="does not contain",
+        standard="contains",
+        compact="contains",
+        negated="does not contain",
+        negated_compact="does not contain",
     )
     NOT_CONTAINS = OperatorPhrase(
-        standard="does not contain",  compact="does not contain",
-        negated="contains",           negated_compact="contains",
+        standard="does not contain",
+        compact="does not contain",
+        negated="contains",
+        negated_compact="contains",
     )
 
     def select(
@@ -405,15 +461,18 @@ class Operators(Enum):
         :rtype: Operators
         :raises KeyError: If *fn* has no registered mapping.
         """
-        from krrood.entity_query_language.operators.comparator import not_contains as _nc
+        from krrood.entity_query_language.operators.comparator import (
+            not_contains as _nc,
+        )
+
         _MAP = {
-            _operator.eq:       cls.EQ,
-            _operator.ne:       cls.NE,
-            _operator.lt:       cls.LT,
-            _operator.le:       cls.LE,
-            _operator.gt:       cls.GT,
-            _operator.ge:       cls.GE,
+            _operator.eq: cls.EQ,
+            _operator.ne: cls.NE,
+            _operator.lt: cls.LT,
+            _operator.le: cls.LE,
+            _operator.gt: cls.GT,
+            _operator.ge: cls.GE,
             _operator.contains: cls.CONTAINS,
-            _nc:                cls.NOT_CONTAINS,
+            _nc: cls.NOT_CONTAINS,
         }
         return _MAP[fn]

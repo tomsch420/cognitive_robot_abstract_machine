@@ -237,14 +237,17 @@ def test_verbalize_flat_variable_delegates_to_child():
 # ── Unit tests: comparators ────────────────────────────────────────────────────
 
 
-@pytest.mark.parametrize("op,word", [
-    ("__gt__", "greater than"),
-    ("__lt__", "less than"),
-    ("__ge__", "at least"),
-    ("__le__", "at most"),
-    ("__eq__", "is"),
-    ("__ne__", "is not"),
-])
+@pytest.mark.parametrize(
+    "op,word",
+    [
+        ("__gt__", "greater than"),
+        ("__lt__", "less than"),
+        ("__ge__", "at least"),
+        ("__le__", "at most"),
+        ("__eq__", "is"),
+        ("__ne__", "is not"),
+    ],
+)
 def test_verbalize_comparator_operators(op, word):
     x = variable(int, [1])
     comp = getattr(x, op)(5)
@@ -395,14 +398,18 @@ def test_max_single_attribute_chain():
     """MAX on a single-level attribute: 'the maximum of the <attr> of a <Type>'."""
     t = variable(BankTransaction, domain=None)
     text = verbalize_expression(an(entity(eql.max(t.amount_details))))
-    assert "the maximum of the amount_details of a BankTransaction" in text, f"Got: {text!r}"
+    assert (
+        "the maximum of the amount_details of a BankTransaction" in text
+    ), f"Got: {text!r}"
 
 
 def test_min_single_attribute_chain():
     """MIN on a single-level attribute: 'the minimum of the <attr> of a <Type>'."""
     t = variable(BankTransaction, domain=None)
     text = verbalize_expression(an(entity(eql.min(t.amount_details))))
-    assert "the minimum of the amount_details of a BankTransaction" in text, f"Got: {text!r}"
+    assert (
+        "the minimum of the amount_details of a BankTransaction" in text
+    ), f"Got: {text!r}"
 
 
 def test_max_multi_level_attribute_chain():
@@ -410,7 +417,9 @@ def test_max_multi_level_attribute_chain():
     t = variable(BankTransaction, domain=None)
     query = an(entity(eql.max(t.amount_details.amount)))
     text = verbalize_expression(query)
-    assert "the maximum of the amount of the amount_details of a BankTransaction" in text, f"Got: {text!r}"
+    assert (
+        "the maximum of the amount of the amount_details of a BankTransaction" in text
+    ), f"Got: {text!r}"
 
 
 def test_min_multi_level_attribute_chain():
@@ -418,7 +427,9 @@ def test_min_multi_level_attribute_chain():
     t = variable(BankTransaction, domain=None)
     query = an(entity(eql.min(t.amount_details.amount)))
     text = verbalize_expression(query)
-    assert "the minimum of the amount of the amount_details of a BankTransaction" in text, f"Got: {text!r}"
+    assert (
+        "the minimum of the amount of the amount_details of a BankTransaction" in text
+    ), f"Got: {text!r}"
 
 
 def test_max_re_mention_in_having():
@@ -427,7 +438,9 @@ def test_max_re_mention_in_having():
     max_amount = eql.max(t.amount_details.amount)
     query = a(set_of(max_amount).grouped_by(t.amount_details).having(max_amount > 100))
     text = verbalize_expression(query)
-    assert text.count("the maximum of") >= 2, f"Expected ≥2 occurrences of 'the maximum of' in: {text!r}"
+    assert (
+        text.count("the maximum of") >= 2
+    ), f"Expected ≥2 occurrences of 'the maximum of' in: {text!r}"
 
 
 # ── Nested sub-queries as values (the imperative "Find" is reserved for the top level) ──
@@ -438,7 +451,9 @@ def test_nested_unconstrained_aggregation_no_second_find():
     t1 = variable(BankTransaction, domain=None)
     t2 = variable(BankTransaction, domain=None)
     query = eql.the(
-        entity(t1).where(t1.amount_details.amount == an(entity(eql.max(t2.amount_details.amount))))
+        entity(t1).where(
+            t1.amount_details.amount == an(entity(eql.max(t2.amount_details.amount)))
+        )
     )
     text = verbalize_expression(query)
     assert text.count("Find") == 1, f"Expected exactly one 'Find' in: {text!r}"
@@ -481,10 +496,12 @@ def test_nested_aggregation_collapses_to_compact_amount():
     t1 = variable(BankTransaction, domain=None)
     t2 = variable(BankTransaction, domain=None)
     query = eql.the(
-        entity(t1).where(t1.amount_details.amount == an(entity(eql.max(t2.amount_details.amount))))
+        entity(t1).where(
+            t1.amount_details.amount == an(entity(eql.max(t2.amount_details.amount)))
+        )
     )
     text = verbalize_expression(query)
-    assert "is the maximum amount" in text, f"Got: {text!r}"
+    assert "is equal to the maximum amount" in text, f"Got: {text!r}"
 
 
 def test_nested_aggregation_sum_uses_plural_leaf():
@@ -492,7 +509,9 @@ def test_nested_aggregation_sum_uses_plural_leaf():
     t1 = variable(BankTransaction, domain=None)
     t2 = variable(BankTransaction, domain=None)
     query = eql.the(
-        entity(t1).where(t1.amount_details.amount == an(entity(eql.sum(t2.amount_details.amount))))
+        entity(t1).where(
+            t1.amount_details.amount == an(entity(eql.sum(t2.amount_details.amount)))
+        )
     )
     text = verbalize_expression(query)
     assert "the sum of amounts" in text, f"Got: {text!r}"
@@ -523,10 +542,12 @@ def test_nested_aggregation_source_not_numbered_on_outer_subject():
     t1 = variable(BankTransaction, domain=None)
     t2 = variable(BankTransaction, domain=None)
     query = eql.the(
-        entity(t1).where(t1.amount_details.amount == an(entity(eql.max(t2.amount_details.amount))))
+        entity(t1).where(
+            t1.amount_details.amount == an(entity(eql.max(t2.amount_details.amount)))
+        )
     )
     text = verbalize_expression(query)
-    assert "of the BankTransaction is the maximum amount" in text, f"Got: {text!r}"
+    assert "its amount_details is equal to the maximum amount" in text, f"Got: {text!r}"
     assert "BankTransaction 1" not in text, f"Spurious numbering in: {text!r}"
 
 
@@ -664,7 +685,9 @@ def test_verbalize_nested_rule(doors_and_drawers_world):
     assert text.startswith("If "), f"Expected 'If' at start, got: {text!r}"
     assert "then" in text, f"Expected 'then' in: {text!r}"
     # IF clause introduces the FixedConnection antecedent
-    assert "there's a FixedConnection" in text, f"Expected 'there's a FixedConnection' in: {text!r}"
+    assert (
+        "there's a FixedConnection" in text
+    ), f"Expected 'there's a FixedConnection' in: {text!r}"
     # IF clause describes its bindings as "whose" clauses
     assert "whose parent is the child of a PrismaticConnection" in text
     assert "whose child is a Handle" in text
@@ -696,11 +719,7 @@ def test_verbalize_has_type_with_exists():
     fb1 = FruitBox("FruitBox1", [Apple("apple"), Body("Body1")])
     fb2 = FruitBox("FruitBox2", [Body("Body3")])
     fb = variable(FruitBox, domain=[fb1, fb2])
-    query = an(
-        entity(fb).where(
-            exists(fb, HasType(flat_variable(fb.fruits), Apple))
-        )
-    )
+    query = an(entity(fb).where(exists(fb, HasType(flat_variable(fb.fruits), Apple))))
     text = verbalize_expression(query)
 
     assert "FruitBox" in text
@@ -815,7 +834,9 @@ def test_verbalize_predicate_no_template_no_args_fallback():
 # ── Aggregator coreference & HAVING compact form ──────────────────────────────
 
 
-def test_aggregator_coreference_second_mention_is_the(departments_and_employees_fixture):
+def test_aggregator_coreference_second_mention_is_the(
+    departments_and_employees_fixture,
+):
     """Same aggregator expression in set_of and having → both mentions include 'the'."""
     _, _ = departments_and_employees_fixture
     emp = variable(Employee, domain=None)
@@ -832,23 +853,25 @@ def test_having_comparator_omits_is_copula(departments_and_employees_fixture):
     emp = variable(Employee, domain=None)
     avg_salary = eql.average(emp.salary)
     query = a(
-        set_of(emp.department, avg_salary).grouped_by(emp.department).having(avg_salary > 30000)
+        set_of(emp.department, avg_salary)
+        .grouped_by(emp.department)
+        .having(avg_salary > 30000)
     )
     text = verbalize_expression(query)
 
-    having_part = text[text.index("having"):]
+    having_part = text[text.index("having") :]
     assert "is greater than" not in having_part
     assert "greater than" in having_part
 
 
 def test_where_keeps_is_copula(departments_and_employees_fixture):
-    """WHERE condition must still use the full 'is greater than' form."""
+    """A single-hop subject predicate groups under 'whose' but keeps the full 'is greater than' form."""
     _, _ = departments_and_employees_fixture
     emp = variable(Employee, domain=None)
     query = a(entity(emp).where(emp.salary > 30000))
     text = verbalize_expression(query)
 
-    where_part = text[text.index("such that"):]
+    where_part = text[text.index("whose") :]
     assert "is greater than" in where_part
 
 
@@ -865,7 +888,7 @@ def test_having_compound_condition_all_compact(departments_and_employees_fixture
     )
     text = verbalize_expression(query)
 
-    having_part = text[text.index("having"):]
+    having_part = text[text.index("having") :]
     assert "is greater than" not in having_part
     assert "is at least" not in having_part
     assert "greater than" in having_part
@@ -884,7 +907,7 @@ def test_having_negated_comparator_compact(departments_and_employees_fixture):
     )
     text = verbalize_expression(query)
 
-    having_part = text[text.index("having"):]
+    having_part = text[text.index("having") :]
     assert "is not greater than" not in having_part
     assert "not greater than" in having_part
 
@@ -921,7 +944,7 @@ def test_verbalize_having_compact_eq_uses_equals():
         .having(count_emp == 2)
     )
     text = verbalize_expression(query)
-    having_part = text[text.index("having"):]
+    having_part = text[text.index("having") :]
     assert "equals" in having_part
     assert "is 2" not in having_part
 
@@ -1072,6 +1095,7 @@ def test_verbalize_triple():
     # Subject–predicate–object order
     assert text.index("Body") < text.index("Handle")
 
+
 def test_verbalize_1arg_predicate_generic_fallback():
     """1-arg Predicate without template still uses generic constructor-like fallback."""
 
@@ -1122,7 +1146,9 @@ def test_three_same_type_variables_are_disambiguated():
     emp1 = variable(Employee, [])
     emp2 = variable(Employee, [])
     emp3 = variable(Employee, [])
-    query = an(entity(emp1).where(and_(emp1.salary > emp2.salary, emp2.salary > emp3.salary)))
+    query = an(
+        entity(emp1).where(and_(emp1.salary > emp2.salary, emp2.salary > emp3.salary))
+    )
     text = verbalize_expression(query)
     assert "Employee 1" in text, f"Expected 'Employee 1' in: {text!r}"
     assert "Employee 2" in text, f"Expected 'Employee 2' in: {text!r}"
@@ -1152,7 +1178,11 @@ def test_number_of_business_transactions():
 
 def test_search_by_booking_date_and_aggregate():
     t = variable(BankTransaction, domain=None)
-    query = an(entity(eql.sum(t.amount_details.amount)).where(t.booking_date < datetime.datetime(2024, 5, 17)))
+    query = an(
+        entity(eql.sum(t.amount_details.amount)).where(
+            t.booking_date < datetime.datetime(2024, 5, 17)
+        )
+    )
 
     text = verbalize_expression(query)
     assert "BankTransaction" in text, f"Expected 'BankTransaction' in: {text!r}"
@@ -1162,7 +1192,9 @@ def test_search_by_booking_date_and_aggregate():
 def test_cabinet_rule_verbalization(handles_and_containers_world):
     """if/then form: aggregated antecedents plural, group-key binding uses 'common'."""
     drawer = variable(Drawer, handles_and_containers_world.views)
-    prismatic_connection = variable(PrismaticConnection, handles_and_containers_world.connections)
+    prismatic_connection = variable(
+        PrismaticConnection, handles_and_containers_world.connections
+    )
     query = (
         entity(
             inference(Cabinet)(
@@ -1179,16 +1211,21 @@ def test_cabinet_rule_verbalization(handles_and_containers_world):
     assert text.startswith("If "), f"Expected 'If' at start, got: {text!r}"
     assert "then" in text, f"Expected 'then' in: {text!r}"
     # IF clause introduces PrismaticConnections in plural (aggregated)
-    assert "there are PrismaticConnections" in text, f"Expected 'there are PrismaticConnections' in: {text!r}"
+    assert (
+        "there are PrismaticConnections" in text
+    ), f"Expected 'there are PrismaticConnections' in: {text!r}"
     # IF clause contains a "whose children" constraint from the WHERE condition
     assert "whose children" in text, f"Expected 'whose children' in: {text!r}"
     # THEN clause introduces the Cabinet
     assert "there's a Cabinet" in text, f"Expected 'there's a Cabinet' in: {text!r}"
     # group-key binding uses "common"
-    assert "whose container is the common parent of the PrismaticConnections" in text, \
-        f"Expected 'whose container is the common parent of the PrismaticConnections' in: {text!r}"
+    assert (
+        "whose container is the common parent of the PrismaticConnections" in text
+    ), f"Expected 'whose container is the common parent of the PrismaticConnections' in: {text!r}"
     # aggregated plural binding
-    assert "whose drawers are the Drawers" in text, f"Expected 'whose drawers are the Drawers' in: {text!r}"
+    assert (
+        "whose drawers are the Drawers" in text
+    ), f"Expected 'whose drawers are the Drawers' in: {text!r}"
 
 
 def test_plural_field_binding_uses_are(handles_and_containers_world):
@@ -1196,7 +1233,9 @@ def test_plural_field_binding_uses_are(handles_and_containers_world):
     drawer = variable(Drawer, handles_and_containers_world.views)
     cabinet = inference(Cabinet)(drawers=drawer)
     text = verbalize_expression(cabinet)
-    assert "drawers of the Cabinet are Drawers" in text, f"Expected 'drawers of the Cabinet are Drawers' in: {text!r}"
+    assert (
+        "drawers of the Cabinet are Drawers" in text
+    ), f"Expected 'drawers of the Cabinet are Drawers' in: {text!r}"
     assert "drawers is" not in text, f"Did not expect 'drawers is' in: {text!r}"
 
 
@@ -1226,3 +1265,233 @@ def departments_and_employees_fixture():
     e1 = Employee("John", d1, 10000)
     e2 = Employee("Anna", d2, 40000)
     return [d1, d2], [e1, e2]
+
+
+# ── Reference pronouns, condition grouping, range folding, calc-equality ────────
+
+
+def test_example_sum_between_full_sentence():
+    """Motivating example 1: pronoun + calc-equality + 'whose … between' in the aggregation scope."""
+    bt = variable(BankTransaction, domain=None)
+    bt_sum = variable(BankTransaction, domain=None)
+    start_date = datetime.datetime(2026, 5, 15)
+    end_date = datetime.datetime(2026, 5, 30)
+    sum_val = an(
+        entity(eql.sum(bt_sum.amount_details.amount)).where(
+            bt_sum.booking_date >= start_date,
+            bt_sum.booking_date <= end_date,
+        )
+    )
+    query = an(entity(bt).where(bt.amount_details.amount == sum_val))
+    assert verbalize_expression(query) == (
+        "Find a BankTransaction such that the amount of its amount_details is equal to "
+        "the sum of amounts among BankTransactions whose booking_date is between "
+        "May 15, 2026, and May 30, 2026"
+    )
+
+
+def test_example_max_full_sentence():
+    """Motivating example 2: pronoun + calc-equality, multi-hop residual keeps 'such that'."""
+    bt = variable(BankTransaction, domain=None)
+    bt2 = variable(BankTransaction, domain=None)
+    max_q = an(entity(eql.max(bt2.amount_details.amount)))
+    query = eql.the(entity(bt).where(bt.amount_details.amount == max_q))
+    assert verbalize_expression(query) == (
+        "Find the unique BankTransaction such that the amount of its amount_details "
+        "is equal to the maximum amount"
+    )
+
+
+def test_pronoun_multi_hop_chain_elides_subject():
+    """A multi-hop chain rooted at the subject becomes 'the amount of its amount_details'."""
+    bt = variable(BankTransaction, domain=None)
+    bt2 = variable(BankTransaction, domain=None)
+    query = eql.the(
+        entity(bt).where(
+            bt.amount_details.amount == an(entity(eql.max(bt2.amount_details.amount)))
+        )
+    )
+    text = verbalize_expression(query)
+    assert "the amount of its amount_details" in text, f"Got: {text!r}"
+    assert "of the BankTransaction" not in text, f"Subject not elided in: {text!r}"
+
+
+def test_pronoun_single_hop_in_residual_or():
+    """A single-hop subject chain that stays residual (inside OR) uses 'its booking_date'."""
+    bt = variable(BankTransaction, domain=None)
+    lo = datetime.datetime(2026, 1, 1)
+    hi = datetime.datetime(2026, 12, 31)
+    query = an(entity(bt).where(or_(bt.booking_date < lo, bt.booking_date > hi)))
+    text = verbalize_expression(query)
+    assert "its booking_date" in text, f"Got: {text!r}"
+    assert "of the BankTransaction" not in text, f"Got: {text!r}"
+
+
+def test_pronoun_not_used_for_non_subject_variable():
+    """Only the subject is pronominalised; another variable in the condition stays explicit."""
+    bt = variable(BankTransaction, domain=None)
+    emp = variable(Employee, domain=None)
+    query = an(entity(bt).where(bt.amount_details.amount == emp.starting_salary))
+    text = verbalize_expression(query)
+    assert "the amount of its amount_details" in text, f"Got: {text!r}"
+    assert "the starting_salary of an Employee" in text, f"Got: {text!r}"
+    # object (non-calculation) equality keeps the bare copula
+    assert (
+        "is the starting_salary" in text and "is equal to" not in text
+    ), f"Got: {text!r}"
+
+
+def test_whose_grouping_top_level_between():
+    """A >=/<= pair on a single-hop subject attribute folds into 'whose … is between … and …'."""
+    bt = variable(BankTransaction, domain=None)
+    lo = datetime.datetime(2026, 5, 15)
+    hi = datetime.datetime(2026, 5, 30)
+    query = an(entity(bt).where(bt.booking_date >= lo, bt.booking_date <= hi))
+    assert verbalize_expression(query) == (
+        "Find a BankTransaction whose booking_date is between May 15, 2026, and May 30, 2026"
+    )
+
+
+def test_whose_grouping_mixed_groupable_and_residual():
+    """Groupable single-hop predicates go under 'whose'; multi-hop ones stay in 'such that'."""
+    bt = variable(BankTransaction, domain=None)
+    bt2 = variable(BankTransaction, domain=None)
+    lo = datetime.datetime(2026, 5, 15)
+    hi = datetime.datetime(2026, 5, 30)
+    query = an(
+        entity(bt).where(
+            bt.booking_date >= lo,
+            bt.booking_date <= hi,
+            bt.amount_details.amount == an(entity(eql.max(bt2.amount_details.amount))),
+        )
+    )
+    text = verbalize_expression(query)
+    assert (
+        "whose booking_date is between May 15, 2026, and May 30, 2026" in text
+    ), f"Got: {text!r}"
+    assert (
+        "such that the amount of its amount_details is equal to the maximum amount"
+        in text
+    ), f"Got: {text!r}"
+
+
+def test_calc_equality_uses_is_equal_to():
+    """== against a calculation reads 'is equal to'."""
+    bt = variable(BankTransaction, domain=None)
+    bt2 = variable(BankTransaction, domain=None)
+    query = an(
+        entity(bt).where(
+            bt.amount_details.amount
+            == an(entity(eql.average(bt2.amount_details.amount)))
+        )
+    )
+    assert "is equal to the average of amounts" in verbalize_expression(query)
+
+
+def test_object_equality_keeps_is():
+    """== against a plain value keeps the bare 'is'."""
+    bt = variable(BankTransaction, domain=None)
+    query = an(entity(bt).where(bt.amount_details.amount == 3.5))
+    text = verbalize_expression(query)
+    assert "the amount of its amount_details is 3.5" in text, f"Got: {text!r}"
+    assert "is equal to" not in text, f"Got: {text!r}"
+
+
+def test_not_calc_equality_uses_is_not_equal_to():
+    """not(== calculation) reads 'is not equal to'."""
+    bt = variable(BankTransaction, domain=None)
+    bt2 = variable(BankTransaction, domain=None)
+    query = an(
+        entity(bt).where(
+            not_(
+                bt.amount_details.amount
+                == an(entity(eql.max(bt2.amount_details.amount)))
+            )
+        )
+    )
+    assert "is not equal to the maximum amount" in verbalize_expression(query)
+
+
+def test_range_fold_without_subject_has_no_whose():
+    """A bare AND of bound comparisons folds to 'between' with the full chain (no subject → no 'whose')."""
+    bt = variable(BankTransaction, domain=None)
+    lo = datetime.datetime(2026, 5, 15)
+    hi = datetime.datetime(2026, 5, 30)
+    text = verbalize_expression(and_(bt.booking_date >= lo, bt.booking_date <= hi))
+    assert "is between May 15, 2026, and May 30, 2026" in text, f"Got: {text!r}"
+    assert "whose" not in text, f"Got: {text!r}"
+    assert "booking_date of" in text, f"Expected full chain in: {text!r}"
+
+
+# ── Generality: a second domain (Employee) ──────────────────────────────────────
+
+
+def test_second_domain_whose_single_predicate():
+    emp = variable(Employee, domain=None)
+    query = an(entity(emp).where(emp.salary > 50000))
+    assert (
+        verbalize_expression(query)
+        == "Find an Employee whose salary is greater than 50000"
+    )
+
+
+def test_second_domain_whose_between():
+    emp = variable(Employee, domain=None)
+    query = an(entity(emp).where(emp.salary >= 30000, emp.salary <= 60000))
+    assert verbalize_expression(query) == (
+        "Find an Employee whose salary is between 30000, and 60000"
+    )
+
+
+def test_second_domain_calc_equality_in_whose():
+    emp = variable(Employee, domain=None)
+    emp2 = variable(Employee, domain=None)
+    query = an(entity(emp).where(emp.salary == an(entity(eql.average(emp2.salary)))))
+    text = verbalize_expression(query)
+    assert "whose salary is equal to" in text, f"Got: {text!r}"
+    assert "average of salaries" in text, f"Got: {text!r}"
+
+
+# ── Declarative-rule unit tests ─────────────────────────────────────────────────
+
+
+def test_is_calculation_value_predicate():
+    from krrood.entity_query_language.verbalization.subquery import is_calculation_value
+
+    bt = variable(BankTransaction, domain=None)
+    assert is_calculation_value(eql.max(bt.amount_details.amount)) is True
+    assert is_calculation_value(an(entity(eql.sum(bt.amount_details.amount)))) is True
+    assert is_calculation_value(variable(BankTransaction, domain=None)) is False
+
+
+def test_fold_range_pairs_is_position_independent():
+    from krrood.entity_query_language.verbalization.range_fold import (
+        fold_range_pairs,
+        has_pair,
+        RangeFold,
+    )
+
+    bt = variable(BankTransaction, domain=None)
+    lo = datetime.datetime(2026, 5, 15)
+    hi = datetime.datetime(2026, 5, 30)
+    lower = bt.booking_date >= lo
+    upper = bt.booking_date <= hi
+
+    folded = fold_range_pairs([lower, upper])
+    assert len(folded) == 1 and isinstance(folded[0], RangeFold)
+    assert has_pair([lower, upper]) is True
+
+    # Upper bound written first: lo/hi are still assigned by direction, not position.
+    folded_rev = fold_range_pairs([upper, lower])
+    assert isinstance(folded_rev[0], RangeFold)
+    assert folded_rev[0].lo_expr is lower.right
+    assert folded_rev[0].hi_expr is upper.right
+
+
+def test_fold_range_pairs_ignores_unrelated_bounds():
+    from krrood.entity_query_language.verbalization.range_fold import has_pair
+
+    bt = variable(BankTransaction, domain=None)
+    lo = datetime.datetime(2026, 5, 15)
+    # Two lower bounds on different chains do not form a range.
+    assert has_pair([bt.booking_date >= lo, bt.amount_details.amount > 5]) is False
