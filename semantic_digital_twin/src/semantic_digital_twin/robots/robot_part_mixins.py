@@ -2,17 +2,18 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from functools import cached_property
 from typing import Union
 
 from typing_extensions import TYPE_CHECKING, Type, TypeVar, Generic
 
+from krrood.class_diagrams.class_diagram import WrappedClass
 from krrood.patterns.subclass_safe_generic import (
-    SubClassSafeGeneric,
     AbstractSubClassSafeGeneric,
 )
 from semantic_digital_twin.reasoning.predicates import LeftOf, RightOf
+from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
 from semantic_digital_twin.world_description.world_modification import (
     synchronized_attribute_modification,
 )
@@ -41,7 +42,38 @@ GenericRightFinger = TypeVar("GenericRightFinger")
 
 
 @dataclass(eq=False)
-class HasFingers(SubClassSafeGeneric[GenericFinger], ABC):
+class RobotPartMixin(HasRootBody, ABC):
+
+    def __post_init__(self):
+        from semantic_digital_twin.robots.robot_parts import (
+            AbstractRobotPart,
+        )
+
+        super().__post_init__()
+        cls = type(self)
+        wrapped_class = WrappedClass(cls)
+        for wrapped_field in wrapped_class.fields:
+            if not wrapped_field.is_underspecified_generic:
+                continue
+
+            type_endpoint = wrapped_field.type_endpoint
+            if not issubclass(type_endpoint, AbstractRobotPart):
+                continue
+
+            instantiated_field = (
+                type_endpoint.setup_default_configuration_in_world_below_robot_root(
+                    self.root
+                )
+            )
+            setattr(
+                self,
+                wrapped_field.public_name,
+                instantiated_field,
+            )
+
+
+@dataclass(eq=False)
+class HasFingers(Generic[GenericFinger], AbstractSubClassSafeGeneric, ABC):
     """
     Mixin class for robots or robot parts that have fingers as their direct children.
     """
@@ -103,7 +135,7 @@ class HasTwoFingers(
 
 
 @dataclass(eq=False)
-class HasSensors(SubClassSafeGeneric[GenericSensor], ABC):
+class HasSensors(Generic[GenericSensor], AbstractSubClassSafeGeneric, ABC):
     """
     Mixin class for robots or robot parts that have sensors
     """
@@ -125,7 +157,7 @@ class HasSensors(SubClassSafeGeneric[GenericSensor], ABC):
 
 
 @dataclass(eq=False)
-class HasEndEffector(SubClassSafeGeneric[GenericEndEffector], ABC):
+class HasEndEffector(Generic[GenericEndEffector], AbstractSubClassSafeGeneric, ABC):
     """
     Mixin class for robots or robot parts that have an end effector as their direct child.
     """
@@ -147,7 +179,7 @@ class HasEndEffector(SubClassSafeGeneric[GenericEndEffector], ABC):
 
 
 @dataclass(eq=False)
-class HasArms(SubClassSafeGeneric[GenericArm], ABC):
+class HasArms(Generic[GenericArm], AbstractSubClassSafeGeneric, ABC):
     """
     Mixin class for robots or robot parts that have arms as their direct children.
     """
@@ -238,7 +270,7 @@ class HasLeftRightArm(
 
 
 @dataclass(eq=False)
-class HasMobileBase(SubClassSafeGeneric[GenericMobileBase], ABC):
+class HasMobileBase(Generic[GenericMobileBase], AbstractSubClassSafeGeneric, ABC):
     """
     Mixin class for robots that have a mobile base.
     """
@@ -260,7 +292,7 @@ class HasMobileBase(SubClassSafeGeneric[GenericMobileBase], ABC):
 
 
 @dataclass(eq=False)
-class HasTorso(SubClassSafeGeneric[GenericTorso], ABC):
+class HasTorso(Generic[GenericTorso], AbstractSubClassSafeGeneric, ABC):
     """
     Mixin class for robots or robot parts that have a torso as their direct child.
     """
@@ -282,7 +314,7 @@ class HasTorso(SubClassSafeGeneric[GenericTorso], ABC):
 
 
 @dataclass(eq=False)
-class HasNeck(SubClassSafeGeneric[GenericNeck], ABC):
+class HasNeck(Generic[GenericNeck], AbstractSubClassSafeGeneric, ABC):
     """
     Mixin class for robots or robot parts that have a neck as their direct child.
     """

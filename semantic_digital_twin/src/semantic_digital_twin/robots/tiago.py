@@ -226,7 +226,7 @@ class TiagoRightGripper(TiagoGripper[TiagoRightIndexFinger, TiagoRightThumb]):
 
 
 @dataclass(eq=False)
-class TiagoLeftArm(Arm, HasEndEffector[TiagoLeftGripper]):
+class TiagoLeftArm(Arm[TiagoLeftGripper]):
 
     def setup_hardware_interfaces(self):
         self._setup_hardware_interfaces_for_active_connections()
@@ -267,7 +267,7 @@ class TiagoLeftArm(Arm, HasEndEffector[TiagoLeftGripper]):
 
 
 @dataclass(eq=False)
-class TiagoRightArm(Arm, HasEndEffector[TiagoRightGripper]):
+class TiagoRightArm(Arm[TiagoRightGripper]):
 
     def setup_hardware_interfaces(self):
         self._setup_hardware_interfaces_for_active_connections()
@@ -337,7 +337,7 @@ class TiagoCamera(Camera):
 
 
 @dataclass(eq=False)
-class TiagoNeck(Neck, HasSensors[TiagoCamera]):
+class TiagoNeck(Neck[TiagoCamera]):
 
     def setup_hardware_interfaces(self):
         self._setup_hardware_interfaces_for_active_connections()
@@ -680,7 +680,7 @@ class TiagoMujocoRightGripper(
 
 
 @dataclass(eq=False)
-class TiagoMujocoLeftArm(Arm, HasEndEffector[TiagoMujocoLeftGripper]):
+class TiagoMujocoLeftArm(Arm[TiagoMujocoLeftGripper]):
 
     def setup_hardware_interfaces(self):
         self._setup_hardware_interfaces_for_active_connections()
@@ -719,7 +719,7 @@ class TiagoMujocoLeftArm(Arm, HasEndEffector[TiagoMujocoLeftGripper]):
 
 
 @dataclass(eq=False)
-class TiagoMujocoRightArm(Arm, HasEndEffector[TiagoMujocoRightGripper]):
+class TiagoMujocoRightArm(Arm[TiagoMujocoRightGripper]):
 
     def setup_hardware_interfaces(self):
         self._setup_hardware_interfaces_for_active_connections()
@@ -758,7 +758,7 @@ class TiagoMujocoRightArm(Arm, HasEndEffector[TiagoMujocoRightGripper]):
 
 
 @dataclass(eq=False)
-class TiagoMujocoNeck(Neck, HasSensors[TiagoCamera]):
+class TiagoMujocoNeck(Neck[TiagoCamera]):
 
     def setup_hardware_interfaces(self):
         self._setup_hardware_interfaces_for_active_connections()

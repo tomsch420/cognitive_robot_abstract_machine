@@ -64,7 +64,7 @@ class PerceptionQuery:
                 None,
                 [
                     cam if isinstance(cam, Camera) else None
-                    for cam in self.robot.sensors
+                    for cam in self.robot.all_sensors
                 ],
             )
         )[0]

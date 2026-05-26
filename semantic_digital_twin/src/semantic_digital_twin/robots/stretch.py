@@ -148,7 +148,7 @@ class StretchGripper(EndEffector, HasTwoFingers[StretchLeftFinger, StretchRightF
 
 
 @dataclass(eq=False)
-class StretchArm(Arm, HasEndEffector[StretchGripper]):
+class StretchArm(Arm[StretchGripper]):
 
     def setup_hardware_interfaces(self):
         self._setup_hardware_interfaces_for_active_connections()
@@ -298,8 +298,7 @@ class StretchCameraInfra2(Camera):
 
 @dataclass(eq=False)
 class StretchNeck(
-    Neck,
-    HasSensors[
+    Neck[
         Union[
             StretchCameraColor,
             StretchCameraDepth,

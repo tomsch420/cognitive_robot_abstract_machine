@@ -168,7 +168,7 @@ class MMPDresdenCamera(Camera):
 
 
 @dataclass(eq=False)
-class MMPDresdenArm(Arm, HasEndEffector[MMPDresdenGripper]):
+class MMPDresdenArm(Arm[MMPDresdenGripper]):
 
     def setup_hardware_interfaces(self):
         self._setup_hardware_interfaces_for_active_connections()

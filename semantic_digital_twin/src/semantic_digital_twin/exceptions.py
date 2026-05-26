@@ -240,6 +240,21 @@ class MismatchingWorld(UsageError):
 
 
 @dataclass
+class SemanticAnnotationCircularDependencyError(UsageError):
+    """
+    Raised when a circular dependency between semantic annotations is detected.
+    """
+
+    semantic_annotations: List[SemanticAnnotation]
+    """
+    The list of semantic annotations that in which a circular dependency is detected.
+    """
+
+    def __post_init__(self):
+        self.message = f"The following semantic annotations have circular dependencies: {self.semantic_annotations}"
+
+
+@dataclass
 class MissingSemanticAnnotationError(UsageError):
     """
     Raised when a semantic annotation is required but missing.

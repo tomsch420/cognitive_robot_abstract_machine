@@ -196,7 +196,7 @@ def test_move_gripper_multi(immutable_multiple_robot_apartment):
     with simulated_robot:
         plan.perform()
 
-    arm = view.arms[0]
+    arm = view.all_arms[0]
     open_state = arm.manipulator.get_joint_state_by_type(GripperState.OPEN)
     close_state = arm.manipulator.get_joint_state_by_type(GripperState.CLOSE)
 
@@ -222,7 +222,7 @@ def test_park_arms_multi(immutable_multiple_robot_apartment):
 
     joints = []
     states = []
-    for arm in robot.arms:
+    for arm in robot.all_arms:
         joint_state = arm.get_joint_state_by_type(StaticJointState.PARK)
         joints.extend(joint_state.connections)
         states.extend(joint_state.target_values)

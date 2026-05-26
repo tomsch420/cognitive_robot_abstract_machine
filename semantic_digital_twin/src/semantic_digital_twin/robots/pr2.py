@@ -290,7 +290,7 @@ class PR2LeftGripper(PR2Gripper[PR2LeftGripperLeftFinger, PR2LeftGripperRightFin
 
 
 @dataclass(eq=False)
-class PR2Neck(Neck, HasSensors[PR2KinectV1]):
+class PR2Neck(Neck[PR2KinectV1]):
 
     def setup_hardware_interfaces(self):
         self._setup_hardware_interfaces_for_active_connections()
@@ -318,7 +318,7 @@ class PR2Neck(Neck, HasSensors[PR2KinectV1]):
 
 
 @dataclass(eq=False)
-class PR2LeftArm(Arm, HasEndEffector[PR2LeftGripper]):
+class PR2LeftArm(Arm[PR2LeftGripper]):
 
     def setup_hardware_interfaces(self):
         self._setup_hardware_interfaces_for_active_connections()
@@ -366,7 +366,7 @@ class PR2LeftArm(Arm, HasEndEffector[PR2LeftGripper]):
 
 
 @dataclass(eq=False)
-class PR2RightArm(Arm, HasEndEffector[PR2RightGripper]):
+class PR2RightArm(Arm[PR2RightGripper]):
 
     def setup_hardware_interfaces(self):
         self._setup_hardware_interfaces_for_active_connections()
@@ -614,5 +614,5 @@ class PR2(AbstractRobot, HasMobileBase[PR2MobileBase]):
         return self.mobile_base.torso
 
     @property
-    def end_effectors(self) -> list[PR2Gripper]:
+    def all_end_effectors(self) -> list[PR2Gripper]:
         return [self.left_arm.end_effector, self.right_arm.end_effector]

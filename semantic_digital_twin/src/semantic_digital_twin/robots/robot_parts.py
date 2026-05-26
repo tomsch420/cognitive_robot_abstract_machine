@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from collections import defaultdict
 from copy import deepcopy
 from dataclasses import dataclass, field
-from typing import Optional, Self, TYPE_CHECKING, Set, List, DefaultDict
+from typing import Optional, Self, TYPE_CHECKING, Set, List, DefaultDict, TypeVar
 from uuid import UUID
 
 from krrood.adapters.json_serializer import list_like_classes
@@ -92,56 +92,16 @@ class HasRobotParts(ABC):
 
         for field_ in introspector.discover(self.__class__):
             value = getattr(self, field_.public_name)
-            wrapped_field = WrappedField(wrapped_class, field_.field)
 
-            if isinstance(value, list_like_classes) and issubclass(
-                wrapped_field.contained_type, HasRobotParts
-            ):
+            if isinstance(value, list_like_classes):
                 for robot_part in value:
+                    if not isinstance(robot_part, HasRobotParts):
+                        continue
                     robot_parts.extend(robot_part._aggregate_robot_parts(seen))
             elif isinstance(value, HasRobotParts):
                 robot_parts.extend(value._aggregate_robot_parts(seen))
 
         return robot_parts
-
-    def _log_missing_fields(self):
-        """
-        Logs any fields that are empty, which could indicate missing information in the robot annotation.
-        Primarily used for manual validation purposes.
-        """
-        wrapped_class = WrappedClass(self.__class__)
-        introspector = DataclassOnlyIntrospector()
-        for field_ in introspector.discover(self.__class__):
-            self._process_field(wrapped_class, field_)
-
-    def _process_field(self, wrapped_class: WrappedClass, field: DiscoveredAttribute):
-        """
-        Processes a single field of the dataclass, checking if it is empty, and logs a warning if it is.
-
-        :param wrapped_class: The wrapped class of the dataclass.
-        :param field: The discovered attribute of the dataclass.
-        """
-        value = getattr(self, field.public_name)
-        wrapped_field = WrappedField(wrapped_class, field.field)
-        type_endpoint = wrapped_field.type_endpoint
-
-        if isinstance(value, list_like_classes) and issubclass(
-            wrapped_field.contained_type, HasRobotParts
-        ):
-            if not value:
-                self._log_missing_field(field)
-                return
-
-            for robot_part in value:
-                robot_part._log_missing_fields()
-
-        elif issubclass(type_endpoint, HasRobotParts) and value is None:
-            self._log_missing_field(field)
-
-    def _log_missing_field(self, field: DiscoveredAttribute):
-        logger.info(
-            f"The field {field.public_name} of {self.__class__.__name__} is empty."
-        )
 
 
 @dataclass(eq=False)
@@ -525,10 +485,6 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
 
         :return: True if the robot semantic annotation is valid, False otherwise.
         """
-
-        for robot_part in self._robot_parts:
-            robot_part._log_missing_fields()
-
         self_world_copy = deepcopy(self._world)
 
         assert set(self_world_copy._world_entity_hash_table.keys()) == set(
@@ -589,15 +545,15 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
             )
 
     @property
-    def end_effectors(self) -> list[EndEffector]:
+    def all_end_effectors(self) -> list[EndEffector]:
         return [p for p in self._robot_parts if isinstance(p, EndEffector)]
 
     @property
-    def arms(self) -> list[Arm]:
+    def all_arms(self) -> list[Arm]:
         return [p for p in self._robot_parts if isinstance(p, Arm)]
 
     @property
-    def sensors(self) -> list[Sensor]:
+    def all_sensors(self) -> list[Sensor]:
         return [p for p in self._robot_parts if isinstance(p, Sensor)]
 
     def get_default_camera(self) -> Camera:

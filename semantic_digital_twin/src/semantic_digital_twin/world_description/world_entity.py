@@ -220,8 +220,8 @@ class WorldEntityWithID(WorldEntity, SubclassJSONSerializer):
                 if isinstance(v.type, str):
                     type_name = v.type
                 else:
-                    type_name = v.type._name
-                if type_name.startswith("Set"):
+                    type_name = v.type.__name__
+                if type_name.lower().startswith("set"):
                     container_type = set
                 else:
                     container_type = list

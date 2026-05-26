@@ -273,7 +273,7 @@ class UnitreeG1RightHand(
 
 
 @dataclass(eq=False)
-class UnitreeG1LeftArm(Arm, HasEndEffector[UnitreeG1LeftHand]):
+class UnitreeG1LeftArm(Arm[UnitreeG1LeftHand]):
 
     def setup_hardware_interfaces(self):
         self._setup_hardware_interfaces_for_active_connections()
@@ -311,7 +311,7 @@ class UnitreeG1LeftArm(Arm, HasEndEffector[UnitreeG1LeftHand]):
 
 
 @dataclass(eq=False)
-class UnitreeG1RightArm(Arm, HasEndEffector[UnitreeG1RightHand]):
+class UnitreeG1RightArm(Arm[UnitreeG1RightHand]):
 
     def setup_hardware_interfaces(self):
         self._setup_hardware_interfaces_for_active_connections()
@@ -376,7 +376,7 @@ class D435(Camera):
 
 
 @dataclass(eq=False)
-class UnitreeG1Neck(Neck, HasSensors[D435]):
+class UnitreeG1Neck(Neck[D435]):
 
     def setup_hardware_interfaces(self):
         self._setup_hardware_interfaces_for_active_connections()
