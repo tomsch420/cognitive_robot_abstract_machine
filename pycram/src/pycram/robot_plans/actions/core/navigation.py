@@ -6,10 +6,11 @@ from datetime import timedelta
 from typing_extensions import Optional, Any, Dict
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
-from krrood.entity_query_language.factories import variable_from, and_
+from krrood.entity_query_language.factories import variable_from, and_, ConditionType
 from pycram.config.action_conf import ActionConfig
 from pycram.datastructures.dataclasses import Context
 from pycram.plans.factories import execute_single
+from pycram.plans.plan_node import PlanNode
 from pycram.robot_plans.actions.base import ActionDescription
 from pycram.robot_plans.motions.navigation import MoveMotion
 from pycram.robot_plans.motions.robot_body import LookingMotion
@@ -35,15 +36,14 @@ class NavigateAction(ActionDescription):
     Keep the joint states of the robot the same during the navigation.
     """
 
-    def execute(self) -> None:
-        self.add_subplan(
-            execute_single(MoveMotion(self.target_location, self.keep_joint_states))
-        ).perform()
+    @property
+    def _action_plan(self) -> PlanNode:
+        return execute_single(MoveMotion(self.target_location, self.keep_joint_states))
 
     @staticmethod
     def pre_condition(
         variables, context: Context, kwargs: Dict[str, Any]
-    ) -> SymbolicExpression:
+    ) -> ConditionType:
         """
         The robot needs to have a drive and the target location needs to be free from obstacles
         """
@@ -56,7 +56,7 @@ class NavigateAction(ActionDescription):
     @staticmethod
     def post_condition(
         variables, context: Context, kwargs: Dict[str, Any]
-    ) -> SymbolicExpression:
+    ) -> ConditionType:
         """
         The robot needs to be within 3 cm of the target location
         """

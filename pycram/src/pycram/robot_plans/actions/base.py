@@ -74,13 +74,10 @@ class ActionDescription(Designator):
     @property
     def action_plan(self) -> PlanNode:
 
-        # plan_context = self.plan.context if self.plan_node else None
-
         sub_plan_root = self._action_plan
         action_node = ActionNode(designator=copy(self))
 
         sub_plan_root.plan.add_edge(action_node, sub_plan_root)
-        # sub_plan_root.plan.context = plan_context
 
         return action_node
 
@@ -122,14 +119,13 @@ class ActionDescription(Designator):
 
         return root
 
-    @abstractmethod
     def execute(self) -> Any:
         """
         Create the symbolic plan for this action.
         This method should only use Motions or Actions and mount them under itself, such that the plan can manage the
         entire execution.
         """
-        pass
+        self.add_subplan(self.action_plan)
 
     @staticmethod
     def pre_condition(

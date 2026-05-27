@@ -28,6 +28,7 @@ from semantic_digital_twin.datastructures.definitions import (
     GripperState,
     StaticJointState,
 )
+from ....plans.plan_node import PlanNode
 
 
 @dataclass
@@ -41,16 +42,15 @@ class MoveTorsoAction(ActionDescription):
     The state of the torso that should be set
     """
 
-    def execute(self) -> None:
+    @property
+    def _action_plan(self) -> PlanNode:
         joint_state = self.robot.torso.get_joint_state_by_type(self.torso_state)
-        self.add_subplan(
-            execute_single(
-                MoveJointsMotion(
-                    [c.name.name for c in joint_state.connections],
-                    joint_state.target_values,
-                ),
-            )
-        ).perform()
+        return execute_single(
+            MoveJointsMotion(
+                [c.name.name for c in joint_state.connections],
+                joint_state.target_values,
+            ),
+        )
 
     @staticmethod
     def post_condition(
@@ -85,7 +85,6 @@ class SetGripperAction(ActionDescription):
                 [MoveGripperMotion(gripper=arm, motion=self.motion) for arm in arms]
             )
         ).perform()
-
 
 
 @dataclass
