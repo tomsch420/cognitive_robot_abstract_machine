@@ -5,12 +5,10 @@ from typing import Optional
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.query.query import Query
-from krrood.entity_query_language.verbalization.chain_verbalizer import ChainVerbalizer
 from krrood.entity_query_language.verbalization.context import VerbalizationContext
 from krrood.entity_query_language.verbalization.entity_verbalizer import EntityVerbalizer
 from krrood.entity_query_language.verbalization.fragments.base import VerbFragment
 from krrood.entity_query_language.verbalization.rule_engine import RuleEngine
-from krrood.entity_query_language.verbalization.rule_verbalizer import RuleVerbalizer
 from krrood.entity_query_language.verbalization.rules.registry import ALL_RULES
 from krrood.entity_query_language.verbalization.utils import _str
 
@@ -30,25 +28,16 @@ class EQLVerbalizer:
     For coloured / formatted output build a
     :class:`~krrood.entity_query_language.verbalization.pipeline.VerbalizationPipeline`.
 
-    :ivar _chain: Delegate for :class:`~krrood.entity_query_language.core.mapped_variable.MappedVariable` chains.
     :ivar _entity: Delegate for :class:`~krrood.entity_query_language.query.query.Entity` and
         :class:`~krrood.entity_query_language.query.query.SetOf` expressions.
-    :ivar _rule: Delegate for inference-rule (IF/THEN) verbalization.
     :ivar _engine: Rule dispatcher; sorts rules by MRO depth before first call.
     """
 
-    _chain: ChainVerbalizer = field(init=False, repr=False)
     _entity: EntityVerbalizer = field(init=False, repr=False)
-    _rule: RuleVerbalizer = field(init=False, repr=False)
     _engine: RuleEngine = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
-        self._rule = RuleVerbalizer(delegate=self)
         self._entity = EntityVerbalizer(delegate=self)
-        self._chain = ChainVerbalizer(
-            delegate=self,
-            entity_inline_fn=self._entity.as_inline_noun,
-        )
         self._engine = RuleEngine(ALL_RULES)
 
     def build(

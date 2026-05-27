@@ -54,6 +54,9 @@ from krrood.entity_query_language.verbalization.rules.query import (
     GroupedByRule,
     OrderedByRule,
 )
+from krrood.entity_query_language.verbalization.rules.inference_rule import (
+    InferenceRuleRule,
+)
 
 ALL_RULES: list[type] = [
     # logical — specific patterns first, generic Not last
@@ -80,7 +83,8 @@ ALL_RULES: list[type] = [
     # aggregators — CountAll before generic Aggregator
     CountAllRule,
     AggregatorRule,
-    # query structures
+    # query structures — inference-rule form before the generic Entity form
+    InferenceRuleRule,
     EntityRule,
     SetOfRule,
     ResultQuantifierRule,

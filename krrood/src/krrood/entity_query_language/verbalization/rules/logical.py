@@ -10,14 +10,16 @@ from krrood.entity_query_language.operators.core_logical_operators import (
     OR,
     Not,
     LogicalOperator,
+    flatten_operands,
 )
 from krrood.entity_query_language.verbalization.fragments.base import (
     join_with,
     oxford_and,
     PhraseFragment,
-    RoleFragment,
     VerbFragment,
 )
+from krrood.entity_query_language.verbalization.operator_phrase import comparator_phrase
+from krrood.entity_query_language.verbalization.rules.chains import verbalize_chain
 from krrood.entity_query_language.verbalization.range_fold import (
     build_between,
     fold_range_pairs,
@@ -29,7 +31,6 @@ from krrood.entity_query_language.verbalization.subquery import is_calculation_v
 from krrood.entity_query_language.verbalization.vocabulary.english import (
     Conjunctions,
     Logicals,
-    Operators,
 )
 
 if TYPE_CHECKING:
@@ -98,7 +99,7 @@ class AndRule(LogicalRule):
         :returns: Oxford-comma joined fragment.
         :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment
         """
-        parts = [delegate.build(c, ctx) for c in ctx.flatten_same_type(expr, AND)]
+        parts = [delegate.build(c, ctx) for c in flatten_operands(expr, AND)]
         if len(parts) == 1:
             return parts[0]
         return oxford_and(parts, Conjunctions.AND.as_fragment())
@@ -119,7 +120,7 @@ class RangeConjunctionRule(AndRule):
     @classmethod
     def applies(cls, expr, ctx: "VerbalizationContext") -> bool:
         """Return ``True`` for an ``AND`` containing a foldable lo/hi range pair."""
-        return isinstance(expr, AND) and has_pair(ctx.flatten_same_type(expr, AND))
+        return isinstance(expr, AND) and has_pair(flatten_operands(expr, AND))
 
     @classmethod
     def transform(
@@ -135,7 +136,7 @@ class RangeConjunctionRule(AndRule):
         :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment
         """
         parts: list[VerbFragment] = []
-        for item in fold_range_pairs(ctx.flatten_same_type(expr, AND)):
+        for item in fold_range_pairs(flatten_operands(expr, AND)):
             if isinstance(item, RangeFold):
                 parts.append(
                     build_between(
@@ -177,7 +178,7 @@ class OrRule(LogicalRule):
         :returns: Disjunction phrase fragment.
         :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment
         """
-        parts = [delegate.build(c, ctx) for c in ctx.flatten_same_type(expr, OR)]
+        parts = [delegate.build(c, ctx) for c in flatten_operands(expr, OR)]
         if len(parts) == 1:
             return parts[0]
         head_with_comma = PhraseFragment(
@@ -252,23 +253,7 @@ class NotComparatorRule(NotRule):
         :returns: Negated comparator phrase.
         :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment
         """
-        child = expr._child_
-        left = delegate.build(child.left, ctx)
-        right = delegate.build(child.right, ctx)
-        is_temporal = delegate._chain.is_temporal(
-            child.left
-        ) or delegate._chain.is_temporal(child.right)
-        try:
-            op_frag = (
-                Operators.from_callable(child.operation)
-                .select(
-                    negated=True, compact=ctx.compact_predicates, temporal=is_temporal
-                )
-                .as_fragment()
-            )
-        except KeyError:
-            op_frag = RoleFragment.for_operator(f"not {child._name_}")
-        return _phrase(left, op_frag, right)
+        return comparator_phrase(expr._child_, ctx, delegate, negated=True)
 
 
 class NotCalculationEqualityRule(NotComparatorRule):
@@ -305,13 +290,7 @@ class NotCalculationEqualityRule(NotComparatorRule):
         :returns: Negated calc-equality fragment.
         :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment
         """
-        child = expr._child_
-        left = delegate.build(child.left, ctx)
-        right = delegate.build(child.right, ctx)
-        op_frag = Operators.CALC_EQ.select(
-            negated=child.operation is operator.eq, compact=ctx.compact_predicates
-        ).as_fragment()
-        return _phrase(left, op_frag, right)
+        return comparator_phrase(expr._child_, ctx, delegate, negated=True)
 
 
 class NotBoolAttrRule(NotRule):
@@ -322,7 +301,8 @@ class NotBoolAttrRule(NotRule):
     :class:`~krrood.entity_query_language.core.mapped_variable.MappedVariable`
     chain whose terminal node is a ``bool``-typed
     :class:`~krrood.entity_query_language.core.mapped_variable.Attribute`.
-    Delegates to :meth:`~krrood.entity_query_language.verbalization.chain_verbalizer.ChainVerbalizer.verbalize_mapped_negated`.
+    Renders via :func:`~krrood.entity_query_language.verbalization.rules.chains.verbalize_chain`
+    with ``negated=True``.
     """
 
     @classmethod
@@ -335,7 +315,7 @@ class NotBoolAttrRule(NotRule):
         cls, expr: "Not", ctx: "VerbalizationContext", delegate: "EQLVerbalizer"
     ) -> VerbFragment:
         """
-        Delegate to :meth:`~krrood.entity_query_language.verbalization.chain_verbalizer.ChainVerbalizer.verbalize_mapped_negated`.
+        Render *"<nav> is not <attr>"* for the negated boolean attribute chain.
 
         :param expr: Not-wrapping-bool-Attribute expression.
         :param ctx: Shared verbalization state.
@@ -343,4 +323,4 @@ class NotBoolAttrRule(NotRule):
         :returns: Predicative *"is not <attr>"* fragment.
         :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment
         """
-        return delegate._chain.verbalize_mapped_negated(expr._child_, ctx)
+        return verbalize_chain(expr._child_, ctx, delegate, negated=True)

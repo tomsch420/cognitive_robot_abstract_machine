@@ -21,12 +21,9 @@ from __future__ import annotations
 
 from typing import Optional
 
-from krrood.entity_query_language.core.mapped_variable import Attribute
-from krrood.entity_query_language.core.variable import Variable
 from krrood.entity_query_language.operators.aggregators import Aggregator
 from krrood.entity_query_language.query.quantifiers import ResultQuantifier
 from krrood.entity_query_language.query.query import Entity
-from krrood.entity_query_language.verbalization.chain_utils import chain_root, walk_chain
 
 
 def selected_aggregator(entity) -> Optional["Aggregator"]:
@@ -35,14 +32,14 @@ def selected_aggregator(entity) -> Optional["Aggregator"]:
     selected by *entity*, or ``None`` when *entity* is not an
     :class:`~krrood.entity_query_language.query.query.Entity` selecting one.
 
+    Thin verbalization-facing adapter over
+    :attr:`~krrood.entity_query_language.query.query.Entity.selected_aggregator`.
+
     :param entity: Candidate expression.
     :returns: The selected aggregator, or ``None``.
     :rtype: ~krrood.entity_query_language.operators.aggregators.Aggregator or None
     """
-    if not isinstance(entity, Entity):
-        return None
-    var = entity.selected_variable
-    return var if isinstance(var, Aggregator) else None
+    return entity.selected_aggregator if isinstance(entity, Entity) else None
 
 
 def is_aggregation_subquery(entity) -> bool:
@@ -89,12 +86,7 @@ def is_constrained_query(entity) -> bool:
     :param entity: An :class:`~krrood.entity_query_language.query.query.Entity`.
     :rtype: bool
     """
-    if entity._where_expression_ is not None:
-        return True
-    if entity._having_expression_ is not None:
-        return True
-    grouped = entity._grouped_by_expression_
-    return grouped is not None and bool(grouped.variables_to_group_by)
+    return entity.is_constrained
 
 
 def is_collapsible_aggregation_subquery(entity) -> bool:
@@ -120,12 +112,7 @@ def aggregation_leaf_attribute(entity):
     :returns: The leaf attribute node, or ``None``.
     """
     aggregator = selected_aggregator(entity)
-    if aggregator is None:
-        return None
-    chain, _ = walk_chain(aggregator._child_)
-    if chain and isinstance(chain[-1], Attribute):
-        return chain[-1]
-    return None
+    return aggregator._leaf_attribute_ if aggregator is not None else None
 
 
 def aggregation_source_root(entity) -> Optional["Variable"]:
@@ -139,7 +126,4 @@ def aggregation_source_root(entity) -> Optional["Variable"]:
     :rtype: ~krrood.entity_query_language.core.variable.Variable or None
     """
     aggregator = selected_aggregator(entity)
-    if aggregator is None:
-        return None
-    root = chain_root(aggregator._child_)
-    return root if isinstance(root, Variable) else None
+    return aggregator._source_root_ if aggregator is not None else None

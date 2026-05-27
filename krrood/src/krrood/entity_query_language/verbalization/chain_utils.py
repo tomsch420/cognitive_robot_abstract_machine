@@ -29,18 +29,44 @@ def walk_chain(expr) -> tuple[list, object]:
 
     :param expr: Any expression; non-MappedVariable expressions return an
         empty chain with *expr* as the root.
-    :returns: Tuple ``(chain, root)`` where *chain* is ordered outermost-first.
+    :returns: Tuple ``(chain, root)`` where *chain* is the core
+        :attr:`~krrood.entity_query_language.core.mapped_variable.MappedVariable._access_path_`
+        (root-adjacent first, terminal last) and *root* is the chain base.
     :rtype: tuple[list, object]
     """
     from krrood.entity_query_language.core.mapped_variable import MappedVariable
 
-    chain: list[MappedVariable] = []
-    current = expr
-    while isinstance(current, MappedVariable):
-        chain.append(current)
-        current = current._child_
-    chain.reverse()
-    return chain, current
+    if isinstance(expr, MappedVariable):
+        return list(expr._access_path_), expr._chain_root_
+    return [], expr
+
+
+def is_temporal(expr) -> bool:
+    """
+    Return ``True`` when *expr* denotes a :class:`datetime.datetime` value or variable.
+
+    Used by comparator verbalization to select temporal operator phrases
+    (*"is before"* / *"is after"*) instead of relational ones.  Inspects the
+    expression's ``_type_`` (or a :class:`~krrood.entity_query_language.core.variable.Literal`'s
+    value), so it is a pure structural/type check with no verbalization state.
+
+    :param expr: Any EQL expression.
+    :returns: ``True`` when the expression is datetime-typed.
+    :rtype: bool
+    """
+    import datetime as _dt
+
+    from krrood.entity_query_language.core.mapped_variable import MappedVariable
+    from krrood.entity_query_language.core.variable import Literal, Variable
+
+    if isinstance(expr, Literal):
+        return isinstance(expr._value_, _dt.datetime)
+    if isinstance(expr, Variable):
+        return getattr(expr, "_type_", None) is _dt.datetime
+    if isinstance(expr, MappedVariable):
+        chain, _ = walk_chain(expr)
+        return bool(chain) and getattr(chain[-1], "_type_", None) is _dt.datetime
+    return False
 
 
 def chain_root(expr) -> object:
@@ -57,10 +83,7 @@ def chain_root(expr) -> object:
     """
     from krrood.entity_query_language.core.mapped_variable import MappedVariable
 
-    current = expr
-    while isinstance(current, MappedVariable):
-        current = current._child_
-    return current
+    return expr._chain_root_ if isinstance(expr, MappedVariable) else expr
 
 
 def build_path_parts(chain: list) -> list[tuple[str, Optional["SourceRef"]]]:

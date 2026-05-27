@@ -11,15 +11,20 @@ import inflect
 
 from krrood.entity_query_language.core.variable import Variable, Literal
 from krrood.entity_query_language.query.query import Entity, Query
+from krrood.entity_query_language.verbalization.fragments.base import (
+    PhraseFragment,
+    RoleFragment,
+    VerbFragment,
+)
+from krrood.entity_query_language.verbalization.fragments.roles import SemanticRole
 from krrood.entity_query_language.verbalization.subquery import (
     aggregation_source_root,
     selected_aggregator,
 )
-from krrood.entity_query_language.verbalization.vocabulary.english import Pronouns
+from krrood.entity_query_language.verbalization.vocabulary.english import Articles, Pronouns
 
 if TYPE_CHECKING:
     from krrood.entity_query_language.core.base_expressions import SymbolicExpression
-    from krrood.entity_query_language.verbalization.fragments.base import VerbFragment
 
 _engine = inflect.engine()
 
@@ -237,6 +242,28 @@ class VerbalizationContext:
         """``_id_`` of the current coreference subject, or ``None`` when there is none."""
         return self.coref_subjects[-1] if self.coref_subjects else None
 
+    def seen_reference(self, expr) -> "Optional[VerbFragment]":
+        """
+        Return *"the <label>"* when *expr* has already been verbalized in this pass,
+        else ``None``.
+
+        Centralises the coreference short-circuit that every Entity / nested-noun /
+        InstantiatedVariable rendering path performs on re-encountering a variable.
+
+        :param expr: Any expression carrying an ``_id_``.
+        :returns: The definite-reference phrase, or ``None`` when *expr* is unseen.
+        :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment or None
+        """
+        var_id = getattr(expr, "_id_", None)
+        if var_id is None or var_id not in self.seen:
+            return None
+        return PhraseFragment(
+            parts=[
+                Articles.THE.as_fragment(),
+                RoleFragment(text=self.seen[var_id], role=SemanticRole.VARIABLE),
+            ]
+        )
+
     def pronoun_for(self, root) -> "Optional[VerbFragment]":
         """
         Return the possessive-pronoun fragment (*"its"*) for *root* when it is the
@@ -294,25 +321,6 @@ class VerbalizationContext:
         return (
             ArticleSelection.NONE if is_numbered else ArticleSelection.INDEFINITE
         ), label
-
-    def flatten_same_type(self, expr, operator_type) -> List:
-        """
-        Recursively flatten a homogeneous binary chain into a flat list.
-
-        For example, ``AND(AND(a, b), c)`` with ``operator_type=AND`` yields
-        ``[a, b, c]``.  Non-matching nodes are returned as a single-element list.
-
-        :param expr: Root of the expression tree to flatten.
-        :param operator_type: The binary operator class whose chains to flatten
-            (e.g. :class:`~krrood.entity_query_language.operators.core_logical_operators.AND`).
-        :returns: Flat list of operand expressions.
-        :rtype: list
-        """
-        if not isinstance(expr, operator_type):
-            return [expr]
-        left = self.flatten_same_type(expr.left, operator_type)
-        right = self.flatten_same_type(expr.right, operator_type)
-        return left + right
 
     def type_name_of_value(self, value: Any) -> str:
         """

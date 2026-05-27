@@ -15,7 +15,6 @@ preconditions, not in branching glue.
 
 from __future__ import annotations
 
-import operator
 from abc import ABC, abstractmethod
 from typing import List, Optional, TYPE_CHECKING
 
@@ -23,7 +22,10 @@ from krrood.entity_query_language.core.mapped_variable import Attribute, MappedV
 from krrood.entity_query_language.core.variable import Variable
 from krrood.entity_query_language.operators.aggregators import Aggregator
 from krrood.entity_query_language.operators.comparator import Comparator
-from krrood.entity_query_language.operators.core_logical_operators import AND
+from krrood.entity_query_language.operators.core_logical_operators import (
+    AND,
+    flatten_operands,
+)
 from krrood.entity_query_language.verbalization.chain_utils import chain_root, walk_chain
 from krrood.entity_query_language.verbalization.fragments.base import (
     oxford_and,
@@ -31,19 +33,16 @@ from krrood.entity_query_language.verbalization.fragments.base import (
     RoleFragment,
     VerbFragment,
 )
+from krrood.entity_query_language.verbalization.operator_phrase import comparator_operator
 from krrood.entity_query_language.verbalization.range_fold import (
     build_between,
     fold_range_pairs,
     RangeFold,
 )
-from krrood.entity_query_language.verbalization.subquery import (
-    aggregation_source_root,
-    is_calculation_value,
-)
+from krrood.entity_query_language.verbalization.subquery import aggregation_source_root
 from krrood.entity_query_language.verbalization.vocabulary.english import (
     Conjunctions,
     Keywords,
-    Operators,
 )
 
 if TYPE_CHECKING:
@@ -75,29 +74,6 @@ def _references(expr, subject_var) -> bool:
         )
     except AttributeError:
         return chain_root(expr) is subject_var
-
-
-def _predicate_op_frag(
-    comparator: Comparator, ctx: "VerbalizationContext", delegate
-) -> VerbFragment:
-    """Operator fragment for a bare-attribute predicate (standard form, keeps the copula)."""
-    if comparator.operation in (operator.eq, operator.ne) and (
-        is_calculation_value(comparator.left) or is_calculation_value(comparator.right)
-    ):
-        return Operators.CALC_EQ.select(
-            negated=comparator.operation is operator.ne, compact=False
-        ).as_fragment()
-    is_temporal = delegate._chain.is_temporal(
-        comparator.left
-    ) or delegate._chain.is_temporal(comparator.right)
-    try:
-        return (
-            Operators.from_callable(comparator.operation)
-            .select(compact=False, temporal=is_temporal)
-            .as_fragment()
-        )
-    except KeyError:
-        return RoleFragment.for_operator(comparator._name_)
 
 
 # ── Restriction rule hierarchy ──────────────────────────────────────────────────
@@ -173,7 +149,7 @@ class AttributePredicateRestrictionRule(RestrictionRule):
         attr_frag = RoleFragment.for_attribute(
             attr._owner_class_, attr._attribute_name_
         )
-        op_frag = _predicate_op_frag(item, ctx, delegate)
+        op_frag = comparator_operator(item, ctx, compact=False)
         return PhraseFragment(
             parts=[attr_frag, op_frag, delegate.build(item.right, ctx)]
         )
@@ -298,7 +274,7 @@ class RestrictionClauseBuilder:
             a ``such that`` / ``where`` keyword (the caller adds the appropriate one).
         :rtype: tuple
         """
-        items = fold_range_pairs(ctx.flatten_same_type(condition, AND))
+        items = fold_range_pairs(flatten_operands(condition, AND))
         grouped: List[VerbFragment] = []
         residual: List = []
         for item in items:

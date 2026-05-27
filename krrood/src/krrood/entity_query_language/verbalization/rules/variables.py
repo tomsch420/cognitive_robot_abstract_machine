@@ -278,8 +278,9 @@ def _verbalize_instantiated_natural(
     delegate: EQLVerbalizer,
 ) -> VerbFragment:
     type_name = getattr(expr._type_, "__name__", str(expr._type_))
-    if expr._id_ in ctx.seen:
-        return _phrase(Articles.THE.as_fragment(), _role(ctx.seen[expr._id_], SemanticRole.VARIABLE))
+    seen = ctx.seen_reference(expr)
+    if seen is not None:
+        return seen
     ctx.seen[expr._id_] = type_name
 
     ctx.push_constraint_frame()

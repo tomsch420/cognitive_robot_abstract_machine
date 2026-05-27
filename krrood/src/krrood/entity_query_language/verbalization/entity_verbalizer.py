@@ -108,16 +108,11 @@ class EntityVerbalizer:
         :returns: Fragment tree for the full query.
         :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment
         """
-        if expr._id_ in ctx.seen:
-            return _phrase(
-                Articles.THE.as_fragment(),
-                _role(ctx.seen[expr._id_], SemanticRole.VARIABLE),
-            )
+        seen = ctx.seen_reference(expr)
+        if seen is not None:
+            return seen
 
         expr.build()
-
-        if self._d._rule.can_handle(expr):
-            return self._d._rule.verbalize(expr, ctx)
 
         ctx.query_depth += 1
         try:
@@ -190,11 +185,9 @@ class EntityVerbalizer:
         :returns: A noun-phrase fragment for *expr*.
         :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment
         """
-        if expr._id_ in ctx.seen:
-            return _phrase(
-                Articles.THE.as_fragment(),
-                _role(ctx.seen[expr._id_], SemanticRole.VARIABLE),
-            )
+        seen = ctx.seen_reference(expr)
+        if seen is not None:
+            return seen
 
         expr.build()
 
@@ -314,11 +307,9 @@ class EntityVerbalizer:
         :returns: A noun-phrase fragment for *expr*.
         :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment
         """
-        if expr._id_ in ctx.seen:
-            return _phrase(
-                Articles.THE.as_fragment(),
-                _role(ctx.seen[expr._id_], SemanticRole.VARIABLE),
-            )
+        seen = ctx.seen_reference(expr)
+        if seen is not None:
+            return seen
 
         expr.build()
         is_the = (
@@ -382,11 +373,9 @@ class EntityVerbalizer:
         :returns: A bare noun-phrase fragment (article + type name).
         :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment
         """
-        if entity._id_ in ctx.seen:
-            return _phrase(
-                Articles.THE.as_fragment(),
-                _role(ctx.seen[entity._id_], SemanticRole.VARIABLE),
-            )
+        seen = ctx.seen_reference(entity)
+        if seen is not None:
+            return seen
 
         entity.build()
         var = entity.selected_variable
