@@ -503,6 +503,8 @@ class MotionNode(DesignatorNode):
     executed.
     """
 
+    designator: BaseMotion
+
     @property
     def motion(self) -> BaseMotion:
         return self.designator

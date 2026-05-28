@@ -89,6 +89,15 @@ class TaskStatus(int, Enum):
     INTERRUPTED = 4
     PAUSE = 5
 
+TaskStatusColors = {
+    TaskStatus.CREATED: "blue",
+    TaskStatus.RUNNING: "light-green",
+    TaskStatus.SUCCEEDED: "green",
+    TaskStatus.FAILED: "red",
+    TaskStatus.INTERRUPTED: "orange",
+    TaskStatus.PAUSE: "yellow",
+}
+
 class JointType(Enum):
     """
     Enum for readable joint types.
