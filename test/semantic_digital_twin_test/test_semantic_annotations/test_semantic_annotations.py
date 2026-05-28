@@ -4,7 +4,7 @@ from krrood.entity_query_language.core.base_expressions import SymbolicExpressio
 from krrood.entity_query_language.core.variable import InstantiatedVariable
 from krrood.entity_query_language.explanation.explanation import explain_inference
 from krrood.entity_query_language.factories import entity, variable, in_, inference, an
-from krrood.entity_query_language.verbalization import verbalize_expression
+from krrood.entity_query_language.verbalization.verbalizer import verbalize_expression
 from krrood.entity_query_language.query.quantifiers import An
 from numpy.ma.testutils import (
     assert_equal,
@@ -219,6 +219,7 @@ def test_explain_inferred_semantic_annotations(apartment_world_setup):
     visualize = False
     if visualize:
         explanation.condition_graph().visualize(filename="drawer_explanation.pdf")
+
 
 @pytest.mark.order("fourth_to_last")
 def test_verbalize_query_that_inferred_semantic_annotations(apartment_world_setup):
