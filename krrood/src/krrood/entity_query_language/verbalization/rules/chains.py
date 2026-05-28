@@ -23,6 +23,7 @@ from krrood.entity_query_language.query.quantifiers import ResultQuantifier
 from krrood.entity_query_language.query.query import Entity
 from krrood.entity_query_language.verbalization.chain_utils import (
     build_path_parts,
+    chain_root,
     walk_chain,
 )
 from krrood.entity_query_language.verbalization.fragments.base import (
@@ -71,9 +72,9 @@ def verbalize_chain(
     chain, leaf = walk_chain(expression)
     terminal = chain[-1]
     if isinstance(terminal, Attribute) and terminal._type_ is bool:
-        return _bool_attribute_chain(chain, leaf, context, verbalizer, negated)
+        return _verbalize_bool_predicative(chain, leaf, context, verbalizer, negated)
     root_fragment = _chain_root_frag(leaf, context, verbalizer)
-    return _render_path(build_path_parts(chain), root_fragment)
+    return _verbalize_possessive_path(build_path_parts(chain), root_fragment)
 
 
 def verbalize_possessive_chain(
@@ -85,45 +86,64 @@ def verbalize_possessive_chain(
     amount_details"* / *"its booking_date"*.
     """
     chain, _root = walk_chain(expression)
-    return _render_possessive_path(build_path_parts(chain), pronoun_fragment)
+    return _verbalize_pronominal_path(build_path_parts(chain), pronoun_fragment)
 
 
-def _render_path(
+def _verbalize_possessive_path(
     parts: list[tuple[str, Optional[SourceRef]]], root_fragment: VerbFragment
 ) -> VerbFragment:
+    """Build a possessive-path phrase fragment: ``"the attr of the Root"``.
+
+    Iterates *parts* in reverse (innermost attribute first) and assembles
+    ``"the <inner> of the <outer> of <root>"``.
+
+    :param parts: Ordered pairs of ``(display_name, source_ref)`` from
+        :func:`~krrood.entity_query_language.verbalization.chain_utils.build_path_parts`,
+        outermost attribute first.
+    :param root_fragment: Noun-phrase fragment for the chain root.
+    :returns: :class:`PhraseFragment` representing the full possessive chain.
+    """
     if not parts:
         return root_fragment
     reversed_parts = list(reversed(parts))
     first_name, first_ref = reversed_parts[0]
     fragment_parts: list[VerbFragment] = [
         Articles.THE.as_fragment(),
-        RoleFragment(text=first_name, role=SemanticRole.ATTRIBUTE, source_ref=first_ref),
+        _attr_fragment(first_name, first_ref),
     ]
     for attribute_name, attribute_reference in reversed_parts[1:]:
         fragment_parts.extend(
             [
                 Prepositions.OF_THE.as_fragment(),
-                RoleFragment(
-                    text=attribute_name, role=SemanticRole.ATTRIBUTE, source_ref=attribute_reference
-                ),
+                _attr_fragment(attribute_name, attribute_reference),
             ]
         )
     fragment_parts.extend([Prepositions.OF.as_fragment(), root_fragment])
     return PhraseFragment(parts=fragment_parts)
 
 
-def _render_possessive_path(
+def _verbalize_pronominal_path(
     parts: list[tuple[str, Optional[SourceRef]]], pronoun_fragment: VerbFragment
 ) -> VerbFragment:
+    """Build a pronominal chain: ``"its attr"`` or ``"the attr of its foo"``.
+
+    Replaces the trailing ``"of the Root"`` with a leading possessive pronoun.
+    The pronoun is placed at the position closest to the (elided) root:
+
+    * Single hop: ``"its booking_date"``
+    * Multi-hop: ``"the amount of its amount_details"``
+
+    :param parts: Ordered pairs from :func:`build_path_parts`, outermost first.
+    :param pronoun_fragment: Pronoun fragment (typically ``Pronouns.ITS.as_fragment()``).
+    :returns: :class:`PhraseFragment` with the pronoun in the correct position.
+    """
     if not parts:
         return pronoun_fragment
     reversed_parts = list(reversed(parts))
     last = len(reversed_parts) - 1
     fragment_parts: list[VerbFragment] = []
     for index, (attribute_name, attribute_reference) in enumerate(reversed_parts):
-        attribute_fragment = RoleFragment(
-            text=attribute_name, role=SemanticRole.ATTRIBUTE, source_ref=attribute_reference
-        )
+        attribute_fragment = _attr_fragment(attribute_name, attribute_reference)
         if index == 0 and index != last:
             fragment_parts.extend([Articles.THE.as_fragment(), attribute_fragment])
         elif index == 0:  # single attribute → "its booking_date"
@@ -135,8 +155,31 @@ def _render_possessive_path(
     return PhraseFragment(parts=fragment_parts)
 
 
-def _chain_root_frag(leaf, context: VerbalizationContext, verbalizer: EQLVerbalizer) -> VerbFragment:
-    """Noun phrase for the root of a chain; unwraps ResultQuantifier wrappers."""
+def _attr_fragment(name: str, source_ref: Optional[SourceRef]) -> RoleFragment:
+    """Return a :class:`RoleFragment` with :attr:`~SemanticRole.ATTRIBUTE` role.
+
+    :param name: Display name of the attribute (from :func:`build_path_parts`).
+    :param source_ref: Optional source reference for hyperlink resolution.
+    :returns: Role-tagged fragment for the attribute.
+    """
+    return RoleFragment(text=name, role=SemanticRole.ATTRIBUTE, source_ref=source_ref)
+
+
+def _chain_root_frag(
+    leaf: object, context: VerbalizationContext, verbalizer: EQLVerbalizer
+) -> VerbFragment:
+    """Build the noun-phrase fragment for the root of a MappedVariable chain.
+
+    Unwraps :class:`~krrood.entity_query_language.query.quantifiers.ResultQuantifier`
+    wrappers, then delegates to :func:`as_inline_noun` for
+    :class:`~krrood.entity_query_language.query.query.Entity` roots, or to
+    ``verbalizer.build`` for all others.
+
+    :param leaf: The chain root expression (returned by :func:`walk_chain`).
+    :param context: Shared verbalization state.
+    :param verbalizer: Top-level verbalizer for recursive sub-expression building.
+    :returns: Noun-phrase fragment for the root.
+    """
     inner = leaf
     while isinstance(inner, ResultQuantifier):
         inner = inner._child_
@@ -145,32 +188,46 @@ def _chain_root_frag(leaf, context: VerbalizationContext, verbalizer: EQLVerbali
     return verbalizer.build(leaf, context)
 
 
-def _navigation_chain(nav_chain: list, root_fragment: VerbFragment) -> VerbFragment:
-    """Fragment for the navigation path up to (but not including) the terminal attribute."""
+def _verbalize_bool_predicative(
+    chain: list[MappedVariable],
+    leaf: object,
+    context: VerbalizationContext,
+    verbalizer: EQLVerbalizer,
+    negated: bool,
+) -> VerbFragment:
+    """Build a predicative boolean attribute phrase: ``"<nav> is [not] <attr>"``.
+
+    For chains ending in an int-typed :class:`Index`, produces ordinal navigation
+    (e.g. ``"the first tasks of the Robot is completed"``).
+
+    :param chain: Full chain from :func:`walk_chain` (outermost-first, including terminal).
+    :param leaf: Chain root expression.
+    :param context: Shared verbalization state.
+    :param verbalizer: Top-level verbalizer for recursive sub-expression building.
+    :param negated: If ``True``, use ``"is not"`` copula.
+    :returns: :class:`PhraseFragment` for the predicative form.
+    """
+    root_fragment = _chain_root_frag(leaf, context, verbalizer)
+    nav_chain = chain[:-1]
+
     if not nav_chain:
-        return root_fragment
-    if isinstance(nav_chain[-1], Index) and isinstance(nav_chain[-1]._key_, int):
+        nav_fragment = root_fragment
+    elif isinstance(nav_chain[-1], Index) and isinstance(nav_chain[-1]._key_, int):
         ordinal = _ordinal(nav_chain[-1]._key_)
-        pre_frag = _render_path(build_path_parts(nav_chain[:-1]), root_fragment)
-        return phrase(
+        pre_frag = _verbalize_possessive_path(build_path_parts(nav_chain[:-1]), root_fragment)
+        nav_fragment = phrase(
             Articles.THE.as_fragment(),
             word(ordinal),
             Prepositions.OF.as_fragment(),
             pre_frag,
         )
-    return _render_path(build_path_parts(nav_chain), root_fragment)
+    else:
+        nav_fragment = _verbalize_possessive_path(build_path_parts(nav_chain), root_fragment)
 
-
-def _bool_attribute_chain(
-    chain: list, leaf, context: VerbalizationContext, verbalizer: EQLVerbalizer, negated: bool
-) -> VerbFragment:
-    """Produces '<nav-path> is [not] <attr>' for boolean terminal attributes."""
-    root_fragment = _chain_root_frag(leaf, context, verbalizer)
-    navigation_fragment = _navigation_chain(chain[:-1], root_fragment)
     copula = Copulas.IS_NOT.as_fragment() if negated else Copulas.IS.as_fragment()
     terminal = chain[-1]
     return phrase(
-        navigation_fragment,
+        nav_fragment,
         copula,
         RoleFragment.for_attribute(terminal._owner_class_, terminal._attribute_name_),
     )
@@ -237,7 +294,7 @@ class PronominalChainRule(MappedVariableRule):
         verbalizer: EQLVerbalizer,
     ) -> VerbFragment:
         """Render the chain with a leading *"its"* possessive pronoun."""
-        _chain, root = walk_chain(expression)
+        root = chain_root(expression)
         return verbalize_possessive_chain(expression, context, context.pronoun_for(root))
 
 
