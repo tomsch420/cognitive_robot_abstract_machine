@@ -14,14 +14,32 @@ Also defines :class:`BulletStyle` and :class:`IndentSize` enums used by
 
 from __future__ import annotations
 
+import html
+import inspect
 import logging
 import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import ClassVar
+from typing import ClassVar, Optional
 
 from krrood.entity_query_language.verbalization.fragments.roles import ROLE_COLORS, SemanticRole
+
+_TOOLTIP_ATTR = "title"
+
+
+def _first_docstring_line(obj: object) -> Optional[str]:
+    """Return the first non-empty line of *obj*'s docstring as plain text, or ``None``."""
+    if obj is None:
+        return None
+    doc = inspect.getdoc(obj)
+    if not doc:
+        return None
+    for line in doc.splitlines():
+        stripped = line.strip()
+        if stripped:
+            return stripped
+    return None
 
 _log = logging.getLogger(__name__)
 
@@ -115,7 +133,7 @@ class Formatter(ABC):
         """
         ...
 
-    def wrap_link(self, text: str, url: str) -> str:
+    def wrap_link(self, text: str, url: str, tooltip: Optional[str] = None) -> str:
         """
         Wrap already-rendered *text* with a hyperlink to *url*.
 
@@ -126,6 +144,8 @@ class Formatter(ABC):
         :type text: str
         :param url: Destination URL.
         :type url: str
+        :param tooltip: Optional single-line docstring summary shown on hover (HTML-escaped).
+        :type tooltip: str or None
         :returns: *text* unchanged (base); linked string (subclasses).
         :rtype: str
         """
@@ -183,7 +203,7 @@ class ANSIFormatter(Formatter):
         r, g, b = self._hex_to_rgb(color)
         return f"\033[38;2;{r};{g};{b}m{text}{self._RESET}"
 
-    def wrap_link(self, text: str, url: str) -> str:
+    def wrap_link(self, text: str, url: str, tooltip: Optional[str] = None) -> str:
         if not self._hyperlinks_enabled:
             return text
         # OSC 8 format: ESC ] 8 ; ; URL ST  text  ESC ] 8 ; ; ST
@@ -223,8 +243,9 @@ class HTMLFormatter(Formatter):
             return text
         return f'<span style="color:{color}">{text}</span>'
 
-    def wrap_link(self, text: str, url: str) -> str:
-        return f'<a target="_blank" rel="noopener" href="{url}">{text}</a>'
+    def wrap_link(self, text: str, url: str, tooltip: Optional[str] = None) -> str:
+        tooltip_attr = f' {_TOOLTIP_ATTR}="{html.escape(tooltip, quote=True)}"' if tooltip else ""
+        return f'<a target="_blank" rel="noopener" href="{url}"{tooltip_attr}>{text}</a>'
 
     @property
     def space(self) -> str:

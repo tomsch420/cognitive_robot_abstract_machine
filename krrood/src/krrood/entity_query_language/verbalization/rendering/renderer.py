@@ -29,6 +29,7 @@ from krrood.entity_query_language.verbalization.rendering.formatter import (
     Formatter,
     IndentSize,
     PlainFormatter,
+    _first_docstring_line,
 )
 
 if TYPE_CHECKING:
@@ -86,7 +87,12 @@ class FragmentRenderer(ABC):
         if source_ref is not None and self._link_resolver is not None:
             url = self._link_resolver.resolve(source_ref)
             if url is not None:
-                return self._formatter.wrap_link(colored, url)
+                tooltip = _first_docstring_line(
+                    getattr(source_ref.cls, source_ref.attribute, None)
+                    if source_ref.attribute is not None
+                    else source_ref.cls
+                )
+                return self._formatter.wrap_link(colored, url, tooltip=tooltip)
         return colored
 
 
