@@ -609,9 +609,9 @@ class World(HasSimulatorProperties):
         """
         Return a list of all semantic annotations in the world, sorted topologically based on their dependencies.
         """
-        return self._topological_sort_semantic_annotations(self.semantic_annotations)
+        return self._topologically_sort_semantic_annotations(self.semantic_annotations)
 
-    def _topological_sort_semantic_annotations(
+    def _topologically_sort_semantic_annotations(
         self,
         annotations: List[SemanticAnnotation],
     ) -> List[SemanticAnnotation]:
