@@ -230,7 +230,6 @@ class URDFParser:
                 parent_T_connection_expression=parent_T_connection,
             )
 
-        lower_limits, upper_limits = urdf_joint_to_limits(joint)
         dof_name = connection_name
         multiplier = offset = None
         if joint.mimic:
@@ -241,6 +240,7 @@ class URDFParser:
             dof_name = PrefixedName(joint.mimic.joint, prefix)
 
         if dof_name not in [d.name for d in world.degrees_of_freedom]:
+            lower_limits, upper_limits = urdf_joint_to_limits(joint)
             dof = DegreeOfFreedom(
                 name=dof_name,
                 limits=DegreeOfFreedomLimits(lower=lower_limits, upper=upper_limits),
