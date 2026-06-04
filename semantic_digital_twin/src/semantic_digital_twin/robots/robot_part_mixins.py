@@ -35,11 +35,6 @@ GenericRightFinger = TypeVar("GenericRightFinger")
 
 
 @dataclass(eq=False)
-class RobotPartMixin(HasRootBody, ABC):
-    pass
-
-
-@dataclass(eq=False)
 class HasFingers(Generic[GenericFinger], AbstractSubClassSafeGeneric, ABC):
     """
     Mixin class for robots or robot parts that have fingers as their direct children.

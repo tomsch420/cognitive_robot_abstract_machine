@@ -131,28 +131,25 @@ class HasRobotParts(ABC):
             origin = get_origin(field_type)
             args = get_args(field_type)
 
-            # Case 1: List-like collection of parts (e.g., arms: list[PR2LeftArm | PR2RightArm])
             if origin in list_like_classes and args:
                 self._initialize_list_field(field_name, args[0])
 
-            # Case 2: Single robot part field (e.g., mobile_base: PR2MobileBase)
             elif (
                 inspect.isclass(field_type)
                 and issubclass(field_type, AbstractRobotPart)
                 and not inspect.isabstract(field_type)
+                and getattr(self, field_name) is None
             ):
-                if getattr(self, field_name) is None:
-                    # Requirement: Each semantic annotation type should only be initialized once
-                    if any(type(item) is field_type for item in self._robot_parts):
-                        continue
+                # Each robot part is only initialized once
+                if any(type(item) is field_type for item in self._robot_parts):
+                    continue
 
-                    part = field_type.setup_default_configuration_in_world_below_robot_root(
-                        self.root
-                    )
-                    if part:
-                        setattr(self, field_name, part)
-                        # Recursive call to trigger initialization for child part's fields
-                        part.setup_robot_part_semantic_annotations()
+                part = field_type.setup_default_configuration_in_world_below_robot_root(
+                    self.root
+                )
+                setattr(self, field_name, part)
+                # Recursive call to trigger initialization for child part's fields
+                part.setup_robot_part_semantic_annotations()
 
     def _initialize_list_field(self, field_name: str, item_type: Any):
         """
@@ -610,6 +607,9 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
         return True
 
     def _setup_velocity_limits(self):
+        """
+        Sets up velocity limits for 1-DOF connections in the robot.
+        """
         vel_limits = defaultdict(
             lambda: 1.0,
         )

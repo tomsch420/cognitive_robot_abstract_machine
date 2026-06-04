@@ -622,7 +622,6 @@ class World(HasSimulatorProperties):
         :param annotations: List of semantic annotations to sort.
         :return: Sorted list of semantic annotations in dependency order.
         """
-        # Create a mapping from annotation to its dependencies
         annotation_set = set(annotations)
         dependency_map = {}
 
@@ -631,7 +630,7 @@ class World(HasSimulatorProperties):
             # Only consider dependencies that are in our list
             dependency_map[annotation] = deps & annotation_set
 
-        # Perform topological sort using Kahn's algorithm
+        # Perform topological sort using Kahn's algorithm https://www.geeksforgeeks.org/dsa/topological-sorting-indegree-based-solution/
         sorted_annotations = []
         no_dependency_queue = [
             ann for ann in annotations if len(dependency_map[ann]) == 0
@@ -650,7 +649,6 @@ class World(HasSimulatorProperties):
                 if len(dependency_map[annotation]) == 0:
                     no_dependency_queue.append(annotation)
 
-        # Check for circular dependencies
         if len(sorted_annotations) != len(annotations):
             raise SemanticAnnotationCircularDependencyError(sorted_annotations)
 

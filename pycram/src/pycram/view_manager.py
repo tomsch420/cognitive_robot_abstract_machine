@@ -8,6 +8,7 @@ from semantic_digital_twin.robots.robot_parts import (
     EndEffector,
     KinematicChain,
     AbstractRobot,
+    Neck,
 )
 
 
@@ -54,3 +55,15 @@ class ViewManager:
         elif arm == Arms.BOTH:
             return robot_view.all_arms
         return None
+
+    @staticmethod
+    def get_neck_view(robot_view: AbstractRobot) -> Optional[Neck]:
+        """
+        Get the neck view for a given robot view.
+
+        :param robot_view: The robot view to search in.
+        :return: The Neck object representing the neck.
+        """
+        return next(
+            (part for part in robot_view._robot_parts if isinstance(part, Neck)), None
+        )
