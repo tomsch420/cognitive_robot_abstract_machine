@@ -181,7 +181,7 @@ def occluding_bodies(camera: Camera, body: Body) -> List[Body]:
 @symbolic_function
 def reachable(pose: HomogeneousTransformationMatrix, root: Body, tip: Body) -> bool:
     """
-    Checks if a manipulator can reach a given position.
+    Checks if a end_effector can reach a given position.
     This is determined by inverse kinematics.
 
     :param pose: The pose to reach

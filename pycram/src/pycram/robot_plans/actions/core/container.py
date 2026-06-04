@@ -53,12 +53,12 @@ class OpenAction(ActionDescription):
 
     def execute(self) -> None:
         arm = ViewManager.get_arm_view(self.arm, self.robot)
-        manipulator = arm.end_effector
+        end_effector = arm.end_effector
 
         grasp_description = GraspDescription(
             ApproachDirection.FRONT,
             VerticalAlignment.NoAlignment,
-            manipulator,
+            end_effector,
         )
 
         self.add_subplan(
@@ -84,13 +84,13 @@ class OpenAction(ActionDescription):
         test_robot: AbstractRobot = test_world.get_semantic_annotation_by_id(
             context.robot.id
         )
-        manipulator = ViewManager.get_end_effector_view(variables["arm"], test_robot)
+        end_effector = ViewManager.get_end_effector_view(variables["arm"], test_robot)
 
         return and_(
-            GripperIsFree(manipulator),
+            GripperIsFree(end_effector),
             reachability_validator(
                 kwargs["object_designator"].global_pose,
-                manipulator.tool_frame,
+                end_effector.tool_frame,
                 test_world.get_semantic_annotations_by_type(type(context.robot))[0],
                 test_world,
                 (
@@ -113,12 +113,12 @@ class OpenAction(ActionDescription):
         """
         The handle has to be in the gripper of the robot and the container has to be open.
         """
-        manipulator = ViewManager.get_end_effector_view(kwargs["arm"], context.robot)
+        end_effector = ViewManager.get_end_effector_view(kwargs["arm"], context.robot)
         parent_connection = kwargs[
             "object_designator"
         ].get_first_parent_connection_of_type(ActiveConnection1DOF)
         return (
-            is_body_in_gripper(kwargs["object_designator"], manipulator) > 0.9
+            is_body_in_gripper(kwargs["object_designator"], end_effector) > 0.9
             or np.allclose(
                 kwargs["object_designator"].global_pose.to_position(),
                 ViewManager.get_end_effector_view(
@@ -150,12 +150,12 @@ class CloseAction(ActionDescription):
 
     def execute(self) -> None:
         arm = ViewManager.get_arm_view(self.arm, self.robot)
-        manipulator = arm.end_effector
+        end_effector = arm.end_effector
 
         grasp_description = GraspDescription(
             ApproachDirection.FRONT,
             VerticalAlignment.NoAlignment,
-            manipulator,
+            end_effector,
         )
 
         self.add_subplan(

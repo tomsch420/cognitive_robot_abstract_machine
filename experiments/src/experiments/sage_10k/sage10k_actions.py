@@ -73,11 +73,11 @@ class Sage10kOpenDoor(ActionDescription):
                 x=..., y=..., yaw=..., reference_frame=None
             ),
             hip_rotation=0.0,
-            target_pose_manipulator=pre_grasp_pose,
+            target_pose_end_effector=pre_grasp_pose,
             grasp_description=underspecified(GraspDescription)(
                 approach_direction=ApproachDirection.FRONT,
                 vertical_alignment=VerticalAlignment.NoAlignment,
-                manipulator=variable(EndEffector, self.world.semantic_annotations),
+                end_effector=variable(EndEffector, self.world.semantic_annotations),
                 rotate_gripper=False,
             ),
         )

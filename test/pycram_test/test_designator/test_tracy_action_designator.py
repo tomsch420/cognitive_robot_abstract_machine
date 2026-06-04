@@ -149,14 +149,14 @@ def test_reach_action_multi(immutable_tracy_block_world):
     with simulated_robot:
         plan.perform()
 
-    manipulator_pose = left_arm.end_effector.tool_frame.global_transform
-    manipulator_position = manipulator_pose.to_position().to_np()
-    manipulator_orientation = manipulator_pose.to_quaternion().to_np()
+    end_effector_pose = left_arm.end_effector.tool_frame.global_transform
+    end_effector_position = end_effector_pose.to_position().to_np()
+    end_effector_orientation = end_effector_pose.to_quaternion().to_np()
 
     target_orientation = grasp_description.grasp_orientation()
 
-    assert manipulator_position[:3] == pytest.approx([0.8, 0.5, 0.93], abs=0.01)
-    compare_orientations(manipulator_orientation, target_orientation, decimal=2)
+    assert end_effector_position[:3] == pytest.approx([0.8, 0.5, 0.93], abs=0.01)
+    compare_orientations(end_effector_orientation, target_orientation, decimal=2)
 
 
 def test_move_gripper_multi(immutable_tracy_block_world):

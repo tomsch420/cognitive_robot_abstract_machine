@@ -319,14 +319,14 @@ def test_reach_action_multi(immutable_multiple_robot_apartment):
     with simulated_robot:
         plan.perform()
 
-    manipulator_pose = left_arm.end_effector.tool_frame.global_transform
-    manipulator_position = manipulator_pose.to_position().to_np()
-    manipulator_orientation = manipulator_pose.to_quaternion().to_np()
+    end_effector_pose = left_arm.end_effector.tool_frame.global_transform
+    end_effector_position = end_effector_pose.to_position().to_np()
+    end_effector_orientation = end_effector_pose.to_quaternion().to_np()
 
     target_orientation = grasp_description.grasp_orientation()
 
-    assert manipulator_position[:3] == pytest.approx([1, -2, 0.8], abs=0.01)
-    compare_orientations(manipulator_orientation, target_orientation, decimal=2)
+    assert end_effector_position[:3] == pytest.approx([1, -2, 0.8], abs=0.01)
+    compare_orientations(end_effector_orientation, target_orientation, decimal=2)
 
 
 def test_follow_tcp_path_multi(immutable_multiple_robot_apartment):
@@ -658,7 +658,7 @@ def test_move_to_reach(immutable_multiple_robot_apartment):
     world, robot, context = immutable_multiple_robot_apartment
     move_to_reach = MoveToReach(
         target_pose_offset_robot=Pose2D(0.2, -0.55),
-        target_pose_manipulator=Pose.from_xyz_rpy(
+        target_pose_end_effector=Pose.from_xyz_rpy(
             x=0.7, y=-1.3, z=0.9, reference_frame=world.root
         ),
         hip_rotation=0.0,
@@ -666,7 +666,7 @@ def test_move_to_reach(immutable_multiple_robot_apartment):
             approach_direction=ApproachDirection.FRONT,
             vertical_alignment=VerticalAlignment.NoAlignment,
             rotate_gripper=False,
-            manipulator=world.get_semantic_annotations_by_type(EndEffector)[0],
+            end_effector=world.get_semantic_annotations_by_type(EndEffector)[0],
         ),
     )
 

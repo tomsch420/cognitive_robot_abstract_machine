@@ -18,7 +18,7 @@ kernelspec:
 
 > Safe yourself and your colleges time and effort and:
 > 1. Verify assumptions we have about the URDF
-> 	1. Please make sure the robot has a properly defined tool center point or tool frame at each of the manipulators
+> 	1. Please make sure the robot has a properly defined tool center point or tool frame at each of the end_effectors
 > 	2. Velocity limits should always be positive if set
 > 	3. Any filepaths in the urdf should be defined with a `package://your_ros2_package/` prefix, so that they may be discovered by ros
 > 2. Make sure the URDF and Meshes are packaged correctly into a ROS2 Package

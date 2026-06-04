@@ -240,9 +240,9 @@ class MoveManipulatorMotion(BaseMotion):
     Target pose to which the TCP should be moved
     """
 
-    manipulator: EndEffector
+    end_effector: EndEffector
     """
-    The Manipulator to move to the target pose
+    The end effector to move to the target pose
     """
 
     allow_gripper_collision: bool = False
@@ -253,7 +253,11 @@ class MoveManipulatorMotion(BaseMotion):
     @property
     def _motion_chart(self):
         robot = self.robot
-        full_body_controlled = robot.mobile_base.full_body_controlled if isinstance(robot, HasMobileBase) else False
+        full_body_controlled = (
+            robot.mobile_base.full_body_controlled
+            if isinstance(robot, HasMobileBase)
+            else False
+        )
 
         root = self.world.root if full_body_controlled else robot.root
         goal_pose = (
@@ -263,7 +267,7 @@ class MoveManipulatorMotion(BaseMotion):
         )
         task = CartesianPose(
             root_link=root,
-            tip_link=self.manipulator.tool_frame,
+            tip_link=self.end_effector.tool_frame,
             goal_pose=goal_pose,
             threshold=0.005,
             name=self.__class__.__name__,

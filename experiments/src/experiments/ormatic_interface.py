@@ -4076,14 +4076,14 @@ class GraspDescriptionDAO(
         )
     )
 
-    manipulator_id: Mapped[int] = mapped_column(
+    end_effector_id: Mapped[int] = mapped_column(
         ForeignKey("EndEffectorDAO.database_id", use_alter=True),
         nullable=True,
         use_existing_column=True,
     )
 
-    manipulator: Mapped[EndEffectorDAO] = relationship(
-        "EndEffectorDAO", uselist=False, foreign_keys=[manipulator_id], post_update=True
+    end_effector: Mapped[EndEffectorDAO] = relationship(
+        "EndEffectorDAO", uselist=False, foreign_keys=[end_effector_id], post_update=True
     )
 
 
@@ -6761,7 +6761,7 @@ class MoveManipulatorActionDAO(
         nullable=True,
         use_existing_column=True,
     )
-    manipulator_id: Mapped[int] = mapped_column(
+    end_effector_id: Mapped[int] = mapped_column(
         ForeignKey("EndEffectorDAO.database_id", use_alter=True),
         nullable=True,
         use_existing_column=True,
@@ -6770,8 +6770,8 @@ class MoveManipulatorActionDAO(
     target_pose: Mapped[PoseMappingDAO] = relationship(
         "PoseMappingDAO", uselist=False, foreign_keys=[target_pose_id], post_update=True
     )
-    manipulator: Mapped[EndEffectorDAO] = relationship(
-        "EndEffectorDAO", uselist=False, foreign_keys=[manipulator_id], post_update=True
+    end_effector: Mapped[EndEffectorDAO] = relationship(
+        "EndEffectorDAO", uselist=False, foreign_keys=[end_effector_id], post_update=True
     )
 
     __mapper_args__ = {
@@ -6802,7 +6802,7 @@ class MoveManipulatorMotionDAO(
         nullable=True,
         use_existing_column=True,
     )
-    manipulator_id: Mapped[int] = mapped_column(
+    end_effector_id: Mapped[int] = mapped_column(
         ForeignKey("EndEffectorDAO.database_id", use_alter=True),
         nullable=True,
         use_existing_column=True,
@@ -6811,8 +6811,8 @@ class MoveManipulatorMotionDAO(
     target: Mapped[PoseMappingDAO] = relationship(
         "PoseMappingDAO", uselist=False, foreign_keys=[target_id], post_update=True
     )
-    manipulator: Mapped[EndEffectorDAO] = relationship(
-        "EndEffectorDAO", uselist=False, foreign_keys=[manipulator_id], post_update=True
+    end_effector: Mapped[EndEffectorDAO] = relationship(
+        "EndEffectorDAO", uselist=False, foreign_keys=[end_effector_id], post_update=True
     )
 
     __mapper_args__ = {
@@ -6937,7 +6937,7 @@ class MoveToReachDAO(
         nullable=True,
         use_existing_column=True,
     )
-    target_pose_manipulator_id: Mapped[int] = mapped_column(
+    target_pose_end_effector_id: Mapped[int] = mapped_column(
         ForeignKey("PoseMappingDAO.database_id", use_alter=True),
         nullable=True,
         use_existing_column=True,
@@ -6954,10 +6954,10 @@ class MoveToReachDAO(
         foreign_keys=[target_pose_offset_robot_id],
         post_update=True,
     )
-    target_pose_manipulator: Mapped[PoseMappingDAO] = relationship(
+    target_pose_end_effector: Mapped[PoseMappingDAO] = relationship(
         "PoseMappingDAO",
         uselist=False,
-        foreign_keys=[target_pose_manipulator_id],
+        foreign_keys=[target_pose_end_effector_id],
         post_update=True,
     )
     grasp_description: Mapped[GraspDescriptionDAO] = relationship(
@@ -8549,7 +8549,7 @@ class EndEffectorDidNotReachTargetDAO(
         use_existing_column=True,
     )
 
-    manipulator_id: Mapped[int] = mapped_column(
+    end_effector_id: Mapped[int] = mapped_column(
         ForeignKey("EndEffectorDAO.database_id", use_alter=True),
         nullable=True,
         use_existing_column=True,
@@ -8560,8 +8560,8 @@ class EndEffectorDidNotReachTargetDAO(
         use_existing_column=True,
     )
 
-    manipulator: Mapped[EndEffectorDAO] = relationship(
-        "EndEffectorDAO", uselist=False, foreign_keys=[manipulator_id], post_update=True
+    end_effector: Mapped[EndEffectorDAO] = relationship(
+        "EndEffectorDAO", uselist=False, foreign_keys=[end_effector_id], post_update=True
     )
     target: Mapped[PoseMappingDAO] = relationship(
         "PoseMappingDAO", uselist=False, foreign_keys=[target_id], post_update=True

@@ -113,11 +113,11 @@ class BodyUnfetchable(PlanFailure):
 @dataclass
 class EndEffectorDidNotReachTarget(PlanFailure):
 
-    manipulator: EndEffector
+    end_effector: EndEffector
 
     target: Pose
 
     def __post_init__(self):
         self.message = (
-            f"EndEffector {self.manipulator} did not reach target {self.target}"
+            f"EndEffector {self.end_effector} did not reach target {self.target}"
         )

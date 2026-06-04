@@ -189,17 +189,17 @@ class CostmapLocation(Location):
         self, test_robot: AbstractRobot, test_world: World
     ) -> List[Body]:
 
-        manipulator = ViewManager.get_end_effector_view(
+        end_effector = ViewManager.get_end_effector_view(
             self.reachable_arm if self.reachable_arm is not None else Arms.BOTH,
             test_robot,
         )
-        manipulators = (
-            [manipulator]
-            if not isinstance(manipulator, list_like_classes)
-            else manipulator
+        end_effectors = (
+            [end_effector]
+            if not isinstance(end_effector, list_like_classes)
+            else end_effector
         )
         objs = set()
-        for man in manipulators:
+        for man in end_effectors:
             objs.update(
                 test_world.get_kinematic_structure_entities_of_branch(man.tool_frame)
             )

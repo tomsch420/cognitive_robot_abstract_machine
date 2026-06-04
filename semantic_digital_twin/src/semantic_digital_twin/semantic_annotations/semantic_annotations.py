@@ -1075,7 +1075,7 @@ class Human(Agent):
     Represents a human agent in the environment.
 
     A Person is an Agent that is not robotically actuated and does not provide
-    kinematic chains, manipulators, or robot-specific components.
+    kinematic chains, end_effectors, or robot-specific components.
 
     This class exists primarily for semantic distinction, so that algorithms
     can treat human agents differently from robots if needed.

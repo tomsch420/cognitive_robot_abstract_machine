@@ -441,17 +441,17 @@ class EndEffector(AbstractRobotPart, ABC):
 
     tool_frame: Body = field(kw_only=True)
     """
-    The tool frame or tool center point of the manipulator. Usually the point the robot tries to align with the object.
+    The tool frame or tool center point of the end_effector. Usually the point the robot tries to align with the object.
     """
 
     front_facing_orientation: Quaternion = field(kw_only=True)
     """
-    The orientation of the manipulator's tool frame, which is usually the front-facing orientation.
+    The orientation of the end_effector's tool frame, which is usually the front-facing orientation.
     """
 
     front_facing_axis: Vector3 = field(init=False)
     """
-    The axis of the manipulator's tool frame that is facing forward.
+    The axis of the end_effector's tool frame that is facing forward.
     """
 
     def __post_init__(self):
@@ -577,7 +577,7 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
     @property
     def degrees_of_freedom_with_hardware_interface(self) -> List[DegreeOfFreedom]:
         """
-        The number of degrees of freedom of the robot, which is the sum of the degrees of freedom of all its manipulators.
+        The number of degrees of freedom of the robot, which is the sum of the degrees of freedom of all its end_effectors.
         """
         dofs = []
         for connection in self.connections:

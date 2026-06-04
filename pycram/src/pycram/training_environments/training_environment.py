@@ -187,7 +187,7 @@ class MoveToReachTrainingEnvironment(TrainingEnvironment):
         )
 
         move_to_reach = underspecified(MoveToReach)(
-            target_pose_manipulator=target_pose,
+            target_pose_end_effector=target_pose,
             target_pose_offset_robot=underspecified(Pose2D)(
                 x=..., y=..., yaw=..., reference_frame=None
             ),
@@ -195,7 +195,7 @@ class MoveToReachTrainingEnvironment(TrainingEnvironment):
             grasp_description=underspecified(GraspDescription)(
                 approach_direction=...,
                 vertical_alignment=...,
-                manipulator=variable(EndEffector, world.semantic_annotations),
+                end_effector=variable(EndEffector, world.semantic_annotations),
                 rotate_gripper=...,
                 manipulation_offset=...,
             ),

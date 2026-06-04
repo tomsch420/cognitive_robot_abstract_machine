@@ -135,7 +135,7 @@ class Garmi(AbstractRobot, SpecifiesLeftRightArm, HasNeck):
             name=PrefixedName(f"{side}_arm", prefix=self.name.name),
             root=self._world.get_body_by_name(mount),
             tip=self._world.get_body_by_name(f"{arm_id}_fr3_link8"),
-            manipulator=gripper,
+            end_effector=gripper,
             _world=self._world,
         )
 
@@ -230,8 +230,8 @@ class Garmi(AbstractRobot, SpecifiesLeftRightArm, HasNeck):
                 mapping=dict(zip(gripper_joints, [0.0, 0.0])),
                 state_type=GripperState.CLOSE,
             )
-            arm.manipulator.add_joint_state(gripper_open)
-            arm.manipulator.add_joint_state(gripper_close)
+            arm.end_effector.add_joint_state(gripper_open)
+            arm.end_effector.add_joint_state(gripper_close)
 
         lift_joints = [
             self._world.get_connection_by_name("lift_0_lower_joint"),

@@ -241,17 +241,17 @@ class FollowToolCenterPointPathAction(ActionDescription):
 @dataclass
 class MoveManipulatorAction(ActionDescription):
     """
-    Move the manipulator to a specific pose.
+    Move the end_effector to a specific pose.
     """
 
     target_pose: Pose
     """
-    The pose where the manipulator should be moved to.
+    The pose where the end_effector should be moved to.
     """
 
-    manipulator: EndEffector
+    end_effector: EndEffector
     """
-    The manipulator that should be moved.
+    The end_effector that should be moved.
     """
 
     allow_gripper_collision: bool
@@ -264,7 +264,7 @@ class MoveManipulatorAction(ActionDescription):
             execute_single(
                 MoveManipulatorMotion(
                     self.target_pose,
-                    self.manipulator,
+                    self.end_effector,
                     self.allow_gripper_collision,
                 )
             )
@@ -274,10 +274,10 @@ class MoveManipulatorAction(ActionDescription):
     def post_condition(
         variables: Dict[str, Variable], context: Context, kwargs: Dict[str, Any]
     ) -> SymbolicExpression:
-        manipulator = variables["manipulator"]
+        end_effector = variables["end_effector"]
         target_pose = variables["target_pose"]
         return allclose(
-            manipulator.tool_frame.global_pose.to_np(),
+            end_effector.tool_frame.global_pose.to_np(),
             target_pose.to_np(),
             atol=0.1,
         )

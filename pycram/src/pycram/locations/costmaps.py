@@ -782,7 +782,7 @@ class GaussianCostmap(Costmap):
         cut_dist = int(0.05 * self.mean)
         center = int(self.mean / 2)
         # Cuts out the middle 5% of the gaussian to avoid the robot being too close to the target since this is usually
-        # bad for reaching the target with a manipulator. 15% is a magic number that might need some tuning in the future
+        # bad for reaching the target with a end_effector. 15% is a magic number that might need some tuning in the future
         self.map[
             center - cut_dist : center + cut_dist, center - cut_dist : center + cut_dist
         ] = 0
