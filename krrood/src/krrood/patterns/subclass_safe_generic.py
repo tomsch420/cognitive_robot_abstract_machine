@@ -146,90 +146,9 @@ class AbstractSubClassSafeGeneric(ABC):
 
             # Map the root TypeVars of the base to the concrete arguments provided here
             if resolved_types:
-                root_parameters = get_generic_type_params(
-                    base_origin,
-                    AbstractSubClassSafeGeneric,
-                    include_root_generic_base=True,
-                    include_specialized_generic_base=False,
+                substitutions.update(
+                    cls._get_resolved_type_substitutions(base_origin, resolved_types)
                 )
-                type_var_tuple_index = next(
-                    (
-                        index
-                        for index, parameter in enumerate(root_parameters)
-                        if isinstance(parameter, TypeVarTuple)
-                    ),
-                    -1,
-                )
-
-                if type_var_tuple_index == -1:
-                    if len(root_parameters) != len(resolved_types):
-                        raise MismatchingNumberOfGenericParametersAndResolvedTypes(
-                            affected_class=base_origin,
-                            parameters=root_parameters,
-                            resolved_types=resolved_types,
-                        )
-                    matched_pairs = zip(root_parameters, resolved_types)
-                else:
-                    prefix_length = type_var_tuple_index
-                    suffix_length = len(root_parameters) - type_var_tuple_index - 1
-                    if len(resolved_types) < prefix_length + suffix_length:
-                        raise MismatchingNumberOfGenericParametersAndResolvedTypes(
-                            affected_class=base_origin,
-                            parameters=root_parameters,
-                            resolved_types=resolved_types,
-                        )
-                    type_var_tuple_content_length = (
-                        len(resolved_types) - prefix_length - suffix_length
-                    )
-                    matched_pairs = [
-                        (root_parameters[index], resolved_types[index])
-                        for index in range(prefix_length)
-                    ]
-                    matched_pairs.append(
-                        (
-                            root_parameters[type_var_tuple_index],
-                            tuple(
-                                resolved_types[
-                                    prefix_length : prefix_length
-                                    + type_var_tuple_content_length
-                                ]
-                            ),
-                        )
-                    )
-                    for index in range(suffix_length):
-                        matched_pairs.append(
-                            (
-                                root_parameters[type_var_tuple_index + 1 + index],
-                                resolved_types[
-                                    prefix_length
-                                    + type_var_tuple_content_length
-                                    + index
-                                ],
-                            )
-                        )
-
-                for old_type, new_type in matched_pairs:
-                    if (
-                        not isinstance(old_type, (TypeVar, TypeVarTuple))
-                        or old_type is new_type
-                        or new_type is None
-                    ):
-                        continue
-
-                    # Skip redundant variadic pass-through: Ts -> (Unpack[Ts],)
-                    if (
-                        isinstance(old_type, TypeVarTuple)
-                        and isinstance(new_type, tuple)
-                        and len(new_type) == 1
-                    ):
-                        inner = new_type[0]
-                        if (
-                            get_origin(inner) is Unpack
-                            and get_args(inner)[0] is old_type
-                        ):
-                            continue
-
-                    substitutions[ensure_hashable(old_type)] = new_type
 
             # Recursively pull substitutions already defined by the parent
             if base_origin is cls:
@@ -241,6 +160,127 @@ class AbstractSubClassSafeGeneric(ABC):
 
         cls._subclass_safe_substitutions = substitutions
         return substitutions
+
+    @classmethod
+    def _get_resolved_type_substitutions(
+        cls,
+        base_origin: type,
+        resolved_types: tuple[type, ...],
+    ) -> dict[Any, ResolvableType]:
+        """
+        Retrieves resolved type substitutions for a given base origin and resolved types.
+        """
+        root_parameters = get_generic_type_params(
+            base_origin,
+            AbstractSubClassSafeGeneric,
+            include_root_generic_base=True,
+            include_specialized_generic_base=False,
+        )
+
+        type_var_tuple_index = next(
+            (i for i, p in enumerate(root_parameters) if isinstance(p, TypeVarTuple)),
+            -1,
+        )
+
+        if type_var_tuple_index == -1:
+            if len(root_parameters) != len(resolved_types):
+                raise MismatchingNumberOfGenericParametersAndResolvedTypes(
+                    affected_class=base_origin,
+                    parameters=root_parameters,
+                    resolved_types=resolved_types,
+                )
+            matched_pairs = zip(root_parameters, resolved_types)
+        else:
+            matched_pairs = cls._match_type_var_tuple_variable_to_resolved_type(
+                type_var_tuple_index,
+                root_parameters,
+                resolved_types,
+                base_origin,
+            )
+
+        return {
+            ensure_hashable(old_type): new_type
+            for old_type, new_type in matched_pairs
+            if cls._fulfills_substitution_condition(old_type, new_type)
+        }
+
+    @classmethod
+    def _fulfills_substitution_condition(
+        cls,
+        old_type: Any,
+        new_type: type | tuple[type, ...] | None,
+    ) -> bool:
+        """
+        Determines if a substitution condition is fulfilled based on the old and new types.
+        """
+        if not isinstance(old_type, (TypeVar, TypeVarTuple)):
+            return False
+
+        if old_type is new_type or new_type is None:
+            return False
+
+        if not (
+            isinstance(old_type, TypeVarTuple)
+            and isinstance(new_type, tuple)
+            and len(new_type) == 1
+        ):
+            return True
+
+        inner = new_type[0]
+        return not (get_origin(inner) is Unpack and get_args(inner)[0] is old_type)
+
+    @classmethod
+    def _match_type_var_tuple_variable_to_resolved_type(
+        cls,
+        type_var_tuple_index: int,
+        root_parameters: list[Any],
+        resolved_types: tuple[type, ...],
+        base_origin: type,
+    ) -> list[tuple[type, type]]:
+        """
+        Matches type variables in a tuple with resolved types, considering prefix and suffix lengths.
+
+        :param type_var_tuple_index: Index of the TypeVarTuple within root_parameters.
+        :param root_parameters: List of root parameters to match against resolved types.
+        :param resolved_types: Tuple of resolved types to match with root parameters.
+        :param base_origin: Base origin type for substitutions.
+        :return: List of matched type variable tuples.
+        """
+        prefix_length = type_var_tuple_index
+        suffix_length = len(root_parameters) - type_var_tuple_index - 1
+        if len(resolved_types) < prefix_length + suffix_length:
+            raise MismatchingNumberOfGenericParametersAndResolvedTypes(
+                affected_class=base_origin,
+                parameters=root_parameters,
+                resolved_types=resolved_types,
+            )
+        type_var_tuple_content_length = (
+            len(resolved_types) - prefix_length - suffix_length
+        )
+        matched_pairs = [
+            (root_parameters[index], resolved_types[index])
+            for index in range(prefix_length)
+        ]
+        matched_pairs.append(
+            (
+                root_parameters[type_var_tuple_index],
+                tuple(
+                    resolved_types[
+                        prefix_length : prefix_length + type_var_tuple_content_length
+                    ]
+                ),
+            )
+        )
+        for index in range(suffix_length):
+            matched_pairs.append(
+                (
+                    root_parameters[type_var_tuple_index + 1 + index],
+                    resolved_types[
+                        prefix_length + type_var_tuple_content_length + index
+                    ],
+                )
+            )
+        return matched_pairs
 
     @classmethod
     def _resolve_substitutions_transitively(
