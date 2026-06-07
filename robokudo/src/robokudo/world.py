@@ -14,10 +14,10 @@ from semantic_digital_twin.world_description.connections import Connection6DoF
 # Module-level singleton-like variables
 this = sys.modules[__name__]
 
-this.world = None
+this.world = World()
 """RoboKudo's central world state."""
 
-this.world_entity_tracker = None
+this.world_entity_tracker = WorldEntityWithIDKwargsTracker.from_world(this.world)
 """RoboKudo's central entity tracker."""
 
 _rk_world_lock = Lock()
@@ -38,9 +38,10 @@ def init_world_with_entity_tracker() -> WorldEntityWithIDKwargsTracker:
     :return: The newly created entity tracker instance.
     """
     with _rk_world_lock:
-        world = World()
-        this.world_entity_tracker = WorldEntityWithIDKwargsTracker.from_world(world)
-        unsafe_set_world(world)
+        unsafe_clear_world()
+        this.world_entity_tracker = WorldEntityWithIDKwargsTracker.from_world(
+            world_instance()
+        )
     return this.world_entity_tracker
 
 
@@ -109,7 +110,8 @@ def unsafe_clear_world() -> None:
         Always acquire the lock manually before calling this method. Take a look at `this.clear_world()` or
         `this.world_instance()` for examples.
     """
-    this.world = World()
+    with this.world.modify_world():
+        this.world.clear()
 
 
 def world_has_body_by_name(world: World, body_name: str) -> bool:
