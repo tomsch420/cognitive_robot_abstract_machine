@@ -132,30 +132,49 @@ def world_has_body_by_name(world: World, body_name: str) -> bool:
 #                 semantic_digital_twin.world.Body(name=PrefixedName(name=frame_name)))
 
 
-def setup_world_for_camera_frame(world_frame: str, camera_frame: str) -> None:
+def setup_world_for_camera_frame(
+    world_frame: str,
+    camera_frame: str,
+) -> None:
     """Set up the world and camera frames if they do not exist yet.
 
     :param world_frame: The name of the world frame.
     :param camera_frame: The name of the camera frame.
     """
-    world_exists = world_has_body_by_name(world=world_instance(), body_name=world_frame)
-    camera_exists = world_has_body_by_name(
-        world=world_instance(), body_name=camera_frame
-    )
+    world = world_instance()
+    world_exists = world_has_body_by_name(world=world, body_name=world_frame)
+    camera_exists = world_has_body_by_name(world=world, body_name=camera_frame)
 
     if world_exists and camera_exists:
-        return
+        return None
 
     if not world_exists and not camera_exists:
-        with world_instance().modify_world():
-            world_body = Body(name=PrefixedName(name=world_frame))
-            camera_body = Body(name=PrefixedName(name=camera_frame))
-            world_c_camera = Connection6DoF.create_with_dofs(
-                parent=world_body, child=camera_body, world=world_instance()
+        world_body = Body(name=PrefixedName(name=world_frame))
+        world_body.visual.append(
+            Mesh.from_trimesh(
+                mesh=trimesh.creation.axis(),
+                origin=HomogeneousTransformationMatrix(reference_frame=world_body),
             )
-            world_instance().add_connection(world_c_camera)
+        )
 
-        return
+        camera_body = Body(name=PrefixedName(name=camera_frame))
+        camera_body.visual.append(
+            Mesh.from_trimesh(
+                mesh=trimesh.creation.axis(),
+                origin=HomogeneousTransformationMatrix(reference_frame=camera_body),
+            )
+        )
+
+        with world.modify_world():
+            cam_T_world = Connection6DoF.create_with_dofs(
+                parent=world_body,
+                child=camera_body,
+                world=world,
+                name=PrefixedName(name=f"{camera_frame}_T_{world_frame}"),
+            )
+
+            world.add_connection(cam_T_world)
+        return None
 
     raise AssertionError(
         f"This method can currently only be called when neither the world or camera frame exist. "
@@ -175,4 +194,27 @@ def update_connection_transform(
     )
 
     with world.modify_world():
-        connection.parent_T_connection_expression = transform
+        connection.origin = transform
+
+
+def get_object_belief_states() -> Dict[UUID, ObjectBeliefState]:
+    return _tracked_objects
+
+
+def add_object_belief_state(object_belief_state: ObjectBeliefState) -> None:
+    world = world_instance()
+
+    _tracked_objects[object_belief_state.uuid] = object_belief_state
+
+    # with world.modify_world():
+    #     world_T_object_belief = Connection6DoF.create_with_dofs(
+    #         world=world,
+    #         parent=world_frame,
+    #         child=object_belief.body,
+    #     )
+
+    #     world.add_connection(world_T_object_belief)
+
+
+def get_object_belief_state(uuid: UUID) -> ObjectBeliefState:
+    return _tracked_objects[uuid]
