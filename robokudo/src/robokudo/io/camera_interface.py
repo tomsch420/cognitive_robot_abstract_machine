@@ -125,10 +125,10 @@ class ROSCameraInterface(CameraInterface):
             self.lookup_viewpoint: bool = False
             """Whether to look up camera transforms"""
 
-        self.cam_translation: Optional[List[float]] = None
+        self.cam_translation: List[float] = [0.0, 0.0, 0.0]
         """Camera translation from TF"""
 
-        self.cam_quaternion: Optional[List[float]] = None
+        self.cam_quaternion: List[float] = [0.0, 0.0, 0.0, 1.0]
         """Camera rotation from TF"""
 
         if self.lookup_viewpoint:
@@ -146,10 +146,12 @@ class ROSCameraInterface(CameraInterface):
                     target_frame=self.tf_to,
                     source_frame=self.tf_from,
                     time=timestamp,
-                    timeout=Duration(seconds=0.1),
+                    timeout=Duration(seconds=1.0 / 30.0),
                 )
-                translation = world_T_camera.transform.translation
-                rotation = world_T_camera.transform.rotation
+                transform = world_T_camera.transform
+                translation = transform.translation
+                rotation = transform.rotation
+
                 self.cam_translation = [
                     float(translation.x),
                     float(translation.y),
@@ -195,7 +197,7 @@ class ROSCameraInterface(CameraInterface):
             camera_body = world.get_body_by_name(name=self.tf_from)
             world_body = world.get_body_by_name(name=self.tf_to)
 
-            cam_T_world = HomogeneousTransformationMatrix.from_xyz_quaternion(
+            world_T_camera = HomogeneousTransformationMatrix.from_xyz_quaternion(
                 pos_x=self.cam_translation[0],
                 pos_y=self.cam_translation[1],
                 pos_z=self.cam_translation[2],
@@ -206,13 +208,13 @@ class ROSCameraInterface(CameraInterface):
                 reference_frame=world_body,
                 child_frame=camera_body,
             )
-            cas.cam_to_world_transform = cam_T_world
+            cas.cam_to_world_transform = world_T_camera
             cas.data_timestamp = timestamp.sec * 1_000_000_000 + timestamp.nanosec
 
             update_connection_transform(
                 to_name=world_body.name,
                 from_name=camera_body.name,
-                transform=cam_T_world,
+                transform=world_T_camera,
             )
 
             ROSCameraInterface.store_legacy_cam_to_world_transform_from_cas(cas=cas)
@@ -228,6 +230,9 @@ class ROSCameraInterface(CameraInterface):
             raise KeyError("cam_to_world_transform not set in CAS")
 
         timestamp_ns = cas.data_timestamp
+        if timestamp_ns is None:
+            raise KeyError("timestamp_ns not set in CAS")
+
         timestamp = builtin_interfaces.msg.Time(
             sec=int(timestamp_ns // 1_000_000_000),
             nanosec=int(timestamp_ns % 1_000_000_000),
@@ -254,7 +259,7 @@ class ROSCameraInterface(CameraInterface):
         if cam_to_world_transform.reference_frame is not None:
             st.child_frame = str(cam_to_world_transform.reference_frame.name)
         st.timestamp = timestamp
-        cas.set(CASViews.VIEWPOINT_CAM_TO_WORLD, st)
+        cas.viewpoint_cam_to_world = st
 
     def set_o3d_cam_intrinsics_from_ros_cam_info(self) -> None:
         """Convert ROS camera info to Open3D camera intrinsics.
