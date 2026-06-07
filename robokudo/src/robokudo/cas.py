@@ -81,10 +81,10 @@ class CASViews:
     QUERY: str = "query"
     """Query information"""
 
-    WORLD_FRAME: str = "map"
+    WORLD_FRAME: str = "world_frame"
     """Name of the world frame."""
 
-    CAM_FRAME: str = "camera"
+    CAM_FRAME: str = "camera_frame"
     """Name of the camera frame."""
 
     VIEWPOINT_CAM_TO_WORLD: str = "viewpoint_cam_to_world"
