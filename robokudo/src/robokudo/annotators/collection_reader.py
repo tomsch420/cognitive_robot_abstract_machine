@@ -26,7 +26,6 @@ from py_trees.display import unicode_tree
 from typing_extensions import List, Optional
 
 from robokudo.annotators.core import BaseAnnotator
-from robokudo.cas import CASViews
 from robokudo.descriptors.camera_configs.base_camera_config import BaseCameraConfig
 from robokudo.descriptors.camera_configs.components import TfComponent
 from robokudo.io.camera_interface import CameraInterface
@@ -105,12 +104,6 @@ class CollectionReaderAnnotator(BaseAnnotator):
         """
         self.rk_logger.debug("%s.initialise()" % self.__class__.__name__)
 
-        cam_config = self.descriptor.parameters.camera_config
-        if issubclass(type(cam_config), TfComponent):
-            cas = self.get_cas()
-            cas.set(CASViews.CAM_FRAME, cam_config.tf_from)
-            cas.set(CASViews.WORLD_FRAME, cam_config.tf_to)
-
         # Clear all feedback messages when Collection Reader starts over
         assert isinstance(self.parent, Sequence)
         for child in self.parent.children:
@@ -178,7 +171,13 @@ class CollectionReaderAnnotator(BaseAnnotator):
             )
 
             # Create a fresh world
-            robokudo.world.clear_world()
+            # world.clear_world()
+
+            cam_config = self.descriptor.parameters.camera_config
+            if issubclass(type(cam_config), TfComponent):
+                cas = self.get_cas()
+                cas.world_frame = cam_config.tf_to
+                cas.cam_frame = cam_config.tf_from
 
             # Restore any existing queries
             if query:
