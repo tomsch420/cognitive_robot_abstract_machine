@@ -98,12 +98,27 @@ Two concrete renderers:
 
 All verbalization output is expressed as a tree of `VerbFragment` subclasses before rendering.  Understanding this hierarchy is essential for writing new rules or renderers.
 
-```
-VerbFragment (abstract base)
-├── WordFragment          — plain text: articles, punctuation, connectives
-├── RoleFragment          — text + SemanticRole + optional SourceRef (for hyperlinking)
-├── PhraseFragment        — inline sequence of child fragments joined by a separator
-└── BlockFragment         — header + list of item fragments (flattens or indents on render)
+```{mermaid}
+classDiagram
+    class VerbFragment {
+        <<abstract>>
+    }
+    class WordFragment {
+        plain text: articles, punctuation, connectives
+    }
+    class RoleFragment {
+        text + SemanticRole + optional SourceRef (for hyperlinking)
+    }
+    class PhraseFragment {
+        inline sequence of child fragments joined by a separator
+    }
+    class BlockFragment {
+        header + list of item fragments (flattens or indents on render)
+    }
+    VerbFragment <|-- WordFragment
+    VerbFragment <|-- RoleFragment
+    VerbFragment <|-- PhraseFragment
+    VerbFragment <|-- BlockFragment
 ```
 
 ### SemanticRole and Colours
@@ -171,10 +186,19 @@ Rules are sorted by `__mro__.index(VerbalizationRule)` (descending) at `RuleEngi
 
 Example from `rules/logical.py`:
 
-```
-NotRule           (depth 1)   ← generic fallback
-├── NotComparatorRule (depth 2)  ← tried first: Not(Comparator)
-└── NotBoolAttrRule   (depth 2)  ← tried first: Not(bool Attribute)
+```{mermaid}
+classDiagram
+    class NotRule {
+        depth 1 — generic fallback
+    }
+    class NotComparatorRule {
+        depth 2 — tried first: Not(Comparator)
+    }
+    class NotBoolAttrRule {
+        depth 2 — tried first: Not(bool Attribute)
+    }
+    NotRule <|-- NotComparatorRule
+    NotRule <|-- NotBoolAttrRule
 ```
 
 ### How to Extend — A Worked Example
@@ -283,6 +307,11 @@ Key vocabulary enums and their ``.as_fragment()`` return type:
 | {py:class}`~krrood.entity_query_language.verbalization.vocabulary.english.Articles` | ``Articles.THE.as_fragment()`` | ``WordFragment`` (PLAIN role) |
 | {py:class}`~krrood.entity_query_language.verbalization.vocabulary.english.Conjunctions` | ``Conjunctions.AND.as_fragment()`` | ``WordFragment`` (PLAIN role) |
 | {py:class}`~krrood.entity_query_language.verbalization.vocabulary.english.Prepositions` | ``Prepositions.OF.as_fragment()`` | ``WordFragment`` (PLAIN role) |
+| {py:class}`~krrood.entity_query_language.verbalization.vocabulary.english.Pronouns` | ``Pronouns.ITS.as_fragment()`` | ``WordFragment`` (PLAIN role) |
+| {py:class}`~krrood.entity_query_language.verbalization.vocabulary.english.ExistentialPhrase` | ``ExistentialPhrase.singular("Robot")`` | ``PhraseFragment`` |
+| {py:class}`~krrood.entity_query_language.verbalization.vocabulary.english.RangePhrases` | ``RangePhrases.IS_BETWEEN.as_fragment()`` | ``PhraseFragment`` (OPERATOR role) |
+| {py:class}`~krrood.entity_query_language.verbalization.vocabulary.english.SortDirections` | ``SortDirections.ASC.as_fragment()`` | ``WordFragment`` (PLAIN role) |
+| {py:class}`~krrood.entity_query_language.verbalization.vocabulary.english.FallbackNouns` | ``FallbackNouns.ENTITY.as_fragment()`` | ``WordFragment`` (PLAIN role) |
 
 For coloured / linked fragments that reference a Python class or attribute, use
 the class methods on {py:class}`~krrood.entity_query_language.verbalization.fragments.base.RoleFragment`:
@@ -298,14 +327,37 @@ RoleFragment.for_operator("is greater than")         # OPERATOR role, no link
 The rule engine sorts rule classes by MRO depth — the number of inheritance steps
 from ``VerbalizationRule``.  Greater depth = tried first.
 
-```
-VerbalizationRule            (depth 0, abstract — never tried)
-├── NotRule                  (depth 1 — generic negation fallback)
-│   ├── NotComparatorRule    (depth 2 — tried BEFORE NotRule)
-│   └── NotBoolAttrRule      (depth 2 — tried BEFORE NotRule)
-└── LogicalRule              (depth 1 — abstract)
-    └── AndRule              (depth 2)
-        └── RangeConjunctionRule (depth 3 — tried first)
+```{mermaid}
+classDiagram
+    class VerbalizationRule {
+        <<abstract>>
+        depth 0 — never tried
+    }
+    class NotRule {
+        depth 1 — generic negation fallback
+    }
+    class NotComparatorRule {
+        depth 2 — tried BEFORE NotRule
+    }
+    class NotBoolAttrRule {
+        depth 2 — tried BEFORE NotRule
+    }
+    class LogicalRule {
+        <<abstract>>
+        depth 1 — abstract
+    }
+    class AndRule {
+        depth 2
+    }
+    class RangeConjunctionRule {
+        depth 3 — tried first
+    }
+    VerbalizationRule <|-- NotRule
+    VerbalizationRule <|-- LogicalRule
+    NotRule <|-- NotComparatorRule
+    NotRule <|-- NotBoolAttrRule
+    LogicalRule <|-- AndRule
+    AndRule <|-- RangeConjunctionRule
 ```
 
 **When to subclass an existing rule vs ``VerbalizationRule``:**
