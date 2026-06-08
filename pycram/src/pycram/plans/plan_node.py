@@ -24,7 +24,8 @@ from pycram.datastructures.execution_data import ExecutionData
 from pycram.plans.designator import Designator
 
 if TYPE_CHECKING:
-    from pycram.robot_plans import ActionDescription, BaseMotion
+    from pycram.robot_plans import BaseMotion
+    from pycram.robot_plans.actions.base import ActionDescription
 
 
 logger = logging.getLogger(__name__)
