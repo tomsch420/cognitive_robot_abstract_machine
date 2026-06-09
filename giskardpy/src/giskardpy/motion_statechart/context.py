@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from functools import cached_property
-from typing_extensions import Self, Dict, Type, TypeVar, TYPE_CHECKING
+from typing_extensions import Self, Dict, Type, TypeVar
 
 from krrood.symbolic_math.float_variable_data import FloatVariableData
 from krrood.symbolic_math.symbolic_math import FloatVariable
@@ -12,13 +12,9 @@ from semantic_digital_twin.collision_checking.collision_variable_managers import
     SelfCollisionVariableManager,
     ExternalCollisionVariableManager,
 )
-from giskardpy.motion_statechart.exceptions import (
-    MissingContextExtensionError,
-    DuplicateContextExtensionError,
-)
-from giskardpy.qp.qp_controller_config import QPControllerConfig
-
 from semantic_digital_twin.world import World
+from giskardpy.motion_statechart.exceptions import MissingContextExtensionError, DuplicateContextExtensionError
+from giskardpy.qp.qp_controller_config import QPControllerConfig
 
 
 @dataclass

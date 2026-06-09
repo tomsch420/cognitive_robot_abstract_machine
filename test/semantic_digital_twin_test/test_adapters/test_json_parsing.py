@@ -15,7 +15,6 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import (
     SpatialTypeNotJsonSerializable,
     WorldEntityWithIDNotInKwargs,
-    MissingWorldError,
 )
 from semantic_digital_twin.spatial_types import (
     Point3,
@@ -126,7 +125,7 @@ def test_KinematicStructureEntityNotInKwargs():
     point = Point3(1, 2, 3, reference_frame=body)
     json_data = point.to_json()
     kwargs = {}
-    with pytest.raises(MissingWorldError):
+    with pytest.raises(WorldEntityWithIDNotInKwargs):
         Point3.from_json(json_data, **kwargs)
 
 

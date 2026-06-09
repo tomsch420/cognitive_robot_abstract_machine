@@ -1,8 +1,7 @@
 from dataclasses import dataclass
 
 from semantic_digital_twin.reasoning.predicates import visible
-from semantic_digital_twin.robots.robot_parts import Camera, AbstractRobot
-
+from semantic_digital_twin.robots.abstract_robot import AbstractRobot, Camera
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import BoundingBox
 from semantic_digital_twin.world_description.world_entity import (
@@ -64,7 +63,7 @@ class PerceptionQuery:
                 None,
                 [
                     cam if isinstance(cam, Camera) else None
-                    for cam in self.robot.get_sensors()
+                    for cam in self.robot.sensors
                 ],
             )
         )[0]

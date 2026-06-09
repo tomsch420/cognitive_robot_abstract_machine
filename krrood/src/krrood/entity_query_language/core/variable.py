@@ -7,7 +7,6 @@ It contains classes for simple variables, constant literals, and variables that 
 from __future__ import annotations
 
 import uuid
-import inspect
 from abc import ABC
 from dataclasses import dataclass, field
 from functools import cached_property
@@ -43,9 +42,6 @@ from krrood.entity_query_language.utils import (
     is_iterable,
     make_list,
 )
-from krrood.entity_query_language._monitoring import (
-    monitored,
-)
 
 DomainType = Iterable[T]
 """
@@ -73,7 +69,6 @@ class CanHaveDomainSource(CanBehaveLikeAVariable[T], ABC):
         super().__post_init__()
 
 
-@monitored
 @dataclass(eq=False, repr=False)
 class Variable(CanHaveDomainSource[T]):
     """
@@ -114,17 +109,15 @@ class Variable(CanHaveDomainSource[T]):
 
     def _evaluate__(
         self,
-        sources: OperationResult,
+        sources: Bindings,
     ) -> Iterable[OperationResult]:
         """
         Fetch values from the domain values and yield an OperationResult for each.
         """
 
         for v in self._re_enterable_domain_generator_:
-            bindings = sources.bindings | {self._id_: v}
-            yield self._build_operation_result_and_update_truth_value_(
-                bindings, sources
-            )
+            bindings = {**sources, self._id_: v}
+            yield self._build_operation_result_and_update_truth_value_(bindings)
 
     def _replace_child_field_(
         self, old_child: SymbolicExpression, new_child: SymbolicExpression
@@ -174,7 +167,6 @@ class Literal(Variable[T]):
         return super()._name_
 
 
-@monitored
 @dataclass(eq=False, repr=False)
 class InstantiatedVariable(
     MultiArityExpressionThatPerformsACartesianProduct, CanHaveDomainSource[T]
@@ -231,12 +223,12 @@ class InstantiatedVariable(
 
     def _evaluate__(
         self,
-        sources: OperationResult,
+        sources: Bindings,
     ) -> Iterable[OperationResult]:
         yield from self._instantiate_using_child_vars_and_yield_results_(sources)
 
     def _instantiate_using_child_vars_and_yield_results_(
-        self, sources: OperationResult
+        self, sources: Bindings
     ) -> Iterator[OperationResult]:
         """
         Create new instances of the variable type and using as keyword arguments the child variables values.
@@ -248,9 +240,7 @@ class InstantiatedVariable(
                 for id_, v in child_result.bindings.items()
                 if id_ in self._child_var_id_name_map_
             }
-            construct = getattr(self._type_, "_construct_normally_", self._type_)
-            instance = construct(**kwargs)
-
+            instance = self._type_(**kwargs)
             bindings = {self._id_: instance} | child_result.bindings
             result = self._build_operation_result_and_update_truth_value_(
                 bindings, child_result
@@ -294,7 +284,7 @@ class ExternallySetVariable(CanHaveDomainSource[T]):
     ):
         raise ValueError(f"class {self.__class__} does not have children")
 
-    def _evaluate__(self, sources: OperationResult) -> Iterable[OperationResult]:
+    def _evaluate__(self, sources: Bindings) -> Iterable[OperationResult]:
         """
         As this variable is externally set, it does not produce any results on its own, it just yields from an empty
          list to indicate that it has no results. It's important to note that this function will only be called when

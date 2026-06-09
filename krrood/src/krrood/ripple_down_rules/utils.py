@@ -1181,7 +1181,7 @@ def is_iterable(obj: Any) -> bool:
 
     :param obj: The object to check.
     """
-    return callable(getattr(obj, "__iter__", None)) and not isinstance(
+    return hasattr(obj, "__iter__") and not isinstance(
         obj, (str, type, bytes, bytearray)
     )
 

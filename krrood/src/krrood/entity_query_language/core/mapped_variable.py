@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import operator
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass, is_dataclass, fields, field
 from functools import cached_property
 from typing import Self
 
@@ -28,8 +28,6 @@ from krrood.entity_query_language.core.base_expressions import (
     Bindings,
     OperationResult,
     Selectable,
-    SymbolicExpression,
-    UnificationDict,
 )
 from krrood.entity_query_language.operators.comparator import Comparator
 from krrood.entity_query_language.utils import (
@@ -37,6 +35,7 @@ from krrood.entity_query_language.utils import (
     merge_args_and_kwargs,
     convert_args_and_kwargs_into_hashable_key,
 )
+
 from krrood.symbol_graph.helpers import get_field_type_endpoint
 
 
@@ -147,7 +146,7 @@ class MappedVariable(UnaryExpression, CanBehaveLikeAVariable[T], ABC):
 
     def _evaluate__(
         self,
-        sources: OperationResult,
+        sources: Bindings,
     ) -> Iterable[OperationResult]:
         """
         Apply the mapping to the child's values.
@@ -157,21 +156,14 @@ class MappedVariable(UnaryExpression, CanBehaveLikeAVariable[T], ABC):
             self._build_operation_result_and_update_truth_value_(
                 child_result.bindings | {self._id_: mapped_value}, child_result
             )
-            for child_result in self._child_._evaluate_(sources)
-            for mapped_value in self._apply_mapping_(
-                child_result.value, sources=sources
-            )
+            for child_result in self._child_._evaluate_(sources, parent=self)
+            for mapped_value in self._apply_mapping_(child_result.value)
         )
 
     @abstractmethod
-    def _apply_mapping_(
-        self, value: Any, sources: Optional[OperationResult] = None
-    ) -> Iterable[Any]:
+    def _apply_mapping_(self, value: Any) -> Iterable[Any]:
         """
         Apply the mapping to a value from the child variable.
-
-        :param value: The value to map.
-        :param sources: The bindings from the evaluation context.
         """
         pass
 
@@ -266,11 +258,8 @@ class Attribute(MappedVariable):
         """
         self._type_ = get_field_type_endpoint(self._owner_class_, self._attribute_name_)
 
-    def _apply_mapping_(
-        self, value: Any, sources: Optional[OperationResult] = None
-    ) -> Iterable[Any]:
-        if hasattr(value, self._attribute_name_):
-            yield getattr(value, self._attribute_name_)
+    def _apply_mapping_(self, value: Any) -> Iterable[Any]:
+        yield getattr(value, self._attribute_name_)
 
     @property
     def _name_(self):
@@ -291,18 +280,9 @@ class Index(MappedVariable):
     The key to index with.
     """
 
-    def _apply_mapping_(
-        self, value: Any, sources: Optional[OperationResult] = None
-    ) -> Iterable[Any]:
+    def _apply_mapping_(self, value: Any) -> Iterable[Any]:
         try:
-            # Need to verify that this solution is general and not a hack.
-            if isinstance(self._key_, SymbolicExpression) and not (
-                isinstance(value, UnificationDict) and self._key_ in value
-            ):
-                for key in self._key_._evaluate_(sources):
-                    yield value[key.value]
-            else:
-                yield value[self._key_]
+            yield value[self._key_]
         except IndexError:  # break iterator if the key does not exist
             return
 
@@ -329,9 +309,7 @@ class Call(MappedVariable):
     The keyword arguments to call the method with.
     """
 
-    def _apply_mapping_(
-        self, value: Any, sources: Optional[OperationResult] = None
-    ) -> Iterable[Any]:
+    def _apply_mapping_(self, value: Any) -> Iterable[Any]:
         if len(self._args_) > 0 or len(self._kwargs_) > 0:
             yield value(*self._args_, **self._kwargs_)
         else:
@@ -348,7 +326,7 @@ class Call(MappedVariable):
 
 
 @dataclass(eq=False, repr=False)
-class FlatVariable(MappedVariable[T]):
+class FlatVariable(MappedVariable):
     """
     A variable that is created from its child through a flattening operation that
      transforms the values of the child from an iterable-of-iterables into a single iterable of items.
@@ -359,13 +337,11 @@ class FlatVariable(MappedVariable[T]):
     similar to UNNEST in SQL.
     """
 
-    def _apply_mapping_(
-        self, value: Iterable[T], sources: Optional[OperationResult] = None
-    ) -> Iterable[T]:
+    def _apply_mapping_(self, value: Iterable[Any]) -> Iterable[Any]:
         yield from value
 
     @cached_property
-    def _name_(self) -> str:
+    def _name_(self):
         return f"Flatten({self._child_._name_})"
 
 

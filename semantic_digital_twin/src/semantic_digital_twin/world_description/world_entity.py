@@ -4,20 +4,19 @@ import hashlib
 import inspect
 import uuid
 from abc import ABC, abstractmethod
-from collections.abc import Iterable
+from collections import deque
+from collections.abc import Iterable, Mapping
 from copy import deepcopy
 from dataclasses import dataclass, field
 from dataclasses import fields
 from functools import lru_cache, cached_property
-from typing import assert_never
 from uuid import UUID, uuid4
 
 import numpy as np
 import trimesh
 import trimesh.boolean
-from typing_extensions import List, Optional, TYPE_CHECKING, Tuple
-from typing_extensions import Set
 from typing_extensions import (
+    Deque,
     Type,
     TypeVar,
     Dict,
@@ -25,6 +24,8 @@ from typing_extensions import (
     Self,
     ClassVar,
 )
+from typing_extensions import List, Optional, TYPE_CHECKING, Tuple
+from typing_extensions import Set
 
 from krrood.adapters.json_serializer import (
     SubclassJSONSerializer,
@@ -44,30 +45,20 @@ from semantic_digital_twin.world_description.shape_collection import (
     BoundingBoxCollection,
 )
 from semantic_digital_twin.mixin import HasSimulatorProperties
-from krrood.utils import get_full_class_name
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
 )
-from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import (
     ReferenceFrameMismatchError,
-    WorldEntityWithIDNotInKwargs,
-    MissingWorldError,
+    SemanticAnnotationNotInWorldError,
 )
-from semantic_digital_twin.mixin import HasSimulatorProperties
 from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
     Point3,
     Pose,
 )
 from semantic_digital_twin.utils import IDGenerator, camel_case_split
-from semantic_digital_twin.world_description.geometry import Mesh
-from semantic_digital_twin.world_description.inertial_properties import Inertial
-from semantic_digital_twin.world_description.shape_collection import (
-    ShapeCollection,
-    BoundingBoxCollection,
-)
 
 if TYPE_CHECKING:
     from semantic_digital_twin.world_description.degree_of_freedom import (
@@ -220,8 +211,8 @@ class WorldEntityWithID(WorldEntity, SubclassJSONSerializer):
                 if isinstance(v.type, str):
                     type_name = v.type
                 else:
-                    type_name = v.type.__name__
-                if type_name.lower().startswith("set"):
+                    type_name = v.type._name
+                if type_name.startswith("Set"):
                     container_type = set
                 else:
                     container_type = list
@@ -508,14 +499,6 @@ class Body(KinematicStructureEntity):
             filter(lambda sem: isinstance(sem, type_), self._semantic_annotations)
         )
 
-    def copy_for_world(self, new_world: World) -> Self:
-        return Body(
-            name=self.name,
-            id=self.id,
-            visual=self.visual.copy_for_world(new_world),
-            collision=self.collision.copy_for_world(new_world),
-        )
-
 
 @dataclass(eq=False)
 class Region(KinematicStructureEntity):
@@ -560,13 +543,6 @@ class Region(KinematicStructureEntity):
         result.area = area
         return result
 
-    def copy_for_world(self, new_world: World) -> Self:
-        return Region(
-            name=self.name,
-            id=self.id,
-            area=self.area.copy_for_world(new_world),
-        )
-
 
 GenericKinematicStructureEntity = TypeVar(
     "GenericKinematicStructureEntity", bound=KinematicStructureEntity
@@ -596,13 +572,6 @@ class SemanticAnnotation(WorldEntityWithSimulatorProperties):
     Additional names that can be used to match this object.
     """
 
-    def __post_init__(self):
-        if self.name is None:
-            self.name = PrefixedName(
-                name=f"{self.__class__.__name__}",
-                prefix=self._world.name if self._world is not None else None,
-            )
-
     @classmethod
     @memoize
     def class_name_tokens(cls) -> Set[str]:
@@ -611,98 +580,102 @@ class SemanticAnnotation(WorldEntityWithSimulatorProperties):
         """
         return set(n.lower() for n in camel_case_split(cls.__name__))
 
+    def __post_init__(self):
+        if self.name is None:
+            self.name = PrefixedName(
+                name=f"{self.__class__.__name__}",
+                prefix=self._world.name if self._world is not None else None,
+            )
+
     def __hash__(self):
-        introspector = DataclassOnlyIntrospector()
-        result = [self.__class__]
-        for field_ in introspector.discover(self.__class__):
-            value = getattr(self, field_.public_name)
-            if isinstance(value, (list, set)):
-                result.extend(
-                    [v for v in value if isinstance(v, KinematicStructureEntity)]
-                )
-            elif isinstance(value, KinematicStructureEntity):
-                result.append(value)
-        return hash(tuple(result))
+        return hash(
+            tuple(
+                [self.__class__]
+                + sorted([kse.id for kse in self.kinematic_structure_entities])
+            )
+        )
 
     def __eq__(self, other):
         return hash(self) == hash(other)
 
+    def _kinematic_structure_entities(
+        self, aggregation_type: Type[GenericKinematicStructureEntity]
+    ) -> list[GenericKinematicStructureEntity]:
+        """
+        Recursively collects all entities that are part of this semantic annotation.
+        .. note: NP=P
+        """
+        stack: Deque[object] = deque([self])
+        entities: Set[aggregation_type] = set()
+        visited: Set[int] = set()
+
+        while stack:
+            obj = stack.pop()
+            oid = id(obj)
+            if oid in visited:
+                continue
+            visited.add(oid)
+
+            match obj:
+                case aggregation_type():
+                    entities.add(obj)
+
+                case SemanticAnnotation():
+                    stack.extend(_attr_values(obj, aggregation_type))
+
+                case Mapping():
+                    stack.extend(
+                        v
+                        for v in obj.values()
+                        if _is_entity_semantic_annotation_or_iterable(
+                            v, aggregation_type
+                        )
+                    )
+
+                case Iterable() if not isinstance(obj, (str, bytes, bytearray)):
+                    stack.extend(
+                        v
+                        for v in obj
+                        if _is_entity_semantic_annotation_or_iterable(
+                            v, aggregation_type
+                        )
+                    )
+
+        for entity in list(entities):
+            world = entity._world
+            if world is not None:
+                entities.update(
+                    world.get_kinematic_structure_entities_of_branch(entity)
+                )
+
+        return list(entities)
+
     @property
     def kinematic_structure_entities(self) -> list[KinematicStructureEntity]:
         """
-        Returns the kinematic structure entities that are part of this semantic annotation.
-
-        Do not override this property. If your semantic annotation subclass has a specific way of aggregating its
-        kinematic structure entities, override the `_kinematic_structure_entities` method instead.
-
-        :returns: A list of kinematic structure entities that are part of this semantic annotation.
+        Returns a list of all relevant KinematicStructureEntity in this semantic annotation. The default behaviour is to aggregate all KinematicStructureEntity that are accessible
+        through the properties and fields of this semantic annotation, recursively.
+        If this behaviour is not desired for a specific semantic annotation, it can be overridden by implementing the `KinematicStructureEntity` property.
         """
-        visited: Set[int] = set()
-        return self._kinematic_structure_entities(visited)
-
-    def _kinematic_structure_entities(
-        self, visited: Set[int]
-    ) -> list[KinematicStructureEntity]:
-        """
-        Returns the kinematic structure entities that are part of this semantic annotation.
-        This is done by iterating over all fields of the semantic annotation and checking if they are kinematic
-        structure entities or lists of kinematic structure entities.
-        If a field is a semantic annotation, its kinematic structure entities are also added to the result, via the
-        potentially overridden `kinematic_structure_entities` property.
-
-        :param visited: A set of ids of semantic annotations that have already been visited in the current chain of calls.
-        :returns: A list of kinematic structure entities that are part of this semantic annotation.
-        """
-
-        if id(self) in visited:
-            return []
-        visited.add(id(self))
-
-        def _resolve_item(item: Any) -> list[KinematicStructureEntity]:
-            if isinstance(item, KinematicStructureEntity):
-                return [item]
-            elif isinstance(item, SemanticAnnotation):
-                if id(item) in visited:
-                    return []
-                return item._kinematic_structure_entities(visited)
-            else:
-                return []
-
-        result = []
-        introspector = DataclassOnlyIntrospector()
-        for field_ in introspector.discover(self.__class__):
-            value = getattr(self, field_.public_name)
-
-            if isinstance(value, list_like_classes):
-                for item in value:
-                    result.extend(_resolve_item(item))
-            else:
-                result.extend(_resolve_item(value))
-        return result
+        return self._kinematic_structure_entities(KinematicStructureEntity)
 
     @property
     def bodies(self) -> list[Body]:
         """
-        Returns the bodies that are part of this semantic annotation.
+        Returns an list of all relevant bodies in this semantic annotation. The default behaviour is to aggregate all bodies that are accessible
+        through the properties and fields of this semantic annotation, recursively.
+        If this behaviour is not desired for a specific semantic annotation, it can be overridden by implementing the `bodies` property.
         """
-        return [
-            body for body in self.kinematic_structure_entities if isinstance(body, Body)
-        ]
+        return self._kinematic_structure_entities(Body)
 
     @property
     def regions(self) -> list[Region]:
         """
-        Returns the regions that are part of this semantic annotation.
+        Returns an list of all relevant regions in this semantic annotation. The default behaviour is to aggregate all regions that are accessible
+        through the properties and fields of this semantic annotation, recursively.
+        If this behaviour is not desired for a specific semantic annotation, it can be overridden by implementing the `regions` property.
         """
-        return [
-            region
-            for region in self.kinematic_structure_entities
-            if isinstance(region, Region)
-        ]
-
-    @property
-    def bodies_with_collision(self) -> List[Body]:
-        return [x for x in self.bodies if x.has_collision()]
+        return self._kinematic_structure_entities(Region)
 
     def as_bounding_box_collection_at_origin(
         self, origin: HomogeneousTransformationMatrix
@@ -737,27 +710,69 @@ class SemanticAnnotation(WorldEntityWithSimulatorProperties):
             HomogeneousTransformationMatrix(reference_frame=reference_frame)
         )
 
-    def _referenced_semantic_annotations(
-        self,
-    ) -> Set[SemanticAnnotation]:
+
+@dataclass(eq=False)
+class RootedSemanticAnnotation(SemanticAnnotation):
+    """
+    Represents a semantic annotation that is rooted in a specific KinematicStructureEntity.
+    """
+
+    root: KinematicStructureEntity = field(default=None)
+
+    @property
+    def connections(self) -> List[Connection]:
+        return self._world.get_connections_of_branch(self.root)
+
+    @property
+    def bodies(self) -> List[Body]:
+        return [
+            kse for kse in self.kinematic_structure_entities if isinstance(kse, Body)
+        ]
+
+    @property
+    def bodies_with_collision(self) -> List[Body]:
+        return [x for x in self.bodies if x.has_collision()]
+
+
+@dataclass(eq=False)
+class Agent(RootedSemanticAnnotation):
+    """
+    Represents an entity in the world that can act, move, or be controlled.
+
+    Agents are dynamic bodies with semantic meaning — they may have intent,
+    behavior, or be controlled by external or internal logic. Examples include
+    robots, humans, or other autonomous actors.
+
+    """
+
+
+@dataclass(eq=False)
+class Human(Agent):
+    """
+    Represents a human agent in the environment.
+
+    A Person is an Agent that is not robotically actuated and does not provide
+    kinematic chains, manipulators, or robot-specific components.
+
+    This class exists primarily for semantic distinction, so that algorithms
+    can treat human agents differently from robots if needed.
+    """
+
+
+@dataclass(eq=False)
+class SemanticEnvironmentAnnotation(RootedSemanticAnnotation):
+    """
+    Represents a semantic annotation of the environment.
+    """
+
+    @property
+    def kinematic_structure_entities(self) -> Set[KinematicStructureEntity]:
         """
-        Extract all direct SemanticAnnotation dependencies from a given SemanticAnnotation.
-        :return: A set of SemanticAnnotations that are referenced by the given annotation.
+        Returns a set of all KinematicStructureEntity in the environment semantic annotation.
         """
-        dependencies = set()
-        introspector = DataclassOnlyIntrospector()
-
-        for field_info in introspector.discover(self.__class__):
-            value = getattr(self, field_info.public_name)
-
-            if isinstance(value, SemanticAnnotation):
-                dependencies.add(value)
-            elif isinstance(value, list_like_classes):
-                for item in value:
-                    if isinstance(item, SemanticAnnotation):
-                        dependencies.add(item)
-
-        return dependencies
+        return set(
+            self._world.get_kinematic_structure_entities_of_branch(self.root)
+        ) | {self.root}
 
 
 @dataclass(eq=False)
@@ -878,10 +893,6 @@ class Connection(WorldEntity, HasSimulatorProperties, SubclassJSONSerializer):
     @property
     def passive_dofs(self) -> List[DegreeOfFreedom]:
         return []
-
-    @property
-    def controlled_dofs(self) -> List[DegreeOfFreedom]:
-        return [dof for dof in self.active_dofs if dof.has_hardware_interface]
 
     @property
     def is_controlled(self):

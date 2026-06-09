@@ -51,7 +51,7 @@ class ProcthorDoor:
     transformation matrix relative to the parent wall's horizontal center.
     """
 
-    door_dict: dict
+    door_dict: Dict[str, Any]
     """
     Dictionary representing a door from Procthors' JSON format
     """
@@ -529,7 +529,7 @@ class ProcthorObject:
     and computing its world transformation matrix. It also handles the import of child objects recursively.
     """
 
-    object_dict: dict
+    object_dict: dict[str, Any]
     """
     Dictionary representing an object from Procthor's JSON format.
     """

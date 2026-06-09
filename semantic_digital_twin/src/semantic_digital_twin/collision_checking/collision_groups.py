@@ -10,13 +10,14 @@ from semantic_digital_twin.collision_checking.collision_manager import (
     CollisionManager,
     CollisionConsumer,
 )
+from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.world_description.world_entity import (
     Body,
     KinematicStructureEntity,
 )
 
 if TYPE_CHECKING:
-    from semantic_digital_twin.world import World
+    from ..world import World
 
 
 @dataclass(repr=False, eq=False)
@@ -98,7 +99,11 @@ class CollisionGroupConsumer(CollisionConsumer, ABC):
         Updates the collision groups based on the kinematic structure of the world.
         :param world: Reference to the updated world.
         """
-        body_to_robot = world.robot_body_to_robot_mapping
+        body_to_robot: dict[KinematicStructureEntity, AbstractRobot] = {
+            body: robot
+            for robot in world.get_semantic_annotations_by_type(AbstractRobot)
+            for body in robot.bodies
+        }
 
         self.collision_groups = [CollisionGroup(world.root)]
         for parent, children in rustworkx.bfs_successors(

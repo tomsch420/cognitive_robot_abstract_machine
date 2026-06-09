@@ -11,7 +11,7 @@ class SimulatorAdditionalProperty:
     ...
 
 
-@dataclass(eq=False)
+@dataclass
 class HasSimulatorProperties:
     """
     Mixin class to add simulator additional properties to a data class.

@@ -3,8 +3,10 @@ from __future__ import annotations
 import logging
 import pathlib
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, is_dataclass
 from enum import Enum
+from types import ModuleType
+from typing import Set
 
 import rustworkx as rx
 import sqlalchemy
@@ -13,14 +15,16 @@ from sqlalchemy import JSON
 from typing_extensions import List, Type, Dict
 from typing_extensions import Optional, TextIO
 
-from krrood.ormatic.custom_types import TypeType, PolymorphicEnumType, JSONDataType, PathType
+from krrood.ormatic.custom_types import TypeType, PolymorphicEnumType, PathType
 from krrood.ormatic.data_access_objects.alternative_mappings import AlternativeMapping
+from krrood.ormatic.data_access_objects.dao import DataAccessObject
+
 from krrood.ormatic.sqlalchemy_generator import SQLAlchemyGenerator
 from krrood.ormatic.type_dict import TypeDict
-from krrood.ormatic.utils import InheritanceStrategy
-from krrood.utils import module_and_class_name
+from krrood.ormatic.utils import InheritanceStrategy, classes_of_package
+from krrood.utils import module_and_class_name, recursive_subclasses
 from krrood.ormatic.wrapped_table import WrappedTable, AssociationObject
-from krrood.adapters.json_serializer import SubclassJSONSerializer, JSONData
+from krrood.adapters.json_serializer import SubclassJSONSerializer
 from krrood.class_diagrams.class_diagram import (
     ClassDiagram,
     ClassRelation,
@@ -119,7 +123,6 @@ class ORMatic:
         self.type_mappings[Enum] = PolymorphicEnumType
         self.type_mappings[SubclassJSONSerializer] = JSON
         self.type_mappings[uuid.UUID] = sqlalchemy.UUID
-        self.type_mappings[JSONData] = JSONDataType
         self.type_mappings[pathlib.Path] = PathType
 
         for key in self.type_mappings.keys():
@@ -239,3 +242,67 @@ class ORMatic:
         """
         sqlalchemy_generator = SQLAlchemyGenerator(self)
         sqlalchemy_generator.to_sqlalchemy_file(file)
+
+    @classmethod
+    def from_package(
+        cls,
+        packages: List[ModuleType],
+        ormatic_interface_dependencies: List[ModuleType],
+        ignored_classes: Set[Type],
+        type_mappings: Dict[Type, Type],
+    ):
+        """
+        Create an instance from a list of packages, dependencies, and ignored classes.
+
+        :param packages: The packages that should be scanned for dataclasses.
+        :param ormatic_interface_dependencies: The dependent ormatic_interfaces.
+        :param ignored_classes: The classes that should be ignored.
+        :param type_mappings: The type mappings that should be used.
+        :return: The ORMatic instance.
+        """
+        import krrood.ormatic.custom_types  # type: ignore
+        import krrood.ormatic.data_access_objects.alternative_mappings  # type: ignore
+        from krrood.ormatic.helper import get_classes_of_ormatic_interface
+
+        all_classes, all_alternative_mappings, all_type_mappings = set(), set(), {}
+
+        # import classes from the existing interface
+        for ormatic_interface in ormatic_interface_dependencies:
+            classes, alternative_mappings, type_mappings = (
+                get_classes_of_ormatic_interface(ormatic_interface)
+            )
+            all_classes |= set(classes)
+            all_alternative_mappings |= set(alternative_mappings)
+            all_type_mappings.update(type_mappings)
+
+        for package in packages:
+            all_classes |= set(classes_of_package(package))
+
+        all_classes -= ignored_classes
+
+        all_alternative_mappings |= set(recursive_subclasses(AlternativeMapping))
+
+        # keep only dataclasses that are not AlternativeMapping or DataAccessObject subclasses
+        all_classes = {
+            c
+            for c in all_classes
+            if is_dataclass(c)
+            and not issubclass(c, (DataAccessObject, AlternativeMapping))
+        }
+
+        all_classes |= {am.original_class() for am in all_alternative_mappings}
+
+        all_type_mappings.update(type_mappings)
+
+        # create the new ormatic interface
+        class_diagram = ClassDiagram(
+            list(sorted(all_classes, key=lambda c: c.__name__, reverse=True))
+        )
+
+        # Create an ORMatic object with the classes to be mapped
+        ormatic = ORMatic(
+            class_diagram,
+            type_mappings=TypeDict(all_type_mappings),
+            alternative_mappings=list(all_alternative_mappings),
+        )
+        return ormatic

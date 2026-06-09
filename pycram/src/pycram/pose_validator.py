@@ -5,7 +5,6 @@ from typing_extensions import List, Union
 
 from giskardpy.executor import Executor
 from giskardpy.motion_statechart.context import MotionStatechartContext
-from giskardpy.motion_statechart.data_types import LifeCycleValues
 from giskardpy.motion_statechart.goals.templates import Sequence
 from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
@@ -23,7 +22,7 @@ from semantic_digital_twin.collision_checking.collision_rules import (
     AllowSelfCollisions,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.robots.robot_parts import AbstractRobot
+from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection6DoF
@@ -71,7 +70,7 @@ def visibility_validator(
     else:
         gen_body = object_or_pose
     r_t = world.ray_tracer
-    camera = robot.get_default_camera()
+    camera = list(robot.neck.sensors)[0]
     ray = r_t.ray_test(
         camera.bodies[0].global_transform.to_position().to_np()[:3],
         gen_body.global_transform.to_position().to_np()[:3],
@@ -183,20 +182,10 @@ def pose_sequence_reachability_validator(
 
     try:
         executor.tick_until_end()
-    except TimeoutError as e:
-        failed_nodes = [
-            (
-                node
-                if node.life_cycle_state
-                not in [LifeCycleValues.DONE, LifeCycleValues.NOT_STARTED]
-                else None
-            )
-            for node in msc.nodes
-        ]
-        failed_nodes = list(filter(None, failed_nodes))
-        logger.debug(
-            f"Timeout while executing pose sequence: {target_sequence}. Failed Nodes: {failed_nodes}"
-        )
+    except TimeoutError:
+        failed_nodes = []
+
+        logger.debug(f"Timeout while executing pose sequence: {target_sequence}")
         return False
     finally:
         world.state._data[:] = old_state
