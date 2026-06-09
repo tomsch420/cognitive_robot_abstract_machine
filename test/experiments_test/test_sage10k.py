@@ -3,7 +3,7 @@ from copy import deepcopy
 import numpy as np
 import pytest
 
-import experiments.ormatic_interface  # type: ignore
+import experiments.orm.ormatic_interface  # type: ignore
 from experiments.sage_10k.sage10k_actions import Sage10kOpenDoor
 from krrood.entity_query_language.factories import underspecified
 from krrood.entity_query_language.backends import ProbabilisticBackend
@@ -149,8 +149,12 @@ def test_translate_free_space_to_where_condition(wall_door_handle_world):
     result_to_compare = (
         parameters.truncation_assignments_from_where_conditions.update_variables(
             {
-                Continuous("MoveToReach.target_pose_offset_robot.x"): SpatialVariables.x.value,
-                Continuous("MoveToReach.target_pose_offset_robot.y"): SpatialVariables.y.value,
+                Continuous(
+                    "MoveToReach.target_pose_offset_robot.x"
+                ): SpatialVariables.x.value,
+                Continuous(
+                    "MoveToReach.target_pose_offset_robot.y"
+                ): SpatialVariables.y.value,
             }
         )
     )

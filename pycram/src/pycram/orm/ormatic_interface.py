@@ -71,7 +71,6 @@ import krrood.adapters.json_serializer
 import krrood.ormatic.custom_types
 import krrood.ormatic.data_access_objects.alternative_mappings
 import krrood.ormatic.type_dict
-import numpy
 import pathlib
 import pycram.alternative_motion_mapping
 import pycram.alternative_motion_mappings.hsrb_motion_mapping
@@ -143,6 +142,7 @@ import semantic_digital_twin.robots.armar
 import semantic_digital_twin.robots.armar7
 import semantic_digital_twin.robots.boxy
 import semantic_digital_twin.robots.donbot
+import semantic_digital_twin.robots.garmi
 import semantic_digital_twin.robots.hsrb
 import semantic_digital_twin.robots.icub3
 import semantic_digital_twin.robots.justin
@@ -165,6 +165,7 @@ import semantic_digital_twin.semantic_annotations.semantic_annotations
 import semantic_digital_twin.spatial_computations.ik_solver
 import semantic_digital_twin.spatial_types.derivatives
 import semantic_digital_twin.spatial_types.spatial_types
+import semantic_digital_twin.utils
 import semantic_digital_twin.world
 import semantic_digital_twin.world_description.connection_properties
 import semantic_digital_twin.world_description.connections
@@ -199,7 +200,6 @@ class Base(DeclarativeBase):
         krrood.adapters.json_serializer.SubclassJSONSerializer: sqlalchemy.sql.sqltypes.JSON,
         uuid.UUID: sqlalchemy.sql.sqltypes.UUID,
         pathlib.Path: krrood.ormatic.custom_types.PathType,
-        numpy.ndarray: pycram.orm.model.NumpyType,
     }
 
 
@@ -1581,6 +1581,17 @@ class DonbotDAO_arms_association(Base, AssociationDataAccessObject):
     target: Mapped[ArmDAO] = relationship("ArmDAO", foreign_keys=[target_armdao_id])
 
 
+class GarmiDAO_arms_association(Base, AssociationDataAccessObject):
+
+    __tablename__ = "_50446607032975877316565017614330314462576170393779802888493823"
+
+    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    source_garmidao_id: Mapped[int] = mapped_column(ForeignKey("GarmiDAO.database_id"))
+    target_armdao_id: Mapped[int] = mapped_column(ForeignKey("ArmDAO.database_id"))
+
+    target: Mapped[ArmDAO] = relationship("ArmDAO", foreign_keys=[target_armdao_id])
+
+
 class HSRBDAO_arms_association(Base, AssociationDataAccessObject):
 
     __tablename__ = "_61099018291539541121857471645553221702326832484908948418998495"
@@ -2042,16 +2053,6 @@ class ClosestPointsDAO(
     )
 
     distance: Mapped[builtins.float] = mapped_column(use_existing_column=True)
-
-    root_P_point_on_body_a: Mapped[numpy.ndarray] = mapped_column(
-        pycram.orm.model.NumpyType, nullable=False, use_existing_column=True
-    )
-    root_P_point_on_body_b: Mapped[numpy.ndarray] = mapped_column(
-        pycram.orm.model.NumpyType, nullable=False, use_existing_column=True
-    )
-    root_V_contact_normal_from_b_to_a: Mapped[numpy.ndarray] = mapped_column(
-        pycram.orm.model.NumpyType, nullable=False, use_existing_column=True
-    )
 
     body_a_id: Mapped[int] = mapped_column(
         ForeignKey("BodyDAO.database_id", use_alter=True),
@@ -3550,13 +3551,6 @@ class ExecutionDataDAO(
         Integer, primary_key=True, use_existing_column=True
     )
 
-    execution_start_world_state: Mapped[numpy.ndarray] = mapped_column(
-        pycram.orm.model.NumpyType, nullable=False, use_existing_column=True
-    )
-    execution_end_world_state: Mapped[typing.Optional[numpy.ndarray]] = mapped_column(
-        pycram.orm.model.NumpyType, nullable=True, use_existing_column=True
-    )
-
     execution_start_pose_id: Mapped[int] = mapped_column(
         ForeignKey("PoseMappingDAO.database_id", use_alter=True),
         nullable=True,
@@ -4971,6 +4965,41 @@ class MixingActionDAO(
         "polymorphic_identity": "MixingActionDAO",
         "inherit_condition": database_id == ActionDescriptionDAO.database_id,
     }
+
+
+class MockedNodeClassDAO(
+    Base, DataAccessObject[semantic_digital_twin.utils.MockedNodeClass]
+):
+
+    __tablename__ = "MockedNodeClassDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+
+class MockedNodeModuleDAO(
+    Base, DataAccessObject[semantic_digital_twin.utils.MockedNodeModule]
+):
+
+    __tablename__ = "MockedNodeModuleDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    Node: Mapped[TypeType] = mapped_column(
+        TypeType, nullable=False, use_existing_column=True
+    )
+
+
+class MockedRCLPYDAO(Base, DataAccessObject[semantic_digital_twin.utils.MockedRCLPY]):
+
+    __tablename__ = "MockedRCLPYDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
 
 
 class MotionExecutorDAO(Base, DataAccessObject[pycram.motion_executor.MotionExecutor]):
@@ -9051,16 +9080,6 @@ class EqualityBoundsDAO(
 
     evaluated: Mapped[builtins.bool] = mapped_column(use_existing_column=True)
 
-    names: Mapped[numpy.ndarray] = mapped_column(
-        pycram.orm.model.NumpyType, nullable=False, use_existing_column=True
-    )
-    names_equality_constraints: Mapped[numpy.ndarray] = mapped_column(
-        pycram.orm.model.NumpyType, nullable=False, use_existing_column=True
-    )
-    names_derivative_links: Mapped[numpy.ndarray] = mapped_column(
-        pycram.orm.model.NumpyType, nullable=False, use_existing_column=True
-    )
-
     __mapper_args__ = {
         "polymorphic_identity": "EqualityBoundsDAO",
         "inherit_condition": database_id == ProblemDataPartDAO.database_id,
@@ -9100,25 +9119,6 @@ class FreeVariableBoundsDAO(
 
     evaluated: Mapped[builtins.bool] = mapped_column(use_existing_column=True)
 
-    names: Mapped[numpy.ndarray] = mapped_column(
-        pycram.orm.model.NumpyType, nullable=False, use_existing_column=True
-    )
-    names_without_slack: Mapped[numpy.ndarray] = mapped_column(
-        pycram.orm.model.NumpyType, nullable=False, use_existing_column=True
-    )
-    names_slack: Mapped[numpy.ndarray] = mapped_column(
-        pycram.orm.model.NumpyType, nullable=False, use_existing_column=True
-    )
-    names_neq_slack: Mapped[numpy.ndarray] = mapped_column(
-        pycram.orm.model.NumpyType, nullable=False, use_existing_column=True
-    )
-    names_derivative_slack: Mapped[numpy.ndarray] = mapped_column(
-        pycram.orm.model.NumpyType, nullable=False, use_existing_column=True
-    )
-    names_eq_slack: Mapped[numpy.ndarray] = mapped_column(
-        pycram.orm.model.NumpyType, nullable=False, use_existing_column=True
-    )
-
     __mapper_args__ = {
         "polymorphic_identity": "FreeVariableBoundsDAO",
         "inherit_condition": database_id == ProblemDataPartDAO.database_id,
@@ -9140,22 +9140,6 @@ class InequalityBoundsDAO(
 
     default_limits: Mapped[builtins.bool] = mapped_column(use_existing_column=True)
     evaluated: Mapped[builtins.bool] = mapped_column(use_existing_column=True)
-
-    names: Mapped[numpy.ndarray] = mapped_column(
-        pycram.orm.model.NumpyType, nullable=False, use_existing_column=True
-    )
-    names_position_limits: Mapped[numpy.ndarray] = mapped_column(
-        pycram.orm.model.NumpyType, nullable=False, use_existing_column=True
-    )
-    names_derivative_links: Mapped[numpy.ndarray] = mapped_column(
-        pycram.orm.model.NumpyType, nullable=False, use_existing_column=True
-    )
-    names_neq_constraints: Mapped[numpy.ndarray] = mapped_column(
-        pycram.orm.model.NumpyType, nullable=False, use_existing_column=True
-    )
-    names_non_position_limits: Mapped[numpy.ndarray] = mapped_column(
-        pycram.orm.model.NumpyType, nullable=False, use_existing_column=True
-    )
 
     __mapper_args__ = {
         "polymorphic_identity": "InequalityBoundsDAO",
@@ -9324,28 +9308,6 @@ class QPDataExplicitDAO(
         ForeignKey(QPDataDAO.database_id), primary_key=True, use_existing_column=True
     )
 
-    quadratic_weights: Mapped[numpy.ndarray] = mapped_column(
-        pycram.orm.model.NumpyType, nullable=False, use_existing_column=True
-    )
-    linear_weights: Mapped[numpy.ndarray] = mapped_column(
-        pycram.orm.model.NumpyType, nullable=False, use_existing_column=True
-    )
-    box_lower_constraints: Mapped[numpy.ndarray] = mapped_column(
-        pycram.orm.model.NumpyType, nullable=False, use_existing_column=True
-    )
-    box_upper_constraints: Mapped[numpy.ndarray] = mapped_column(
-        pycram.orm.model.NumpyType, nullable=False, use_existing_column=True
-    )
-    equality_bounds: Mapped[numpy.ndarray] = mapped_column(
-        pycram.orm.model.NumpyType, nullable=False, use_existing_column=True
-    )
-    inequality_lower_bounds: Mapped[numpy.ndarray] = mapped_column(
-        pycram.orm.model.NumpyType, nullable=False, use_existing_column=True
-    )
-    inequality_upper_bounds: Mapped[numpy.ndarray] = mapped_column(
-        pycram.orm.model.NumpyType, nullable=False, use_existing_column=True
-    )
-
     __mapper_args__ = {
         "polymorphic_identity": "QPDataExplicitDAO",
         "inherit_condition": database_id == QPDataDAO.database_id,
@@ -9448,19 +9410,6 @@ class QPDataTwoSidedInequalityDAO(
         ForeignKey(QPDataDAO.database_id), primary_key=True, use_existing_column=True
     )
 
-    quadratic_weights: Mapped[numpy.ndarray] = mapped_column(
-        pycram.orm.model.NumpyType, nullable=False, use_existing_column=True
-    )
-    linear_weights: Mapped[numpy.ndarray] = mapped_column(
-        pycram.orm.model.NumpyType, nullable=False, use_existing_column=True
-    )
-    inequality_lower_bounds: Mapped[numpy.ndarray] = mapped_column(
-        pycram.orm.model.NumpyType, nullable=False, use_existing_column=True
-    )
-    inequality_upper_bounds: Mapped[numpy.ndarray] = mapped_column(
-        pycram.orm.model.NumpyType, nullable=False, use_existing_column=True
-    )
-
     __mapper_args__ = {
         "polymorphic_identity": "QPDataTwoSidedInequalityDAO",
         "inherit_condition": database_id == QPDataDAO.database_id,
@@ -9495,22 +9444,6 @@ class QPMatricesDAO(
 
     database_id: Mapped[builtins.int] = mapped_column(
         Integer, primary_key=True, use_existing_column=True
-    )
-
-    H: Mapped[numpy.ndarray] = mapped_column(
-        pycram.orm.model.NumpyType, nullable=False, use_existing_column=True
-    )
-    g: Mapped[numpy.ndarray] = mapped_column(
-        pycram.orm.model.NumpyType, nullable=False, use_existing_column=True
-    )
-    A: Mapped[numpy.ndarray] = mapped_column(
-        pycram.orm.model.NumpyType, nullable=False, use_existing_column=True
-    )
-    l: Mapped[numpy.ndarray] = mapped_column(
-        pycram.orm.model.NumpyType, nullable=False, use_existing_column=True
-    )
-    u: Mapped[numpy.ndarray] = mapped_column(
-        pycram.orm.model.NumpyType, nullable=False, use_existing_column=True
     )
 
 
@@ -11218,9 +11151,6 @@ class StateDAO(
         Integer, primary_key=True, use_existing_column=True
     )
 
-    data: Mapped[numpy.ndarray] = mapped_column(
-        pycram.orm.model.NumpyType, nullable=False, use_existing_column=True
-    )
     polymorphic_type: Mapped[str] = mapped_column(
         String(255), nullable=False, use_existing_column=True
     )
@@ -18159,6 +18089,40 @@ class DonbotDAO(
     }
 
 
+class GarmiDAO(
+    AbstractRobotDAO, DataAccessObject[semantic_digital_twin.robots.garmi.Garmi]
+):
+
+    __tablename__ = "GarmiDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(AbstractRobotDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    neck_id: Mapped[int] = mapped_column(
+        ForeignKey("NeckDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    neck: Mapped[NeckDAO] = relationship(
+        "NeckDAO", uselist=False, foreign_keys=[neck_id], post_update=True
+    )
+    arms: Mapped[builtins.list[GarmiDAO_arms_association]] = relationship(
+        "GarmiDAO_arms_association",
+        collection_class=builtins.list,
+        cascade="all, delete-orphan",
+        foreign_keys="[GarmiDAO_arms_association.source_garmidao_id]",
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "GarmiDAO",
+        "inherit_condition": database_id == AbstractRobotDAO.database_id,
+    }
+
+
 class HSRBDAO(
     AbstractRobotDAO, DataAccessObject[semantic_digital_twin.robots.hsrb.HSRB]
 ):
@@ -19520,10 +19484,6 @@ class WorldStateEntryViewDAO(
 
     database_id: Mapped[builtins.int] = mapped_column(
         Integer, primary_key=True, use_existing_column=True
-    )
-
-    data: Mapped[numpy.ndarray] = mapped_column(
-        pycram.orm.model.NumpyType, nullable=False, use_existing_column=True
     )
 
 

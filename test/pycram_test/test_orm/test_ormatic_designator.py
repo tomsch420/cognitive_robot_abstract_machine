@@ -8,19 +8,23 @@ from sqlalchemy import select
 import pycram.alternative_motion_mappings.stretch_motion_mapping  # type: ignore
 import pycram.alternative_motion_mappings.tiago_motion_mapping  # type: ignore
 from krrood.ormatic.data_access_objects.helper import to_dao
-from pycram.datastructures.enums import Arms
+from pycram.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
+from pycram.datastructures.grasp import GraspDescription
 from pycram.motion_executor import simulated_robot
 from pycram.orm.ormatic_interface import *  # type: ignore
 from pycram.plans.factories import sequential, execute_single
+from pycram.plans.failures import PlanFailure
 from pycram.plans.plan import Plan
 from pycram.robot_plans.actions.composite.transporting import TransportAction
+from pycram.robot_plans.actions.core.misc import MoveToReach
 from pycram.robot_plans.actions.core.navigation import NavigateAction
 from pycram.robot_plans.actions.core.robot_body import MoveTorsoAction, ParkArmsAction
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
 )
 from semantic_digital_twin.datastructures.definitions import TorsoState
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from semantic_digital_twin.robots.abstract_robot import Manipulator
+from semantic_digital_twin.spatial_types.spatial_types import Pose, Pose2D
 
 
 @pytest.fixture()
@@ -145,3 +149,37 @@ def test_replay_complex_plan_from_db(pycram_testing_session, complex_plan):
     fetched_plan = session.scalars(select(PlanMappingDAO)).one()
 
     recreated_plan = fetched_plan.from_dao()
+
+
+def test_plan_that_failed_serialization(pycram_testing_session, mutable_model_world):
+    world, robot_view, context = mutable_model_world
+    context.evaluate_conditions = False
+
+    plan = execute_single(
+        MoveToReach(
+            target_pose_offset_robot=Pose2D(0.2, -0.55),
+            target_pose_manipulator=Pose.from_xyz_rpy(
+                x=0.7, y=-1.3, z=5.0, reference_frame=world.root
+            ),
+            hip_rotation=0.0,
+            grasp_description=GraspDescription(
+                approach_direction=ApproachDirection.FRONT,
+                vertical_alignment=VerticalAlignment.NoAlignment,
+                rotate_gripper=False,
+                manipulator=world.get_semantic_annotations_by_type(Manipulator)[0],
+            ),
+        ),
+        context=context,
+    )
+
+    with simulated_robot:
+        try:
+            plan.perform()
+        except PlanFailure:
+            pass
+    plan.initial_world = None
+    session = pycram_testing_session
+
+    dao = to_dao(plan)
+    session.add(dao)
+    session.commit()

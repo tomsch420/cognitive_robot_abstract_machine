@@ -11,7 +11,7 @@ import numpy as np
 import tempfile
 import shutil
 import experiments
-import experiments.ormatic_interface
+import experiments.orm.ormatic_interface
 import pycram.orm.ormatic_interface
 from krrood.class_diagrams import ClassDiagram
 from krrood.ormatic.data_access_objects.alternative_mappings import AlternativeMapping
