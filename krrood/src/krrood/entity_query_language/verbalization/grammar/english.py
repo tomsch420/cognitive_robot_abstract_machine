@@ -102,6 +102,10 @@ from krrood.entity_query_language.verbalization.grammar.aggregation_kinds import
 from krrood.entity_query_language.verbalization.grammar.assembly.inference import (
     InferenceAssembler,
 )
+from krrood.entity_query_language.verbalization.grammar.assembly.clauses import (
+    GroupedByAssembler,
+    OrderedByAssembler,
+)
 from krrood.entity_query_language.verbalization.grammar.assembly.query import (
     QueryAssembler,
 )
@@ -498,7 +502,7 @@ class GroupedByRule(PhraseRule):
     name = "grouped-by"
 
     def build(self, node, ctx: Ctx):
-        return QueryAssembler(ctx).grouped_by(node)
+        return GroupedByAssembler(ctx).assemble(node)
 
 
 class OrderedByRule(PhraseRule):
@@ -508,7 +512,7 @@ class OrderedByRule(PhraseRule):
     name = "ordered-by"
 
     def build(self, node, ctx: Ctx):
-        return QueryAssembler(ctx).ordered_by(node)
+        return OrderedByAssembler(ctx).assemble(node)
 
 
 # ── instantiated variable ────────────────────────────────────────────────────

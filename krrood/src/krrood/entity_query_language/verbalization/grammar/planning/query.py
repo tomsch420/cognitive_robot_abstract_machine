@@ -6,10 +6,11 @@ into a :class:`QueryPlan` (the *what to say* decisions).
 It never builds fragments, mutates the context, or recurses — those are realisation
 concerns owned by
 :class:`~krrood.entity_query_language.verbalization.grammar.assembly.query.QueryAssembler`.
-The planner records: the selection shape, the definiteness (``is_the``), the restriction
-subject and its WHERE partition (grouped *"whose …"* predicates vs. residual *"such
-that …"*), the grouping keys + aggregated expressions, the HAVING/ORDER clauses, and
-whether the entity is an aggregation value-subquery.
+The plan is the **selection** concern: the selection shape, the definiteness
+(``is_the``), the restriction subject and its WHERE partition (grouped *"whose …"*
+predicates vs. residual *"such that …"*), and whether the entity is an aggregation
+value-subquery.  The trailing clauses (GROUP BY / HAVING / ORDER BY) are owned by their
+own components (see :mod:`~krrood.entity_query_language.verbalization.grammar.assembly.clauses`).
 
 Reference: Reiter & Dale (2000) — content/structure determination (microplanning).
 """
@@ -21,14 +22,12 @@ from enum import Enum, auto
 
 from typing_extensions import Any, List, Optional, Tuple, Type
 
-from krrood.entity_query_language.core.variable import InstantiatedVariable, Variable
 from krrood.entity_query_language.operators.core_logical_operators import (
     AND,
     flatten_operands,
 )
 from krrood.entity_query_language.query.quantifiers import The
 from krrood.entity_query_language.query.query import Entity, Query, SetOf
-from krrood.entity_query_language.verbalization.chain_utils import chain_root
 from krrood.entity_query_language.verbalization.grammar.planning.base import Planner
 from krrood.entity_query_language.verbalization.grammar.restriction import (
     RestrictionRule,
@@ -83,29 +82,6 @@ class RestrictionPlan:
 
 
 @dataclass(frozen=True)
-class GroupPlan:
-    """The GROUP BY keys and the expressions aggregated over them."""
-
-    keys: List[Any]
-    """The group-by key expressions."""
-
-    aggregated: List[Any]
-    """Child expressions aggregated (not group keys) — rendered plural."""
-
-    @property
-    def has_keys(self) -> bool:
-        return bool(self.keys)
-
-
-@dataclass(frozen=True)
-class OrderPlan:
-    """The ORDER BY variable and direction."""
-
-    variable: Any
-    descending: bool
-
-
-@dataclass(frozen=True)
 class AggregationValuePlan:
     """A collapsed aggregation value-subquery (*"the maximum amount among …"*)."""
 
@@ -128,9 +104,6 @@ class QueryPlan:
     subject: Optional[Any]
     subject_restriction: Optional[RestrictionPlan]
     where_condition: Optional[Any]
-    group: Optional[GroupPlan]
-    having_condition: Optional[Any]
-    order: Optional[OrderPlan]
     is_aggregation_subquery: bool
     aggregation_value: Optional[AggregationValuePlan]
 
@@ -148,9 +121,6 @@ class QueryPlanner(Planner[Query, QueryPlan]):
             subject=self._subject(),
             subject_restriction=self._subject_restriction(),
             where_condition=self._where_condition(),
-            group=self._group_plan(),
-            having_condition=self._having_condition(),
-            order=self._order_plan(),
             is_aggregation_subquery=is_aggregation_subquery(self.node),
             aggregation_value=self._aggregation_value(),
         )
@@ -212,53 +182,6 @@ class QueryPlanner(Planner[Query, QueryPlan]):
     def _where_condition(self) -> Optional[Any]:
         where = getattr(self.node, "_where_expression_", None)
         return where.condition if where is not None else None
-
-    def _having_condition(self) -> Optional[Any]:
-        having = getattr(self.node, "_having_expression_", None)
-        return having.condition if having is not None else None
-
-    def _order_plan(self) -> Optional[OrderPlan]:
-        builder = getattr(self.node, "_ordered_by_builder_", None)
-        if builder is None:
-            return None
-        return OrderPlan(variable=builder.variable, descending=builder.descending)
-
-    def _group_plan(self) -> Optional[GroupPlan]:
-        grouped = getattr(self.node, "_grouped_by_expression_", None)
-        if grouped is None or not grouped.variables_to_group_by:
-            return None
-        keys = list(grouped.variables_to_group_by)
-        root_ids = self._root_var_ids(keys)
-        return GroupPlan(keys=keys, aggregated=self._aggregated_expressions(root_ids))
-
-    @staticmethod
-    def _root_var_ids(exprs) -> set:
-        ids: set = set()
-        for expression in exprs:
-            root = chain_root(expression)
-            if isinstance(root, Variable):
-                ids.add(root._id_)
-        return ids
-
-    def _aggregated_expressions(self, group_key_root_ids: set) -> List[Any]:
-        """Child expressions that are aggregated (not group keys)."""
-        var = self._selected if isinstance(self.node, Entity) else None
-        if isinstance(var, InstantiatedVariable):
-            return [
-                child
-                for child in var._child_vars_.values()
-                if not (
-                    isinstance(chain_root(child), Variable)
-                    and chain_root(child)._id_ in group_key_root_ids
-                )
-            ]
-        if isinstance(self.node, Query):
-            return [
-                variable
-                for variable in self.node._selected_variables_
-                if variable._id_ not in group_key_root_ids
-            ]
-        return []
 
     # ── aggregation value-subquery ───────────────────────────────────────────
 

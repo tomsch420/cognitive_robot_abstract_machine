@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from typing_extensions import List, Optional, Tuple
 
-from krrood.entity_query_language.query.query import Entity, Query, SetOf
+from krrood.entity_query_language.query.query import Query
 from krrood.entity_query_language.verbalization.chain_utils import verbalize_plural
 from krrood.entity_query_language.verbalization.fragments.base import (
     BlockFragment,
@@ -36,6 +36,11 @@ from krrood.entity_query_language.verbalization.grammar.aggregation_kinds import
     AGGREGATION_KIND,
 )
 from krrood.entity_query_language.verbalization.grammar.assembly.base import Assembler
+from krrood.entity_query_language.verbalization.grammar.assembly.clauses import (
+    GroupedByAssembler,
+    HavingAssembler,
+    OrderedByAssembler,
+)
 from krrood.entity_query_language.verbalization.grammar.planning.query import (
     QueryPlan,
     QueryPlanner,
@@ -49,11 +54,9 @@ from krrood.entity_query_language.verbalization.microplanning.coordination impor
 from krrood.entity_query_language.verbalization.vocabulary.english import (
     Articles,
     Conjunctions,
-    Copulas,
     FallbackNouns,
     Keywords,
     Prepositions,
-    SortDirections,
 )
 from krrood.entity_query_language.verbalization.vocabulary.words import ChildForm
 
@@ -114,21 +117,6 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
                 where_item=self._where_clause(plan),
                 find_header=Keywords.FIND_SETS_OF.as_fragment(),
             )
-
-    # ── standalone clause rules (GroupedBy / OrderedBy dispatched on their own) ──
-
-    def grouped_by(self, node) -> VerbFragment:
-        """*"grouped by <keys>"* (or *"grouped"* when keyless)."""
-        if node.variables_to_group_by:
-            return phrase(
-                Keywords.GROUPED_BY.as_fragment(),
-                self._group_keys_phrase(node.variables_to_group_by),
-            )
-        return Keywords.GROUPED.as_fragment()
-
-    def ordered_by(self, node) -> VerbFragment:
-        """*"ordered by <variable> (ascending|descending)"*."""
-        return self._ordered_by(node.variable, node.descending)
 
     # ── subject selection ──────────────────────────────────────────────────────
 
@@ -266,13 +254,10 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
             if residual is not None:
                 parts += [Keywords.SUCH_THAT.as_fragment(), residual]
 
-        if plan.having_condition is not None:
-            with (
-                self.ctx.context.compact_predicates_scope(),
-                self.ctx.context.query_depth_scope(),
-            ):
-                having_frag = self.ctx.child(plan.having_condition)
-            parts += [Keywords.HAVING.as_fragment(), having_frag]
+        with self.ctx.context.query_depth_scope():
+            having = HavingAssembler(self.ctx).clause(node)
+        if having is not None:
+            parts.append(having)
 
         return phrase(*parts)
 
@@ -333,15 +318,19 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
         header = phrase(find_header, selection)
         clauses = [
             clause
-            for clause in [
-                where_item,
-                self._grouped_by_clause(node, plan),
-                self._having_clause(plan),
-                self._ordered_by_clause(plan),
-            ]
+            for clause in [where_item, *self._trailing_clauses(node)]
             if clause is not None
         ]
         return BlockFragment(header=header, items=clauses)
+
+    def _trailing_clauses(self, node) -> List[Optional[VerbFragment]]:
+        """The post-selection clauses, in canonical reading order, each rendered by its
+        own component (``None`` when absent)."""
+        return [
+            GroupedByAssembler(self.ctx).clause(node),
+            HavingAssembler(self.ctx).clause(node),
+            OrderedByAssembler(self.ctx).clause(node),
+        ]
 
     def _where_clause(self, plan: QueryPlan) -> Optional[VerbFragment]:
         if plan.where_condition is None:
@@ -349,57 +338,6 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
         return phrase(
             Keywords.SUCH_THAT.as_fragment(), self.ctx.child(plan.where_condition)
         )
-
-    def _grouped_by_clause(self, node, plan: QueryPlan) -> Optional[VerbFragment]:
-        group = plan.group
-        if group is None:
-            return None
-        groups_phrase = self._group_keys_phrase(group.keys)
-        aggregated_frags = [
-            verbalize_plural(expr, self.ctx.context, self.ctx.child)
-            for expr in group.aggregated
-        ]
-        if aggregated_frags and not isinstance(node, SetOf):
-            aggregated_phrase = oxford_and(
-                aggregated_frags, Conjunctions.AND.as_fragment()
-            )
-            return phrase(
-                Conjunctions.AND.as_fragment(),
-                Articles.THE.as_fragment(),
-                aggregated_phrase,
-                Copulas.ARE.as_fragment(),
-                Keywords.GROUPED_BY.as_fragment(),
-                groups_phrase,
-            )
-        return phrase(Keywords.GROUPED_BY.as_fragment(), groups_phrase)
-
-    def _having_clause(self, plan: QueryPlan) -> Optional[VerbFragment]:
-        if plan.having_condition is None:
-            return None
-        with self.ctx.context.compact_predicates_scope():
-            having_frag = self.ctx.child(plan.having_condition)
-        return phrase(Keywords.HAVING.as_fragment(), having_frag)
-
-    def _ordered_by_clause(self, plan: QueryPlan) -> Optional[VerbFragment]:
-        if plan.order is None:
-            return None
-        return self._ordered_by(plan.order.variable, plan.order.descending)
-
-    def _ordered_by(self, variable, descending: bool) -> VerbFragment:
-        direction_frag = (
-            SortDirections.DESCENDING.as_fragment()
-            if descending
-            else SortDirections.ASCENDING.as_fragment()
-        )
-        ordered_frag = self.ctx.child(variable)
-        paren_frag = PhraseFragment(
-            parts=[word("("), direction_frag, word(")")], separator=""
-        )
-        return phrase(Keywords.ORDERED_BY.as_fragment(), ordered_frag, paren_frag)
-
-    def _group_keys_phrase(self, variables: list) -> VerbFragment:
-        group_frags = [self.ctx.child(variable) for variable in variables]
-        return PhraseFragment(parts=group_frags, separator=", ")
 
     def inline_noun(self, entity) -> VerbFragment:
         """

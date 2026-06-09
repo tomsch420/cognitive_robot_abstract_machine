@@ -1458,7 +1458,6 @@ def test_query_planner_decomposes_subject_restriction_without_rendering():
     assert plan.selected_type == "_Robot"
     assert plan.subject is not None
     assert plan.is_aggregation_subquery is False
-    assert plan.group is None and plan.order is None and plan.having_condition is None
 
     # "battery > 50" is a single-hop, non-boolean attribute predicate → grouped (foldable
     # to "whose battery is greater than 50"); nothing is residual.
@@ -1484,6 +1483,25 @@ def test_instantiated_planner_decomposes_bindings_without_rendering(
     assert plan.type_name == "Cabinet"
     # "drawers" is a plural field name → plural copula/value at realisation time.
     assert [(b.field_name, b.is_plural) for b in plan.bindings] == [("drawers", True)]
+
+
+def test_grouped_by_planner_extracts_keys_without_rendering(
+    handles_and_containers_world,
+):
+    """The GroupedByPlanner reads the GROUP BY keys as pure data — no fragments rendered."""
+    from krrood.entity_query_language.verbalization.grammar.planning.clauses import (
+        GroupedByPlanner,
+    )
+
+    cabinet = variable(Cabinet, handles_and_containers_world.views)
+    query = entity(cabinet).grouped_by(cabinet)
+    query.build()
+
+    plan = GroupedByPlanner(query).plan()
+    assert plan.has_keys
+    assert len(plan.keys) == 1
+    # The selected variable *is* the group key, so nothing is aggregated over it.
+    assert plan.aggregated == []
 
 
 def test_plural_field_binding_uses_are(handles_and_containers_world):
