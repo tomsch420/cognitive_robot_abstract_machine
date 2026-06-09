@@ -1,15 +1,4 @@
-from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
-from semantic_digital_twin.world_description.shape_collection import ShapeCollection
-from robokudo.utils.transform import get_translation_from_transform_matrix
-from robokudo.utils.transform import get_quaternion_from_transform_matrix
-from robokudo.utils.annotator_helper import get_cam_to_world_transform_matrix
-from robokudo.utils.transform import get_transform_matrix_from_q
-from semantic_digital_twin.world_description.geometry import Scale
-from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from robokudo.world import world_instance
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
-from semantic_digital_twin.world_description.connections import Connection6DoF
-from robokudo.types.belief_state import ObjectBeliefState
 from scipy.optimize import linear_sum_assignment
 from robokudo.types.cv import ImageROI
 from robokudo.utils.hypothesis_comparators import ObjectHypothesisComparator
@@ -25,7 +14,6 @@ from robokudo.types.annotation import (
 )
 from robokudo.types.scene import ObjectHypothesis
 from robokudo import world
-from semantic_digital_twin.world_description.geometry import Box
 
 
 class SemanticDigitalTwinConnector(BaseAnnotator):
@@ -43,7 +31,7 @@ class SemanticDigitalTwinConnector(BaseAnnotator):
 
     def __init__(
         self,
-        name: str = "WorldValidator",
+        name: str = "SemanticDigitalTwinSynchronization",
         descriptor: "SemanticDigitalTwinConnector.Descriptor" = Descriptor(),
     ) -> None:
         """Default construction. Minimal one-time init!"""
@@ -74,7 +62,7 @@ class SemanticDigitalTwinConnector(BaseAnnotator):
         if len(obs) == 0:
             for oh in ohs:
                 world.add_object_hypothesis_as_belief_state(oh, cas)
-            self.rk_logger.info(
+            self.rk_logger.debug(
                 f"SemDT \nKS Entities: {len(rk_world.kinematic_structure_entities)}\nViews: {len(rk_world.semantic_annotations)}\nConnections: {len(rk_world.connections)}"
             )
             return Status.SUCCESS
@@ -98,7 +86,7 @@ class SemanticDigitalTwinConnector(BaseAnnotator):
             else:
                 world.add_object_hypothesis_as_belief_state(oh, cas)
 
-        self.rk_logger.info(
+        self.rk_logger.debug(
             f"SemDT \nKS Entities: {len(rk_world.kinematic_structure_entities)}\nViews: {len(rk_world.semantic_annotations)}\nConnections: {len(rk_world.connections)}"
         )
         end_timer = default_timer()

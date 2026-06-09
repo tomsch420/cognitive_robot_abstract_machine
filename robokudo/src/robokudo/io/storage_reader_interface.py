@@ -92,6 +92,9 @@ class StorageReaderInterface(CameraInterface):
         tracker = world.init_world_entity_tracker_from_world(rk_world)
         kwargs = tracker.create_kwargs()
         world_snapshot = json.loads(cas_frame["world"])
+
+        # This replays the entire world snapshot history, currently this does not throw duplicate entitiy errors.
+        # This might change in the future.
         WorldModelSnapshot.apply_to_json_snapshot_to_world(
             rk_world, world_snapshot, **kwargs
         )

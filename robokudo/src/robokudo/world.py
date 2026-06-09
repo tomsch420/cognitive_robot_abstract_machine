@@ -249,6 +249,8 @@ def add_object_hypothesis_as_belief_state(
     object_belief = ObjectBeliefState.create_with_new_body().add_hypothesis(
         object_hypothesis
     )
+    object_belief_body = object_belief.body
+    _tracked_objects[object_belief.uuid] = object_belief
 
     world_frame = cas.world_frame
     if world_frame is None:
@@ -259,44 +261,37 @@ def add_object_hypothesis_as_belief_state(
         world_T_object_belief = Connection6DoF.create_with_dofs(
             world=world,
             parent=world_body,
-            child=object_belief.body,
+            child=object_belief_body,
         )
         world.add_connection(world_T_object_belief)
 
-    latest_pose = object_belief.latest_pose
-    if latest_pose is None:
-        return object_belief
-
     bb = object_belief.latest_bbox_3d
-    if bb is None:
-        return object_belief
+    if bb is not None:
+        pose_mat = get_transform_matrix_from_q(bb.pose.rotation, bb.pose.translation)
 
-    pose_mat = get_transform_matrix_from_q(bb.pose.rotation, bb.pose.translation)
+        cam_to_world_transform = get_cam_to_world_transform_matrix(cas)
+        pose_in_world_mat = np.matmul(cam_to_world_transform, pose_mat)
 
-    cam_to_world_transform = get_cam_to_world_transform_matrix(cas)
-    pose_in_world_mat = np.matmul(cam_to_world_transform, pose_mat)
+        rotation = list(get_quaternion_from_transform_matrix(pose_in_world_mat))
+        translation = list(get_translation_from_transform_matrix(pose_in_world_mat))
 
-    rotation = list(get_quaternion_from_transform_matrix(pose_in_world_mat))
-    translation = list(get_translation_from_transform_matrix(pose_in_world_mat))
+        origin = HomogeneousTransformationMatrix.from_xyz_quaternion(
+            pos_x=translation[0],
+            pos_y=translation[1],
+            pos_z=translation[2],
+            quat_x=rotation[0],
+            quat_y=rotation[1],
+            quat_z=rotation[2],
+            quat_w=rotation[3],
+            reference_frame=world_body,
+            child_frame=object_belief_body,
+        )
 
-    origin = HomogeneousTransformationMatrix.from_xyz_quaternion(
-        pos_x=translation[0],
-        pos_y=translation[1],
-        pos_z=translation[2],
-        quat_x=rotation[0],
-        quat_y=rotation[1],
-        quat_z=rotation[2],
-        quat_w=rotation[3],
-        reference_frame=world_body,
-        child_frame=object_belief.body,
-    )
+        scale = Scale(x=bb.x_length, y=bb.y_length, z=bb.z_length)
 
-    scale = Scale(x=bb.x_length, y=bb.y_length, z=bb.z_length)
-
-    with world.modify_world():
-        object_belief.body.collision.append(Box(scale=scale))
-        world_T_object_belief.origin = origin
-
+        with world.modify_world():
+            object_belief_body.visual.append(Box(scale=scale))
+            world_T_object_belief.origin = origin
     return object_belief
 
 
@@ -315,48 +310,43 @@ def update_belief_state_with_object_hypothesis(
     world = world_instance()
 
     object_belief.add_hypothesis(object_hypothesis)
-
-    latest_pose = object_belief.latest_pose
-    if latest_pose is None:
-        return
-
-    bb = object_belief.latest_bbox_3d
-    if bb is None:
-        return
+    object_belief_body = object_belief.body
 
     world_frame = cas.world_frame
     if world_frame is None:
         return
     world_body = world.get_body_by_name(PrefixedName(name=world_frame))
 
-    pose_mat = get_transform_matrix_from_q(bb.pose.rotation, bb.pose.translation)
+    bb = object_belief.latest_bbox_3d
+    if bb is not None:
+        pose_mat = get_transform_matrix_from_q(bb.pose.rotation, bb.pose.translation)
 
-    cam_to_world_transform = get_cam_to_world_transform_matrix(cas)
-    pose_in_world_mat = np.matmul(cam_to_world_transform, pose_mat)
+        cam_to_world_transform = get_cam_to_world_transform_matrix(cas)
+        pose_in_world_mat = np.matmul(cam_to_world_transform, pose_mat)
 
-    rotation = list(get_quaternion_from_transform_matrix(pose_in_world_mat))
-    translation = list(get_translation_from_transform_matrix(pose_in_world_mat))
+        rotation = list(get_quaternion_from_transform_matrix(pose_in_world_mat))
+        translation = list(get_translation_from_transform_matrix(pose_in_world_mat))
 
-    origin = HomogeneousTransformationMatrix.from_xyz_quaternion(
-        pos_x=translation[0],
-        pos_y=translation[1],
-        pos_z=translation[2],
-        quat_x=rotation[0],
-        quat_y=rotation[1],
-        quat_z=rotation[2],
-        quat_w=rotation[3],
-        reference_frame=world_body,
-        child_frame=object_belief.body,
-    )
+        origin = HomogeneousTransformationMatrix.from_xyz_quaternion(
+            pos_x=translation[0],
+            pos_y=translation[1],
+            pos_z=translation[2],
+            quat_x=rotation[0],
+            quat_y=rotation[1],
+            quat_z=rotation[2],
+            quat_w=rotation[3],
+            reference_frame=world_body,
+            child_frame=object_belief_body,
+        )
 
-    scale = Scale(x=bb.x_length, y=bb.y_length, z=bb.z_length)
+        scale = Scale(x=bb.x_length, y=bb.y_length, z=bb.z_length)
 
-    with world.modify_world():
-        object_belief.body.get_first_parent_connection_of_type(
-            Connection6DoF
-        ).origin = origin
-        object_belief.body.collision.shapes.clear()
-        object_belief.body.collision.append(Box(scale=scale))
+        with world.modify_world():
+            object_belief_body.get_first_parent_connection_of_type(
+                Connection6DoF
+            ).origin = origin
+            object_belief_body.visual.shapes.clear()
+            object_belief_body.visual.append(Box(scale=scale))
 
 
 def get_object_belief_state(uuid: UUID) -> ObjectBeliefState:
