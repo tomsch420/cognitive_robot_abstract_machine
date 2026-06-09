@@ -10,12 +10,14 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-import semantic_digital_twin
+import trimesh
 
+import semantic_digital_twin
+import semantic_digital_twin.orm.model
+from semantic_digital_twin.orm import ormatic_interface
 import semantic_digital_twin.adapters.procthor.procthor_resolver
 from krrood.adapters.json_serializer import SubclassJSONSerializer
 from krrood.ormatic.ormatic import ORMatic
-from semantic_digital_twin.orm.model import *  # type: ignore
 from semantic_digital_twin.reasoning.predicates import ContainsType
 from semantic_digital_twin.semantic_annotations.position_descriptions import (
     SemanticDirection,
@@ -57,14 +59,8 @@ def generate_orm():
         },
     )
     ormatic.make_all_tables()
+    ormatic_interface_path = Path(ormatic_interface.__file__)
 
-    ormatic_interface_path = (
-        Path(__file__).parent.parent
-        / "src"
-        / "semantic_digital_twin"
-        / "orm"
-        / "ormatic_interface.py"
-    )
     with open(ormatic_interface_path, "w") as f:
         ormatic.to_sqlalchemy_file(f)
 

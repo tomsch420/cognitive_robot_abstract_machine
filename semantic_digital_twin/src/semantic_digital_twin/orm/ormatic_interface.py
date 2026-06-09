@@ -114,8 +114,6 @@ import semantic_digital_twin.world_description.world_modification
 import semantic_digital_twin.world_description.world_state
 import semantic_digital_twin.world_description.world_state_trajectory_plotter
 import sqlalchemy.sql.sqltypes
-import test.krrood_test.dataset.alternative_mappings_construction_order
-import test.krrood_test.dataset.example_classes
 import trimesh.base
 import typing
 import typing_extensions
@@ -369,25 +367,6 @@ class JointStateDAO_connections_association(Base, AssociationDataAccessObject):
     )
 
 
-class KRROODVectorsWithPropertyMappedDAO_vectors_association(
-    Base, AssociationDataAccessObject
-):
-
-    __tablename__ = "_12855553753674777610102557888512997151793935275319322513032732"
-
-    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    source_krroodvectorswithpropertymappeddao_id: Mapped[int] = mapped_column(
-        ForeignKey("KRROODVectorsWithPropertyMappedDAO.database_id")
-    )
-    target_krroodvectormappeddao_id: Mapped[int] = mapped_column(
-        ForeignKey("KRROODVectorMappedDAO.database_id")
-    )
-
-    target: Mapped[KRROODVectorMappedDAO] = relationship(
-        "KRROODVectorMappedDAO", foreign_keys=[target_krroodvectormappeddao_id]
-    )
-
-
 class MaxAvoidedCollisionsOverrideDAO_bodies_association(
     Base, AssociationDataAccessObject
 ):
@@ -401,25 +380,6 @@ class MaxAvoidedCollisionsOverrideDAO_bodies_association(
     target_bodydao_id: Mapped[int] = mapped_column(ForeignKey("BodyDAO.database_id"))
 
     target: Mapped[BodyDAO] = relationship("BodyDAO", foreign_keys=[target_bodydao_id])
-
-
-class ParentAlternativelyMappedMappingDAO_entities_association(
-    Base, AssociationDataAccessObject
-):
-
-    __tablename__ = "_18538887150188136553884900854751209553534594064309193033312303"
-
-    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    source_parentalternativelymappedmappingdao_id: Mapped[int] = mapped_column(
-        ForeignKey("ParentAlternativelyMappedMappingDAO.database_id")
-    )
-    target_entitymappingdao_id: Mapped[int] = mapped_column(
-        ForeignKey("EntityMappingDAO.database_id")
-    )
-
-    target: Mapped[EntityMappingDAO] = relationship(
-        "EntityMappingDAO", foreign_keys=[target_entitymappingdao_id]
-    )
 
 
 class PipelineDAO_steps_association(Base, AssociationDataAccessObject):
@@ -1663,22 +1623,6 @@ class AtomicWorldModificationNotAtomicDAO(
     )
 
 
-class BackreferenceMappingDAO(
-    Base,
-    DataAccessObject[test.krrood_test.dataset.example_classes.BackreferenceMapping],
-):
-
-    __tablename__ = "BackreferenceMappingDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        Integer, primary_key=True, use_existing_column=True
-    )
-
-    values: Mapped[typing.List[builtins.int]] = mapped_column(
-        JSON, nullable=False, use_existing_column=True
-    )
-
-
 class BoundingBoxDAO(
     Base, DataAccessObject[semantic_digital_twin.world_description.geometry.BoundingBox]
 ):
@@ -1708,39 +1652,6 @@ class BoundingBoxDAO(
         "HomogeneousTransformationMatrixMappingDAO",
         uselist=False,
         foreign_keys=[origin_id],
-        post_update=True,
-    )
-
-
-class BuildFirstMappingDAO(
-    Base,
-    DataAccessObject[
-        test.krrood_test.dataset.alternative_mappings_construction_order.BuildFirstMapping
-    ],
-):
-
-    __tablename__ = "BuildFirstMappingDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        Integer, primary_key=True, use_existing_column=True
-    )
-
-    value: Mapped[builtins.str] = mapped_column(
-        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
-    )
-
-    backreference_to_entrypoint_id: Mapped[typing.Optional[builtins.int]] = (
-        mapped_column(
-            ForeignKey("EntryPointMappingDAO.database_id", use_alter=True),
-            nullable=True,
-            use_existing_column=True,
-        )
-    )
-
-    backreference_to_entrypoint: Mapped[EntryPointMappingDAO] = relationship(
-        "EntryPointMappingDAO",
-        uselist=False,
-        foreign_keys=[backreference_to_entrypoint_id],
         post_update=True,
     )
 
@@ -2731,21 +2642,6 @@ class DurationJSONSerializerDAO(
     )
 
 
-class EntityMappingDAO(
-    Base, DataAccessObject[test.krrood_test.dataset.example_classes.EntityMapping]
-):
-
-    __tablename__ = "EntityMappingDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        Integer, primary_key=True, use_existing_column=True
-    )
-
-    overwritten_name: Mapped[builtins.str] = mapped_column(
-        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
-    )
-
-
 class EntityConverterDAO(
     Base, DataAccessObject[semantic_digital_twin.adapters.multi_sim.EntityConverter]
 ):
@@ -3065,33 +2961,6 @@ class ConnectionRevoluteSpawnerDAO(
         "polymorphic_identity": "ConnectionRevoluteSpawnerDAO",
         "inherit_condition": database_id == ConnectionSpawnerDAO.database_id,
     }
-
-
-class EntryPointMappingDAO(
-    Base,
-    DataAccessObject[
-        test.krrood_test.dataset.alternative_mappings_construction_order.EntryPointMapping
-    ],
-):
-
-    __tablename__ = "EntryPointMappingDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        Integer, primary_key=True, use_existing_column=True
-    )
-
-    build_first_id: Mapped[int] = mapped_column(
-        ForeignKey("BuildFirstMappingDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
-
-    build_first: Mapped[BuildFirstMappingDAO] = relationship(
-        "BuildFirstMappingDAO",
-        uselist=False,
-        foreign_keys=[build_first_id],
-        post_update=True,
-    )
 
 
 class ExternalCollisionVariableManagerDAO(
@@ -3438,87 +3307,6 @@ class InertialConverterDAO(
     )
 
 
-class InheritanceBaseWithoutSymbolButAlternativelyMappedMappingDAO(
-    Base,
-    DataAccessObject[
-        test.krrood_test.dataset.example_classes.InheritanceBaseWithoutSymbolButAlternativelyMappedMapping
-    ],
-):
-
-    __tablename__ = "InheritanceBaseWithoutSymbolButAlternativelyMappedMappingDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        Integer, primary_key=True, use_existing_column=True
-    )
-
-    base_attribute: Mapped[builtins.float] = mapped_column(use_existing_column=True)
-
-    polymorphic_type: Mapped[str] = mapped_column(
-        String(255), nullable=False, use_existing_column=True
-    )
-
-    __mapper_args__ = {
-        "polymorphic_on": "polymorphic_type",
-        "polymorphic_identity": "InheritanceBaseWithoutSymbolButAlternativelyMappedMappingDAO",
-    }
-
-
-class InheritanceLevel1WithoutSymbolButAlternativelyMappedMappingDAO(
-    InheritanceBaseWithoutSymbolButAlternativelyMappedMappingDAO,
-    DataAccessObject[
-        test.krrood_test.dataset.example_classes.InheritanceLevel1WithoutSymbolButAlternativelyMappedMapping
-    ],
-):
-
-    __tablename__ = "InheritanceLevel1WithoutSymbolButAlternativelyMappedMappingDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(
-            InheritanceBaseWithoutSymbolButAlternativelyMappedMappingDAO.database_id
-        ),
-        primary_key=True,
-        use_existing_column=True,
-    )
-
-    level_one_attribute: Mapped[builtins.float] = mapped_column(
-        use_existing_column=True
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "InheritanceLevel1WithoutSymbolButAlternativelyMappedMappingDAO",
-        "inherit_condition": database_id
-        == InheritanceBaseWithoutSymbolButAlternativelyMappedMappingDAO.database_id,
-    }
-
-
-class InheritanceLevel2WithoutSymbolButAlternativelyMappedMappingDAO(
-    InheritanceLevel1WithoutSymbolButAlternativelyMappedMappingDAO,
-    DataAccessObject[
-        test.krrood_test.dataset.example_classes.InheritanceLevel2WithoutSymbolButAlternativelyMappedMapping
-    ],
-):
-
-    __tablename__ = "InheritanceLevel2WithoutSymbolButAlternativelyMappedMappingDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(
-            InheritanceLevel1WithoutSymbolButAlternativelyMappedMappingDAO.database_id
-        ),
-        primary_key=True,
-        use_existing_column=True,
-    )
-
-    level_two_attribute: Mapped[builtins.float] = mapped_column(
-        use_existing_column=True
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "InheritanceLevel2WithoutSymbolButAlternativelyMappedMappingDAO",
-        "inherit_condition": database_id
-        == InheritanceLevel1WithoutSymbolButAlternativelyMappedMappingDAO.database_id,
-    }
-
-
 class InvalidCollisionCheckErrorDAO(
     CollisionCheckingErrorDAO,
     DataAccessObject[semantic_digital_twin.exceptions.InvalidCollisionCheckError],
@@ -3723,77 +3511,6 @@ class JointStateDAO(
     )
     name: Mapped[PrefixedNameDAO] = relationship(
         "PrefixedNameDAO", uselist=False, foreign_keys=[name_id], post_update=True
-    )
-
-
-class KRROODTransformationMappedDAO(
-    Base,
-    DataAccessObject[
-        test.krrood_test.dataset.example_classes.KRROODTransformationMapped
-    ],
-):
-
-    __tablename__ = "KRROODTransformationMappedDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        Integer, primary_key=True, use_existing_column=True
-    )
-
-    vector_id: Mapped[int] = mapped_column(
-        ForeignKey("KRROODVectorMappedDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
-    rotation_id: Mapped[int] = mapped_column(
-        ForeignKey("RotationMappedDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
-
-    vector: Mapped[KRROODVectorMappedDAO] = relationship(
-        "KRROODVectorMappedDAO",
-        uselist=False,
-        foreign_keys=[vector_id],
-        post_update=True,
-    )
-    rotation: Mapped[RotationMappedDAO] = relationship(
-        "RotationMappedDAO", uselist=False, foreign_keys=[rotation_id], post_update=True
-    )
-
-
-class KRROODVectorMappedDAO(
-    Base, DataAccessObject[test.krrood_test.dataset.example_classes.KRROODVectorMapped]
-):
-
-    __tablename__ = "KRROODVectorMappedDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        Integer, primary_key=True, use_existing_column=True
-    )
-
-    x: Mapped[builtins.float] = mapped_column(use_existing_column=True)
-
-
-class KRROODVectorsWithPropertyMappedDAO(
-    Base,
-    DataAccessObject[
-        test.krrood_test.dataset.example_classes.KRROODVectorsWithPropertyMapped
-    ],
-):
-
-    __tablename__ = "KRROODVectorsWithPropertyMappedDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        Integer, primary_key=True, use_existing_column=True
-    )
-
-    vectors: Mapped[
-        builtins.list[KRROODVectorsWithPropertyMappedDAO_vectors_association]
-    ] = relationship(
-        "KRROODVectorsWithPropertyMappedDAO_vectors_association",
-        collection_class=builtins.list,
-        cascade="all, delete-orphan",
-        foreign_keys="[KRROODVectorsWithPropertyMappedDAO_vectors_association.source_krroodvectorswithpropertymappeddao_id]",
     )
 
 
@@ -5178,76 +4895,6 @@ class PackageUriResolverDAO(
     )
 
 
-class ParentAlternativelyMappedMappingDAO(
-    Base,
-    DataAccessObject[
-        test.krrood_test.dataset.example_classes.ParentAlternativelyMappedMapping
-    ],
-):
-
-    __tablename__ = "ParentAlternativelyMappedMappingDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        Integer, primary_key=True, use_existing_column=True
-    )
-
-    derived_attribute: Mapped[builtins.str] = mapped_column(
-        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
-    )
-
-    entities: Mapped[
-        builtins.list[ParentAlternativelyMappedMappingDAO_entities_association]
-    ] = relationship(
-        "ParentAlternativelyMappedMappingDAO_entities_association",
-        collection_class=builtins.list,
-        cascade="all, delete-orphan",
-        foreign_keys="[ParentAlternativelyMappedMappingDAO_entities_association.source_parentalternativelymappedmappingdao_id]",
-    )
-
-
-class ParentBaseMappingDAO(
-    Base, DataAccessObject[test.krrood_test.dataset.example_classes.ParentBaseMapping]
-):
-
-    __tablename__ = "ParentBaseMappingDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        Integer, primary_key=True, use_existing_column=True
-    )
-
-    name: Mapped[builtins.str] = mapped_column(
-        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
-    )
-
-    polymorphic_type: Mapped[str] = mapped_column(
-        String(255), nullable=False, use_existing_column=True
-    )
-
-    __mapper_args__ = {
-        "polymorphic_on": "polymorphic_type",
-        "polymorphic_identity": "ParentBaseMappingDAO",
-    }
-
-
-class ChildBaseMappingDAO(
-    ParentBaseMappingDAO,
-    DataAccessObject[test.krrood_test.dataset.example_classes.ChildBaseMapping],
-):
-
-    __tablename__ = "ChildBaseMappingDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(ParentBaseMappingDAO.database_id),
-        primary_key=True,
-        use_existing_column=True,
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "ChildBaseMappingDAO",
-        "inherit_condition": database_id == ParentBaseMappingDAO.database_id,
-    }
-
-
 class ParsingErrorDAO(
     Base, DataAccessObject[semantic_digital_twin.exceptions.ParsingError]
 ):
@@ -6095,19 +5742,6 @@ class QuaternionToSemDTConverterDAO(
         "polymorphic_identity": "QuaternionToSemDTConverterDAO",
         "inherit_condition": database_id == Ros2ToSemDTConverterDAO.database_id,
     }
-
-
-class RotationMappedDAO(
-    Base, DataAccessObject[test.krrood_test.dataset.example_classes.RotationMapped]
-):
-
-    __tablename__ = "RotationMappedDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        Integer, primary_key=True, use_existing_column=True
-    )
-
-    angle: Mapped[builtins.float] = mapped_column(use_existing_column=True)
 
 
 class STLParserDAO(

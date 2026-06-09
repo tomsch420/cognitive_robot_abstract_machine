@@ -10,6 +10,7 @@ from typing import Set
 
 import rustworkx as rx
 import sqlalchemy
+from hypothesis.internal.conjecture.junkdrawer import startswith
 from sortedcontainers import SortedSet
 from sqlalchemy import JSON
 from typing_extensions import List, Type, Dict
@@ -250,14 +251,18 @@ class ORMatic:
         ormatic_interface_dependencies: List[ModuleType],
         ignored_classes: Set[Type],
         type_mappings: Dict[Type, Type],
+        ignore_krrood_test_classes: bool = True,
     ):
         """
         Create an instance from a list of packages, dependencies, and ignored classes.
+
 
         :param packages: The packages that should be scanned for dataclasses.
         :param ormatic_interface_dependencies: The dependent ormatic_interfaces.
         :param ignored_classes: The classes that should be ignored.
         :param type_mappings: The type mappings that should be used.
+        :param ignore_krrood_test_classes: Rather to ignore classes from the krrood test package.
+
         :return: The ORMatic instance.
         """
         import krrood.ormatic.custom_types  # type: ignore
@@ -280,7 +285,12 @@ class ORMatic:
 
         all_classes -= ignored_classes
 
-        all_alternative_mappings |= set(recursive_subclasses(AlternativeMapping))
+        all_alternative_mappings |= set(
+            am
+            for am in recursive_subclasses(AlternativeMapping)
+            if ignore_krrood_test_classes
+            and "krrood_test" not in am.original_class().__module__
+        )
 
         # keep only dataclasses that are not AlternativeMapping or DataAccessObject subclasses
         all_classes = {
