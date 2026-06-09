@@ -36,7 +36,9 @@ from krrood.entity_query_language.verbalization.fragments.factory import phrase,
 from krrood.entity_query_language.verbalization.fragments.roles import SemanticRole
 from krrood.entity_query_language.verbalization.fragments.source_ref import SourceRef
 from krrood.entity_query_language.verbalization.rule_engine import VerbalizationRule
-from krrood.entity_query_language.verbalization.rules.query import as_inline_noun
+from krrood.entity_query_language.verbalization.grammar.assembly.query import (
+    as_inline_noun,
+)
 from krrood.entity_query_language.verbalization import morphology
 from krrood.entity_query_language.verbalization.vocabulary.english import (
     Articles,

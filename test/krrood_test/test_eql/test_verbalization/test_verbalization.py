@@ -1439,6 +1439,36 @@ def test_inference_planner_decomposes_rule_without_rendering(
     assert any(pc.whose_attr == "child" for pc in planned)
 
 
+def test_query_planner_decomposes_subject_restriction_without_rendering():
+    """The QueryPlanner partitions the WHERE into grouped/residual as pure data — no fragments."""
+    from krrood.entity_query_language.verbalization.grammar.planning.query import (
+        QueryPlanner,
+        SelectionKind,
+    )
+    from krrood.entity_query_language.verbalization.grammar.restriction import (
+        AttributePredicateRestrictionRule,
+    )
+
+    r = variable(_Robot, [])
+    query = entity(r).where(r.battery > 50)
+    plan = QueryPlanner(query).plan()
+
+    assert plan.kind is SelectionKind.SUBJECT
+    assert plan.is_the is False
+    assert plan.selected_type == "_Robot"
+    assert plan.subject is not None
+    assert plan.is_aggregation_subquery is False
+    assert plan.group is None and plan.order is None and plan.having_condition is None
+
+    # "battery > 50" is a single-hop, non-boolean attribute predicate → grouped (foldable
+    # to "whose battery is greater than 50"); nothing is residual.
+    assert plan.subject_restriction is not None
+    assert plan.subject_restriction.residual == []
+    assert [rule for rule, _ in plan.subject_restriction.grouped] == [
+        AttributePredicateRestrictionRule
+    ]
+
+
 def test_plural_field_binding_uses_are(handles_and_containers_world):
     """A plural field name in an InstantiatedVariable binding uses 'are <Plural>' not 'is <Article> <Singular>'."""
     drawer = variable(Drawer, handles_and_containers_world.views)

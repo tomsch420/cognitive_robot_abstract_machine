@@ -33,14 +33,7 @@ from krrood.entity_query_language.core.variable import (
 )
 from krrood.entity_query_language.operators.aggregators import (
     Aggregator,
-    Average,
-    Count,
     CountAll,
-    Max,
-    Min,
-    Mode,
-    MultiMode,
-    Sum,
 )
 from krrood.entity_query_language.operators.comparator import Comparator
 from krrood.entity_query_language.operators.core_logical_operators import (
@@ -106,34 +99,25 @@ from krrood.entity_query_language.core.base_expressions import Filter
 from krrood.entity_query_language.query.operations import GroupedBy, OrderedBy
 from krrood.entity_query_language.query.quantifiers import ResultQuantifier
 from krrood.entity_query_language.query.query import Entity, SetOf
-from krrood.entity_query_language.verbalization.rules.query import (
-    _verbalize_group_keys,
-    _verbalize_ordered_by,
-    verbalize_nested,
-    verbalize_query,
-    verbalize_set_of,
+from krrood.entity_query_language.verbalization.grammar.aggregation_kinds import (
+    AGGREGATION_KIND,
 )
 from krrood.entity_query_language.verbalization.grammar.assembly.inference import (
     InferenceAssembler,
 )
+from krrood.entity_query_language.verbalization.grammar.assembly.query import (
+    QueryAssembler,
+)
 from krrood.entity_query_language.verbalization.grammar.planning.inference import (
     InferencePlanner,
+)
+from krrood.entity_query_language.verbalization.grammar.planning.query import (
+    QueryPlanner,
 )
 from krrood.entity_query_language.verbalization.rules.variables import (
     _has_verbalization_template,
     _verbalize_instantiated_natural,
 )
-
-#: Maps each standard aggregator subtype to its lexicon phrase.
-_AGGREGATION_KIND = {
-    Count: Aggregations.COUNT,
-    Sum: Aggregations.SUM,
-    Average: Aggregations.AVERAGE,
-    Max: Aggregations.MAX,
-    Min: Aggregations.MIN,
-    Mode: Aggregations.MODE,
-    MultiMode: Aggregations.MULTI_MODE,
-}
 
 
 @dataclass
@@ -389,7 +373,7 @@ class AggregatorRule(PhraseRule):
     name = "aggregator"
 
     def build(self, node, ctx: Ctx):
-        aggregation_kind = _AGGREGATION_KIND[type(node)]
+        aggregation_kind = AGGREGATION_KIND[type(node)]
         aggregation_word = aggregation_kind.value
         aggregation_fragment = aggregation_kind.as_fragment()
 
@@ -466,8 +450,7 @@ class ExistsRule(PhraseRule):
 
 
 # ── query / entity family ───────────────────────────────────────────────────
-# Phase A: build delegates to the relocated query helpers via _FoldVerbalizer.
-# Phase B splits these into planner (plan_query) + assembler.
+# Phase B: each rule wires the query planner (what to say) + assembler (realise it).
 
 
 class TopLevelEntityRule(PhraseRule):
@@ -480,7 +463,7 @@ class TopLevelEntityRule(PhraseRule):
         return ctx.config.query_depth == 0
 
     def build(self, node, ctx: Ctx):
-        return verbalize_query(node, ctx.context, _FoldVerbalizer(ctx))
+        return QueryAssembler(ctx).assemble(node, QueryPlanner(node).plan())
 
 
 class NestedEntityRule(PhraseRule):
@@ -493,7 +476,7 @@ class NestedEntityRule(PhraseRule):
         return ctx.config.query_depth > 0
 
     def build(self, node, ctx: Ctx):
-        return verbalize_nested(node, ctx.context, _FoldVerbalizer(ctx))
+        return QueryAssembler(ctx).assemble_nested(node, QueryPlanner(node).plan())
 
 
 class InferenceRuleRule(PhraseRule):
@@ -517,7 +500,7 @@ class SetOfRule(PhraseRule):
     name = "set-of"
 
     def build(self, node, ctx: Ctx):
-        return verbalize_set_of(node, ctx.context, _FoldVerbalizer(ctx))
+        return QueryAssembler(ctx).assemble_set_of(node, QueryPlanner(node).plan())
 
 
 class ResultQuantifierRule(PhraseRule):
@@ -547,14 +530,7 @@ class GroupedByRule(PhraseRule):
     name = "grouped-by"
 
     def build(self, node, ctx: Ctx):
-        if node.variables_to_group_by:
-            return phrase(
-                Keywords.GROUPED_BY.as_fragment(),
-                _verbalize_group_keys(
-                    node.variables_to_group_by, ctx.context, _FoldVerbalizer(ctx)
-                ),
-            )
-        return Keywords.GROUPED.as_fragment()
+        return QueryAssembler(ctx).grouped_by(node)
 
 
 class OrderedByRule(PhraseRule):
@@ -564,7 +540,7 @@ class OrderedByRule(PhraseRule):
     name = "ordered-by"
 
     def build(self, node, ctx: Ctx):
-        return _verbalize_ordered_by(node, ctx.context, _FoldVerbalizer(ctx))
+        return QueryAssembler(ctx).ordered_by(node)
 
 
 # ── instantiated variable ────────────────────────────────────────────────────
