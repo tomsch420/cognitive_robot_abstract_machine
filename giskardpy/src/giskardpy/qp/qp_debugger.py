@@ -48,15 +48,26 @@ class QuadraticProgramDebugger:
     """
     equality_matrix: pandas.DataFrame = field(init=False)
     """
-    
+    Panda array representing the equality constraint matrix.
     """
     inequality_constraints: pandas.DataFrame = field(init=False)
+    """
+    Panda array giving insights into the inequality constraints.
+    It contains columns for the inequality bounds, the result of the inequality matrix * decision variables (without slack),
+    and the slack, which is essentially how much the constraints are violated. 
+    """
     inequality_matrix: pandas.DataFrame = field(init=False)
+    """
+    Panda array representing the inequality constraint matrix.
+    """
 
     def __post_init__(self):
         self.update(self.current_solution)
 
     def update(self, current_solution: np.ndarray):
+        """
+        Updates the debugger with a new solution.
+        """
         self.current_solution = current_solution
         last_solution = (
             np.ones(self.qp_data_symbolic.box_lower_constraints.shape[0]) * np.nan
@@ -71,6 +82,9 @@ class QuadraticProgramDebugger:
 
     @property
     def quadratic_weight_filter(self) -> np.ndarray:
+        """
+        Returns a filter for the quadratic weights.
+        """
         quadratic_weight_filter = np.ones(
             self.qp_data_symbolic.quadratic_weights.shape[0]
         )
@@ -83,6 +97,9 @@ class QuadraticProgramDebugger:
         return quadratic_weight_filter.astype(bool)
 
     def create_direct_limits(self):
+        """
+        Creates a panda array for decision variable insights.
+        """
         self.direct_limits = pd.DataFrame(
             {
                 "lower bounds": self.qp_data_symbolic.box_lower_constraints.evaluate(),
@@ -96,6 +113,9 @@ class QuadraticProgramDebugger:
         )
 
     def create_equality_constraints(self):
+        """
+        Creates panda arrays for equality constraint insights.
+        """
         eq_matrix_dofs_np = self.qp_data_symbolic.eq_matrix_dofs.evaluate()
         eq_matrix_slack_np = self.qp_data_symbolic.eq_matrix_slack.evaluate()
         Ex = eq_matrix_dofs_np @ self.current_solution[: eq_matrix_dofs_np.shape[1]]
@@ -117,6 +137,9 @@ class QuadraticProgramDebugger:
         )
 
     def create_inequality_constraints(self):
+        """
+        Creates panda arrays for inequality constraint insights.
+        """
         neq_matrix_dofs_np = self.qp_data_symbolic.neq_matrix_dofs.evaluate()
         neq_matrix_slack_np = self.qp_data_symbolic.neq_matrix_slack.evaluate()
         Ex = neq_matrix_dofs_np @ self.current_solution[: neq_matrix_dofs_np.shape[1]]
@@ -142,10 +165,16 @@ class QuadraticProgramDebugger:
 
     @property
     def free_variable_names(self) -> list[str]:
+        """
+        Returns the names of all free variables.
+        """
         return self.qp_data_symbolic.free_variable_names
 
     @property
     def degree_of_freedom_names(self) -> list[str]:
+        """
+        Returns the names of all degrees of freedom.
+        """
         names = []
         for derivative in ["vel", "jerk"]:
             for k in range(self.qp_data_symbolic.config.prediction_horizon):
@@ -160,8 +189,14 @@ class QuadraticProgramDebugger:
 
     @property
     def equality_constr_names(self):
+        """
+        Returns the names of all equality constraints.
+        """
         return self.qp_data_symbolic.eq_constraint_names
 
     @property
     def inequality_constr_names(self):
+        """
+        Returns the names of all inequality constraints.
+        """
         return self.qp_data_symbolic.neq_constraint_names
