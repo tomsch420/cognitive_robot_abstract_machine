@@ -1,3 +1,4 @@
+import statistics
 from dataclasses import dataclass
 from typing import List
 
@@ -6,6 +7,30 @@ from krrood.class_diagrams.attribute_introspector import (
     AttributeIntrospector,
     DiscoveredAttribute,
 )
+
+
+@dataclass
+class MeanAndStandardDeviation:
+    """
+    Class that represents a mean and standard deviation for tables that will be directly rendered as
+    mean +- standard deviation.
+
+    Use this in experiment results when you want to render a mean +- standard deviation.
+    """
+
+    mean: float
+    standard_deviation: float
+
+    def __str__(self) -> str:
+        return f"{round(self.mean, 2)} ± {round(self.standard_deviation, 2)}"
+
+    @classmethod
+    def from_measurements(cls, measurements: List[float]) -> "MeanAndStandardDeviation":
+        std = 0.0 if len(measurements) < 2 else statistics.stdev(measurements)
+        return cls(
+            mean=round(statistics.mean(measurements), 2),
+            standard_deviation=round(std, 4),
+        )
 
 
 @dataclass
@@ -80,7 +105,7 @@ class TypstRenderer:
 
     def render_row(self, row: ExperimentResult) -> str:
         """Renders the cells of a single row in Typst format."""
-        return ",\n  ".join([f"[{v}]" for v in row.get_column_values()])
+        return ", ".join([f"[{v}]" for v in row.get_column_values()])
 
     def render_table(self) -> str:
         """Renders the entire ExperimentsTable into a valid Typst #table markup string."""

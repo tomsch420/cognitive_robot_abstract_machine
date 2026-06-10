@@ -768,11 +768,6 @@ class ClassDiagram:
         """
         # Phase 1: Collect all unique specialized generic types referenced in fields
         to_process = set()
-        [
-            to_process.add(wrapped_field.type_endpoint)
-            for wrapped_class in self.wrapped_classes
-            for wrapped_field in wrapped_class.fields
-        ]
 
         for wrapped_class in self.wrapped_classes:
             for wrapped_field in wrapped_class.fields:
