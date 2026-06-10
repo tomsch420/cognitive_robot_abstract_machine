@@ -52,11 +52,8 @@ class InstantiatedAssembler(Assembler[InstantiatedVariable, InstantiatedPlan]):
     planner = InstantiatedPlanner
 
     def realize(self, node, plan: InstantiatedPlan) -> VerbFragment:
-        seen = self.ctx.refer.seen_reference(node)
-        if seen is not None:
-            return seen
-        self.ctx.refer.register_label(node, plan.type_name)
-
+        # A referring NP (referent_id below) — the CoreferenceProcessor reduces a repeat
+        # mention to "the <type>" in document order, so no build-time seen check here.
         self.ctx.scope.push_constraint_frame()
         binding_frags, overrides = self._bindings(plan, node._type_)
         self.ctx.scope.binding_overrides.update(overrides)
@@ -116,19 +113,24 @@ class InstantiatedAssembler(Assembler[InstantiatedVariable, InstantiatedPlan]):
         binding_frags: List[VerbFragment],
         constraint_frags: List[VerbFragment],
     ) -> VerbFragment:
-        result_parts: List[VerbFragment] = [
-            NounPhrase(head=RoleFragment.for_variable(type_name, node))
-        ]
+        modifiers: List[VerbFragment] = []
         if binding_frags:
             joined = oxford_and(binding_frags, Conjunctions.AND.as_fragment())
-            result_parts.append(
+            modifiers.append(
                 PhraseFragment(parts=[word(","), Keywords.WHERE.as_fragment(), joined])
             )
         if constraint_frags:
             joined_c = oxford_and(constraint_frags, Conjunctions.AND.as_fragment())
-            result_parts.append(
+            modifiers.append(
                 PhraseFragment(
                     parts=[word(","), Keywords.SUCH_THAT.as_fragment(), joined_c]
                 )
             )
-        return PhraseFragment(parts=result_parts, separator="")
+        # A referring NP: "a <type>" first mention (+ appositive clauses), reduced to
+        # "the <type>" on a repeat by the CoreferenceProcessor (which drops the modifiers).
+        return NounPhrase(
+            head=RoleFragment.for_variable(type_name, node),
+            modifiers=modifiers,
+            modifier_separator="",
+            referent_id=node._id_,
+        )
