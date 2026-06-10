@@ -16,6 +16,8 @@ EQL-queryable (e.g. ``entity(rule).where(rule.construct == Comparator)`` over
 
 from __future__ import annotations
 
+import sys
+
 from typing_extensions import List
 
 from krrood.entity_query_language.core.mapped_variable import (
@@ -83,6 +85,7 @@ from krrood.entity_query_language.verbalization.vocabulary.english import (
     Prepositions,
 )
 from krrood.entity_query_language.verbalization.vocabulary.words import ChildForm
+from krrood.ormatic.utils import classes_of_module
 
 # Constructs + relocated helpers for the complex query / inference families
 # (Phase A transcription; the helpers move into grammar/ in Phase B).
@@ -539,33 +542,13 @@ class InstantiatedVerbalizableRule(PhraseRule):
         return WordFragment(text=template.format(**kwargs))
 
 
-# ── the full grammar (one instance per rule) ─────────────────────────────────────
-
+# ── the full grammar ─────────────────────────────────────────────────────────────
+# Auto-discovered: one instance of every concrete PhraseRule subclass *defined in this
+# module* (``classes_of_module`` excludes the imported ``PhraseRule`` base).  A new rule is
+# registered simply by defining its class here.  Order is irrelevant — ``select`` decides
+# specificity — so the discovery order (alphabetical) is fine.
 RULES: List[PhraseRule] = [
-    ComparatorRule(),
-    VariableRule(),
-    LiteralRule(),
-    ExternalVariableRule(),
-    AndRule(),
-    RangeConjunctionRule(),
-    OrRule(),
-    NotRule(),
-    NotComparatorRule(),
-    NotBoolAttrRule(),
-    MappedVariableRule(),
-    FlatVariableRule(),
-    AggregatorRule(),
-    CountAllRule(),
-    ForAllRule(),
-    ExistsRule(),
-    TopLevelEntityRule(),
-    NestedEntityRule(),
-    InferenceRuleRule(),
-    SetOfRule(),
-    ResultQuantifierRule(),
-    FilterRule(),
-    GroupedByRule(),
-    OrderedByRule(),
-    InstantiatedVariableRule(),
-    InstantiatedVerbalizableRule(),
+    rule_cls()
+    for rule_cls in classes_of_module(sys.modules[__name__])
+    if issubclass(rule_cls, PhraseRule)
 ]
