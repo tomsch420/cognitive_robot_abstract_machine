@@ -168,32 +168,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Self, List
 
-from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.datastructures.joint_state import JointState
-from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.datastructures.definitions import (
-    GripperState,
-    StaticJointState,
-    TorsoState,
-)
-from semantic_digital_twin.robots.robot_part_mixins import (
-    HasMobileBase,
-    HasTorso,
-    HasOneArm,
-    HasNeck,
-    HasTwoFingers,
-)
-from semantic_digital_twin.robots.robot_parts import (
-    AbstractRobot,
-    MobileBase,
-    Torso,
-    Arm,
-    Neck,
-    EndEffector,
-    Finger,
-    Camera,
-)
-from semantic_digital_twin.spatial_types import Quaternion, Vector3
+from semantic_digital_twin.robots.robot_parts import Finger
 from semantic_digital_twin.world_description.world_entity import KinematicStructureEntity
 
 
@@ -262,22 +238,7 @@ from typing import Self, List
 
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.datastructures.joint_state import JointState
-from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.datastructures.definitions import (
-    GripperState,
-    StaticJointState,
-    TorsoState,
-)
-from semantic_digital_twin.robots.robot_part_mixins import (
-    HasMobileBase,
-    HasTorso,
-    HasOneArm,
-    HasNeck,
-    HasTwoFingers,
-)
-from semantic_digital_twin.robots.robot_parts import (
-    Camera,
-)
+from semantic_digital_twin.robots.robot_parts import Camera
 from semantic_digital_twin.spatial_types import Vector3
 from semantic_digital_twin.world_description.world_entity import KinematicStructureEntity
 
