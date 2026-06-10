@@ -16,7 +16,7 @@ Reference: Gatt & Reiter (2009), SimpleNLG — surface realisation.
 
 from __future__ import annotations
 
-from typing_extensions import List, Optional
+from typing_extensions import Optional
 
 from krrood.entity_query_language.core.mapped_variable import (
     Attribute,
@@ -29,7 +29,7 @@ from krrood.entity_query_language.query.query import Entity
 from krrood.entity_query_language.verbalization import morphology
 from krrood.entity_query_language.verbalization.chain_utils import (
     build_path_parts,
-    walk_chain,
+    ChainAnalysis,
 )
 from krrood.entity_query_language.verbalization.fragments.base import (
     NounPhrase,
@@ -47,9 +47,6 @@ from krrood.entity_query_language.verbalization.fragments.roles import SemanticR
 from krrood.entity_query_language.verbalization.grammar.assembly.base import Assembler
 from krrood.entity_query_language.verbalization.grammar.assembly.query import (
     QueryAssembler,
-)
-from krrood.entity_query_language.verbalization.grammar.conditions.recognition import (
-    is_bool_attr_chain,
 )
 from krrood.entity_query_language.verbalization.rendering.possessive import (
     possessive_path,
@@ -80,42 +77,44 @@ class ChainAssembler(Assembler[MappedVariable, None]):
         """Boolean terminal → predicative *"<nav> is [not] <attr>"*; else possessive path.
 
         When a plural is requested (``ctx.number``) and this is a single attribute on a
-        variable, build the bare plural *"attrs of Roots"*; otherwise render singular.
+        variable, build the bare plural *"attrs of Roots"*; otherwise render singular.  The
+        chain is analysed once (:class:`ChainAnalysis`) and each branch reads off that value.
         """
+        analysis = ChainAnalysis.of(expression)
         if self.ctx.number is Number.PLURAL:
-            plural = self._plural_attribute(expression)
+            plural = self._plural_attribute(analysis)
             if plural is not None:
                 return plural
-        chain, leaf = walk_chain(expression)
-        if is_bool_attr_chain(expression):
-            return self._bool_predicative(chain, leaf, negated)
-        parts = build_path_parts(chain)
-        root_fragment = self._chain_root(leaf)
-        if isinstance(leaf, Variable):
+        if analysis.is_bool_terminal:
+            return self._bool_predicative(analysis, negated)
+        root_fragment = self._chain_root(analysis.root)
+        if isinstance(analysis.root, Variable):
             # Defer the pronominal-vs-possessive choice to the coreference pass: it knows
             # whether the root is the current subject (a build-time fact no longer consulted here).
             return PossessiveChain(
-                parts=parts, root_fragment=root_fragment, root_referent_id=leaf._id_
+                parts=analysis.parts,
+                root_fragment=root_fragment,
+                root_referent_id=analysis.root._id_,
             )
-        return possessive_path(parts, root_fragment)
+        return possessive_path(analysis.parts, root_fragment)
 
-    def _plural_attribute(self, expression: MappedVariable) -> Optional[VerbFragment]:
-        """*"attrs of Roots"* when *expression* is a single ``Attribute`` on a ``Variable``,
+    def _plural_attribute(self, analysis: ChainAnalysis) -> Optional[VerbFragment]:
+        """*"attrs of Roots"* when the chain is a single ``Attribute`` on a ``Variable``,
         else ``None`` (caller falls through to the singular rendering).  Tags both leaves
         plural for the morphology pass; marks the root introduced for cross-build seeding.
         """
-        chain, root = walk_chain(expression)
+        root = analysis.root
         if not (
             isinstance(root, Variable)
-            and len(chain) == 1
-            and isinstance(chain[0], Attribute)
+            and len(analysis.chain) == 1
+            and isinstance(analysis.chain[0], Attribute)
         ):
             return None
         type_name = root._type_.__name__
         label = self.ctx.refer.disambiguation_map.get(root._id_, type_name)
         self.ctx.refer.mark_introduced(root)
         numbered = label != type_name
-        attribute = chain[0]
+        attribute = analysis.chain[0]
         root_np = NounPhrase(
             head=RoleFragment.for_variable(label, root),
             number=Number.SINGULAR if numbered else Number.PLURAL,
@@ -140,11 +139,10 @@ class ChainAssembler(Assembler[MappedVariable, None]):
             return QueryAssembler(self.ctx).inline_noun(inner)
         return self.ctx.child(leaf)
 
-    def _bool_predicative(
-        self, chain: List[MappedVariable], leaf: object, negated: bool
-    ) -> VerbFragment:
+    def _bool_predicative(self, analysis: ChainAnalysis, negated: bool) -> VerbFragment:
         """*"<nav> is [not] <attr>"* — chains ending in an int Index get ordinal navigation."""
-        root_fragment = self._chain_root(leaf)
+        chain = analysis.chain
+        root_fragment = self._chain_root(analysis.root)
         nav_chain = chain[:-1]
 
         if not nav_chain:

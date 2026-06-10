@@ -10,8 +10,9 @@ are safe because those are lower in the dependency graph.
 from __future__ import annotations
 
 import datetime as _dt
+from dataclasses import dataclass
 
-from typing_extensions import Optional
+from typing_extensions import List, Optional, Tuple
 
 from krrood.entity_query_language.core.mapped_variable import (
     Attribute,
@@ -130,3 +131,42 @@ def build_path_parts(chain: list) -> list[tuple[str, Optional[SourceRef]]]:
             pass
         i += 1
     return parts
+
+
+@dataclass(frozen=True)
+class ChainAnalysis:
+    """A MappedVariable chain analysed **once**.
+
+    The chain rendering needs the walked chain, its root, the display path-parts, and whether
+    it ends in a boolean attribute — previously each was recomputed (``walk_chain`` /
+    ``build_path_parts`` / ``is_bool_attr_chain``) at separate call sites on the same
+    expression.  :meth:`of` computes them together so the assembler can branch off one value.
+    """
+
+    chain: List
+    """The access path, root-adjacent first (from :func:`walk_chain`)."""
+
+    root: object
+    """The chain root (first non-MappedVariable node)."""
+
+    parts: List[Tuple[str, Optional[SourceRef]]]
+    """The display path-parts (from :func:`build_path_parts`)."""
+
+    is_bool_terminal: bool
+    """``True`` when the chain ends in a ``bool``-typed :class:`Attribute` (predicative form)."""
+
+    @classmethod
+    def of(cls, expression) -> "ChainAnalysis":
+        """Analyse *expression* (a MappedVariable chain, or any root expression)."""
+        chain, root = walk_chain(expression)
+        is_bool_terminal = (
+            bool(chain)
+            and isinstance(chain[-1], Attribute)
+            and chain[-1]._type_ is bool
+        )
+        return cls(
+            chain=chain,
+            root=root,
+            parts=build_path_parts(chain),
+            is_bool_terminal=is_bool_terminal,
+        )
