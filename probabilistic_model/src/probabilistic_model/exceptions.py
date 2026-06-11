@@ -16,8 +16,8 @@ class IntractableError(DataclassException):
 
     model: ProbabilisticModel
 
-    def __post_init__(self):
-        self.message = f"Inference is intractable for {self.model}."
+    def error_message(self) -> str:
+        return f"Inference is intractable for {self.model}."
 
 
 @dataclass
@@ -29,8 +29,8 @@ class UndefinedOperationError(DataclassException):
 
     model: ProbabilisticModel
 
-    def __post_init__(self):
-        self.message = f"Operation is not defined for {self.model}."
+    def error_message(self) -> str:
+        return f"Operation is not defined for {self.model}."
 
 @dataclass
 class ShapeMismatchError(DataclassException, ValueError):
@@ -48,5 +48,5 @@ class ShapeMismatchError(DataclassException, ValueError):
     The second object to compare.
     """
 
-    def __post_init__(self):
-        self.message = f"Expected shape {self.expected_shape}, received shape {self.received_shape}"
+    def error_message(self) -> str:
+        return f"Expected shape {self.expected_shape}, received shape {self.received_shape}"

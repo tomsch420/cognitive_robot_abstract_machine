@@ -21,8 +21,6 @@ class SymbolicMathError(DataclassException):
     Represents an error specifically related to symbolic mathematics operations.
     """
 
-    message: str = field(init=False)
-
 
 @dataclass
 class UnsupportedOperationError(SymbolicMathError, TypeError):
@@ -37,9 +35,8 @@ class UnsupportedOperationError(SymbolicMathError, TypeError):
     right: Any
     """The second argument involved in the operation."""
 
-    def __post_init__(self):
-        self.message = f"unsupported operand type(s) for {self.operation}: '{self.left.__class__.__name__}' and '{self.right.__class__.__name__}'"
-        super().__post_init__()
+    def error_message(self) -> str:
+        return f"unsupported operand type(s) for {self.operation}: '{self.left.__class__.__name__}' and '{self.right.__class__.__name__}'"
 
 
 @dataclass
@@ -50,9 +47,8 @@ class CannotConvertToStringError(SymbolicMathError):
 
     expression: SymbolicMathType
 
-    def __post_init__(self):
-        self.message = f"cannot convert {self.expression} to a string"
-        super().__post_init__()
+    def error_message(self) -> str:
+        return f"cannot convert {self.expression} to a string"
 
 
 @dataclass
@@ -64,9 +60,8 @@ class WrongDimensionsError(SymbolicMathError):
     expected_dimensions: Tuple[int, int] | str
     actual_dimensions: Tuple[int, int]
 
-    def __post_init__(self):
-        self.message = f"Expected {self.expected_dimensions} dimensions, but got {self.actual_dimensions}."
-        super().__post_init__()
+    def error_message(self) -> str:
+        return f"Expected {self.expected_dimensions} dimensions, but got {self.actual_dimensions}."
 
 
 @dataclass
@@ -96,9 +91,8 @@ class HasFreeVariablesError(SymbolicMathError):
 
     variables: List[FloatVariable]
 
-    def __post_init__(self):
-        self.message = f"Operation can't be performed on expression with free variables: {self.variables}."
-        super().__post_init__()
+    def error_message(self) -> str:
+        return f"Operation can't be performed on expression with free variables: {self.variables}."
 
 
 @dataclass
@@ -107,11 +101,10 @@ class NoFreeVariablesError(SymbolicMathError):
     Raised when an operation can't be performed on an expression with NO free variables.
     """
 
-    def __post_init__(self):
-        self.message = (
+    def error_message(self) -> str:
+        return (
             f"Operation can't be performed on expression with NO free variables."
         )
-        super().__post_init__()
 
 
 class ExpressionEvaluationError(SymbolicMathError):
@@ -130,9 +123,8 @@ class WrongNumberOfArgsError(ExpressionEvaluationError):
     expected_number_of_args: int
     actual_number_of_args: int
 
-    def __post_init__(self):
-        self.message = f"Expected {self.expected_number_of_args} arguments, but got {self.actual_number_of_args}."
-        super().__post_init__()
+    def error_message(self) -> str:
+        return f"Expected {self.expected_number_of_args} arguments, but got {self.actual_number_of_args}."
 
 
 @dataclass
@@ -143,9 +135,8 @@ class DuplicateVariablesError(SymbolicMathError):
 
     variables: List[FloatVariable]
 
-    def __post_init__(self):
-        self.message = f"Operation failed due to duplicate variables: {self.variables}. All variables must be unique."
-        super().__post_init__()
+    def error_message(self) -> str:
+        return f"Operation failed due to duplicate variables: {self.variables}. All variables must be unique."
 
 
 @dataclass
@@ -153,8 +144,6 @@ class FloatVariableDataError(DataclassException):
     """
     Represents an error specific to FloatVariableData operations.
     """
-
-    message: str = field(init=False)
 
 
 @dataclass
@@ -166,9 +155,8 @@ class FloatVariableAlreadyHasResolveError(FloatVariableDataError):
 
     variable: FloatVariable
 
-    def __post_init__(self):
-        self.message = f"Cannot register an expression which has a FloatVariable ({self.variable}) that already has a resolver."
-        super().__post_init__()
+    def error_message(self) -> str:
+        return f"Cannot register an expression which has a FloatVariable ({self.variable}) that already has a resolver."
 
 
 @dataclass
@@ -179,9 +167,8 @@ class SymbolicMathExpressionNotRegisteredError(FloatVariableDataError):
 
     expression: SymbolicMathType
 
-    def __post_init__(self):
-        self.message = f"Symbolic math expression '{self.expression}' is not registered to FloatVariableData."
-        super().__post_init__()
+    def error_message(self) -> str:
+        return f"Symbolic math expression '{self.expression}' is not registered to FloatVariableData."
 
 
 @dataclass
@@ -192,6 +179,5 @@ class SymbolicMathExpressionAlreadyRegisteredError(FloatVariableDataError):
 
     expression: SymbolicMathType
 
-    def __post_init__(self):
-        self.message = f"Symbolic math expression '{self.expression}' is already registered to FloatVariableData."
-        super().__post_init__()
+    def error_message(self) -> str:
+        return f"Symbolic math expression '{self.expression}' is already registered to FloatVariableData."

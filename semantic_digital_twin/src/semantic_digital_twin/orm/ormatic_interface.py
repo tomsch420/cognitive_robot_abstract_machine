@@ -1526,10 +1526,6 @@ class AtomicWorldModificationNotAtomicDAO(
         Integer, primary_key=True, use_existing_column=True
     )
 
-    message: Mapped[builtins.str] = mapped_column(
-        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
-    )
-
     world_id: Mapped[int] = mapped_column(
         ForeignKey("WorldMappingDAO.database_id", use_alter=True),
         nullable=True,
@@ -2429,10 +2425,6 @@ class DatabaseNotAvailableErrorDAO(
         Integer, primary_key=True, use_existing_column=True
     )
 
-    message: Mapped[builtins.str] = mapped_column(
-        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
-    )
-
 
 class DegreeOfFreedomLimitsDAO(
     Base,
@@ -2535,10 +2527,6 @@ class DofNotInWorldStateErrorDAO(
 
     database_id: Mapped[builtins.int] = mapped_column(
         Integer, primary_key=True, use_existing_column=True
-    )
-
-    message: Mapped[builtins.str] = mapped_column(
-        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
     )
 
     dof_id: Mapped[uuid.UUID] = mapped_column(
@@ -3102,10 +3090,6 @@ class IncorrectWorldStateValueShapeErrorDAO(
         Integer, primary_key=True, use_existing_column=True
     )
 
-    message: Mapped[builtins.str] = mapped_column(
-        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
-    )
-
     dof_id: Mapped[uuid.UUID] = mapped_column(
         sqlalchemy.sql.sqltypes.UUID, nullable=False, use_existing_column=True
     )
@@ -3577,10 +3561,6 @@ class LogicalErrorDAO(
         Integer, primary_key=True, use_existing_column=True
     )
 
-    message: Mapped[builtins.str] = mapped_column(
-        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
-    )
-
     polymorphic_type: Mapped[str] = mapped_column(
         String(255), nullable=False, use_existing_column=True
     )
@@ -3845,9 +3825,6 @@ class MismatchingCommandLengthErrorDAO(
         Integer, primary_key=True, use_existing_column=True
     )
 
-    message: Mapped[builtins.str] = mapped_column(
-        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
-    )
     expected_length: Mapped[builtins.int] = mapped_column(use_existing_column=True)
     actual_length: Mapped[builtins.int] = mapped_column(use_existing_column=True)
 
@@ -3863,10 +3840,6 @@ class MismatchingIDsInWorldModificationDAO(
 
     database_id: Mapped[builtins.int] = mapped_column(
         Integer, primary_key=True, use_existing_column=True
-    )
-
-    message: Mapped[builtins.str] = mapped_column(
-        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
     )
 
     modification_type: Mapped[TypeType] = mapped_column(
@@ -4435,10 +4408,6 @@ class MultiSimErrorDAO(
         Integer, primary_key=True, use_existing_column=True
     )
 
-    message: Mapped[builtins.str] = mapped_column(
-        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
-    )
-
     polymorphic_type: Mapped[str] = mapped_column(
         String(255), nullable=False, use_existing_column=True
     )
@@ -4587,9 +4556,6 @@ class NegativeConnectionVelocityDAO(
         Integer, primary_key=True, use_existing_column=True
     )
 
-    message: Mapped[builtins.str] = mapped_column(
-        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
-    )
     velocity: Mapped[builtins.float] = mapped_column(use_existing_column=True)
 
 
@@ -4601,10 +4567,6 @@ class NoJointStateWithTypeDAO(
 
     database_id: Mapped[builtins.int] = mapped_column(
         Integer, primary_key=True, use_existing_column=True
-    )
-
-    message: Mapped[builtins.str] = mapped_column(
-        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
     )
 
     joint_state: Mapped[
@@ -4695,10 +4657,6 @@ class NotJsonSerializableDAO(
         Integer, primary_key=True, use_existing_column=True
     )
 
-    message: Mapped[builtins.str] = mapped_column(
-        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
-    )
-
     polymorphic_type: Mapped[str] = mapped_column(
         String(255), nullable=False, use_existing_column=True
     )
@@ -4787,12 +4745,44 @@ class ParsingErrorDAO(
         Integer, primary_key=True, use_existing_column=True
     )
 
-    message: Mapped[builtins.str] = mapped_column(
-        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
-    )
     file_path: Mapped[typing.Optional[builtins.str]] = mapped_column(
         sqlalchemy.sql.sqltypes.Text, use_existing_column=True
     )
+
+    polymorphic_type: Mapped[str] = mapped_column(
+        String(255), nullable=False, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_on": "polymorphic_type",
+        "polymorphic_identity": "ParsingErrorDAO",
+    }
+
+
+class PackageResolutionErrorDAO(
+    ParsingErrorDAO,
+    DataAccessObject[semantic_digital_twin.exceptions.PackageResolutionError],
+):
+
+    __tablename__ = "PackageResolutionErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(ParsingErrorDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    package_name: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+    details: Mapped[typing.Optional[builtins.str]] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "PackageResolutionErrorDAO",
+        "inherit_condition": database_id == ParsingErrorDAO.database_id,
+    }
 
 
 class PartNetLabelClassDescriptionDAO(
@@ -4845,6 +4835,32 @@ class PartNetMobilityDatasetLoaderDAO(
     )
 
 
+class PathResolutionErrorDAO(
+    ParsingErrorDAO,
+    DataAccessObject[semantic_digital_twin.exceptions.PathResolutionError],
+):
+
+    __tablename__ = "PathResolutionErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(ParsingErrorDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    uri: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+    details: Mapped[typing.Optional[builtins.str]] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "PathResolutionErrorDAO",
+        "inherit_condition": database_id == ParsingErrorDAO.database_id,
+    }
+
+
 class PipelineDAO(
     Base, DataAccessObject[semantic_digital_twin.pipeline.pipeline.Pipeline]
 ):
@@ -4871,10 +4887,6 @@ class PointOccupiedErrorDAO(
 
     database_id: Mapped[builtins.int] = mapped_column(
         Integer, primary_key=True, use_existing_column=True
-    )
-
-    message: Mapped[builtins.str] = mapped_column(
-        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
     )
 
     point_id: Mapped[int] = mapped_column(
@@ -5199,6 +5211,31 @@ class QoSProfileJSONSerializerDAO(
     database_id: Mapped[builtins.int] = mapped_column(
         Integer, primary_key=True, use_existing_column=True
     )
+
+
+class QuaternionConversionErrorDAO(
+    MultiSimErrorDAO,
+    DataAccessObject[
+        semantic_digital_twin.adapters.multi_sim.QuaternionConversionError
+    ],
+):
+
+    __tablename__ = "QuaternionConversionErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(MultiSimErrorDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    reason: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "QuaternionConversionErrorDAO",
+        "inherit_condition": database_id == MultiSimErrorDAO.database_id,
+    }
 
 
 class ROS2ConversionErrorDAO(
@@ -5595,10 +5632,6 @@ class RootNodeNotFoundErrorDAO(
 
     database_id: Mapped[builtins.int] = mapped_column(
         Integer, primary_key=True, use_existing_column=True
-    )
-
-    message: Mapped[builtins.str] = mapped_column(
-        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
     )
 
     candidates: Mapped[typing.List[builtins.str]] = mapped_column(
@@ -7916,10 +7949,6 @@ class UnknownWorldModificationDAO(
         Integer, primary_key=True, use_existing_column=True
     )
 
-    message: Mapped[builtins.str] = mapped_column(
-        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
-    )
-
 
 class UsageErrorDAO(
     LogicalErrorDAO, DataAccessObject[semantic_digital_twin.exceptions.UsageError]
@@ -8259,6 +8288,35 @@ class InvalidPlaneDimensionsDAO(
     }
 
 
+class MimicDofLimitOverwriteErrorDAO(
+    UsageErrorDAO,
+    DataAccessObject[semantic_digital_twin.exceptions.MimicDofLimitOverwriteError],
+):
+
+    __tablename__ = "MimicDofLimitOverwriteErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(UsageErrorDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    dof_name_id: Mapped[int] = mapped_column(
+        ForeignKey("PrefixedNameDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    dof_name: Mapped[PrefixedNameDAO] = relationship(
+        "PrefixedNameDAO", uselist=False, foreign_keys=[dof_name_id], post_update=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "MimicDofLimitOverwriteErrorDAO",
+        "inherit_condition": database_id == UsageErrorDAO.database_id,
+    }
+
+
 class MismatchingPublishChangesAttributeDAO(
     UsageErrorDAO,
     DataAccessObject[
@@ -8520,6 +8578,25 @@ class SpatialTypesErrorDAO(
     }
 
 
+class InsufficientVectorsErrorDAO(
+    SpatialTypesErrorDAO,
+    DataAccessObject[semantic_digital_twin.exceptions.InsufficientVectorsError],
+):
+
+    __tablename__ = "InsufficientVectorsErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(SpatialTypesErrorDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "InsufficientVectorsErrorDAO",
+        "inherit_condition": database_id == SpatialTypesErrorDAO.database_id,
+    }
+
+
 class MissingReferenceFrameErrorDAO(
     SpatialTypesErrorDAO,
     DataAccessObject[semantic_digital_twin.exceptions.MissingReferenceFrameError],
@@ -8565,27 +8642,31 @@ class ReferenceFrameMismatchErrorDAO(
         use_existing_column=True,
     )
 
-    frame1_id: Mapped[int] = mapped_column(
+    context: Mapped[typing.Optional[builtins.str]] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+
+    expected_frame_id: Mapped[int] = mapped_column(
         ForeignKey("KinematicStructureEntityDAO.database_id", use_alter=True),
         nullable=True,
         use_existing_column=True,
     )
-    frame2_id: Mapped[int] = mapped_column(
+    actual_frame_id: Mapped[int] = mapped_column(
         ForeignKey("KinematicStructureEntityDAO.database_id", use_alter=True),
         nullable=True,
         use_existing_column=True,
     )
 
-    frame1: Mapped[KinematicStructureEntityDAO] = relationship(
+    expected_frame: Mapped[KinematicStructureEntityDAO] = relationship(
         "KinematicStructureEntityDAO",
         uselist=False,
-        foreign_keys=[frame1_id],
+        foreign_keys=[expected_frame_id],
         post_update=True,
     )
-    frame2: Mapped[KinematicStructureEntityDAO] = relationship(
+    actual_frame: Mapped[KinematicStructureEntityDAO] = relationship(
         "KinematicStructureEntityDAO",
         uselist=False,
-        foreign_keys=[frame2_id],
+        foreign_keys=[actual_frame_id],
         post_update=True,
     )
 
@@ -8631,6 +8712,10 @@ class UselessConceptErrorDAO(
         ForeignKey(UsageErrorDAO.database_id),
         primary_key=True,
         use_existing_column=True,
+    )
+
+    reason: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
     )
 
     __mapper_args__ = {
@@ -10037,10 +10122,6 @@ class WorldEntityWithIDNotInKwargsDAO(
 
     database_id: Mapped[builtins.int] = mapped_column(
         Integer, primary_key=True, use_existing_column=True
-    )
-
-    message: Mapped[builtins.str] = mapped_column(
-        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
     )
 
     world_entity_id: Mapped[uuid.UUID] = mapped_column(

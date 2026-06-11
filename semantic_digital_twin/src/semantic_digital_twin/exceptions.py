@@ -53,8 +53,8 @@ class NoJointStateWithType(DataclassException):
 
     joint_state: JointStateType
 
-    def __post_init__(self):
-        self.message = f"There is no JointState with the type: {self.joint_state}"
+    def error_message(self) -> str:
+        return f"There is no JointState with the type: {self.joint_state}"
 
 
 @dataclass
@@ -66,10 +66,12 @@ class UnknownWorldModification(DataclassException):
     call: Callable
     kwargs: Dict[str, Any]
 
-    def __post_init__(self):
-        self.message = (
-            " Make sure that world modifications are atomic and that every atomic modification is "
-            "represented by exactly one subclass of WorldModelModification."
+    def error_message(self) -> str:
+        call_name = getattr(self.call, "__name__", repr(self.call))
+        return (
+            f"No WorldModification subclass is registered for the call '{call_name}' with kwargs {self.kwargs}. "
+            "Make sure that world modifications are atomic and that every atomic modification is "
+            "represented by exactly one subclass of WorldModelModification. "
             "This module might be incomplete, you can help by expanding it."
         )
 
@@ -92,11 +94,12 @@ class MismatchingIDsInWorldModification(DataclassException):
     The actual UUIDs of the Modification.
     """
 
-    def __post_init__(self):
-        self.message = (
-            f"The world modification of type {self.modification_type.__name__} was initialized the following UUIDs: {self.original_uuids}"
-            f"But during the application of those modifications, the UUIDs were {self.actual_uuids}."
-            f"Somehow the original UUIDs were overridden, which should not happen."
+    def error_message(self) -> str:
+        return (
+            f"The world modification of type {self.modification_type.__name__} was initialized with the following UUIDs: {self.original_uuids}. "
+            f"But during the application of those modifications, the UUIDs were {self.actual_uuids}. "
+            f"Somehow the original UUIDs were overridden, which should not happen. "
+            f"This is an internal error in semantic_digital_twin, not a usage error - please open a bug report."
         )
 
 
@@ -123,8 +126,8 @@ class NegativeConnectionVelocity(DataclassException):
     The negative velocity limit.
     """
 
-    def __post_init__(self):
-        self.message = f"Velocity limit must be non-negative, got {self.velocity} for joint {self.connection_name}"
+    def error_message(self) -> str:
+        return f"Velocity limit must be non-negative, got {self.velocity} for joint {self.connection_name}"
 
 
 @dataclass
@@ -135,8 +138,12 @@ class DofNotInWorldStateError(DataclassException, KeyError):
 
     dof_id: UUID
 
-    def __post_init__(self):
-        self.message = f"Degree of freedom {self.dof_id} not found in world state."
+    def error_message(self) -> str:
+        return (
+            f"Degree of freedom {self.dof_id} not found in world state. "
+            f"This usually means the DegreeOfFreedom reference is stale, e.g. it was removed from the world "
+            f"or belongs to a different world. Re-fetch it via world.get_degree_of_freedom_by_name(...)."
+        )
 
 
 @dataclass
@@ -147,23 +154,10 @@ class IncorrectWorldStateValueShapeError(DataclassException, ValueError):
 
     dof_id: UUID
 
-    def __post_init__(self):
-        self.message = (
+    def error_message(self) -> str:
+        return (
             f"Value for '{self.dof_id}' must be length-4 array (pos, vel, acc, jerk)."
         )
-
-
-@dataclass
-class WrongWorldModelVersion(LogicalError):
-    """
-    Raised when a specific world model version is required.
-    """
-
-    expected_version: int
-    actual_version: int
-
-    def __post_init__(self):
-        self.message = f"Expected world model version {self.expected_version}, but got {self.actual_version}."
 
 
 @dataclass
@@ -175,8 +169,8 @@ class NonMonotonicTimeError(LogicalError):
     last_time: float
     attempted_time: float
 
-    def __post_init__(self):
-        self.message = f"Time must be strictly increasing. Last time: {self.last_time}, attempted time: {self.attempted_time}"
+    def error_message(self) -> str:
+        return f"Time must be strictly increasing. Last time: {self.last_time}, attempted time: {self.attempted_time}"
 
 
 @dataclass
@@ -188,8 +182,8 @@ class MismatchingCommandLengthError(DataclassException, ValueError):
     expected_length: int
     actual_length: int
 
-    def __post_init__(self):
-        self.message = f"Commands length {self.actual_length} does not match number of free variables {self.expected_length}."
+    def error_message(self) -> str:
+        return f"Commands length {self.actual_length} does not match number of free variables {self.expected_length}."
 
 
 @dataclass
@@ -215,8 +209,27 @@ class InvalidConnectionLimits(UsageError):
     The invalid limits.
     """
 
-    def __post_init__(self):
-        self.message = f"Lower limit for {self.name} must be less than upper limit. Given limits: {self.limits}."
+    def error_message(self) -> str:
+        return f"Lower limit for {self.name} must be less than upper limit. Given limits: {self.limits}."
+
+
+@dataclass
+class MimicDofLimitOverwriteError(UsageError):
+    """
+    Raised when trying to overwrite the limits of a mimic degree of freedom.
+    """
+
+    dof_name: PrefixedName
+    """
+    The name of the mimic degree of freedom.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"Cannot overwrite limits of the mimic DOF '{self.dof_name}'. "
+            f"Mimic DOF limits are derived from the DOF they mimic; "
+            f"use .raw_dof._overwrite_dof_limits instead."
+        )
 
 
 @dataclass
@@ -235,8 +248,13 @@ class MismatchingWorld(UsageError):
     The given world.
     """
 
-    def __post_init__(self):
-        self.message = f"The two entities have mismatching worlds. Expected world: {self.expected_world}, given world: {self.given_world}"
+    def error_message(self) -> str:
+        return (
+            f"The two entities have mismatching worlds: expected world '{self.expected_world.name}', "
+            f"given world '{self.given_world.name}'. Entities can only be combined when they belong to "
+            f"the same world. Bring everything into one world first, e.g. with "
+            f"world.merge_world(other_world) or world.merge_world_at_pose(other_world, pose)."
+        )
 
 
 @dataclass
@@ -250,8 +268,8 @@ class SemanticAnnotationCircularDependencyError(UsageError):
     The list of semantic annotations that in which a circular dependency is detected.
     """
 
-    def __post_init__(self):
-        self.message = f"The following semantic annotations have circular dependencies: {self.semantic_annotations}"
+    def error_message(self) -> str:
+        return f"The following semantic annotations have circular dependencies: {self.semantic_annotations}"
 
 
 @dataclass
@@ -270,8 +288,8 @@ class MissingSemanticAnnotationError(UsageError):
     The missing semantic annotation class.
     """
 
-    def __post_init__(self):
-        self.message = (
+    def error_message(self) -> str:
+        return (
             f"The semantic annotation of type {self.missing_semantic_annotation_class.__name__} is required"
             f" by {self.semantic_annotation_class.__name__}, but is missing."
         )
@@ -293,8 +311,8 @@ class InvalidPlaneDimensions(UsageError):
     The class for which the dimensions are invalid.
     """
 
-    def __post_init__(self):
-        self.message = f"The Dimensions {self.scale} are invalid for the class {self.clazz.__name__}"
+    def error_message(self) -> str:
+        return f"The Dimensions {self.scale} are invalid for the class {self.clazz.__name__}"
 
 
 @dataclass
@@ -303,6 +321,14 @@ class UselessConceptError(UsageError):
     Used to indicate that the operation the user is trying to perform is not useful in the current context, even
     though it might be technically possible.
     """
+
+    reason: str
+    """
+    Why the operation is not useful in this context.
+    """
+
+    def error_message(self) -> str:
+        return self.reason
 
 
 @dataclass
@@ -316,8 +342,8 @@ class InvalidHingeActiveAxis(UsageError):
     The invalid axis.
     """
 
-    def __post_init__(self):
-        self.message = (
+    def error_message(self) -> str:
+        return (
             f"Axis {self.axis} provided when trying to calculate the hinge position is invalid. "
             f"If you think this is incorrect, consider extending Door.calculate_world_T_hinge_based_on_handle"
         )
@@ -327,24 +353,39 @@ class InvalidHingeActiveAxis(UsageError):
 class AddingAnExistingSemanticAnnotationError(UsageError):
     semantic_annotation: SemanticAnnotation
 
-    def __post_init__(self):
-        self.message = f"Semantic annotation {self.semantic_annotation} already exists."
+    def error_message(self) -> str:
+        return (
+            f"Semantic annotation {self.semantic_annotation} already exists in this world. "
+            f"Each annotation instance can only be added once; reuse the existing one instead of adding it again."
+        )
 
 
 @dataclass
 class SemanticAnnotationNotInWorldError(UsageError):
     semantic_annotation: SemanticAnnotation
 
-    def __post_init__(self):
-        self.message = f"Semantic annotation {self.semantic_annotation} does not belong to a world."
+    def error_message(self) -> str:
+        return (
+            f"Semantic annotation {self.semantic_annotation} does not belong to a world, "
+            f"but this operation requires one. Add it first via world.add_semantic_annotation(annotation)."
+        )
 
 
 @dataclass
 class MissingWorldModificationContextError(UsageError):
     function: Callable
 
-    def __post_init__(self):
-        self.message = f"World function '{self.function.__name__}' was called without a 'with world.modify_world():' context manager."
+    def error_message(self) -> str:
+        # Strip leading underscores so the hint shows the public method, not the internal one it delegates to.
+        function_name = getattr(self.function, "__name__", repr(self.function)).lstrip(
+            "_"
+        )
+        return (
+            f"'{function_name}' modifies the world model and must be called inside a world modification context. "
+            f"Wrap the call like this:\n"
+            f"    with world.modify_world():\n"
+            f"        world.{function_name}(...)"
+        )
 
 
 @dataclass
@@ -362,16 +403,24 @@ class MismatchingPublishChangesAttribute(UsageError):
     The publish_changes of the world modification context that is being entered.
     """
 
-    def __post_init__(self):
-        self.message = f"Cannot enter context with publish_changes={self.proposed_publish_changes} when the currently active modification context has publish_changes={self.active_publish_changes}. Make sure to not nest contexts with different publish_changes states."
+    def error_message(self) -> str:
+        return (
+            f"Cannot enter context with publish_changes={self.proposed_publish_changes} when the currently active "
+            f"modification context has publish_changes={self.active_publish_changes}. "
+            f"Make sure to not nest contexts with different publish_changes states."
+        )
 
 
 @dataclass
 class MissingPublishChangesKWARG(UsageError):
     kwargs: Dict[str, Any]
 
-    def __post_init__(self):
-        self.message = f"publish_changes must be provided as a keyword argument, but got {self.kwargs}. If you see this exception you probably notified a synchronizer without setting publish_changes, which will cause hard to debug issues."
+    def error_message(self) -> str:
+        return (
+            f"publish_changes must be provided as a keyword argument, but got {self.kwargs}. "
+            f"If you see this exception you probably notified a synchronizer without setting publish_changes, "
+            f"which will cause hard to debug issues."
+        )
 
 
 @dataclass
@@ -387,8 +436,8 @@ class StateUpdateContainsUnknownDegreesOfFreedomError(UsageError):
     List of unknown DOF UUIDs that were attempted to update the state of
     """
 
-    def __post_init__(self):
-        self.message = (
+    def error_message(self) -> str:
+        return (
             f"Received a WorldStateUpdate containing {len(self.unknown_identifiers)} "
             f"DOF identifier(s) absent from the world state index: "
             f"{self.unknown_identifiers}. "
@@ -404,8 +453,8 @@ class ApplyMissedMessagesWhileWorldIsBeingModifiedError(UsageError):
     with any currently active modify_world context due to mismatching publish_changes policies.
     """
 
-    def __post_init__(self):
-        self.message = (
+    def error_message(self) -> str:
+        return (
             "apply_missed_messages must not be called while a modify_world context is active on the synchronizer's world. "
             "Call apply_missed_messages after the modify_world context has exited."
         )
@@ -415,8 +464,14 @@ class ApplyMissedMessagesWhileWorldIsBeingModifiedError(UsageError):
 class DuplicateWorldEntityError(UsageError):
     world_entities: List[WorldEntity]
 
-    def __post_init__(self):
-        self.message = f"WorldEntities {self.world_entities} are duplicates, while world entity elements should be unique."
+    def error_message(self) -> str:
+        names = [str(world_entity.name) for world_entity in self.world_entities]
+        return (
+            f"Multiple world entities match: {names}, but the result must be unique. "
+            f"If this came from a lookup with a plain string name, disambiguate by passing a "
+            f"PrefixedName with the desired prefix, or use the plural get_..._by_name variant "
+            f"to retrieve all matches."
+        )
 
 
 @dataclass
@@ -435,8 +490,8 @@ class DuplicateRobotAssignmentsError(UsageError):
     The robots that are already assigned to the robot part.
     """
 
-    def __post_init__(self):
-        self.message = (
+    def error_message(self) -> str:
+        return (
             f"Robot part {self.robot_part} is assigned to multiple robots: {self.robots}."
             f" Each robot part should be assigned to at most one robot."
         )
@@ -446,8 +501,12 @@ class DuplicateRobotAssignmentsError(UsageError):
 class DuplicateKinematicStructureEntityError(UsageError):
     names: List[PrefixedName]
 
-    def __post_init__(self):
-        self.message = f"Kinematic structure entities with names {self.names} are duplicates, while kinematic structure entity names should be unique."
+    def error_message(self) -> str:
+        return (
+            f"Kinematic structure entities with names {self.names} are duplicates, "
+            f"but kinematic structure entity names must be unique within a world. "
+            f"Give entities from different sources distinct prefixes, e.g. PrefixedName(name, prefix='robot1')."
+        )
 
 
 @dataclass
@@ -456,12 +515,43 @@ class SpatialTypesError(UsageError):
 
 
 @dataclass
-class ReferenceFrameMismatchError(SpatialTypesError):
-    frame1: KinematicStructureEntity
-    frame2: KinematicStructureEntity
+class InsufficientVectorsError(SpatialTypesError):
+    """
+    Raised when a rotation matrix is constructed from fewer than two vectors.
+    """
 
-    def __post_init__(self):
-        self.message = f"Reference frames {self.frame1.name} and {self.frame2.name} are not the same."
+    def error_message(self) -> str:
+        return (
+            "from_vectors requires at least two of the vectors x, y, z to be provided; "
+            "the third is computed via the cross product."
+        )
+
+
+@dataclass
+class ReferenceFrameMismatchError(SpatialTypesError):
+    expected_frame: KinematicStructureEntity
+    """
+    The frame the operation requires.
+    """
+
+    actual_frame: KinematicStructureEntity
+    """
+    The frame that was found instead.
+    """
+
+    context: Optional[str] = None
+    """
+    Description of the value whose frame was checked, e.g. the argument name.
+    """
+
+    def error_message(self) -> str:
+        checked_value = self.context or "the given value"
+        return (
+            f"Expected {checked_value} to be expressed in frame '{self.expected_frame.name}', "
+            f"but it is expressed in frame '{self.actual_frame.name}'. "
+            f"Transform it into the expected frame first, e.g. via "
+            f"world.transform(value, target_frame), or construct it with the expected frame."
+        )
 
 
 @dataclass
@@ -476,8 +566,11 @@ class MissingReferenceFrameError(SpatialTypesError):
     Spatial type that lacks a reference frame.
     """
 
-    def __post_init__(self):
-        self.message = f"Spatial type {self.spatial_type} has no reference frame."
+    def error_message(self) -> str:
+        return (
+            f"Spatial type {self.spatial_type} has no reference frame, but this operation requires one. "
+            f"Construct it with an explicit frame, e.g. Point3(x, y, z, reference_frame=some_body)."
+        )
 
 
 @dataclass
@@ -488,19 +581,75 @@ class ParsingError(DataclassException, Exception):
 
     file_path: Optional[str] = None
 
-    def __post_init__(self):
-        self.message = f"Error parsing file {self.file_path}."
+    def error_message(self) -> str:
+        return f"Error parsing file {self.file_path}."
+
+
+@dataclass
+class PackageResolutionError(ParsingError):
+    """
+    Raised when a ROS package name cannot be resolved to a directory.
+    """
+
+    package_name: str = field(kw_only=True)
+    """
+    The package name that could not be resolved.
+    """
+
+    details: Optional[str] = field(kw_only=True, default=None)
+    """
+    Details about why the resolution failed.
+    """
+
+    def error_message(self) -> str:
+        message = f"Could not resolve package '{self.package_name}'."
+        if self.details:
+            message += f" Details: {self.details}"
+        return message
+
+
+@dataclass
+class PathResolutionError(ParsingError):
+    """
+    Raised when a URI cannot be resolved to a local file path.
+    """
+
+    uri: str = field(kw_only=True)
+    """
+    The URI that could not be resolved.
+    """
+
+    details: Optional[str] = field(kw_only=True, default=None)
+    """
+    Details about why the resolution failed.
+    """
+
+    def error_message(self) -> str:
+        message = f"Could not resolve path '{self.uri}'."
+        if self.details:
+            message += f" Details: {self.details}"
+        return message
 
 
 @dataclass
 class WorldEntityNotFoundError(UsageError):
-    name_or_hash: Union[PrefixedName, int]
+    name_or_hash: Union[str, PrefixedName, int]
 
-    def __post_init__(self):
-        if isinstance(self.name_or_hash, PrefixedName):
-            self.message = f"WorldEntity with name {self.name_or_hash} not found"
-        else:
-            self.message = f"WorldEntity with hash {self.name_or_hash} not found"
+    suggestions: List[Union[str, PrefixedName]] = field(default_factory=list)
+    """
+    Names of existing world entities that closely match the searched name.
+    """
+
+    def error_message(self) -> str:
+        if isinstance(self.name_or_hash, (str, PrefixedName)):
+            message = f"No world entity with name '{self.name_or_hash}' found."
+            if self.suggestions:
+                formatted_suggestions = ", ".join(
+                    f"'{suggestion}'" for suggestion in self.suggestions
+                )
+                message += f" Did you mean: {formatted_suggestions}?"
+            return message
+        return f"No world entity with hash {self.name_or_hash} found."
 
 
 @dataclass
@@ -514,8 +663,8 @@ class MissingDefaultCameraError(UsageError):
     The robot that does not have a default camera.
     """
 
-    def __post_init__(self):
-        self.message = f"Robot {self.robot.name} does not have a default camera."
+    def error_message(self) -> str:
+        return f"Robot {self.robot.name} does not have a default camera."
 
 
 @dataclass
@@ -524,16 +673,19 @@ class MissingWorldError(UsageError):
     Raised when trying to access a world that is None, but a world is required for the operation.
     """
 
-    def __post_init__(self):
-        self.message = f"The world you are trying to access is None."
+    def error_message(self) -> str:
+        return (
+            "A world is required for this operation, but None was found. "
+            "Make sure the involved entities have been added to a world before calling this."
+        )
 
 
 @dataclass
 class WorldEntityWithIDNotFoundError(UsageError):
     id: UUID
 
-    def __post_init__(self):
-        self.message = f"WorldEntity with id {self.id} not found"
+    def error_message(self) -> str:
+        return f"WorldEntity with id {self.id} not found"
 
 
 @dataclass
@@ -541,8 +693,12 @@ class AlreadyBelongsToAWorldError(UsageError):
     world: World
     type_trying_to_add: Type[WorldEntity]
 
-    def __post_init__(self):
-        self.message = f"Cannot add a {self.type_trying_to_add} that already belongs to another world {self.world.name}."
+    def error_message(self) -> str:
+        return (
+            f"Cannot add this {self.type_trying_to_add.__name__} because it already belongs to the world "
+            f"'{self.world.name}'. A world entity can belong to at most one world. "
+            f"To combine two worlds, use world.merge_world(other_world); to reuse an entity, create a fresh copy."
+        )
 
 
 @dataclass
@@ -556,8 +712,13 @@ class DoesNotBelongToAWorldError(UsageError):
     The world entity that does not belong to a world.
     """
 
-    def __post_init__(self):
-        self.message = f"WorldEntity {self.world_entity} does not belong to a world."
+    def error_message(self) -> str:
+        return (
+            f"WorldEntity '{self.world_entity.name}' does not belong to a world, but this operation requires one. "
+            f"Add it to a world first, e.g.:\n"
+            f"    with world.modify_world():\n"
+            f"        world.add_kinematic_structure_entity(entity)"
+        )
 
 
 class NotJsonSerializable(JSONSerializationError): ...
@@ -567,8 +728,8 @@ class NotJsonSerializable(JSONSerializationError): ...
 class SpatialTypeNotJsonSerializable(NotJsonSerializable):
     spatial_object: SymbolicMathType
 
-    def __post_init__(self):
-        self.message = (
+    def error_message(self) -> str:
+        return (
             f"Object of type '{self.spatial_object.__class__.__name__}' is not JSON serializable, because it has "
             f"free variables: {self.spatial_object.free_variables()}"
         )
@@ -578,8 +739,8 @@ class SpatialTypeNotJsonSerializable(NotJsonSerializable):
 class WorldEntityWithIDNotInKwargs(JSONSerializationError):
     world_entity_id: UUID
 
-    def __post_init__(self):
-        self.message = (
+    def error_message(self) -> str:
+        return (
             f"World entity '{self.world_entity_id}' is not in the kwargs of the "
             f"method that created it."
         )
@@ -602,15 +763,15 @@ class RootNodeNotFoundError(DataclassException):
     candidates: List[str]
     """The candidate node names that were considered as potential roots."""
 
-    def __post_init__(self):
-        self.message = (
-            f"Could not determine unique root node. Candidates: {self.candidates}"
-        )
+    def error_message(self) -> str:
+        return f"Could not determine unique root node. Candidates: {self.candidates}"
 
 
 @dataclass
 class CollisionCheckingError(DataclassException):
-    message: str = field(kw_only=True, default=None, init=False)
+    """
+    Base class for errors during collision checking.
+    """
 
 
 @dataclass
@@ -620,31 +781,28 @@ class InvalidCollisionCheckError(CollisionCheckingError):
 
 @dataclass
 class NegativeCollisionCheckingDistanceError(InvalidCollisionCheckError):
-    def __post_init__(self):
-        super().__post_init__()
-        self.message = f"Distance must be positive, got {self.collision_check.distance}"
+    def error_message(self) -> str:
+        return f"Distance must be positive, got {self.collision_check.distance}"
 
 
 @dataclass
 class InvalidBodiesInCollisionCheckError(InvalidCollisionCheckError):
-    def __post_init__(self):
-        super().__post_init__()
-        self.message = f"Body_a and body_b must be different, got {self.collision_check.body_a} and {self.collision_check.body_b}"
+    def error_message(self) -> str:
+        return f"Body_a and body_b must be different, got {self.collision_check.body_a} and {self.collision_check.body_b}"
 
 
 @dataclass
 class BodyHasNoGeometryError(InvalidCollisionCheckError):
-    def __post_init__(self):
-        super().__post_init__()
-        self.message = ""
-        if not self.collision_check.body_a.has_collision():
-            self.message += (
-                f"Body {self.collision_check.body_a.name} has collision geometry."
-            )
-        if not self.collision_check.body_b.has_collision():
-            self.message += (
-                f"Body {self.collision_check.body_b.name} has collision geometry."
-            )
+    def error_message(self) -> str:
+        bodies_without_geometry = [
+            body
+            for body in (self.collision_check.body_a, self.collision_check.body_b)
+            if not body.has_collision()
+        ]
+        return " ".join(
+            f"Body {body.name} has no collision geometry."
+            for body in bodies_without_geometry
+        )
 
 
 @dataclass
@@ -665,13 +823,14 @@ class AtomicWorldModificationNotAtomic(DataclassException):
     The world where this happened.
     """
 
-    def __post_init__(self):
-        self.message = (
-            f"World {self.world} is already being modified atomically by "
-            f"{self.world._current_active_atomic_world_modification.__name__}.\n"
-            f"{self.modification.__name__} tried to perform an atomic world modification anyways."
+    def error_message(self) -> str:
+        return (
+            f"World '{self.world.name}' is already being modified atomically by "
+            f"'{self.world._current_active_atomic_world_modification.__name__}' while "
+            f"'{self.modification.__name__}' attempted another atomic world modification. "
+            f"Atomic world modifications must never trigger each other. This is an internal error in "
+            f"semantic_digital_twin, not a usage error - please open a bug report with the stack trace."
         )
-        super().__post_init__()
 
 
 @dataclass
@@ -685,5 +844,5 @@ class PointOccupiedError(DataclassException):
     The point that is occupied.
     """
 
-    def __post_init__(self):
-        self.message = f"The point {self.point} is occupied."
+    def error_message(self) -> str:
+        return f"The point {self.point} is occupied."

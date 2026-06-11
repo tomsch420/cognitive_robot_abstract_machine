@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ast
 import types
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Type, Tuple
 
@@ -9,17 +10,33 @@ from typing_extensions import Optional
 
 
 @dataclass
-class DataclassException(Exception):
+class DataclassException(Exception, ABC):
     """
     A base exception class for dataclass-based exceptions.
-    The way this is used is by inheriting from it and setting the `message` field in the __post_init__ method,
-    then calling the super().__post_init__() method.
+    Subclasses implement error_message(); it is evaluated at construction time and becomes the
+    actual exception message (the args passed to Exception).
+    Subclasses that override __post_init__ must call super().__post_init__() at the end.
     """
 
-    message: str = field(kw_only=True, default=None)
-
     def __post_init__(self):
-        super().__init__(self.message)
+        # BaseException.__new__ bypasses the usual ABC instantiation check, so enforce it here.
+        if getattr(type(self), "__abstractmethods__", None):
+            raise TypeError(
+                f"Can't instantiate abstract class {type(self).__name__} without an implementation of "
+                f"{', '.join(sorted(type(self).__abstractmethods__))}."
+            )
+        super().__init__(self.error_message())
+
+    def __str__(self) -> str:
+        # Stdlib mixins like KeyError override __str__ to repr their args; always render the
+        # plain message that __post_init__ baked into the args.
+        return Exception.__str__(self)
+
+    @abstractmethod
+    def error_message(self) -> str:
+        """
+        :return: A human-readable description of the error including, where possible, how to fix it.
+        """
 
 
 @dataclass
@@ -50,14 +67,13 @@ class MismatchingNumberOfGenericParametersAndResolvedTypes(DataclassException):
     The resolved types for the generic parameters.
     """
 
-    def __post_init__(self):
-        self.message = (
+    def error_message(self) -> str:
+        return (
             f"The number of generic type parameters in {self.affected_class.__name__} "
             f"({len(self.parameters)}) does not match the number of "
             f"provided arguments ({len(self.resolved_types)})."
             f"Parameters: {self.parameters}, resolved_types: {self.resolved_types}"
         )
-        super().__post_init__()
 
 
 @dataclass
@@ -75,12 +91,11 @@ class ModuleNotFoundForConvertingImportsToAbsolute(InputError):
     The source code of the file that contains the relative import.
     """
 
-    def __post_init__(self):
-        self.message = (
+    def error_message(self) -> str:
+        return (
             f"Current module is required for relative import conversion, path: {self.path},"
             f" source code: {self.source_code}."
         )
-        super().__post_init__()
 
 
 @dataclass
@@ -102,13 +117,12 @@ class NoSourceDataToParseImportsFrom(InputError):
     The AST tree to parse imports from.
     """
 
-    def __post_init__(self):
-        self.message = (
+    def error_message(self) -> str:
+        return (
             f"No source data provided for import parsing, at least one of module, file_path, ast_tree should be give. "
             f"Instead got, module: {self.module},"
             f" file_path: {self.file_path}, ast_tree: {self.ast_tree}"
         )
-        super().__post_init__()
 
 
 @dataclass
@@ -126,12 +140,11 @@ class NoModuleSourceProvided(InputError):
     The module to parse imports from.
     """
 
-    def __post_init__(self):
-        self.message = (
+    def error_message(self) -> str:
+        return (
             f"No source module data provided for import parsing, at least one of imported_module_path, module_name should be given. "
             f"Instead got, imported_module_path: {self.imported_module_path}, module_name: {self.module_name}"
         )
-        super().__post_init__()
 
 
 @dataclass
@@ -149,9 +162,8 @@ class NoDefaultValueFound(DataclassException):
     The name of the field for which no default value was found.
     """
 
-    def __post_init__(self):
-        self.message = f"No default value for field '{self.field_name}' in class '{self.clazz.__name__}'"
-        super().__post_init__()
+    def error_message(self) -> str:
+        return f"No default value for field '{self.field_name}' in class '{self.clazz.__name__}'"
 
 
 @dataclass
@@ -169,9 +181,8 @@ class PackageNameNotFoundError(DataclassException):
     The path where the package name was not found.
     """
 
-    def __post_init__(self):
-        self.message = f"Could not find {self.package_name} in {self.path}"
-        super().__post_init__()
+    def error_message(self) -> str:
+        return f"Could not find {self.package_name} in {self.path}"
 
 
 @dataclass
@@ -190,9 +201,8 @@ class PathMissingRequiredPartsError(DataclassException):
     The path that was missing required parts.
     """
 
-    def __post_init__(self):
-        self.message = f"Path '{self.path}' is missing required parts: {', '.join(self.required_parts)}"
-        super().__post_init__()
+    def error_message(self) -> str:
+        return f"Path '{self.path}' is missing required parts: {', '.join(self.required_parts)}"
 
 
 @dataclass
@@ -218,12 +228,11 @@ class SubprocessExecutionError(DataclassException):
     The standard error of the subprocess.
     """
 
-    def __post_init__(self):
-        self.message = (
+    def error_message(self) -> str:
+        return (
             f"Command '{self.command}' failed with code {self.return_code}\nSTDOUT:\n{self.stdout}\nSTDERR:"
             f"\n{self.stderr}"
         )
-        super().__post_init__()
 
 
 @dataclass
@@ -245,9 +254,8 @@ class SourceDataNotProvided(InputError):
     The source code that was missing.
     """
 
-    def __post_init__(self):
-        self.message = (
+    def error_message(self) -> str:
+        return (
             f"Either file_path, tree, or source must be provided, got file_path: {self.file_path},"
             f" tree: {self.tree}, source_code: {self.source_code}"
         )
-        super().__post_init__()

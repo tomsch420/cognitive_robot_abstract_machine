@@ -24,8 +24,8 @@ class NoGenericError(DataclassException, TypeError):
 
     clazz: Type
 
-    def __post_init__(self):
-        self.message = (
+    def error_message(self) -> str:
+        return (
             f"Cannot determine original class for {self.clazz}. "
             "Did you forget to parameterise the DataAccessObject subclass?"
         )
@@ -45,8 +45,8 @@ class NoDAOFoundError(DataclassException, TypeError):
     The class that no dao was found for
     """
 
-    def __post_init__(self):
-        self.message = (
+    def error_message(self) -> str:
+        return (
             f"Class {type(self.obj)} does not have a DAO. Did you forget to import your ORM Interface? "
             f"Otherwise the class may not be in the ORM Interface"
         )
@@ -66,11 +66,17 @@ class NoDAOFoundDuringParsingError(NoDAOFoundError):
     """
 
     def __init__(self, obj: Any, dao: Type, relationship: RelationshipProperty = None):
-        self.message = (
-            f"Class {type(obj)} does not have a DAO. This happened when trying "
-            f"to create a dao for {dao}) on the relationship {relationship} with the "
-            f"relationship value {obj}. "
-            f"Expected a relationship value of type {relationship.target if relationship else "Unknown"}."
+        self.obj = obj
+        self.dao = dao
+        self.relationship = relationship
+        self.__post_init__()
+
+    def error_message(self) -> str:
+        return (
+            f"Class {type(self.obj)} does not have a DAO. This happened when trying "
+            f"to create a dao for {self.dao}) on the relationship {self.relationship} with the "
+            f"relationship value {self.obj}. "
+            f"Expected a relationship value of type {self.relationship.target if self.relationship else 'Unknown'}."
         )
 
 
@@ -85,8 +91,8 @@ class UnsupportedRelationshipError(DataclassException, ValueError):
 
     relationship: RelationshipProperty
 
-    def __post_init__(self):
-        self.message = f"Unsupported relationship direction for {self.relationship}."
+    def error_message(self) -> str:
+        return f"Unsupported relationship direction for {self.relationship}."
 
 
 @dataclass
@@ -115,5 +121,5 @@ class UnsupportedColumnType(DataclassException, TypeError):
 
     column_type: Type
 
-    def __post_init__(self):
-        self.message = f"Column type: {self.column_type} is neither a builtin sqlalchemy type nor does it exist in the dict of type_mappings."
+    def error_message(self) -> str:
+        return f"Column type: {self.column_type} is neither a builtin sqlalchemy type nor does it exist in the dict of type_mappings."

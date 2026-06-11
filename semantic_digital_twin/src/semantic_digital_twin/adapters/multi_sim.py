@@ -88,8 +88,7 @@ def cas_pose_to_list(pose: HomogeneousTransformationMatrix) -> List[float]:
     try:
         quat = Rotation.from_matrix(rotation_matrix).as_quat(scalar_first=True)
     except Exception as e:
-        error_msg = f"Error converting rotation matrix to quaternion. Rotation matrix:\n{rotation_matrix}\nError message: {str(e)}"
-        raise MultiSimError(error_msg)
+        raise QuaternionConversionError(rotation_matrix, str(e))
     return [pos[0], pos[1], pos[2], quat[0], quat[1], quat[2], quat[3]]
 
 
@@ -140,6 +139,29 @@ class GeomVisibilityAndCollisionType(IntEnum):
 @dataclass
 class MultiSimError(DataclassException):
     """Base class for all MultiSim-related exceptions."""
+
+
+@dataclass
+class QuaternionConversionError(MultiSimError):
+    """
+    Raised when a rotation matrix cannot be converted to a quaternion.
+    """
+
+    rotation_matrix: Any
+    """
+    The rotation matrix that could not be converted.
+    """
+
+    reason: str
+    """
+    The error message of the underlying conversion failure.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"Error converting rotation matrix to quaternion. "
+            f"Rotation matrix:\n{self.rotation_matrix}\nError message: {self.reason}"
+        )
 
 
 @dataclass(eq=False)
@@ -694,9 +716,8 @@ class MujocoEntityNotFoundError(MujocoError):
     entity_type: mujoco.mjtObj
     action: str = "find"
 
-    def __post_init__(self):
-        self.message = f"Failed to {self.action}: type={self.entity_type}, name='{self.entity_name}'"
-        super().__post_init__()
+    def error_message(self) -> str:
+        return f"Failed to {self.action}: type={self.entity_type}, name='{self.entity_name}'"
 
 
 @dataclass
