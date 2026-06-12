@@ -1,3 +1,11 @@
+"""
+This module provides functions and dataclass definitions for conducting
+scalability experiments with the ORMatic library. It includes tools for
+collecting mappable classes, alternative mappings, and type mappings, as well
+as computing timing and structural statistics across multiple ORMatic
+generation runs.
+"""
+
 import logging
 import random
 import time

@@ -1,3 +1,11 @@
+"""
+This module provides functionality to build a PR2 robot world, create random
+robot action plans, execute plans in a simulated environment, and measure the
+performance of data operations, such as serialization and database storage.
+It includes tools for running experiments to evaluate the reliability and
+performance of robotic action plans and data operations.
+"""
+
 import pathlib
 import random
 import time
@@ -77,11 +85,8 @@ def build_cram_world():
     return pr2_world, pr2, ctx
 
 
-_MAX_TRIES = 10
-
-
 def _random_underspecified_action(world: World):
-    """Return a random underspecified action limited to at most ``_MAX_TRIES`` attempts."""
+    """Return a random underspecified action limited to at most attempts."""
     choice = random.randint(0, 2)
     if choice == 0:
         action = underspecified(NavigateAction)(
@@ -100,7 +105,7 @@ def _random_underspecified_action(world: World):
         action = underspecified(MoveTorsoAction)(torso_state=...)
     else:
         action = underspecified(ParkArmsAction)(arm=...)
-    action.expression.limit(_MAX_TRIES)
+    action.expression.limit(10)
     return action
 
 

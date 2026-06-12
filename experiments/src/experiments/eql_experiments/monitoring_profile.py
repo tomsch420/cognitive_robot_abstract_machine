@@ -87,13 +87,25 @@ from experiments.experiment_definitions import (
 
 # %% Self-contained domain types
 
+
 @dataclass(unsafe_hash=True)
 class Gadget(Symbol):
     """A small symbol with a few attributes used to exercise filters and aggregations."""
 
     name: str
+    """
+    The name of the gadget.
+    """
+
     weight: int
+    """
+    The weight of the gadget.
+    """
+
     category: str
+    """
+    The category of the gadget.
+    """
 
 
 @dataclass(unsafe_hash=True)
@@ -101,6 +113,9 @@ class Owner(Symbol):
     """A symbol used as a second source to exercise multi-source (cross-product) queries."""
 
     name: str
+    """
+    The name of the owner.
+    """
 
 
 _CATEGORIES = ("tool", "toy", "device")
@@ -130,6 +145,7 @@ def _build_owners(count: int) -> List[Owner]:
 
 
 # %% Workloads
+
 
 @dataclass
 class Workload:
@@ -199,6 +215,7 @@ def build_workloads() -> List[Workload]:
 
 # %% Monitoring levels
 
+
 class MonitoringLevel(Enum):
     """The three monitoring configurations compared by the A/B stress test."""
 
@@ -236,6 +253,7 @@ def apply_monitoring_level(level: MonitoringLevel) -> Iterator[None]:
 
 
 # %% A/B wall-clock measurement
+
 
 @dataclass
 class MonitoringLevelResult(ExperimentResult):
@@ -325,6 +343,7 @@ def run_ab_comparison(
 
 # %% Per-line profiling
 
+
 def monitoring_target_functions() -> List[Callable]:
     """
     Collect every hot monitoring function to feed to :class:`line_profiler.LineProfiler`.
@@ -392,6 +411,7 @@ def profile_lines(workloads: List[Workload], repetitions: int) -> str:
 
 # %% Reporting
 
+
 def _markdown_ab_table(table: ExperimentsTable) -> str:
     """
     Render the A/B comparison as a GitHub-flavoured markdown table.
@@ -405,7 +425,9 @@ def _markdown_ab_table(table: ExperimentsTable) -> str:
         "| " + " | ".join("---" for _ in headers) + " |",
     ]
     for row in table.experiments:
-        lines.append("| " + " | ".join(str(value) for value in row.get_column_values()) + " |")
+        lines.append(
+            "| " + " | ".join(str(value) for value in row.get_column_values()) + " |"
+        )
     return "\n".join(lines)
 
 
@@ -475,6 +497,7 @@ def write_report(
 
 
 # %% Entry point
+
 
 def main() -> None:
     """Run the A/B stress test and per-line profile, print a summary and write the report."""

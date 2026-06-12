@@ -1,3 +1,10 @@
+"""
+This module measures the maintainability of ORMatic's impact on the CRAM
+repository by analyzing lines of code and maintainability indices of developer-
+authored files versus auto-generated files. It computes various metrics to
+understand the reduction of manual maintenance effort.
+"""
+
 import ast
 import pathlib
 from dataclasses import dataclass
