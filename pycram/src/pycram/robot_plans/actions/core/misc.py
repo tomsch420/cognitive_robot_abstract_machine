@@ -10,6 +10,7 @@ from pycram.datastructures.enums import DetectionTechnique, DetectionState
 from pycram.datastructures.grasp import GraspDescription
 from pycram.perception import PerceptionQuery
 from pycram.plans.factories import sequential
+from pycram.plans.plan_node import PlanNode
 from pycram.robot_plans.actions.base import ActionDescription
 from pycram.robot_plans.actions.core.navigation import NavigateAction
 from pycram.robot_plans.actions.core.robot_body import MoveManipulatorAction
@@ -118,7 +119,8 @@ class MoveToReach(ActionDescription):
     The semantic description for the reaching.
     """
 
-    def execute(self):
+    @property
+    def _action_plan(self) -> PlanNode:
         grasp_orientation = self.grasp_description.grasp_orientation()
         target_pose = Pose(
             self.target_pose_end_effector.to_position(),
@@ -128,18 +130,18 @@ class MoveToReach(ActionDescription):
             ).to_quaternion(),
             self.target_pose_end_effector.reference_frame,
         )
-        self.add_subplan(
-            sequential(
-                [
-                    NavigateAction(self.standing_pose),
-                    MoveManipulatorAction(
-                        target_pose,
-                        self.grasp_description.end_effector,
-                        allow_gripper_collision=False,
-                    ),
-                ]
-            )
-        ).perform()
+        return sequential(
+            [
+                NavigateAction(self.standing_pose).action_plan_for_context(
+                    self.context
+                ),
+                MoveManipulatorAction(
+                    target_pose,
+                    self.grasp_description.end_effector,
+                    allow_gripper_collision=False,
+                ).action_plan_for_context(self.context),
+            ]
+        )
 
     @property
     def standing_pose(self) -> Pose:

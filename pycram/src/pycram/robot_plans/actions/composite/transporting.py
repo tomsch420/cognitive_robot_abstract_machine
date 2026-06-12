@@ -16,8 +16,8 @@ from pycram.config.action_conf import ActionConfig
 from pycram.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
 from pycram.datastructures.grasp import GraspDescription
 from pycram.locations.factories import reachability_location
-from pycram.plans.factories import sequential, execute_single
-from pycram.plans.failures import BodyUnfetchable
+from pycram.plans.factories import sequential
+from pycram.plans.plan_node import PlanNode
 from pycram.robot_plans.actions.base import ActionDescription
 from pycram.robot_plans.actions.composite.facing import FaceAtAction
 from pycram.robot_plans.actions.core.container import OpenAction
@@ -68,8 +68,11 @@ class TransportAction(ActionDescription):
                 bodies.append(body)
         return bodies
 
-    def open_container(self, container: Body):
-
+    def _make_open_container_actions(self, container: Body) -> List:
+        """
+        :param container: The container body in which the object is located.
+        :return: The actions needed to open the given container, empty if the container is not a known drawer.
+        """
         drawer_annotation = an(
             entity(
                 drawer := variable(Drawer, domain=self.world.semantic_annotations)
@@ -77,74 +80,64 @@ class TransportAction(ActionDescription):
         )
         drawer_annotation = list(drawer_annotation.evaluate())
         if len(drawer_annotation) == 0:
-            return
+            return []
         handle = drawer_annotation[0].handle.root
 
-        self.add_subplan(
-            sequential(
-                [
-                    NavigateAction(
-                        reachability_location(
-                            handle.global_pose, self.context, self.arm
-                        ).ground(),
-                        True,
+        return [
+            underspecified(NavigateAction)(
+                target_location=variable(
+                    Pose,
+                    domain=reachability_location(
+                        handle.global_pose, self.context, self.arm
                     ),
-                    OpenAction(handle, self.arm),
-                ]
-            )
-        ).perform()
+                ),
+                keep_joint_states=True,
+            ),
+            OpenAction(handle, self.arm).action_plan_for_context(self.context),
+        ]
 
-    def execute(self) -> None:
+    @property
+    def _action_plan(self) -> PlanNode:
         self.grasp_description = self.grasp_description or GraspDescription(
             ApproachDirection.FRONT,
             VerticalAlignment.NoAlignment,
             ViewManager.get_end_effector_view(self.arm, self.robot),
         )
 
+        children = []
         for container in self.inside_container():
-            self.open_container(container)
+            children.extend(self._make_open_container_actions(container))
 
-        self.add_subplan(execute_single(ParkArmsAction(Arms.BOTH))).perform()
-
-        pickup_loc = reachability_location(
-            self.object_designator,
-            self.context,
-            self.arm,
-            self.grasp_description,
-        )
-        # Tries to find a pick-up position for the robot that uses the given arm
-
-        pickup_pose = pickup_loc.ground()
-
-        if not pickup_pose:
-            raise BodyUnfetchable(self.object_designator, self.arm)
-
-        self.add_subplan(
-            sequential(
-                [
-                    NavigateAction(pickup_pose, True),
-                    PickUpAction(
-                        self.object_designator,
-                        self.arm,
-                        grasp_description=self.grasp_description,
-                    ),
-                    ParkArmsAction(Arms.BOTH),
-                    MoveTorsoAction(TorsoState.HIGH),
-                ]
-            )
-        ).perform()
-
-        self.add_subplan(self._make_place_plan()).perform()
-
-    def _make_place_plan(self):
-
-        return sequential(
-            children=[
-                self._make_navigate_action_for_placing(self.grasp_description),
-                PlaceAction(self.object_designator, self.target_location, self.arm),
+        children.extend(
+            [
                 ParkArmsAction(Arms.BOTH),
+                # Tries to find a pick-up position for the robot that uses the given arm
+                underspecified(NavigateAction)(
+                    target_location=variable(
+                        Pose,
+                        domain=reachability_location(
+                            self.object_designator,
+                            self.context,
+                            self.arm,
+                            self.grasp_description,
+                        ),
+                    ),
+                    keep_joint_states=True,
+                ),
+                PickUpAction(
+                    self.object_designator,
+                    self.arm,
+                    grasp_description=self.grasp_description,
+                ).action_plan_for_context(self.context),
+                ParkArmsAction(Arms.BOTH).action_plan_for_context(self.context),
+                MoveTorsoAction(TorsoState.HIGH).action_plan_for_context(self.context),
+                self._make_navigate_action_for_placing(self.grasp_description),
+                PlaceAction(self.object_designator, self.target_location, self.arm).action_plan_for_context(self.context),
+                ParkArmsAction(Arms.BOTH).action_plan_for_context(self.context),
             ]
         )
+
+        return sequential(children)
 
     def _make_navigate_action_for_placing(self, grasp_description: GraspDescription):
         """
@@ -185,22 +178,21 @@ class PickAndPlaceAction(ActionDescription):
     Description of the grasp to pick up the target
     """
 
-    def execute(self) -> None:
-        self.add_subplan(
-            sequential(
-                [
-                    ParkArmsAction(Arms.BOTH),
-                    PickUpAction(
-                        self.object_designator,
-                        self.arm,
-                        grasp_description=self.grasp_description,
-                    ),
-                    ParkArmsAction(Arms.BOTH),
-                    PlaceAction(self.object_designator, self.target_location, self.arm),
-                    ParkArmsAction(Arms.BOTH),
-                ]
-            )
-        ).perform()
+    @property
+    def _action_plan(self) -> PlanNode:
+        return sequential(
+            [
+                ParkArmsAction(Arms.BOTH).action_plan_for_context(self.context),
+                PickUpAction(
+                    self.object_designator,
+                    self.arm,
+                    grasp_description=self.grasp_description,
+                ).action_plan_for_context(self.context),
+                ParkArmsAction(Arms.BOTH).action_plan_for_context(self.context),
+                PlaceAction(self.object_designator, self.target_location, self.arm).action_plan_for_context(self.context),
+                ParkArmsAction(Arms.BOTH).action_plan_for_context(self.context),
+            ]
+        )
 
 
 @dataclass
@@ -234,16 +226,15 @@ class MoveAndPlaceAction(ActionDescription):
     Keep the joint states of the robot the same during the navigation.
     """
 
-    def execute(self):
-        self.add_subplan(
-            sequential(
-                [
-                    NavigateAction(self.standing_position, self.keep_joint_states),
-                    FaceAtAction(self.target_location, self.keep_joint_states),
-                    PlaceAction(self.object_designator, self.target_location, self.arm),
-                ]
-            )
-        ).perform()
+    @property
+    def _action_plan(self) -> PlanNode:
+        return sequential(
+            [
+                NavigateAction(self.standing_position, self.keep_joint_states).action_plan_for_context(self.context),
+                FaceAtAction(self.target_location, self.keep_joint_states).action_plan_for_context(self.context),
+                PlaceAction(self.object_designator, self.target_location, self.arm).action_plan_for_context(self.context),
+            ]
+        )
 
 
 @dataclass
@@ -277,17 +268,14 @@ class MoveAndPickUpAction(ActionDescription):
     Keep the joint states of the robot the same during the navigation.
     """
 
-    def execute(self):
-        self.add_subplan(
-            sequential(
-                [
-                    NavigateAction(self.standing_position, self.keep_joint_states),
-                    FaceAtAction(
-                        self.object_designator.global_pose, self.keep_joint_states
-                    ),
-                    PickUpAction(
-                        self.object_designator, self.arm, self.grasp_description
-                    ),
-                ]
-            )
-        ).perform()
+    @property
+    def _action_plan(self) -> PlanNode:
+        return sequential(
+            [
+                NavigateAction(self.standing_position, self.keep_joint_states).action_plan_for_context(self.context),
+                FaceAtAction(
+                    self.object_designator.global_pose, self.keep_joint_states
+                ).action_plan_for_context(self.context),
+                PickUpAction(self.object_designator, self.arm, self.grasp_description).action_plan_for_context(self.context),
+            ]
+        )

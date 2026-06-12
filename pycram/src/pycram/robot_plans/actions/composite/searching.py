@@ -6,9 +6,11 @@ from datetime import timedelta
 
 from typing_extensions import Optional, Type, Any
 
+from krrood.entity_query_language.factories import underspecified, variable
 from pycram.datastructures.enums import DetectionTechnique
-from pycram.plans.failures import PerceptionObjectNotFound
-from pycram.plans.factories import sequential, execute_single, try_in_order
+from pycram.locations.factories import visibility_location
+from pycram.plans.factories import sequential, try_in_order
+from pycram.plans.plan_node import PlanNode
 from pycram.robot_plans.actions.base import ActionDescription
 from pycram.robot_plans.actions.core.misc import DetectAction
 from pycram.robot_plans.actions.core.navigation import NavigateAction, LookAtAction
@@ -32,18 +34,8 @@ class SearchAction(ActionDescription):
     Type of the object which is searched for.
     """
 
-    def execute(self) -> None:
-
-        # go to a location where the target location is visible
-        self.add_subplan(
-            execute_single(
-                NavigateAction(
-                    next(
-                        iter(CostmapLocation(target=self.target_location, visible=True))
-                    )
-                )
-            )
-        ).perform()
+    @property
+    def _action_plan(self) -> PlanNode:
 
         # define searching cone
         target_base = self.world.transform(self.target_location, self.world.root)
@@ -54,34 +46,31 @@ class SearchAction(ActionDescription):
         target_base_right = deepcopy(target_base)
         target_base_right.y += 0.5
 
-        self.add_subplan(
-            searching := try_in_order(
-                [
-                    sequential(
-                        [
-                            LookAtAction(target),
-                            DetectAction(
-                                DetectionTechnique.TYPES,
-                                object_sem_annotation=self.object_sem_annotation,
-                            ),
-                        ]
-                    )
-                    for target in [target_base, target_base_left, target_base_right]
-                ]
-            )
+        return sequential(
+            [
+                # go to a location where the target location is visible
+                underspecified(NavigateAction)(
+                    target_location=variable(
+                        Pose,
+                        domain=visibility_location(self.target_location, self.context),
+                    ),
+                ),
+                try_in_order(
+                    [
+                        sequential(
+                            [
+                                LookAtAction(target),
+                                DetectAction(
+                                    DetectionTechnique.TYPES,
+                                    object_sem_annotation=self.object_sem_annotation,
+                                ),
+                            ]
+                        )
+                        for target in [target_base, target_base_left, target_base_right]
+                    ]
+                ),
+            ]
         )
-
-        # get the found objects
-        old_annotation_ids = {
-            annotation.id for annotation in self.world.semantic_annotations
-        }
-        searching.perform()
-        new_annotation_ids = {
-            annotation.id for annotation in self.world.semantic_annotations
-        } - old_annotation_ids
-
-        if not new_annotation_ids:
-            raise PerceptionObjectNotFound(self)
 
     def validate(
         self, result: Optional[Any] = None, max_wait_time: Optional[timedelta] = None

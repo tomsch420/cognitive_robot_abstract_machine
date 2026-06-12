@@ -53,7 +53,7 @@ class PlaceAction(ActionDescription):
     """
 
     @property
-    def action_plan(self) -> PlanNode:
+    def _action_plan(self) -> PlanNode:
         arm = ViewManager.get_arm_view(self.arm, self.robot)
         end_effector = arm.end_effector
 
@@ -80,7 +80,7 @@ class PlaceAction(ActionDescription):
                     previous_grasp,
                     self.object_designator,
                     reverse_reach_order=True,
-                ).action_plan,
+                ).action_plan_for_context(self.context),
                 MoveGripperMotion(GripperState.OPEN, self.arm),
                 DetachNode(body=self.object_designator, new_parent=self.world.root),
                 MoveToolCenterPointMotion(retract_pose, self.arm),
@@ -104,9 +104,6 @@ class PlaceAction(ActionDescription):
         # self.add_subplan(
         #     execute_single(MoveToolCenterPointMotion(retract_pose, self.arm))
         # ).perform()
-
-    def execute(self) -> Any:
-        self.add_subplan(self.action_plan).perform()
 
     # def execute(self) -> None:
     #     arm = ViewManager.get_arm_view(self.arm, self.robot)
@@ -185,7 +182,7 @@ class PlaceAction(ActionDescription):
             is_body_in_gripper(kwargs["object_designator"], end_effector) < 0.1,
             allclose(
                 kwargs["object_designator"].global_pose,
-                kwargs["target_location"].to_spatial_type(),
+                kwargs["target_location"],
                 atol=0.03,
             ),
         )

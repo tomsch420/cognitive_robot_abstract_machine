@@ -18,6 +18,7 @@ from pycram.datastructures.enums import (
 from pycram.datastructures.grasp import GraspDescription
 from pycram.locations.pose_validator import IsReachableBy
 from pycram.plans.factories import sequential
+from pycram.plans.plan_node import PlanNode
 from pycram.querying.predicates import GripperIsFree
 from pycram.robot_plans.actions.base import ActionDescription
 from pycram.robot_plans.actions.core.pick_up import GraspingAction
@@ -51,7 +52,8 @@ class OpenAction(ActionDescription):
     The distance in meters the gripper should be at in the x-axis away from the handle.
     """
 
-    def execute(self) -> None:
+    @property
+    def _action_plan(self) -> PlanNode:
         arm = ViewManager.get_arm_view(self.arm, self.robot)
         end_effector = arm.end_effector
 
@@ -61,17 +63,17 @@ class OpenAction(ActionDescription):
             end_effector,
         )
 
-        self.add_subplan(
-            sequential(
-                [
-                    GraspingAction(self.object_designator, self.arm, grasp_description),
-                    OpeningMotion(self.object_designator, self.arm),
-                    MoveGripperMotion(
-                        GripperState.OPEN, self.arm, allow_gripper_collision=True
-                    ),
-                ]
-            )
-        ).perform()
+        return sequential(
+            [
+                GraspingAction(
+                    self.object_designator, self.arm, grasp_description
+                ).action_plan_for_context(self.context),
+                OpeningMotion(self.object_designator, self.arm),
+                MoveGripperMotion(
+                    GripperState.OPEN, self.arm, allow_gripper_collision=True
+                ),
+            ]
+        )
 
     @staticmethod
     def pre_condition(
@@ -145,7 +147,8 @@ class CloseAction(ActionDescription):
     The distance in meters between the gripper and the handle before approaching to grasp.
     """
 
-    def execute(self) -> None:
+    @property
+    def _action_plan(self) -> PlanNode:
         arm = ViewManager.get_arm_view(self.arm, self.robot)
         end_effector = arm.end_effector
 
@@ -155,17 +158,17 @@ class CloseAction(ActionDescription):
             end_effector,
         )
 
-        self.add_subplan(
-            sequential(
-                [
-                    GraspingAction(self.object_designator, self.arm, grasp_description),
-                    ClosingMotion(self.object_designator, self.arm),
-                    MoveGripperMotion(
-                        GripperState.OPEN, self.arm, allow_gripper_collision=True
-                    ),
-                ]
-            )
-        ).perform()
+        return sequential(
+            [
+                GraspingAction(
+                    self.object_designator, self.arm, grasp_description
+                ).action_plan_for_context(self.context),
+                ClosingMotion(self.object_designator, self.arm),
+                MoveGripperMotion(
+                    GripperState.OPEN, self.arm, allow_gripper_collision=True
+                ),
+            ]
+        )
 
     @staticmethod
     def post_condition(

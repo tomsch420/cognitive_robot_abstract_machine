@@ -84,8 +84,7 @@ class LookAtAction(ActionDescription):
     Camera that should be looking at the target
     """
 
-    def execute(self) -> None:
+    @property
+    def _action_plan(self) -> PlanNode:
         camera = self.camera or self.robot.get_default_camera()
-        self.add_subplan(
-            execute_single(LookingMotion(target=self.target, camera=camera))
-        ).perform()
+        return execute_single(LookingMotion(target=self.target, camera=camera))

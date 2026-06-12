@@ -273,22 +273,21 @@ class GraspingAction(ActionDescription):
     The distance in meters the gripper should be at before grasping the object
     """
 
-    def execute(self) -> None:
+    @property
+    def _action_plan(self) -> PlanNode:
         pre_pose, grasp_pose, _ = self.grasp_description.grasp_pose_sequence(
             self.object_designator
         )
 
-        self.add_subplan(
-            sequential(
-                [
-                    MoveToolCenterPointMotion(pre_pose, self.arm),
-                    MoveGripperMotion(GripperState.OPEN, self.arm),
-                    MoveToolCenterPointMotion(
-                        grasp_pose, self.arm, allow_gripper_collision=True
-                    ),
-                    MoveGripperMotion(
-                        GripperState.CLOSE, self.arm, allow_gripper_collision=True
-                    ),
-                ]
-            )
-        ).perform()
+        return sequential(
+            [
+                MoveToolCenterPointMotion(pre_pose, self.arm),
+                MoveGripperMotion(GripperState.OPEN, self.arm),
+                MoveToolCenterPointMotion(
+                    grasp_pose, self.arm, allow_gripper_collision=True
+                ),
+                MoveGripperMotion(
+                    GripperState.CLOSE, self.arm, allow_gripper_collision=True
+                ),
+            ]
+        )

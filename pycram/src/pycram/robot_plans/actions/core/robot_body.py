@@ -77,13 +77,12 @@ class SetGripperAction(ActionDescription):
     The motion that should be set on the gripper
     """
 
-    def execute(self) -> None:
+    @property
+    def _action_plan(self) -> PlanNode:
         arms = [Arms.LEFT, Arms.RIGHT] if self.gripper == Arms.BOTH else [self.gripper]
-        self.add_subplan(
-            sequential(
-                [MoveGripperMotion(gripper=arm, motion=self.motion) for arm in arms]
-            )
-        ).perform()
+        return sequential(
+            [MoveGripperMotion(gripper=arm, motion=self.motion) for arm in arms]
+        )
 
 
 @dataclass
@@ -97,12 +96,13 @@ class ParkArmsAction(ActionDescription):
     Entry from the enum for which arm should be parked.
     """
 
-    def execute(self) -> None:
+    @property
+    def _action_plan(self) -> PlanNode:
         joint_names, joint_poses = self.get_joint_poses()
 
-        self.add_subplan(
-            execute_single(MoveJointsMotion(names=joint_names, positions=joint_poses))
-        ).perform()
+        return execute_single(
+            MoveJointsMotion(names=joint_names, positions=joint_poses)
+        )
 
     def get_joint_poses(self) -> Tuple[List[str], List[float]]:
         """
@@ -219,7 +219,8 @@ class FollowToolCenterPointPathAction(ActionDescription):
     Entry from the enum for which arm should be parked.
     """
 
-    def execute(self) -> None:
+    @property
+    def _action_plan(self) -> PlanNode:
         target_locations = list(self.target_locations.poses)
 
         motion = MoveTCPWaypointsMotion(
@@ -228,7 +229,7 @@ class FollowToolCenterPointPathAction(ActionDescription):
             allow_gripper_collision=True,
         )
 
-        self.add_subplan(execute_single(motion)).perform()
+        return execute_single(motion)
 
     def validate(
         self,
@@ -259,16 +260,15 @@ class MoveManipulatorAction(ActionDescription):
     If the gripper can collide with something.
     """
 
-    def execute(self):
-        self.add_subplan(
-            execute_single(
-                MoveManipulatorMotion(
-                    self.target_pose,
-                    self.end_effector,
-                    self.allow_gripper_collision,
-                )
+    @property
+    def _action_plan(self) -> PlanNode:
+        return execute_single(
+            MoveManipulatorMotion(
+                self.target_pose,
+                self.end_effector,
+                self.allow_gripper_collision,
             )
-        ).perform()
+        )
 
     @staticmethod
     def post_condition(
