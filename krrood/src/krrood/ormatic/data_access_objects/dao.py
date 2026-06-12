@@ -1095,8 +1095,10 @@ def selectin_loading(session: sqlalchemy.orm.Session):
     """
 
     def _add_selectin(orm_execute_state) -> None:
-        if not orm_execute_state.is_relationship_load:
-            orm_execute_state.user_defined_options += (selectinload("*"),)
+        if orm_execute_state.is_select and not orm_execute_state.is_relationship_load:
+            return orm_execute_state.invoke_statement(
+                statement=orm_execute_state.statement.options(selectinload("*"))
+            )
 
     event.listen(session, "do_orm_execute", _add_selectin)
     try:

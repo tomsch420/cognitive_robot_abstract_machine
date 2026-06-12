@@ -11,6 +11,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import sessionmaker
 
 import coraplex.orm.ormatic_interface  # type: ignore  # noqa: F401
+from coraplex.datastructures.dataclasses import Context
+from coraplex.motion_executor import simulated_robot
+from coraplex.orm.ormatic_interface import Base, PlanMappingDAO  # type: ignore
+from coraplex.plans.factories import sequential
+from coraplex.robot_plans.actions.core.navigation import NavigateAction
+from coraplex.robot_plans.actions.core.robot_body import MoveTorsoAction, ParkArmsAction
 from experiments.experiment_definitions import (
     ExperimentResult,
     ExperimentsTable,
@@ -19,15 +25,11 @@ from experiments.experiment_definitions import (
 )
 from krrood.entity_query_language.backends import ProbabilisticBackend
 from krrood.entity_query_language.factories import underspecified
+from krrood.ormatic.data_access_objects.dao import selectin_loading
 from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.ormatic.utils import create_engine, drop_database
-from coraplex.datastructures.dataclasses import Context
-from coraplex.motion_executor import simulated_robot
-from coraplex.orm.ormatic_interface import Base, PlanMappingDAO  # type: ignore
-from coraplex.plans.factories import sequential
-from coraplex.robot_plans.actions.core.navigation import NavigateAction
-from coraplex.robot_plans.actions.core.robot_body import MoveTorsoAction, ParkArmsAction
 from semantic_digital_twin.adapters.urdf import URDFParser
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.spatial_types.spatial_types import Pose
@@ -37,7 +39,6 @@ from semantic_digital_twin.world_description.connections import (
     OmniDrive,
 )
 from semantic_digital_twin.world_description.world_entity import Body
-from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 
 _REPO_ROOT = pathlib.Path(__file__).parents[4]
 _APARTMENT_URDF = _REPO_ROOT / "coraplex" / "resources" / "worlds" / "apartment.urdf"
@@ -180,7 +181,8 @@ def reliability_experiment(
     writing_to_database_duration = time.perf_counter() - t0
 
     t0 = time.perf_counter()
-    fetched = session.scalars(select(PlanMappingDAO)).one()
+    with selectin_loading(session):
+        fetched = session.scalars(select(PlanMappingDAO)).one()
     reading_from_database_duration = time.perf_counter() - t0
 
     t0 = time.perf_counter()

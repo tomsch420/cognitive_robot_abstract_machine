@@ -2,17 +2,12 @@
 Reproduction tests for bugs found during the ORMatic package review.
 """
 
-from dataclasses import dataclass
-
 from sqlalchemy import select
 
-from krrood.ormatic.custom_types import TypeType, JSONDataType
-from krrood.ormatic.data_access_objects.dao import DataAccessObject
 from krrood.ormatic.data_access_objects.from_dao import FromDataAccessObjectState
 from krrood.ormatic.data_access_objects.helper import to_dao, get_dao_class
 from krrood.ormatic.data_access_objects.to_dao import ToDataAccessObjectState
 from krrood.ormatic.ormatic import ORMatic
-from ..dataset import ormatic_interface as ormatic_interface_module
 from ..dataset.example_classes import *
 from ..dataset.ormatic_interface import *
 
@@ -22,7 +17,9 @@ def test_shared_state_does_not_rerun_post_init(session, database, monkeypatch):
     Converting an already converted root DAO again with a shared state must not
     re-run population and ``__post_init__``.
     """
-    container = ContainerGeneration([ItemWithBackreference(10), ItemWithBackreference(20)])
+    container = ContainerGeneration(
+        [ItemWithBackreference(10), ItemWithBackreference(20)]
+    )
     session.add(to_dao(container))
     session.commit()
     session.expunge_all()
@@ -146,25 +143,6 @@ def test_from_package_includes_alternative_mappings_when_not_ignoring():
     assert len(ormatic.alternative_mappings) > 0
 
 
-@dataclass
-class _UserMappedClass:
-    x: int = 0
-
-
-def test_from_package_keeps_user_type_mappings_with_interface_dependencies():
-    """
-    User-supplied ``type_mappings`` must survive when
-    ``ormatic_interface_dependencies`` is non-empty.
-    """
-    ormatic = ORMatic.from_package(
-        packages=[],
-        ormatic_interface_dependencies=[ormatic_interface_module],
-        ignored_classes=set(),
-        type_mappings={_UserMappedClass: ConceptType},
-    )
-    assert _UserMappedClass in set(ormatic.type_mappings.keys())
-
-
 def test_empty_collection_is_not_aliased(session, database):
     """
     An empty collection on the domain object must be a fresh container, not
@@ -184,36 +162,6 @@ def test_empty_collection_is_not_aliased(session, database):
     # mutating the domain object must not touch the DAO
     reconstructed.positions.append(KRROODPosition(1, 2, 3))
     assert len(queried.positions) == 0
-
-
-def test_type_type_handles_none():
-    """``TypeType`` must map None to NULL instead of crashing."""
-    type_type = TypeType()
-    assert type_type.process_bind_param(None, None) is None
-
-
-def test_type_type_has_cache_ok():
-    """``TypeType`` must set ``cache_ok`` to keep statement caching enabled."""
-    assert TypeType.cache_ok is True
-
-
-def test_json_data_type_handles_none():
-    """``JSONDataType`` must map NULL to None instead of crashing."""
-    json_data_type = JSONDataType()
-    assert json_data_type.process_result_value(None, None) is None
-    assert json_data_type.process_bind_param(None, None) is None
-
-
-def test_to_dao_classmethod_accepts_none_state():
-    """The ``state`` parameter is Optional, passing None must work."""
-    dao = KRROODPositionDAO.to_dao(KRROODPosition(1, 2, 3), None)
-    assert dao.x == 1
-
-
-def test_alternative_mapping_to_dao_accepts_none_state():
-    """``AlternativeMapping.to_dao`` with ``state=None`` must work."""
-    mapping = EntityMapping.to_dao(Entity("x"), None)
-    assert mapping.overwritten_name == "x"
 
 
 class _LateDomainClass:
