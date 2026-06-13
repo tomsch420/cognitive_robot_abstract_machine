@@ -595,39 +595,39 @@ class RotationMatrix(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         return cls(s, reference_frame=reference_frame)
 
     @classmethod
+    def _from_constant_quaternion(cls, q: Quaternion) -> RotationMatrix:
+        """
+        Build a rotation matrix from a constant (fully numeric) quaternion.
+
+        Uses numpy arithmetic instead of the symbolic CasADi path.  The
+        symbolic path in :meth:`from_quaternion` constructs ~36 CasADi
+        sub-expressions even for constant inputs; evaluating them in numpy is
+        an order of magnitude faster and covers the common case for values
+        loaded from a database.
+
+        :param q: A constant quaternion (``q._casadi_sx.is_constant()`` must be True).
+        :return: The corresponding rotation matrix.
+        """
+        x, y, z, w = q.to_np().ravel()
+        x2, y2, z2, w2 = x * x, y * y, z * z, w * w
+        data = np.array(
+            [
+                [w2 + x2 - y2 - z2, 2 * x * y - 2 * w * z, 2 * x * z + 2 * w * y, 0],
+                [2 * x * y + 2 * w * z, w2 - x2 + y2 - z2, 2 * y * z - 2 * w * x, 0],
+                [2 * x * z - 2 * w * y, 2 * y * z + 2 * w * x, w2 - x2 - y2 + z2, 0],
+                [0, 0, 0, 1],
+            ]
+        )
+        return cls(data=data, reference_frame=q.reference_frame)
+
+    @classmethod
     def from_quaternion(cls, q: Quaternion) -> RotationMatrix:
         """
         Unit quaternion to 4x4 rotation matrix according to:
         https://github.com/orocos/orocos_kinematics_dynamics/blob/master/orocos_kdl/src/frames.cpp#L167
         """
         if q._casadi_sx.is_constant():
-            # compute numerically to avoid building ~36 symbolic expressions per call
-            x, y, z, w = q.to_np().ravel()
-            x2, y2, z2, w2 = x * x, y * y, z * z, w * w
-            data = np.array(
-                [
-                    [
-                        w2 + x2 - y2 - z2,
-                        2 * x * y - 2 * w * z,
-                        2 * x * z + 2 * w * y,
-                        0,
-                    ],
-                    [
-                        2 * x * y + 2 * w * z,
-                        w2 - x2 + y2 - z2,
-                        2 * y * z - 2 * w * x,
-                        0,
-                    ],
-                    [
-                        2 * x * z - 2 * w * y,
-                        2 * y * z + 2 * w * x,
-                        w2 - x2 - y2 + z2,
-                        0,
-                    ],
-                    [0, 0, 0, 1],
-                ]
-            )
-            return cls(data=data, reference_frame=q.reference_frame)
+            return cls._from_constant_quaternion(q)
         x = q[0]
         y = q[1]
         z = q[2]
@@ -1719,11 +1719,20 @@ class Quaternion(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         """
         return self.conjugate().multiply(q)
 
+    def _normalize_numerically(self) -> None:
+        """
+        Normalize this quaternion in-place using numpy arithmetic.
+
+        Called by :meth:`normalize` when the quaternion is constant.  Using
+        numpy avoids constructing symbolic CasADi expressions, which is
+        substantially faster for values loaded from a database.
+        """
+        values = self.to_np().ravel()
+        self._casadi_sx = ca.SX(ca.DM(values / np.linalg.norm(values)))
+
     def normalize(self) -> None:
         if self._casadi_sx.is_constant():
-            # normalize numerically to avoid building symbolic expressions
-            values = self.to_np().ravel()
-            self._casadi_sx = ca.SX(ca.DM(values / np.linalg.norm(values)))
+            self._normalize_numerically()
             return
         norm_ = self.to_generic_vector().norm()
         self.x /= norm_

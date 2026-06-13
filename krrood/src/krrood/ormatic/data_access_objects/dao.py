@@ -4,6 +4,7 @@ import logging
 import threading
 from contextlib import contextmanager
 from dataclasses import dataclass, fields
+from enum import StrEnum
 from functools import lru_cache
 
 import sqlalchemy.inspection
@@ -166,6 +167,40 @@ class DataAccessObjectConversionPlan:
     """
 
 
+def _build_single_relationship(
+    relationship: RelationshipProperty, domain_type: Type
+) -> SingleRelationship:
+    """
+    Build a :class:`SingleRelationship` descriptor from a SQLAlchemy relationship property.
+
+    For many-to-one relationships the local foreign key column is recorded as
+    ``foreign_key_attribute``.  During ``from_dao`` this lets
+    :func:`_read_single_relationship` resolve the related instance via
+    ``Session.get`` (an identity-map lookup) instead of triggering a lazy load.
+    SQLAlchemy disables its built-in identity-map shortcut (``use_get``) for
+    targets deep in joined-table inheritance hierarchies, so without this
+    explicit FK read every many-to-one access on an unloaded attribute would
+    emit a separate SELECT.
+
+    :param relationship: The SQLAlchemy relationship property to inspect.
+    :param domain_type: The expected domain type of the related object.
+    :return: A :class:`SingleRelationship` ready for use in a
+        :class:`DataAccessObjectConversionPlan`.
+    """
+    local_columns = list(relationship.local_columns)
+    foreign_key_attribute = (
+        local_columns[0].key
+        if relationship.direction == MANYTOONE and len(local_columns) == 1
+        else None
+    )
+    return SingleRelationship(
+        key=relationship.key,
+        domain_type=domain_type,
+        foreign_key_attribute=foreign_key_attribute,
+        target_dao_class=relationship.mapper.class_,
+    )
+
+
 @lru_cache(maxsize=None)
 def _get_conversion_plan(dao_class: Type) -> DataAccessObjectConversionPlan:
     """
@@ -175,25 +210,6 @@ def _get_conversion_plan(dao_class: Type) -> DataAccessObjectConversionPlan:
     :return: The conversion plan.
     """
     mapper: sqlalchemy.orm.Mapper = sqlalchemy.inspection.inspect(dao_class)
-
-    def _build_single_relationship(
-        relationship: RelationshipProperty, domain_type: Type
-    ) -> SingleRelationship:
-        # Resolving via the local foreign key + Session.get() hits the identity
-        # map; plain attribute access would emit one SELECT per access because
-        # use_get is disabled for targets deep in joined-table inheritance.
-        local_columns = list(relationship.local_columns)
-        foreign_key_attribute = (
-            local_columns[0].key
-            if relationship.direction == MANYTOONE and len(local_columns) == 1
-            else None
-        )
-        return SingleRelationship(
-            key=relationship.key,
-            domain_type=domain_type,
-            foreign_key_attribute=foreign_key_attribute,
-            target_dao_class=relationship.mapper.class_,
-        )
 
     single_relationships = []
     collection_relationships = []
@@ -361,8 +377,12 @@ def _has_post_init(clazz: Type) -> bool:
     return hasattr(clazz, "__post_init__")
 
 
-_BULK_LOADING_FLAG = "krrood_bulk_loading"
-_BULK_LOADED_MAPPERS = "krrood_bulk_loaded_mappers"
+class _SessionInfoKey(StrEnum):
+    """Session-info keys written into ``Session.info`` by the krrood ORM layer."""
+
+    BULK_LOADING_FLAG = "krrood_bulk_loading"
+    BULK_LOADED_MAPPERS = "krrood_bulk_loaded_mappers"
+    PLAIN_LOAD = "krrood_plain_load"
 
 
 def _bulk_load_target_table_if_enabled(
@@ -379,16 +399,18 @@ def _bulk_load_target_table_if_enabled(
     :param session: The session to load into.
     :param target_dao_class: The DAO class about to be fetched.
     """
-    if not session.info.get(_BULK_LOADING_FLAG, False):
+    if not session.info.get(_SessionInfoKey.BULK_LOADING_FLAG, False):
         return
     root_mapper = sqlalchemy.inspection.inspect(target_dao_class).base_mapper
-    loaded = session.info.setdefault(_BULK_LOADED_MAPPERS, {})
+    loaded = session.info.setdefault(_SessionInfoKey.BULK_LOADED_MAPPERS, {})
     if root_mapper in loaded:
         return
     # keep strong references to the rows: the identity map is weak, so the
     # instances would be garbage collected (and the map emptied) otherwise
     loaded[root_mapper] = session.scalars(
-        sqlalchemy.select(root_mapper.class_).execution_options(krrood_plain_load=True)
+        sqlalchemy.select(root_mapper.class_).execution_options(
+            **{_SessionInfoKey.PLAIN_LOAD: True}
+        )
     ).all()
 
 
@@ -421,7 +443,7 @@ def _read_single_relationship(
         session.get(
             relationship.target_dao_class,
             foreign_key_value,
-            execution_options={"krrood_plain_load": True},
+            execution_options={_SessionInfoKey.PLAIN_LOAD: True},
         )
         if foreign_key_value is not None
         else None
@@ -1222,7 +1244,7 @@ def selectin_loading(session: sqlalchemy.orm.Session):
     """
 
     def _add_selectin(orm_execute_state: sqlalchemy.orm.ORMExecuteState) -> None:
-        if orm_execute_state.execution_options.get("krrood_plain_load", False):
+        if orm_execute_state.execution_options.get(_SessionInfoKey.PLAIN_LOAD, False):
             return None
         if orm_execute_state.is_select and not orm_execute_state.is_relationship_load:
             return orm_execute_state.invoke_statement(
@@ -1230,10 +1252,10 @@ def selectin_loading(session: sqlalchemy.orm.Session):
             )
 
     event.listen(session, "do_orm_execute", _add_selectin)
-    session.info[_BULK_LOADING_FLAG] = True
+    session.info[_SessionInfoKey.BULK_LOADING_FLAG] = True
     try:
         yield
     finally:
-        session.info[_BULK_LOADING_FLAG] = False
-        session.info.pop(_BULK_LOADED_MAPPERS, None)
+        session.info[_SessionInfoKey.BULK_LOADING_FLAG] = False
+        session.info.pop(_SessionInfoKey.BULK_LOADED_MAPPERS, None)
         event.remove(session, "do_orm_execute", _add_selectin)
