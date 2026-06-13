@@ -4,26 +4,28 @@ import os
 import sys
 import weakref
 from collections import defaultdict
-from dataclasses import dataclass, field, InitVar
+from dataclasses import InitVar, dataclass, field
 
 from rustworkx import PyDiGraph
 from typing_extensions import (
+    TYPE_CHECKING,
     Any,
-    Iterable,
-    Optional,
-    List,
-    Type,
-    Dict,
-    DefaultDict,
     Callable,
     ClassVar,
-    TypeVar,
+    DefaultDict,
+    Dict,
+    Iterable,
     Iterator,
-    TYPE_CHECKING,
+    List,
+    Optional,
+    Type,
+    TypeVar,
 )
 
 if TYPE_CHECKING:
-    from krrood.entity_query_language.explanation.explanation import InferenceExplanation
+    from krrood.entity_query_language.explanation.explanation import (
+        InferenceExplanation,
+    )
 
 from krrood import logger
 from krrood.class_diagrams.class_diagram import ClassDiagram
@@ -43,6 +45,12 @@ class Symbol:
     _cache_instances_: ClassVar[bool] = True
     """
     Whether instances of this class should be cached or not in the symbol graph.
+    """
+    _inference_explanation_: Optional[InferenceExplanation] = field(
+        default=None, init=False, repr=False
+    )
+    """If this symbol was inferred, this field can contain an explanation of how it
+     was inferred.
     """
 
     def __new__(cls, *args, **kwargs):
