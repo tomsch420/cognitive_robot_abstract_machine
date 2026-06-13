@@ -5,15 +5,17 @@ from dataclasses import dataclass
 
 from typing_extensions import Generic, TypeVar
 
-N = TypeVar("N")
-"""The EQL node type the planner analyses."""
+from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 
-P = TypeVar("P")
-"""The plan (data record) the planner produces."""
+TSymbolicExpression = TypeVar("TSymbolicExpression", bound=SymbolicExpression)
+"""The EQL node type the assembler realises."""
+
+TPlan = TypeVar("TPlan")
+"""The plan (data record) the assembler realises."""
 
 
 @dataclass
-class Planner(ABC, Generic[N, P]):
+class Planner(ABC, Generic[TSymbolicExpression, TPlan]):
     """
     Pure analysis of a single EQL *node* into a plan of type ``P``.
 
@@ -25,9 +27,9 @@ class Planner(ABC, Generic[N, P]):
     microplanning vs. surface realisation.
     """
 
-    node: N
+    node: TSymbolicExpression
     """The EQL expression being analysed."""
 
     @abstractmethod
-    def plan(self) -> P:
+    def plan(self) -> TPlan:
         """:return: The plan computed from the node."""

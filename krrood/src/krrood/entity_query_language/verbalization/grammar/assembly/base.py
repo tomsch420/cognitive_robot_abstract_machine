@@ -3,21 +3,15 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
-from typing_extensions import ClassVar, Generic, Optional, Type, TypeVar
+from typing_extensions import ClassVar, Generic, Optional, Type
 
 from krrood.entity_query_language.verbalization.fragments.base import Fragment
 from krrood.entity_query_language.verbalization.grammar.phrase_rule import RuleContext
-from krrood.entity_query_language.verbalization.grammar.planning.base import Planner
-
-N = TypeVar("N")
-"""The EQL node type the assembler realises."""
-
-P = TypeVar("P")
-"""The plan (data record) the assembler realises."""
+from krrood.entity_query_language.verbalization.grammar.planning.base import Planner, TSymbolicExpression, TPlan
 
 
 @dataclass
-class Assembler(ABC, Generic[N, P]):
+class Assembler(ABC, Generic[TSymbolicExpression, TPlan]):
     """
     Realise an EQL *node* into a fragment, planning it first via the paired planner.
 
@@ -35,14 +29,14 @@ class Assembler(ABC, Generic[N, P]):
     planner: ClassVar[Optional[Type[Planner]]] = None
     """The paired planner (set per family); ``None`` for realisation-only assemblers."""
 
-    def plan(self, node: N) -> Optional[P]:
+    def plan(self, node: TSymbolicExpression) -> Optional[TPlan]:
         """
         :param node: The node to plan.
         :return: The plan from the paired planner, or ``None`` when there is nothing to plan.
         """
         return self.planner(node).plan() if self.planner is not None else None
 
-    def assemble(self, node: N) -> Fragment:
+    def assemble(self, node: TSymbolicExpression) -> Fragment:
         """
         Plan *node*, then realise the plan.
 
@@ -52,7 +46,7 @@ class Assembler(ABC, Generic[N, P]):
         return self.realize(node, self.plan(node))
 
     @abstractmethod
-    def realize(self, node: N, plan: P) -> Fragment:
+    def realize(self, node: TSymbolicExpression, plan: TPlan) -> Fragment:
         """
         :param node: The node to realise.
         :param plan: The plan computed for *node* (``None`` for realisation-only assemblers).
