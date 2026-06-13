@@ -26,11 +26,8 @@ from typing_extensions import (
 
 from krrood.class_diagrams.exceptions import MissingContainedTypeOfContainer
 from krrood.class_diagrams.utils import (
+    ROLE_TAKER_METADATA_KEY,
     behaves_like_a_built_in_type,
-    get_type_hints_of_object,
-)
-from krrood.class_diagrams.utils import (
-    behaves_like_a_built_in_class,
     common_base_class,
     get_type_hints_of_object,
 )
@@ -266,12 +263,7 @@ class WrappedField:
 
     @cached_property
     def is_role_taker(self) -> bool:
-        return (
-            self.is_one_to_one_relationship
-            and not self.is_optional
-            and self.field.default == MISSING
-            and self.field.default_factory == MISSING
-        )
+        return self.field.metadata.get(ROLE_TAKER_METADATA_KEY, False)
 
     @property
     def type_name(self) -> str:

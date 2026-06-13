@@ -60,6 +60,7 @@ def behaves_like_a_built_in_type(
         or (inspect.isclass(clazz) and issubclass(clazz, Enum))
     )
 
+
 def common_base_class(types: List[Type]) -> Optional[Type]:
     """
     Return the lowest common ancestor of *types*, or ``None`` if the only
@@ -80,6 +81,7 @@ def common_base_class(types: List[Type]) -> Optional[Type]:
         if cls in common and cls is not object:
             return cls
     return None
+
 
 def is_builtin_class(clazz: Type) -> bool:
     return clazz.__module__ == "builtins"
@@ -146,6 +148,16 @@ def resolve_name_in_hierarchy(name: str, start_object: Any) -> Any:
 
 
 T = TypeVar("T")
+
+
+ROLE_TAKER_METADATA_KEY = "krrood_role_taker"
+"""
+Dataclass field-metadata key that marks a field as the role taker of a role.
+
+Defined here, in a low-level module imported by both :mod:`krrood.patterns.role` and
+:mod:`krrood.class_diagrams.wrapped_field`, so the role pattern and the class-diagram
+detection share a single source of truth without importing each other.
+"""
 
 
 def _trace_generic_params(cls: type, generic_base: type):
@@ -615,7 +627,9 @@ def same_package(module_a: str, module_b: str) -> bool:
     return bool(top_a) and top_a == top_b
 
 
-def mixin_module_dotted_name(module_dotted_name: str, mixin_folder: str, suffix: str) -> str:
+def mixin_module_dotted_name(
+    module_dotted_name: str, mixin_folder: str, suffix: str
+) -> str:
     """Return the fully-qualified module name for a generated mixin module.
 
     :param module_dotted_name: The dotted module name of the source module.
