@@ -12,6 +12,8 @@ from krrood.entity_query_language.verbalization.context import MicroplanningServ
 from krrood.entity_query_language.verbalization.fragments.base import WordFragment
 from krrood.entity_query_language.verbalization.grammar.assembly.restrictions import (
     RestrictionAssembler,
+)
+from krrood.entity_query_language.verbalization.exceptions import (
     UnplacedRestrictionError,
 )
 from krrood.entity_query_language.verbalization.grammar.phrase_rule import RuleContext
@@ -28,7 +30,9 @@ from krrood.entity_query_language.verbalization.grammar.restriction import (
 
 
 def _rule_context() -> RuleContext:
-    return RuleContext(child=lambda node, number=None: node, services=MicroplanningServices())
+    return RuleContext(
+        child=lambda node, number=None: node, services=MicroplanningServices()
+    )
 
 
 def test_every_restriction_rule_declares_a_placement():

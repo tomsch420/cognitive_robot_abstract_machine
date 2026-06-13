@@ -49,7 +49,8 @@ class GroupedByAssembler(Assembler[Union[Query, GroupedBy], GroupPlan]):
             return Keywords.GROUPED.as_fragment()
         groups_phrase = self._keys_phrase(plan.keys)
         aggregated_fragments = [
-            self.context.child(expression, number=Number.PLURAL) for expression in plan.aggregated
+            self.context.child(expression, number=Number.PLURAL)
+            for expression in plan.aggregated
         ]
         if aggregated_fragments and not isinstance(node, SetOf):
             aggregated_phrase = oxford_and(

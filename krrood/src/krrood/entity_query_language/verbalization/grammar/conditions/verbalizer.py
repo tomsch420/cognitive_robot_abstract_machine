@@ -85,7 +85,9 @@ class ConditionVerbalizer(Assembler[Comparator, None]):
             ]
         )
 
-    def superlative_modifier(self, comparator: Comparator, subject: Variable) -> Fragment:
+    def superlative_modifier(
+        self, comparator: Comparator, subject: Variable
+    ) -> Fragment:
         """
         :param comparator: The ``subject.<chain> == max/min(over all <Type>.<chain>)`` comparator.
         :param subject: The subject variable.

@@ -56,9 +56,9 @@ class RestrictionPlan:
     where its rendering lands.  An unmatched conjunct is residual and stays in a *"such that …"*
     clause."""
 
-    matched: List[Tuple[Type[RestrictionRule], Union[SymbolicExpression, RangeFold]]] = (
-        field(default_factory=list)
-    )
+    matched: List[
+        Tuple[Type[RestrictionRule], Union[SymbolicExpression, RangeFold]]
+    ] = field(default_factory=list)
     """``(rule, folded item)`` pairs — the rule renders each into its declared placement."""
 
     residual: List[Union[SymbolicExpression, RangeFold]] = field(default_factory=list)
@@ -187,7 +187,9 @@ class QueryPlanner(Planner[Query, QueryPlan]):
         """:return: The WHERE folded into range pairs and split per conjunct into a rule-matched
         restriction (the rule's placement decides its slot) or the residual *"such that …"*
         clause."""
-        matched: List[Tuple[Type[RestrictionRule], Union[SymbolicExpression, RangeFold]]] = []
+        matched: List[
+            Tuple[Type[RestrictionRule], Union[SymbolicExpression, RangeFold]]
+        ] = []
         residual: List[Union[SymbolicExpression, RangeFold]] = []
         for item in fold_range_pairs(flatten_operands(condition, AND)):
             rule = match_restriction(item, subject)

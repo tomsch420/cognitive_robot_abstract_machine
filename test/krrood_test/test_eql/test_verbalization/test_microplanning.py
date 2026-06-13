@@ -18,7 +18,9 @@ from krrood.entity_query_language.verbalization.fragments.base import (
 from krrood.entity_query_language.verbalization.microplanning.binding_scope import (
     BindingScope,
 )
-from krrood.entity_query_language.verbalization.microplanning.config import RenderConfiguration
+from krrood.entity_query_language.verbalization.microplanning.config import (
+    RenderConfiguration,
+)
 from krrood.entity_query_language.verbalization.microplanning.coordination import (
     build_between,
     has_pair,

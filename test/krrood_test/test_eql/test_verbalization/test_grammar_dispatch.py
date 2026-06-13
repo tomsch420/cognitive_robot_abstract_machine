@@ -9,8 +9,8 @@ from __future__ import annotations
 import pytest
 
 from krrood.entity_query_language.verbalization.context import MicroplanningServices
-from krrood.entity_query_language.verbalization.engine import (
-    fold,
+from krrood.entity_query_language.verbalization.engine import fold
+from krrood.entity_query_language.verbalization.exceptions import (
     UnverbalizableExpressionError,
 )
 from krrood.entity_query_language.verbalization.fragments.base import (
@@ -122,7 +122,9 @@ def test_fold_child_re_enters_the_fold():
         _custom(
             Mid,
             "parent",
-            lambda node, context: PhraseFragment([WordFragment("p"), context.child(child)]),
+            lambda node, context: PhraseFragment(
+                [WordFragment("p"), context.child(child)]
+            ),
         ),
         _custom(Other, "child", lambda node, context: WordFragment("c")),
     ]

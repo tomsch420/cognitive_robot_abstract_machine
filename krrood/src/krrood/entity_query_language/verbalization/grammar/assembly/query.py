@@ -233,7 +233,8 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
         find_header: Optional[Fragment] = None,
     ) -> Fragment:
         """:return: *"Find <selection>"* + the present clauses (*such that … grouped by … having
-        … ordered by …*) as block items — absent clauses (``None``) are simply skipped."""
+        … ordered by …*) as block items — absent clauses (``None``) are simply skipped.
+        """
         if find_header is None:
             find_header = Keywords.FIND.as_fragment()
         header = PhraseFragment(parts=[find_header, selection])

@@ -105,7 +105,9 @@ class InferenceAssembler(Assembler[Entity, RuleStructure]):
         )
 
     @staticmethod
-    def _antecedent_referent_id(antecedent: AntecedentInformation) -> Optional[uuid.UUID]:
+    def _antecedent_referent_id(
+        antecedent: AntecedentInformation,
+    ) -> Optional[uuid.UUID]:
         """
         :return: The antecedent's canonical referent id — the selected variable for an entity
             root, else the root's own id (matching the variable the THEN-clause chains reference).

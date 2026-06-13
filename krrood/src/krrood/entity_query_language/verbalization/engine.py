@@ -11,16 +11,12 @@ from krrood.entity_query_language.verbalization.grammar.phrase_rule import (
     select,
 )
 from krrood.entity_query_language.verbalization.grammar.english import RULES
+from krrood.entity_query_language.verbalization.exceptions import (
+    UnverbalizableExpressionError,
+)
 
 if TYPE_CHECKING:
     from krrood.entity_query_language.verbalization.context import MicroplanningServices
-
-
-class UnverbalizableExpressionError(TypeError):
-    """
-    No grammar rule covers an EQL construct — a coverage gap, surfaced as an error rather
-    than silently degrading the node to its class name.
-    """
 
 
 def fold(
@@ -66,10 +62,7 @@ def fold(
 
     rule = select(node, rules, context)
     if rule is None:
-        raise UnverbalizableExpressionError(
-            f"No verbalization rule for {type(node).__name__!r} "
-            f"(name={getattr(node, '_name_', None)!r}); add a PhraseRule in grammar/english.py."
-        )
+        raise UnverbalizableExpressionError(node=node)
     if rule.enters_query_scope:
         # The rule's construct is a query body: everything built inside sees query_depth >= 1,
         # so a nested Entity renders as a noun phrase. Declared on the rule (not pushed by hand

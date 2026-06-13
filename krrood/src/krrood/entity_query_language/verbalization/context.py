@@ -9,7 +9,9 @@ from krrood.entity_query_language.core.base_expressions import SymbolicExpressio
 from krrood.entity_query_language.verbalization.microplanning.binding_scope import (
     BindingScope,
 )
-from krrood.entity_query_language.verbalization.microplanning.config import RenderConfiguration
+from krrood.entity_query_language.verbalization.microplanning.config import (
+    RenderConfiguration,
+)
 from krrood.entity_query_language.verbalization.microplanning.referring import (
     ReferringExpressions,
 )

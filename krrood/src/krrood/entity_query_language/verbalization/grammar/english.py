@@ -412,7 +412,9 @@ class InferenceRuleRule(PhraseRule):
     tiebreak = 1  # beats TopLevelEntityRule when both match (same construct + depth 0)
 
     def when(self, node: Entity, context: RuleContext) -> bool:
-        return context.configuration.query_depth == 0 and InferencePlanner.can_handle(node)
+        return context.configuration.query_depth == 0 and InferencePlanner.can_handle(
+            node
+        )
 
     def build(self, node: Entity, context: RuleContext) -> Fragment:
         return InferenceAssembler(context).assemble(node)

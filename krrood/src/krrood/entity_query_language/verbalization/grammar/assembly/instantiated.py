@@ -58,7 +58,9 @@ class InstantiatedAssembler(Assembler[InstantiatedVariable, InstantiatedPlan]):
         binding_fragments, overrides = self._bindings(plan, node._type_)
         self.context.scope.binding_overrides.update(overrides)
         deferred = self.context.scope.pop_constraint_frame()
-        constraint_fragments = [self.context.child(expression) for expression in deferred]
+        constraint_fragments = [
+            self.context.child(expression) for expression in deferred
+        ]
 
         return self._phrase(
             node, plan.type_name, binding_fragments, constraint_fragments

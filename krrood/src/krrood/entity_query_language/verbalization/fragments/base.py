@@ -12,6 +12,7 @@ from krrood.entity_query_language.verbalization.fragments.features import (
 )
 from krrood.entity_query_language.verbalization.fragments.roles import SemanticRole
 from krrood.entity_query_language.verbalization.fragments.source_ref import SourceRef
+from krrood.entity_query_language.verbalization.exceptions import UnloweredFragmentError
 
 _T = TypeVar("_T")
 
@@ -70,7 +71,10 @@ class RoleFragment(HasText, HasNumber, Fragment):
 
     @classmethod
     def for_variable(
-        cls, label: str, expression: SymbolicExpression, number: Number = Number.SINGULAR
+        cls,
+        label: str,
+        expression: SymbolicExpression,
+        number: Number = Number.SINGULAR,
     ) -> RoleFragment:
         """
         Build a fragment for a variable, instantiated variable, or entity, linked to its type.
@@ -215,13 +219,6 @@ class BlockFragment(Fragment):
 # ── Fragment catamorphism ──────────────────────────────────────────────────────
 
 
-class UnloweredFragmentError(TypeError):
-    """
-    A fragment kind with no fold handler reached a renderer — a realisation pass was skipped,
-    leaving an un-lowered ``NounPhrase`` or ``PossessiveChain`` in the tree.
-    """
-
-
 def fold_fragment(
     fragment: Fragment,
     *,
@@ -273,11 +270,7 @@ def fold_fragment(
                 child, word=word, role=role, phrase=phrase, block=block
             )
         case _:
-            raise UnloweredFragmentError(
-                f"fold_fragment received a {type(fragment).__name__}; "
-                "NounPhrase / PossessiveChain nodes must be lowered by the realisation "
-                "passes (realize_tree) before a renderer folds the tree."
-            )
+            raise UnloweredFragmentError(fragment=fragment)
 
 
 # ── Fragment transform (tree → tree) ────────────────────────────────────────────

@@ -17,6 +17,9 @@ from krrood.entity_query_language.verbalization.grammar.planning.query import (
     RestrictionPlan,
 )
 from krrood.entity_query_language.verbalization.grammar.restriction import Placement
+from krrood.entity_query_language.verbalization.exceptions import (
+    UnplacedRestrictionError,
+)
 from krrood.entity_query_language.verbalization.microplanning.coordination import (
     RangeFold,
     fragment_for_folded_conjunct,
@@ -25,12 +28,6 @@ from krrood.entity_query_language.verbalization.vocabulary.english import (
     Conjunctions,
     Keywords,
 )
-
-
-class UnplacedRestrictionError(ValueError):
-    """
-    A restriction rule declared a placement that no ``RestrictionFragments`` slot surfaces.
-    """
 
 
 @dataclass(frozen=True)
@@ -76,16 +73,15 @@ class RestrictionAssembler:
         """
         by_placement: Dict[Placement, List[Fragment]] = defaultdict(list)
         for rule, item in restriction.matched:
-            by_placement[rule.placement].append(rule.render(item, subject, self.context))
+            by_placement[rule.placement].append(
+                rule.render(item, subject, self.context)
+            )
 
         superlatives = by_placement.pop(Placement.SELECTION_MODIFIER, [])
         grouped = by_placement.pop(Placement.WHOSE_GROUP, [])
         # Loud, not silent: a rule declaring a placement no slot surfaces is a bug, not a drop.
         if by_placement:
-            raise UnplacedRestrictionError(
-                "Restriction placement(s) with no RestrictionFragments slot: "
-                f"{[placement.name for placement in by_placement]}."
-            )
+            raise UnplacedRestrictionError(placements=list(by_placement))
 
         whose = (
             PhraseFragment(
@@ -111,7 +107,9 @@ class RestrictionAssembler:
         """
         parts: List[Fragment] = [
             fragment_for_folded_conjunct(
-                item, self.context.child, compact=self.context.configuration.compact_predicates
+                item,
+                self.context.child,
+                compact=self.context.configuration.compact_predicates,
             )
             for item in items
         ]

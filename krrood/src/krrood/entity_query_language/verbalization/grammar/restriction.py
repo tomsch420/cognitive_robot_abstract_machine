@@ -92,7 +92,9 @@ class RangeRestrictionRule(RestrictionRule):
         )
 
     @classmethod
-    def render(cls, item: RangeFold, subject_variable: Variable, context: RuleContext) -> Fragment:
+    def render(
+        cls, item: RangeFold, subject_variable: Variable, context: RuleContext
+    ) -> Fragment:
         return ConditionVerbalizer(context).range_modifier(item, subject_variable)
 
 
@@ -116,7 +118,9 @@ class AttributePredicateRestrictionRule(RestrictionRule):
         return not references(item.right, subject_variable)
 
     @classmethod
-    def render(cls, item: Comparator, subject_variable: Variable, context: RuleContext) -> Fragment:
+    def render(
+        cls, item: Comparator, subject_variable: Variable, context: RuleContext
+    ) -> Fragment:
         return ConditionVerbalizer(context).attribute_modifier(item, subject_variable)
 
 
@@ -136,7 +140,9 @@ class SuperlativeRestrictionRule(RestrictionRule):
         return superlative_aggregation(item, subject_variable) is not None
 
     @classmethod
-    def render(cls, item: Comparator, subject_variable: Variable, context: RuleContext) -> Fragment:
+    def render(
+        cls, item: Comparator, subject_variable: Variable, context: RuleContext
+    ) -> Fragment:
         return ConditionVerbalizer(context).superlative_modifier(item, subject_variable)
 
 
