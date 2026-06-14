@@ -156,9 +156,21 @@ class CoreferenceProcessor:
         return self._rebuilt(noun_phrase)
 
     def _rebuilt(self, noun_phrase: NounPhrase) -> NounPhrase:
-        """Rebuild *noun_phrase* with its head and modifiers recursed (document order preserved)."""
-        return replace(
-            noun_phrase,
-            head=self._walk(noun_phrase.head),
-            modifiers=[self._walk(modifier) for modifier in noun_phrase.modifiers],
-        )
+        """Rebuild *noun_phrase* with its head and modifiers recursed (document order preserved).
+
+        A referring noun phrase is the discourse subject *of its own modifiers*: a restrictive
+        modifier predicates over the head, so a chain rooted at the head pronominalises (*"a Robot
+        whose battery exceeds its threshold"*). This is inferred from structure — the modifiers
+        slot — so rules never mark the scope."""
+        head = self._walk(noun_phrase.head)
+        if noun_phrase.referent_id is None:
+            modifiers = [self._walk(modifier) for modifier in noun_phrase.modifiers]
+        else:
+            self._subject_stack.append(
+                SubjectFrame(noun_phrase.referent_id, noun_phrase.number)
+            )
+            try:
+                modifiers = [self._walk(modifier) for modifier in noun_phrase.modifiers]
+            finally:
+                self._subject_stack.pop()
+        return replace(noun_phrase, head=head, modifiers=modifiers)

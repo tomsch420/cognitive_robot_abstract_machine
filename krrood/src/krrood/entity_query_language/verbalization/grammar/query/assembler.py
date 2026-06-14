@@ -216,16 +216,13 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
                     )
                 )
 
-        noun = NounPhrase(
+        # A referring noun phrase is the subject of its own modifiers (the coreference pass infers
+        # this from the modifiers slot), so no scope marker is emitted here.
+        return NounPhrase(
             head=RoleFragment.for_variable(plan.selected_type, variable),
             definiteness=definiteness,
             referent_id=_subject_id(variable),
             modifiers=modifiers,
-        )
-        return (
-            SubjectScope(subject_id=_subject_id(variable), child=noun)
-            if modifiers
-            else noun
         )
 
     # ── query-body clauses ─────────────────────────────────────────────────────
