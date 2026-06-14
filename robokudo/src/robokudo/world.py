@@ -236,6 +236,76 @@ def get_object_belief_states() -> Dict[UUID, ObjectBeliefState]:
     return _tracked_objects
 
 
+def _get_world_body_from_cas(cas: CAS, rk_world: World) -> Body | None:
+    """Return the world-frame body referenced by the CAS, if available."""
+    world_frame = cas.world_frame
+    if world_frame is None:
+        return None
+    return rk_world.get_body_by_name(PrefixedName(name=world_frame))
+
+
+def _create_world_origin_and_scale_from_latest_bbox(
+    object_belief: ObjectBeliefState,
+    cas: CAS,
+    world_body: Body,
+) -> tuple[HomogeneousTransformationMatrix, Scale] | None:
+    """Convert the latest camera-frame bbox into a world-frame SemDT origin and scale."""
+    bb = object_belief.latest_bbox_3d
+    if bb is None:
+        return None
+
+    pose_mat = get_transform_matrix_from_q(bb.pose.rotation, bb.pose.translation)
+
+    cam_to_world_transform = get_cam_to_world_transform_matrix(cas)
+    pose_in_world_mat = np.matmul(cam_to_world_transform, pose_mat)
+
+    rotation = list(get_quaternion_from_transform_matrix(pose_in_world_mat))
+    translation = list(get_translation_from_transform_matrix(pose_in_world_mat))
+
+    object_belief_body = object_belief.body
+    origin = HomogeneousTransformationMatrix.from_xyz_quaternion(
+        pos_x=translation[0],
+        pos_y=translation[1],
+        pos_z=translation[2],
+        quat_x=rotation[0],
+        quat_y=rotation[1],
+        quat_z=rotation[2],
+        quat_w=rotation[3],
+        reference_frame=world_body,
+        child_frame=object_belief_body,
+    )
+
+    scale = Scale(x=bb.x_length, y=bb.y_length, z=bb.z_length)
+    return origin, scale
+
+
+def _update_belief_body_from_latest_bbox(
+    object_belief: ObjectBeliefState,
+    cas: CAS,
+    rk_world: World,
+    world_body: Body,
+    world_T_object_belief: Connection6DoF,
+    replace_existing_visuals: bool,
+) -> None:
+    """Update the SemDT body origin and box geometry from the latest bbox."""
+    origin_and_scale = _create_world_origin_and_scale_from_latest_bbox(
+        object_belief=object_belief,
+        cas=cas,
+        world_body=world_body,
+    )
+    if origin_and_scale is None:
+        return
+
+    origin, scale = origin_and_scale
+    object_belief_body = object_belief.body
+
+    with rk_world.modify_world():
+        if replace_existing_visuals:
+            object_belief_body.visual.shapes.clear()
+        object_belief_body.visual.append(Box(scale=scale))
+        world_T_object_belief.origin = origin
+
+
 def add_object_hypothesis_as_belief_state(
     object_hypothesis: ObjectHypothesis, cas: CAS
 ) -> ObjectBeliefState:
@@ -248,7 +318,7 @@ def add_object_hypothesis_as_belief_state(
     :param cas: The CAS to use for transform lookups.
     :return: The new object belief.
     """
-    world = world_instance()
+    rk_world = world_instance()
 
     object_belief = ObjectBeliefState.create_with_new_body().add_hypothesis(
         object_hypothesis
@@ -256,46 +326,26 @@ def add_object_hypothesis_as_belief_state(
     object_belief_body = object_belief.body
     _tracked_objects[object_belief.uuid] = object_belief
 
-    world_frame = cas.world_frame
-    if world_frame is None:
+    world_body = _get_world_body_from_cas(cas, rk_world)
+    if world_body is None:
         return object_belief
-    world_body = world.get_body_by_name(PrefixedName(name=world_frame))
 
-    with world.modify_world():
+    with rk_world.modify_world():
         world_T_object_belief = Connection6DoF.create_with_dofs(
-            world=world,
+            world=rk_world,
             parent=world_body,
             child=object_belief_body,
         )
-        world.add_connection(world_T_object_belief)
+        rk_world.add_connection(world_T_object_belief)
 
-    bb = object_belief.latest_bbox_3d
-    if bb is not None:
-        pose_mat = get_transform_matrix_from_q(bb.pose.rotation, bb.pose.translation)
-
-        cam_to_world_transform = get_cam_to_world_transform_matrix(cas)
-        pose_in_world_mat = np.matmul(cam_to_world_transform, pose_mat)
-
-        rotation = list(get_quaternion_from_transform_matrix(pose_in_world_mat))
-        translation = list(get_translation_from_transform_matrix(pose_in_world_mat))
-
-        origin = HomogeneousTransformationMatrix.from_xyz_quaternion(
-            pos_x=translation[0],
-            pos_y=translation[1],
-            pos_z=translation[2],
-            quat_x=rotation[0],
-            quat_y=rotation[1],
-            quat_z=rotation[2],
-            quat_w=rotation[3],
-            reference_frame=world_body,
-            child_frame=object_belief_body,
-        )
-
-        scale = Scale(x=bb.x_length, y=bb.y_length, z=bb.z_length)
-
-        with world.modify_world():
-            object_belief_body.visual.append(Box(scale=scale))
-            world_T_object_belief.origin = origin
+    _update_belief_body_from_latest_bbox(
+        object_belief=object_belief,
+        cas=cas,
+        rk_world=rk_world,
+        world_body=world_body,
+        world_T_object_belief=world_T_object_belief,
+        replace_existing_visuals=False,
+    )
     return object_belief
 
 
@@ -311,46 +361,25 @@ def update_belief_state_with_object_hypothesis(
     :param object_hypothesis: Object hypothesis state to update the belief state with.
     :param cas: The CAS to use for transform lookups.
     """
-    world = world_instance()
+    rk_world = world_instance()
 
     object_belief.add_hypothesis(object_hypothesis)
     object_belief_body = object_belief.body
 
-    world_frame = cas.world_frame
-    if world_frame is None:
+    world_body = _get_world_body_from_cas(cas, rk_world)
+    if world_body is None:
         return
-    world_body = world.get_body_by_name(PrefixedName(name=world_frame))
 
-    bb = object_belief.latest_bbox_3d
-    if bb is not None:
-        pose_mat = get_transform_matrix_from_q(bb.pose.rotation, bb.pose.translation)
-
-        cam_to_world_transform = get_cam_to_world_transform_matrix(cas)
-        pose_in_world_mat = np.matmul(cam_to_world_transform, pose_mat)
-
-        rotation = list(get_quaternion_from_transform_matrix(pose_in_world_mat))
-        translation = list(get_translation_from_transform_matrix(pose_in_world_mat))
-
-        origin = HomogeneousTransformationMatrix.from_xyz_quaternion(
-            pos_x=translation[0],
-            pos_y=translation[1],
-            pos_z=translation[2],
-            quat_x=rotation[0],
-            quat_y=rotation[1],
-            quat_z=rotation[2],
-            quat_w=rotation[3],
-            reference_frame=world_body,
-            child_frame=object_belief_body,
-        )
-
-        scale = Scale(x=bb.x_length, y=bb.y_length, z=bb.z_length)
-
-        with world.modify_world():
-            object_belief_body.get_first_parent_connection_of_type(
-                Connection6DoF
-            ).origin = origin
-            object_belief_body.visual.shapes.clear()
-            object_belief_body.visual.append(Box(scale=scale))
+    _update_belief_body_from_latest_bbox(
+        object_belief=object_belief,
+        cas=cas,
+        rk_world=rk_world,
+        world_body=world_body,
+        world_T_object_belief=object_belief_body.get_first_parent_connection_of_type(
+            Connection6DoF
+        ),
+        replace_existing_visuals=True,
+    )
 
 
 def get_object_belief_state(uuid: UUID) -> ObjectBeliefState:
