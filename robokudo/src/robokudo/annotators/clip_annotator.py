@@ -14,34 +14,47 @@ from robokudo.types.scene import ObjectHypothesis
 class ClipAnnotator(BaseAnnotator):
     """A simple CLIP annotator that uses a given vocabulary to annotate all incoming object hypothesis."""
 
-    def __init__(self, name: str = "ClipAnnotator") -> None:
-        super().__init__(name)
+    class Descriptor(BaseAnnotator.Descriptor):
+        """Descriptor for the ClipAnnotator."""
 
-        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        """Torch device to be used by the annotator."""
+        class Parameters:
+            """Parameters for the Descriptor."""
 
-        self.model_name: str = "openai/clip-vit-large-patch14"
+            def __init__(self) -> None:
+                self.device = torch.device(
+                    "cuda:0" if torch.cuda.is_available() else "cpu"
+                )
+                """Torch device to be used by the annotator."""
 
-        self.clip_model = CLIPModel.from_pretrained(self.model_name)
+                self.model_name = "openai/clip-vit-large-patch14"
+                """Name of the CLIP to use for feature extraction."""
+
+                self.vocabulary_template: str = "A photo of a {}"
+                """A template string that each vocabulary word is inserted into."""
+
+                self.vocabulary: List[str] = [
+                    "Milk Container",
+                    "Box of Cornflakes",
+                    "Pancake Batter",
+                    "Instant Coffee",
+                    "Crepe Pan",
+                    "Dish Soap",
+                ]
+                """The vocabulary used for object classification"""
+
+    def __init__(self, name: str = "ClipAnnotator", descriptor=Descriptor()) -> None:
+        super().__init__(name=name, descriptor=descriptor)
+
+        self.parameters = descriptor.parameters
+
+        self.clip_model = CLIPModel.from_pretrained(self.parameters.model_name)
         """CLIP model used for feature extraction."""
 
-        self.clip_preprocess = CLIPProcessor.from_pretrained(self.model_name)
+        self.clip_preprocess = CLIPProcessor.from_pretrained(self.parameters.model_name)
         """CLIP preprocessor used for input preprocessing."""
 
         self.clip_tokenizer = self.clip_preprocess.tokenizer
         """CLIP tokenizer used for text preprocessing."""
-
-        self.vocabulary_template: str = "A photo of a {}"
-
-        self.vocabulary: List[str] = [
-            "Milk Container",
-            "Box of Cornflakes",
-            "Pancake Batter",
-            "Instant Coffee",
-            "Crepe Pan",
-            "Dish Soap",
-        ]
-        """The vocabulary used for object classification"""
 
         self.vocabulary_index: faiss.IndexFlatIP = faiss.IndexFlatIP(
             self.clip_model.config.projection_dim
@@ -50,13 +63,14 @@ class ClipAnnotator(BaseAnnotator):
 
         with torch.no_grad():
             templated_texts = [
-                self.vocabulary_template.format(name) for name in self.vocabulary
+                self.parameters.vocabulary_template.format(name)
+                for name in self.parameters.vocabulary
             ]
             inputs = self.clip_tokenizer(
                 templated_texts,
                 padding=True,
                 return_tensors="pt",
-            ).to(self.device)
+            ).to(self.parameters.device)
             text_features = self.clip_model.get_text_features(**inputs).pooler_output
             text_features /= torch.norm(text_features, p=2, dim=-1, keepdim=True)
             text_features = text_features.cpu().numpy()
@@ -69,6 +83,8 @@ class ClipAnnotator(BaseAnnotator):
         if len(ohs) == 0:
             return Status.SUCCESS
 
+        parameters = self.parameters
+
         color_image = self.get_cas().get(CASViews.COLOR_IMAGE).copy()
         color_pil = Image.fromarray(color_image)
 
@@ -78,14 +94,14 @@ class ClipAnnotator(BaseAnnotator):
         with torch.no_grad():
             inputs = self.clip_preprocess(
                 images=cropped_images, return_tensors="pt"
-            ).to(self.device)
+            ).to(parameters.device)
             crop_features = self.clip_model.get_image_features(**inputs).pooler_output
             crop_features /= torch.norm(crop_features, p=2, dim=-1, keepdim=True)
             crop_features = crop_features.cpu().numpy()
 
         data, idx = self.vocabulary_index.search(crop_features, k=1)
         best_indices = idx[:, 0].astype(int)
-        best_classes = [self.vocabulary[i] for i in best_indices]
+        best_classes = [parameters.vocabulary[i] for i in best_indices]
         best_similarities = data[:, 0] * 100.0
 
         for oh, best_idx, best_class, best_similarity in zip(
