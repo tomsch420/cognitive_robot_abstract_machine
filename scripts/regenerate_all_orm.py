@@ -3,19 +3,21 @@ import subprocess
 import sys
 
 
-def regenerate(generator_path: str) -> None:
-    """ """
-    generator = Path(generator_path).resolve()
-    folder = generator.parent
+def regenerate(generate_orm_path: str) -> None:
+    """
+    Runs the provided generate_orm.py file in a subprocess.
+    """
+    generate_orm = Path(generate_orm_path).resolve()
+    folder = generate_orm.parent
 
-    if generator.name != "generate_orm.py":
-        raise ValueError(f"Expected a generate_orm.py file, got: {generator}")
+    if generate_orm.name != "generate_orm.py":
+        raise ValueError(f"Expected a generate_orm.py file, got: {generate_orm}")
 
-    if not generator.exists():
-        raise FileNotFoundError(f"Generator not found: {generator}")
+    if not generate_orm.exists():
+        raise FileNotFoundError(f"Generator not found: {generate_orm}")
 
     subprocess.run(
-        [sys.executable, str(generator)],
+        [sys.executable, str(generate_orm)],
         cwd=folder,
         check=True,
     )

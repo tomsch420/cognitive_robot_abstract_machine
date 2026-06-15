@@ -319,7 +319,7 @@ class ActiveConnection1DOF(ActiveConnection, ABC):
         new_parent: KinematicStructureEntity,
         parent_T_connection_expression: HomogeneousTransformationMatrix,
     ) -> Self:
-        # Reuse the same degree of freedom (it persists across remove/add), so the joint state is kept.
+        # Reuse the same degree of freedom so the joint state is kept.
         return self.__class__(
             parent=new_parent,
             child=self.child,

@@ -35,10 +35,7 @@ from random_events.set import Set as EventSet
 from random_events.variable import Symbolic
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.variables import SpatialVariables
-from semantic_digital_twin.exceptions import (
-    CannotBeAPartOf,
-    AmbiguousPart,
-)
+from semantic_digital_twin.exceptions import AmbiguousPart, CannotBeAPartOf
 from semantic_digital_twin.reasoning.predicates import is_supported_by
 from semantic_digital_twin.spatial_types import (
     Point3,
@@ -318,10 +315,17 @@ class HasRootRegion(HasRootKinematicStructureEntity, ABC):
         )
 
 
+@dataclass
+class _CompositionFieldSpecification:
+    field_name: str
+    element_type: Type[HasRootKinematicStructureEntity]
+    is_one_to_many_relationship: bool
+
+
 @lru_cache(maxsize=None)
-def _composition_field_specs(
+def _composition_field_specifications(
     cls: Type[CompositionMixin],
-) -> Tuple[Tuple[str, type, bool], ...]:
+) -> list[_CompositionFieldSpecification]:
     """
     Resolve the composition slots of ``cls`` as ``(field_name, element_type, is_plural)`` tuples.
 
@@ -336,11 +340,13 @@ def _composition_field_specs(
         if CompositionMixin in clazz.__bases__
         for name in vars(clazz).get("__annotations__", {})
     }
-    return tuple(
-        (wf.name, wf.type_endpoint, wf.is_one_to_many_relationship)
+    return [
+        _CompositionFieldSpecification(
+            wf.name, wf.type_endpoint, wf.is_one_to_many_relationship
+        )
         for wf in WrappedClass(cls).fields
         if wf.name in slot_names
-    )
+    ]
 
 
 @dataclass(eq=False)
@@ -363,21 +369,23 @@ class CompositionMixin(HasRootKinematicStructureEntity, ABC):
         :raises AmbiguousPart: If ``type(part)`` matches more than one composition slot.
         """
         matches = [
-            (name, is_plural)
-            for name, element_type, is_plural in _composition_field_specs(type(self))
-            if isinstance(part, element_type)
+            composition_field_specification
+            for composition_field_specification in _composition_field_specifications(
+                type(self)
+            )
+            if isinstance(part, composition_field_specification.element_type)
         ]
         if not matches:
             raise CannotBeAPartOf(self, part)
         if len(matches) > 1:
-            raise AmbiguousPart(self, part, [name for name, _ in matches])
+            raise AmbiguousPart(self, part, [match.field_name for match in matches])
 
-        name, is_plural = matches[0]
+        [match] = matches
         part._mount_strategy(self)
-        if is_plural:
-            getattr(self, name).append(part)
+        if match.is_one_to_many_relationship:
+            getattr(self, match.field_name).append(part)
         else:
-            setattr(self, name, part)
+            setattr(self, match.field_name, part)
 
 
 @dataclass(eq=False)
