@@ -8494,16 +8494,13 @@ class UnknownPartWholeRelationshipFieldDAO(
     )
 
     annotation_id: Mapped[int] = mapped_column(
-        ForeignKey("SemanticAnnotationDAO.database_id", use_alter=True),
+        ForeignKey("HasRootBodyDAO.database_id", use_alter=True),
         nullable=True,
         use_existing_column=True,
     )
 
-    annotation: Mapped[SemanticAnnotationDAO] = relationship(
-        "SemanticAnnotationDAO",
-        uselist=False,
-        foreign_keys=[annotation_id],
-        post_update=True,
+    annotation: Mapped[HasRootBodyDAO] = relationship(
+        "HasRootBodyDAO", uselist=False, foreign_keys=[annotation_id], post_update=True
     )
 
     __mapper_args__ = {

@@ -17739,6 +17739,44 @@ class StateUpdateContainsUnknownDegreesOfFreedomErrorDAO(
     }
 
 
+class UnknownPartWholeRelationshipFieldDAO(
+    UsageErrorDAO,
+    DataAccessObject[
+        semantic_digital_twin.exceptions.UnknownPartWholeRelationshipField
+    ],
+):
+    __tablename__ = "UnknownPartWholeRelationshipFieldDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(UsageErrorDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    field_name: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+
+    available_fields: Mapped[typing.List[builtins.str]] = mapped_column(
+        JSON, nullable=False, use_existing_column=True
+    )
+
+    annotation_id: Mapped[int] = mapped_column(
+        ForeignKey("HasRootBodyDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    annotation: Mapped[HasRootBodyDAO] = relationship(
+        "HasRootBodyDAO", uselist=False, foreign_keys=[annotation_id], post_update=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "UnknownPartWholeRelationshipFieldDAO",
+        "inherit_condition": database_id == UsageErrorDAO.database_id,
+    }
+
+
 class UselessConceptErrorDAO(
     UsageErrorDAO,
     DataAccessObject[semantic_digital_twin.exceptions.UselessConceptError],
