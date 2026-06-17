@@ -17,8 +17,11 @@ The module is used for:
 * Quick prototyping
 """
 
+from __future__ import annotations
+
 from py_trees.common import Status
-from typing_extensions import Optional, Tuple, Dict, Callable
+from typing_extensions import Callable, Dict, Optional, Tuple
+
 from robokudo.annotators.core import BaseAnnotator
 
 
@@ -52,7 +55,7 @@ class LambdaFunctionAnnotator(BaseAnnotator):
     def __init__(
         self,
         name: str = "LambdaFunctionAnnotator",
-        descriptor: "LambdaFunctionAnnotator.Descriptor" = Descriptor(),
+        descriptor: LambdaFunctionAnnotator.Descriptor = Descriptor(),
     ):
         """Initialize the lambda function annotator. Minimal one-time init!
 
