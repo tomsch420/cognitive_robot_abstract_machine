@@ -171,8 +171,11 @@ def visibility_location(target: Union[Pose, Body], context: Context) -> Location
         costmap,
         [
             IsVisibleBy(
-                world=context.world,
-                robot=context.robot,
+                context=Context(
+                    world=context.world,
+                    robot=context.robot,
+                    alternative_motion_mappings=context.alternative_motion_mappings,
+                ),
                 target_pose=target_pose,
                 target_body=target_body,
             )
@@ -223,8 +226,11 @@ def giskard_reachability_location(
                     _get_object_in_hand(context.robot, context.world, arm)
                     or target_body,
                 ),
-                robot=context.robot,
-                world=context.world,
+                context=Context(
+                    robot=context.robot,
+                    world=context.world,
+                    alternative_motion_mappings=context.alternative_motion_mappings,
+                ),
                 tip_link=man.tool_frame,
             )
         ],
