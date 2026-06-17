@@ -110,8 +110,11 @@ def reachability_location(
                     or target_body,
                 ),
                 tip_link=man.tool_frame,
-                world=context.world,
-                robot=context.robot,
+                context=Context(
+                    world=context.world,
+                    robot=context.robot,
+                    alternative_motion_mappings=context.alternative_motion_mappings,
+                ),
             )
         ],
     )

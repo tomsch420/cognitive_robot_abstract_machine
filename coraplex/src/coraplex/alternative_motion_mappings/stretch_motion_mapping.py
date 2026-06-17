@@ -70,7 +70,7 @@ class StretchMoveSim(MoveMotion, AlternativeMotion[Stretch]):
     def _motion_chart(self):
         world_T_target = self.world.transform(self.target, self.world.root)
         world_T_target.z = 0
-        return DifferentialDriveBaseGoal(goal_pose=world_T_target, threshold=0.05)
+        return DifferentialDriveBaseGoal(goal_pose=world_T_target, threshold=0.01)
 
     class StretchMoveReal(MoveMotion, AlternativeMotion[Stretch]):
         """
