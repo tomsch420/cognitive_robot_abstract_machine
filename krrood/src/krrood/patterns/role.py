@@ -71,15 +71,19 @@ class DelegatedFactoryMethodError(DataclassException):
     The name of the delegated factory method.
     """
 
-    def __post_init__(self):
-        self.message = (
+    def error_message(self) -> str:
+        return (
             f"{self.taker_type.__name__}.{self.method_name}() is a factory method; calling it "
             f"through {self.role_type.__name__} would build a bare {self.taker_type.__name__} and "
-            f"drop the role. Either override {self.method_name}() on {self.role_type.__name__} to "
-            f"return a proper role, or call it on the role taker explicitly via .role_taker or "
+            f"drop the role."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            f"Either override {self.method_name}() on {self.role_type.__name__} to return a "
+            f"proper role, or call it on the role taker explicitly via .role_taker or "
             f".root_persistent_entity."
         )
-        super().__post_init__()
 
 
 def role_taker_field(*, kw_only: bool = True, **kwargs: Any) -> Any:
