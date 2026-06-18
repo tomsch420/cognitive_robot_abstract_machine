@@ -359,16 +359,16 @@ def flatten_fragment_to_plain_text(fragment: Fragment) -> str:
 
 
 def oxford_comma(
-    parts: list[Fragment], conjunction: Fragment, *, pair_comma: bool = True
+    parts: list[Fragment], conjunction: Fragment, *, pair_comma: bool = False
 ) -> Fragment:
     """
     Join *parts* with Oxford-comma style: ``f1, f2, conj f3``.
 
     :param parts: Fragments to join.
     :param conjunction: Conjunction fragment (e.g. *"and"*, *"or"*).
-    :param pair_comma: Whether a two-element list keeps a comma before the conjunction
-        (*"a, and b"*, the codebase's serial-comma house style) or drops it (*"a or b"*, standard
-        English). Defaults to ``True``; a list of three or more is always serial-comma joined.
+    :param pair_comma: Whether a two-element list keeps a comma before the conjunction. Defaults to
+        ``False`` — *"a and b"*, standard English (the serial comma is defined only for a series of
+        three or more, so a pair takes none); pass ``True`` only to join two independent clauses.
     :return: A single fragment representing the joined sequence.
     """
     if not parts:

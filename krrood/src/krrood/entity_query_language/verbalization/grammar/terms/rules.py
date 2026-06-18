@@ -115,9 +115,7 @@ class VariableRule(PhraseRule):
         return PhraseFragment(
             parts=[
                 SetMembership.ONE_OF.as_fragment(),
-                oxford_comma(
-                    fragments, Conjunctions.OR.as_fragment(), pair_comma=False
-                ),
+                oxford_comma(fragments, Conjunctions.OR.as_fragment()),
             ]
         )
 
@@ -178,7 +176,7 @@ class LiteralRule(PhraseRule):
         modifiers: List[Fragment] = (
             [
                 Prepositions.WITH.as_fragment(),
-                oxford_comma(details, Conjunctions.AND.as_fragment(), pair_comma=False),
+                oxford_comma(details, Conjunctions.AND.as_fragment()),
             ]
             if details
             else []

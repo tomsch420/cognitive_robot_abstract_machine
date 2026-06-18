@@ -167,7 +167,7 @@ class WhoseRangeForm(StandaloneForm):
     >>> verbalize_expression(
     ...     an(entity(employee).where(and_(employee.salary > 100, employee.salary < 200)))
     ... )
-    'Find an Employee whose salary is between 100, and 200'
+    'Find an Employee whose salary is between 100 and 200'
     """
 
     slot = Slot.WHOSE
@@ -336,4 +336,5 @@ def _join_residual(fragments: List[Fragment]) -> Optional[Fragment]:
         return None
     if len(fragments) == 1:
         return fragments[0]
-    return oxford_comma(fragments, Conjunctions.AND.as_fragment())
+    # Residual conjuncts are independent clauses, so a two-clause pair keeps its comma.
+    return oxford_comma(fragments, Conjunctions.AND.as_fragment(), pair_comma=True)

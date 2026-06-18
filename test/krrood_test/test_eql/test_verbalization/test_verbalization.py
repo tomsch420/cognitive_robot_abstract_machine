@@ -1763,7 +1763,7 @@ def test_example_sum_between_full_sentence():
     assert verbalize_expression(query) == (
         "Find a BankTransaction such that the amount of its amount_details is equal to "
         "the sum of amounts among BankTransactions whose booking_date is between "
-        "May 15, 2026, and May 30, 2026"
+        "May 15, 2026 and May 30, 2026"
     )
 
 
@@ -1860,7 +1860,7 @@ def test_whose_grouping_top_level_between():
         )
     )
     assert verbalize_expression(query) == (
-        "Find a BankTransaction whose booking_date is between May 15, 2026, and May 30, 2026"
+        "Find a BankTransaction whose booking_date is between May 15, 2026 and May 30, 2026"
     )
 
 
@@ -1884,7 +1884,7 @@ def test_whose_grouping_mixed_groupable_and_residual():
     )
     text = verbalize_expression(query)
     assert (
-        "whose booking_date is between May 15, 2026, and May 30, 2026" in text
+        "whose booking_date is between May 15, 2026 and May 30, 2026" in text
     ), f"Got: {text!r}"
     assert (
         "such that the amount of its amount_details is equal to the maximum amount"
@@ -1916,7 +1916,7 @@ def test_top_level_aggregation_average_between_whose():
     )
     assert verbalize_expression(query) == (
         "Find the average of the amount of the amount_details of a BankTransaction "
-        "whose booking_date is between May 15, 2026, and May 27, 2026"
+        "whose booking_date is between May 15, 2026 and May 27, 2026"
     )
 
 
@@ -1996,7 +1996,7 @@ def test_range_fold_without_subject_has_no_whose():
             bank_transaction.booking_date <= upper_bound,
         )
     )
-    assert "is between May 15, 2026, and May 30, 2026" in text, f"Got: {text!r}"
+    assert "is between May 15, 2026 and May 30, 2026" in text, f"Got: {text!r}"
     assert "whose" not in text, f"Got: {text!r}"
     assert "booking_date of" in text, f"Expected full chain in: {text!r}"
 
@@ -2019,7 +2019,7 @@ def test_second_domain_whose_between():
         entity(employee).where(employee.salary >= 30000, employee.salary <= 60000)
     )
     assert verbalize_expression(query) == (
-        "Find an Employee whose salary is between 30000, and 60000"
+        "Find an Employee whose salary is between 30000 and 60000"
     )
 
 
@@ -2113,7 +2113,7 @@ def test_pr_example():
     )
 
     assert verbalize_expression(query) == (
-        "Find a BankTransaction whose amount is greater than 1000, and booking_date is between May 1, 2026,"
+        "Find a BankTransaction whose amount is greater than 1000, and booking_date is between May 1, 2026"
         " and May 30, 2026"
     )
 

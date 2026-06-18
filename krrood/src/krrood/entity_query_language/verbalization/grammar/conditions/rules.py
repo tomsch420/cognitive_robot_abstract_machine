@@ -78,7 +78,7 @@ class AndRule(PhraseRule):
     >>> verbalize_expression(and_(robot.battery > 50, robot.name == 'x'))
     "the battery of a Robot is greater than 50, and the name of the Robot is 'x'"
     >>> verbalize_expression(and_(robot.battery > 10, robot.battery < 90))
-    'the battery of a Robot is between 10, and 90'
+    'the battery of a Robot is between 10 and 90'
     """
 
     construct = AND
@@ -88,7 +88,8 @@ class AndRule(PhraseRule):
         parts = ConditionAssembler(context).as_statements(flatten_operands(node, AND))
         if len(parts) == 1:
             return parts[0]
-        return oxford_comma(parts, Conjunctions.AND.as_fragment())
+        # Conjuncts are independent clauses, so a two-clause coordination keeps its comma.
+        return oxford_comma(parts, Conjunctions.AND.as_fragment(), pair_comma=True)
 
 
 class RangeFoldRule(PhraseRule):

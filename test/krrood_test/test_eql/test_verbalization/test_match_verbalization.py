@@ -157,7 +157,7 @@ def test_where_folds_a_range_pair_into_one_between_point():
     match.resolve()
     match.where(match.variable.x > 0.0, match.variable.x < 5.0)
     text = _hierarchical(match)
-    assert text == "Generate a Position\n  where\n    - its x is between 0.0, and 5.0"
+    assert text == "Generate a Position\n  where\n    - its x is between 0.0 and 5.0"
 
 
 # ── nested matches: per-sub-object grouping ──────────────────────────────────
@@ -196,7 +196,7 @@ def test_nested_predict_with_where_range_on_sub_object():
         "  and predict\n"
         "    - x, y, and z of its position\n"
         "  where\n"
-        "    - the x of its position is between 0.0, and 5.0"
+        "    - the x of its position is between 0.0 and 5.0"
     )
 
 
@@ -232,7 +232,7 @@ def test_multiple_none_assignments_coordinate_under_has_no():
     text = verbalize_expression(
         underspecified(_Widget)(color=None, size=None, owner=object())
     )
-    assert "has no color, and size" in text
+    assert "has no color and size" in text
 
 
 def test_domain_value_variable_lists_candidates():
@@ -330,5 +330,5 @@ def test_compound_value_pulled_out_of_respectively_group():
     text = verbalize_expression(
         underspecified(_Trio)(a=1.0, b=2.0, c=variable(float, [7.0, 8.0]))
     )
-    assert "a, and b of the _Trio are 1.0, and 2.0 respectively" in text
+    assert "a and b of the _Trio are 1.0 and 2.0 respectively" in text
     assert "c of the _Trio is one of 7.0 or 8.0" in text

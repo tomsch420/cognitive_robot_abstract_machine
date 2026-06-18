@@ -251,8 +251,8 @@ def test_coindexed_equality_factors_to_have_the_same():
     text = verbalize_expression(query)
     # The two prefixes coordinate and the shared period factors out (pronominalised by the
     # coreference pass — "its"/"their" depending on the subject's number).
-    assert "the begin, and end of" in text
-    assert "period have the same month, and year" in text
+    assert "the begin and end of" in text
+    assert "period have the same month and year" in text
     # The shared structure is said once — no repeated per-attribute equality.
     assert "is the month of the end" not in text
 
@@ -283,7 +283,7 @@ def test_coindexed_non_equality_uses_faithful_those_of_form():
     )
     text = verbalize_expression(query)
     assert (
-        "the month, and year of the begin of its period are greater than "
+        "the month and year of the begin of its period are greater than "
         "those of the end of its period" in text
     )
 
@@ -300,7 +300,7 @@ def test_coindexed_partial_group_keeps_unrelated_condition_in_order():
         .grouped_by(p.period.begin.month)
     )
     text = verbalize_expression(query)
-    factored = text.index("have the same month, and year")
+    factored = text.index("have the same month and year")
     unrelated = text.index("revenue")
     assert factored < unrelated  # the factored clause precedes the unrelated one
 
@@ -365,6 +365,6 @@ def test_coindexed_factoring_in_subject_whose_path():
             p.begin.year == p.end.year,
         )
     )
-    assert "the begin, and end of the _Period have the same month, and year" in (
+    assert "the begin and end of the _Period have the same month and year" in (
         verbalize_expression(query)
     )
