@@ -149,6 +149,19 @@ print("ceo.head_of:", ceo.head_of)
 print("hasattr(alice, 'head_of'):", hasattr(alice, "head_of"))
 ```
 
+## IDE Support: Python Role Lens
+
+Because a role's attributes come from two places — the fields declared on the role class and,
+through delegation, the attributes of its role-taker chain — a standard IDE only sees the
+fields declared directly on the role class. The **Python Role Lens** plugin for JetBrains IDEs
+(such as PyCharm) closes that gap: it surfaces *all* attributes accessible on a role, including
+the delegated ones, and lets you navigate straight to the source class that defines each
+attribute — much like navigating an inheritance hierarchy.
+
+- Plugin: [Python Role Lens on the JetBrains Marketplace](https://share.google/9peTa3AIqJ9cGsZYK)
+
+<iframe width="560" height="315" src="https://www.youtube.com/embed/qoPctQ9Z5Eo" frameborder="0" allowfullscreen></iframe>
+
 ## Querying Roles
 
 `Role` provides class methods for checking whether a role taker has a role and for retrieving
@@ -329,3 +342,6 @@ flowchart TD
 - **Source**: `krrood/src/krrood/patterns/role.py`
 - **Tests**: `test/krrood_test/test_patterns/test_role.py` and the dataset under
   `test/krrood_test/dataset/role_and_ontology/`.
+- **IDE tooling**: [Python Role Lens](https://share.google/9peTa3AIqJ9cGsZYK) — a JetBrains
+  plugin that displays a role's accessible (including delegated) attributes and lets you
+  navigate to the classes that define them.
