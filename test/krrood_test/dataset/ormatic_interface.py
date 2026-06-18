@@ -74,7 +74,7 @@ class GenericClass_KRROODPositionDAO_container_association(
     )
 
     target: Mapped[KRROODPositionDAO] = relationship(
-        "KRROODPositionDAO", foreign_keys=[target_krroodpositiondao_id]
+        "KRROODPositionDAO", foreign_keys=[target_krroodpositiondao_id], lazy="selectin"
     )
 
 
@@ -95,6 +95,7 @@ class GenericClassAssociationDAO_associated_value_list_association(
     target: Mapped[GenericClass_KRROODPositionDAO] = relationship(
         "GenericClass_KRROODPositionDAO",
         foreign_keys=[target_genericclass_krroodpositiondao_id],
+        lazy="selectin",
     )
 
 
@@ -113,7 +114,7 @@ class ParentAlternativelyMappedMappingDAO_entities_association(
     )
 
     target: Mapped[EntityMappingDAO] = relationship(
-        "EntityMappingDAO", foreign_keys=[target_entitymappingdao_id]
+        "EntityMappingDAO", foreign_keys=[target_entitymappingdao_id], lazy="selectin"
     )
 
 
@@ -130,7 +131,7 @@ class PersonDAO_knows_association(Base, AssociationDataAccessObject):
     )
 
     target: Mapped[PersonDAO] = relationship(
-        "PersonDAO", foreign_keys=[target_persondao_id]
+        "PersonDAO", foreign_keys=[target_persondao_id], lazy="selectin"
     )
 
 
@@ -149,7 +150,7 @@ class AlternativeMappingAggregatorDAO_entities1_association(
     )
 
     target: Mapped[EntityMappingDAO] = relationship(
-        "EntityMappingDAO", foreign_keys=[target_entitymappingdao_id]
+        "EntityMappingDAO", foreign_keys=[target_entitymappingdao_id], lazy="selectin"
     )
 
 
@@ -168,7 +169,7 @@ class AlternativeMappingAggregatorDAO_entities2_association(
     )
 
     target: Mapped[EntityMappingDAO] = relationship(
-        "EntityMappingDAO", foreign_keys=[target_entitymappingdao_id]
+        "EntityMappingDAO", foreign_keys=[target_entitymappingdao_id], lazy="selectin"
     )
 
 
@@ -185,7 +186,9 @@ class ContainerGenerationDAO_items_association(Base, AssociationDataAccessObject
     )
 
     target: Mapped[ItemWithBackreferenceDAO] = relationship(
-        "ItemWithBackreferenceDAO", foreign_keys=[target_itemwithbackreferencedao_id]
+        "ItemWithBackreferenceDAO",
+        foreign_keys=[target_itemwithbackreferencedao_id],
+        lazy="selectin",
     )
 
 
@@ -204,7 +207,7 @@ class DoubleKRROODPositionAggregatorDAO_positions1_association(
     )
 
     target: Mapped[KRROODPositionDAO] = relationship(
-        "KRROODPositionDAO", foreign_keys=[target_krroodpositiondao_id]
+        "KRROODPositionDAO", foreign_keys=[target_krroodpositiondao_id], lazy="selectin"
     )
 
 
@@ -223,7 +226,7 @@ class DoubleKRROODPositionAggregatorDAO_positions2_association(
     )
 
     target: Mapped[KRROODPositionDAO] = relationship(
-        "KRROODPositionDAO", foreign_keys=[target_krroodpositiondao_id]
+        "KRROODPositionDAO", foreign_keys=[target_krroodpositiondao_id], lazy="selectin"
     )
 
 
@@ -237,7 +240,9 @@ class FruitBoxDAO_fruits_association(Base, AssociationDataAccessObject):
     )
     target_bodydao_id: Mapped[int] = mapped_column(ForeignKey("BodyDAO.database_id"))
 
-    target: Mapped[BodyDAO] = relationship("BodyDAO", foreign_keys=[target_bodydao_id])
+    target: Mapped[BodyDAO] = relationship(
+        "BodyDAO", foreign_keys=[target_bodydao_id], lazy="selectin"
+    )
 
 
 class KRROODTorsoDAO_kinematic_chains_association(Base, AssociationDataAccessObject):
@@ -253,7 +258,9 @@ class KRROODTorsoDAO_kinematic_chains_association(Base, AssociationDataAccessObj
     )
 
     target: Mapped[KRROODKinematicChainDAO] = relationship(
-        "KRROODKinematicChainDAO", foreign_keys=[target_krroodkinematicchaindao_id]
+        "KRROODKinematicChainDAO",
+        foreign_keys=[target_krroodkinematicchaindao_id],
+        lazy="selectin",
     )
 
 
@@ -270,7 +277,7 @@ class KRROODPositionsDAO_positions_association(Base, AssociationDataAccessObject
     )
 
     target: Mapped[KRROODPositionDAO] = relationship(
-        "KRROODPositionDAO", foreign_keys=[target_krroodpositiondao_id]
+        "KRROODPositionDAO", foreign_keys=[target_krroodpositiondao_id], lazy="selectin"
     )
 
 
@@ -289,7 +296,9 @@ class KRROODVectorsWithPropertyMappedDAO_vectors_association(
     )
 
     target: Mapped[KRROODVectorMappedDAO] = relationship(
-        "KRROODVectorMappedDAO", foreign_keys=[target_krroodvectormappeddao_id]
+        "KRROODVectorMappedDAO",
+        foreign_keys=[target_krroodvectormappeddao_id],
+        lazy="selectin",
     )
 
 
@@ -306,7 +315,7 @@ class MoreShapesDAO_shapes_association(Base, AssociationDataAccessObject):
     )
 
     target: Mapped[ShapesDAO] = relationship(
-        "ShapesDAO", foreign_keys=[target_shapesdao_id]
+        "ShapesDAO", foreign_keys=[target_shapesdao_id], lazy="selectin"
     )
 
 
@@ -321,7 +330,7 @@ class ShapesDAO_shapes_association(Base, AssociationDataAccessObject):
     target_shapedao_id: Mapped[int] = mapped_column(ForeignKey("ShapeDAO.database_id"))
 
     target: Mapped[ShapeDAO] = relationship(
-        "ShapeDAO", foreign_keys=[target_shapedao_id]
+        "ShapeDAO", foreign_keys=[target_shapedao_id], lazy="selectin"
     )
 
 
@@ -338,7 +347,9 @@ class SymbolGraphMappingDAO_instances_association(Base, AssociationDataAccessObj
     )
 
     target: Mapped[WrappedInstanceMappingDAO] = relationship(
-        "WrappedInstanceMappingDAO", foreign_keys=[target_wrappedinstancemappingdao_id]
+        "WrappedInstanceMappingDAO",
+        foreign_keys=[target_wrappedinstancemappingdao_id],
+        lazy="selectin",
     )
 
 
@@ -357,7 +368,9 @@ class SymbolGraphMappingDAO_predicate_relations_association(
     )
 
     target: Mapped[PredicateClassRelationDAO] = relationship(
-        "PredicateClassRelationDAO", foreign_keys=[target_predicateclassrelationdao_id]
+        "PredicateClassRelationDAO",
+        foreign_keys=[target_predicateclassrelationdao_id],
+        lazy="selectin",
     )
 
 
@@ -374,7 +387,7 @@ class TestKRROODPositionSetDAO_positions_association(Base, AssociationDataAccess
     )
 
     target: Mapped[KRROODPositionDAO] = relationship(
-        "KRROODPositionDAO", foreign_keys=[target_krroodpositiondao_id]
+        "KRROODPositionDAO", foreign_keys=[target_krroodpositiondao_id], lazy="selectin"
     )
 
 
@@ -386,7 +399,9 @@ class WorldDAO_bodies_association(Base, AssociationDataAccessObject):
     source_worlddao_id: Mapped[int] = mapped_column(ForeignKey("WorldDAO.database_id"))
     target_bodydao_id: Mapped[int] = mapped_column(ForeignKey("BodyDAO.database_id"))
 
-    target: Mapped[BodyDAO] = relationship("BodyDAO", foreign_keys=[target_bodydao_id])
+    target: Mapped[BodyDAO] = relationship(
+        "BodyDAO", foreign_keys=[target_bodydao_id], lazy="selectin"
+    )
 
 
 class WorldDAO_connections_association(Base, AssociationDataAccessObject):
@@ -400,7 +415,7 @@ class WorldDAO_connections_association(Base, AssociationDataAccessObject):
     )
 
     target: Mapped[ConnectionDAO] = relationship(
-        "ConnectionDAO", foreign_keys=[target_connectiondao_id]
+        "ConnectionDAO", foreign_keys=[target_connectiondao_id], lazy="selectin"
     )
 
 
@@ -412,7 +427,9 @@ class WorldDAO_views_association(Base, AssociationDataAccessObject):
     source_worlddao_id: Mapped[int] = mapped_column(ForeignKey("WorldDAO.database_id"))
     target_viewdao_id: Mapped[int] = mapped_column(ForeignKey("ViewDAO.database_id"))
 
-    target: Mapped[ViewDAO] = relationship("ViewDAO", foreign_keys=[target_viewdao_id])
+    target: Mapped[ViewDAO] = relationship(
+        "ViewDAO", foreign_keys=[target_viewdao_id], lazy="selectin"
+    )
 
 
 class CabinetDAO_drawers_association(Base, AssociationDataAccessObject):
@@ -428,7 +445,7 @@ class CabinetDAO_drawers_association(Base, AssociationDataAccessObject):
     )
 
     target: Mapped[DrawerDAO] = relationship(
-        "DrawerDAO", foreign_keys=[target_drawerdao_id]
+        "DrawerDAO", foreign_keys=[target_drawerdao_id], lazy="selectin"
     )
 
 
@@ -592,33 +609,6 @@ class GenericClassDAO(
     }
 
 
-class GenericClass_floatDAO(
-    GenericClassDAO,
-    DataAccessObject[test.krrood_test.dataset.example_classes.GenericClass[float]],
-):
-    __tablename__ = "GenericClass_floatDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(GenericClassDAO.database_id),
-        primary_key=True,
-        use_existing_column=True,
-    )
-
-    value: Mapped[builtins.float] = mapped_column(use_existing_column=True)
-    optional_value: Mapped[typing.Optional[builtins.float]] = mapped_column(
-        use_existing_column=True
-    )
-
-    container: Mapped[typing.List[builtins.float]] = mapped_column(
-        JSON, nullable=False, use_existing_column=True
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "GenericClass_floatDAO",
-        "inherit_condition": database_id == GenericClassDAO.database_id,
-    }
-
-
 class GenericClass_KRROODPositionDAO(
     GenericClassDAO,
     DataAccessObject[
@@ -662,11 +652,41 @@ class GenericClass_KRROODPositionDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[GenericClass_KRROODPositionDAO_container_association.source_genericclass_krroodpositiondao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "GenericClass_KRROODPositionDAO",
         "inherit_condition": database_id == GenericClassDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class GenericClass_floatDAO(
+    GenericClassDAO,
+    DataAccessObject[test.krrood_test.dataset.example_classes.GenericClass[float]],
+):
+    __tablename__ = "GenericClass_floatDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(GenericClassDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    value: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    optional_value: Mapped[typing.Optional[builtins.float]] = mapped_column(
+        use_existing_column=True
+    )
+
+    container: Mapped[typing.List[builtins.float]] = mapped_column(
+        JSON, nullable=False, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "GenericClass_floatDAO",
+        "inherit_condition": database_id == GenericClassDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -699,6 +719,7 @@ class GenericClassAssociationDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[GenericClassAssociationDAO_associated_value_list_association.source_genericclassassociationdao_id]",
+        lazy="selectin",
     )
 
 
@@ -799,6 +820,7 @@ class InheritanceLevel1WithoutSymbolButAlternativelyMappedMappingDAO(
         "polymorphic_identity": "InheritanceLevel1WithoutSymbolButAlternativelyMappedMappingDAO",
         "inherit_condition": database_id
         == InheritanceBaseWithoutSymbolButAlternativelyMappedMappingDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -826,6 +848,7 @@ class InheritanceLevel2WithoutSymbolButAlternativelyMappedMappingDAO(
         "polymorphic_identity": "InheritanceLevel2WithoutSymbolButAlternativelyMappedMappingDAO",
         "inherit_condition": database_id
         == InheritanceLevel1WithoutSymbolButAlternativelyMappedMappingDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -942,6 +965,7 @@ class ParentAlternativelyMappedMappingDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[ParentAlternativelyMappedMappingDAO_entities_association.source_parentalternativelymappedmappingdao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -972,6 +996,7 @@ class ChildLevel1NormallyMappedDAO(
         "polymorphic_identity": "ChildLevel1NormallyMappedDAO",
         "inherit_condition": database_id
         == ParentAlternativelyMappedMappingDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -997,6 +1022,7 @@ class ChildLevel2NormallyMappedDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ChildLevel2NormallyMappedDAO",
         "inherit_condition": database_id == ChildLevel1NormallyMappedDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -1032,6 +1058,7 @@ class PersonDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[PersonDAO_knows_association.source_persondao_id]",
+        lazy="selectin",
     )
 
 
@@ -1166,6 +1193,7 @@ class GrasPoseMappingDAO(
     __mapper_args__ = {
         "polymorphic_identity": "GrasPoseMappingDAO",
         "inherit_condition": database_id == PoseMappingDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -1272,6 +1300,7 @@ class MultipleInheritanceDAO(
     __mapper_args__ = {
         "polymorphic_identity": "MultipleInheritanceDAO",
         "inherit_condition": database_id == PrimaryBaseDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -1365,6 +1394,7 @@ class AlternativeMappingAggregatorDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[AlternativeMappingAggregatorDAO_entities1_association.source_alternativemappingaggregatordao_id]",
+        lazy="selectin",
     )
     entities2: Mapped[
         builtins.list[AlternativeMappingAggregatorDAO_entities2_association]
@@ -1373,11 +1403,13 @@ class AlternativeMappingAggregatorDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[AlternativeMappingAggregatorDAO_entities2_association.source_alternativemappingaggregatordao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "AlternativeMappingAggregatorDAO",
         "inherit_condition": database_id == SymbolDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -1403,6 +1435,7 @@ class AtomDAO(
     __mapper_args__ = {
         "polymorphic_identity": "AtomDAO",
         "inherit_condition": database_id == SymbolDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -1433,6 +1466,7 @@ class BackreferenceMappingDAO(
     __mapper_args__ = {
         "polymorphic_identity": "BackreferenceMappingDAO",
         "inherit_condition": database_id == SymbolDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -1452,12 +1486,14 @@ class ContainerGenerationDAO(
             collection_class=builtins.list,
             cascade="all, delete-orphan",
             foreign_keys="[ContainerGenerationDAO_items_association.source_containergenerationdao_id]",
+            lazy="selectin",
         )
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "ContainerGenerationDAO",
         "inherit_condition": database_id == SymbolDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -1480,6 +1516,7 @@ class DoubleKRROODPositionAggregatorDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[DoubleKRROODPositionAggregatorDAO_positions1_association.source_doublekrroodpositionaggregatordao_id]",
+        lazy="selectin",
     )
     positions2: Mapped[
         builtins.list[DoubleKRROODPositionAggregatorDAO_positions2_association]
@@ -1488,11 +1525,13 @@ class DoubleKRROODPositionAggregatorDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[DoubleKRROODPositionAggregatorDAO_positions2_association.source_doublekrroodpositionaggregatordao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "DoubleKRROODPositionAggregatorDAO",
         "inherit_condition": database_id == SymbolDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -1512,6 +1551,7 @@ class EntityMappingDAO(
     __mapper_args__ = {
         "polymorphic_identity": "EntityMappingDAO",
         "inherit_condition": database_id == SymbolDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -1534,6 +1574,7 @@ class DerivedEntityDAO(
     __mapper_args__ = {
         "polymorphic_identity": "DerivedEntityDAO",
         "inherit_condition": database_id == EntityMappingDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -1564,6 +1605,7 @@ class EntityAssociationDAO(
     __mapper_args__ = {
         "polymorphic_identity": "EntityAssociationDAO",
         "inherit_condition": database_id == SymbolDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -1584,6 +1626,7 @@ class ForwardRefTypeADAO(
     __mapper_args__ = {
         "polymorphic_identity": "ForwardRefTypeADAO",
         "inherit_condition": database_id == SymbolDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -1602,6 +1645,7 @@ class ForwardRefTypeBDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ForwardRefTypeBDAO",
         "inherit_condition": database_id == SymbolDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -1624,11 +1668,13 @@ class FruitBoxDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[FruitBoxDAO_fruits_association.source_fruitboxdao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "FruitBoxDAO",
         "inherit_condition": database_id == SymbolDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -1660,6 +1706,7 @@ class ItemWithBackreferenceDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ItemWithBackreferenceDAO",
         "inherit_condition": database_id == SymbolDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -1680,6 +1727,7 @@ class KRROODKinematicChainDAO(
     __mapper_args__ = {
         "polymorphic_identity": "KRROODKinematicChainDAO",
         "inherit_condition": database_id == SymbolDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -1702,11 +1750,13 @@ class KRROODTorsoDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[KRROODTorsoDAO_kinematic_chains_association.source_krroodtorsodao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "KRROODTorsoDAO",
         "inherit_condition": database_id == KRROODKinematicChainDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -1728,6 +1778,7 @@ class KRROODOrientationDAO(
     __mapper_args__ = {
         "polymorphic_identity": "KRROODOrientationDAO",
         "inherit_condition": database_id == SymbolDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -1764,6 +1815,7 @@ class KRROODPoseDAO(
     __mapper_args__ = {
         "polymorphic_identity": "KRROODPoseDAO",
         "inherit_condition": database_id == SymbolDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -1783,6 +1835,7 @@ class KRROODPositionDAO(
     __mapper_args__ = {
         "polymorphic_identity": "KRROODPositionDAO",
         "inherit_condition": database_id == SymbolDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -1803,6 +1856,7 @@ class KRROODPosition4DDAO(
     __mapper_args__ = {
         "polymorphic_identity": "KRROODPosition4DDAO",
         "inherit_condition": database_id == KRROODPositionDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -1823,6 +1877,7 @@ class KRROODPosition5DDAO(
     __mapper_args__ = {
         "polymorphic_identity": "KRROODPosition5DDAO",
         "inherit_condition": database_id == KRROODPosition4DDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -1845,6 +1900,7 @@ class KRROODPositionTypeWrapperDAO(
     __mapper_args__ = {
         "polymorphic_identity": "KRROODPositionTypeWrapperDAO",
         "inherit_condition": database_id == SymbolDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -1868,12 +1924,14 @@ class KRROODPositionsDAO(
             collection_class=builtins.list,
             cascade="all, delete-orphan",
             foreign_keys="[KRROODPositionsDAO_positions_association.source_krroodpositionsdao_id]",
+            lazy="selectin",
         )
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "KRROODPositionsDAO",
         "inherit_condition": database_id == SymbolDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -1907,6 +1965,7 @@ class KRROODPositionsSubclassWithAnotherKRROODPositionDAO(
     __mapper_args__ = {
         "polymorphic_identity": "KRROODPositionsSubclassWithAnotherKRROODPositionDAO",
         "inherit_condition": database_id == KRROODPositionsDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -1946,6 +2005,7 @@ class KRROODTransformationMappedDAO(
     __mapper_args__ = {
         "polymorphic_identity": "KRROODTransformationMappedDAO",
         "inherit_condition": database_id == SymbolDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -1964,6 +2024,7 @@ class KRROODVectorMappedDAO(
     __mapper_args__ = {
         "polymorphic_identity": "KRROODVectorMappedDAO",
         "inherit_condition": database_id == SymbolDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -1986,11 +2047,13 @@ class KRROODVectorsWithPropertyMappedDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[KRROODVectorsWithPropertyMappedDAO_vectors_association.source_krroodvectorswithpropertymappeddao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "KRROODVectorsWithPropertyMappedDAO",
         "inherit_condition": database_id == SymbolDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -2010,6 +2073,7 @@ class ListOfEnumDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ListOfEnumDAO",
         "inherit_condition": database_id == SymbolDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -2027,11 +2091,13 @@ class MoreShapesDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[MoreShapesDAO_shapes_association.source_moreshapesdao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "MoreShapesDAO",
         "inherit_condition": database_id == SymbolDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -2068,6 +2134,7 @@ class MultipleForwardRefContainerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "MultipleForwardRefContainerDAO",
         "inherit_condition": database_id == SymbolDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -2093,6 +2160,7 @@ class NodeDAO(
     __mapper_args__ = {
         "polymorphic_identity": "NodeDAO",
         "inherit_condition": database_id == SymbolDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -2122,6 +2190,7 @@ class ObjectAnnotationDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ObjectAnnotationDAO",
         "inherit_condition": database_id == SymbolDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -2148,6 +2217,7 @@ class OriginalSimulatedObjectDAO(
     __mapper_args__ = {
         "polymorphic_identity": "OriginalSimulatedObjectDAO",
         "inherit_condition": database_id == SymbolDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -2167,6 +2237,7 @@ class ParentDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ParentDAO",
         "inherit_condition": database_id == SymbolDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -2184,6 +2255,7 @@ class ChildMappedDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ChildMappedDAO",
         "inherit_condition": database_id == ParentDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -2204,6 +2276,7 @@ class ParentBaseMappingDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ParentBaseMappingDAO",
         "inherit_condition": database_id == SymbolDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -2222,6 +2295,7 @@ class ChildBaseMappingDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ChildBaseMappingDAO",
         "inherit_condition": database_id == ParentBaseMappingDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -2240,6 +2314,7 @@ class PrivateDefaultFactoryDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PrivateDefaultFactoryDAO",
         "inherit_condition": database_id == SymbolDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -2270,6 +2345,7 @@ class ReferenceDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ReferenceDAO",
         "inherit_condition": database_id == SymbolDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -2299,6 +2375,7 @@ class RelationshipParentDAO(
     __mapper_args__ = {
         "polymorphic_identity": "RelationshipParentDAO",
         "inherit_condition": database_id == SymbolDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -2317,6 +2394,7 @@ class RelationshipChildDAO(
     __mapper_args__ = {
         "polymorphic_identity": "RelationshipChildDAO",
         "inherit_condition": database_id == RelationshipParentDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -2334,6 +2412,7 @@ class RotationMappedDAO(
     __mapper_args__ = {
         "polymorphic_identity": "RotationMappedDAO",
         "inherit_condition": database_id == SymbolDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -2366,6 +2445,7 @@ class ShapeDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ShapeDAO",
         "inherit_condition": database_id == SymbolDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -2383,11 +2463,13 @@ class ShapesDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[ShapesDAO_shapes_association.source_shapesdao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "ShapesDAO",
         "inherit_condition": database_id == SymbolDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -2406,6 +2488,7 @@ class SymbolGraphMappingDAO(
             collection_class=builtins.list,
             cascade="all, delete-orphan",
             foreign_keys="[SymbolGraphMappingDAO_instances_association.source_symbolgraphmappingdao_id]",
+            lazy="selectin",
         )
     )
     predicate_relations: Mapped[
@@ -2415,6 +2498,7 @@ class SymbolGraphMappingDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[SymbolGraphMappingDAO_predicate_relations_association.source_symbolgraphmappingdao_id]",
+        lazy="selectin",
     )
 
 
@@ -2434,6 +2518,7 @@ class TestKRROODPositionSetDAO(
             collection_class=builtins.set,
             cascade="all, delete-orphan",
             foreign_keys="[TestKRROODPositionSetDAO_positions_association.source_testkrroodpositionsetdao_id]",
+            lazy="selectin",
         )
     )
 
@@ -2490,43 +2575,6 @@ class Vector3MappingDAO(
     )
 
 
-class WorldDAO(
-    SymbolDAO,
-    DataAccessObject[test.krrood_test.dataset.semantic_world_like_classes.World],
-):
-    __tablename__ = "WorldDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(SymbolDAO.database_id), primary_key=True, use_existing_column=True
-    )
-
-    id: Mapped[builtins.int] = mapped_column(use_existing_column=True)
-
-    bodies: Mapped[builtins.list[WorldDAO_bodies_association]] = relationship(
-        "WorldDAO_bodies_association",
-        collection_class=builtins.list,
-        cascade="all, delete-orphan",
-        foreign_keys="[WorldDAO_bodies_association.source_worlddao_id]",
-    )
-    connections: Mapped[builtins.list[WorldDAO_connections_association]] = relationship(
-        "WorldDAO_connections_association",
-        collection_class=builtins.list,
-        cascade="all, delete-orphan",
-        foreign_keys="[WorldDAO_connections_association.source_worlddao_id]",
-    )
-    views: Mapped[builtins.list[WorldDAO_views_association]] = relationship(
-        "WorldDAO_views_association",
-        collection_class=builtins.list,
-        cascade="all, delete-orphan",
-        foreign_keys="[WorldDAO_views_association.source_worlddao_id]",
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "WorldDAO",
-        "inherit_condition": database_id == SymbolDAO.database_id,
-    }
-
-
 class WorldMappingDAO(
     Base, DataAccessObject[semantic_digital_twin.orm.model.WorldMapping]
 ):
@@ -2570,6 +2618,47 @@ class WorldMappingDAO(
     )
 
 
+class WorldDAO(
+    SymbolDAO,
+    DataAccessObject[test.krrood_test.dataset.semantic_world_like_classes.World],
+):
+    __tablename__ = "WorldDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(SymbolDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    id: Mapped[builtins.int] = mapped_column(use_existing_column=True)
+
+    bodies: Mapped[builtins.list[WorldDAO_bodies_association]] = relationship(
+        "WorldDAO_bodies_association",
+        collection_class=builtins.list,
+        cascade="all, delete-orphan",
+        foreign_keys="[WorldDAO_bodies_association.source_worlddao_id]",
+        lazy="selectin",
+    )
+    connections: Mapped[builtins.list[WorldDAO_connections_association]] = relationship(
+        "WorldDAO_connections_association",
+        collection_class=builtins.list,
+        cascade="all, delete-orphan",
+        foreign_keys="[WorldDAO_connections_association.source_worlddao_id]",
+        lazy="selectin",
+    )
+    views: Mapped[builtins.list[WorldDAO_views_association]] = relationship(
+        "WorldDAO_views_association",
+        collection_class=builtins.list,
+        cascade="all, delete-orphan",
+        foreign_keys="[WorldDAO_views_association.source_worlddao_id]",
+        lazy="selectin",
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "WorldDAO",
+        "inherit_condition": database_id == SymbolDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
 class WorldEntityDAO(
     SymbolDAO,
     DataAccessObject[test.krrood_test.dataset.semantic_world_like_classes.WorldEntity],
@@ -2581,18 +2670,19 @@ class WorldEntityDAO(
     )
 
     world_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
-        ForeignKey("WorldDAO.database_id", use_alter=True),
+        ForeignKey("WorldMappingDAO.database_id", use_alter=True),
         nullable=True,
         use_existing_column=True,
     )
 
-    world: Mapped[WorldDAO] = relationship(
-        "WorldDAO", uselist=False, foreign_keys=[world_id], post_update=True
+    world: Mapped[WorldMappingDAO] = relationship(
+        "WorldMappingDAO", uselist=False, foreign_keys=[world_id], post_update=True
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "WorldEntityDAO",
         "inherit_condition": database_id == SymbolDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -2616,6 +2706,7 @@ class BodyDAO(
     __mapper_args__ = {
         "polymorphic_identity": "BodyDAO",
         "inherit_condition": database_id == WorldEntityDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -2632,6 +2723,7 @@ class AppleDAO(
     __mapper_args__ = {
         "polymorphic_identity": "AppleDAO",
         "inherit_condition": database_id == BodyDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -2648,6 +2740,7 @@ class ContainerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ContainerDAO",
         "inherit_condition": database_id == BodyDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -2664,6 +2757,7 @@ class HandleDAO(
     __mapper_args__ = {
         "polymorphic_identity": "HandleDAO",
         "inherit_condition": database_id == BodyDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -2700,6 +2794,7 @@ class ConnectionDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ConnectionDAO",
         "inherit_condition": database_id == WorldEntityDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -2720,6 +2815,7 @@ class FixedConnectionDAO(
     __mapper_args__ = {
         "polymorphic_identity": "FixedConnectionDAO",
         "inherit_condition": database_id == ConnectionDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -2740,6 +2836,7 @@ class PrismaticConnectionDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PrismaticConnectionDAO",
         "inherit_condition": database_id == ConnectionDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -2760,6 +2857,7 @@ class RevoluteConnectionDAO(
     __mapper_args__ = {
         "polymorphic_identity": "RevoluteConnectionDAO",
         "inherit_condition": database_id == ConnectionDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -2784,6 +2882,7 @@ class GraspConfigDAO(
     __mapper_args__ = {
         "polymorphic_identity": "GraspConfigDAO",
         "inherit_condition": database_id == WorldEntityDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -2819,6 +2918,7 @@ class MoveActionDAO(
     __mapper_args__ = {
         "polymorphic_identity": "MoveActionDAO",
         "inherit_condition": database_id == WorldEntityDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -2837,6 +2937,7 @@ class ViewDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ViewDAO",
         "inherit_condition": database_id == WorldEntityDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -2864,11 +2965,13 @@ class CabinetDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[CabinetDAO_drawers_association.source_cabinetdao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "CabinetDAO",
         "inherit_condition": database_id == ViewDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -2902,6 +3005,7 @@ class DoorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "DoorDAO",
         "inherit_condition": database_id == ViewDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -2940,6 +3044,7 @@ class DrawerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "DrawerDAO",
         "inherit_condition": database_id == ViewDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -2982,6 +3087,7 @@ class WardrobeDAO(
     __mapper_args__ = {
         "polymorphic_identity": "WardrobeDAO",
         "inherit_condition": database_id == ViewDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -3043,6 +3149,4 @@ class FunctionMappingDAO(
     )
     class_name: Mapped[typing.Optional[builtins.str]] = mapped_column(
         sqlalchemy.sql.sqltypes.Text, use_existing_column=True
-    )
-ng_column=True
     )
