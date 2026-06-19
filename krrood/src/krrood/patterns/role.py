@@ -402,6 +402,12 @@ class Role(Symbol, SubClassSafeGeneric[T]):
         :param role_taker: The role taker instance to link.
         """
         try:
+            # The class diagram is built lazily, so a role class defined after the graph was first
+            # used would otherwise be missing. Register it (and a role-taker class) on demand so the
+            # role registry works regardless of class-definition order.
+            SymbolGraph().ensure_class_in_class_diagram(type(self))
+            if isinstance(role_taker, Symbol):
+                SymbolGraph().ensure_class_in_class_diagram(type(role_taker))
             wrapped_self = SymbolGraph().get_wrapped_instance(self)
             wrapped_role_taker = SymbolGraph().ensure_wrapped_instance(role_taker)
             SymbolGraph().add_relation(

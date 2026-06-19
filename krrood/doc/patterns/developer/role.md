@@ -153,10 +153,14 @@ adds transitive `HasRoleTaker` edges from the new role to every entity that the 
 already points to. This ensures that querying from any point in the chain resolves to all roles
 and takers in the chain.
 
-Classes that are not registered in the class diagram (for example, dynamically created test
-classes) are handled gracefully: `ClassIsUnMappedInClassDiagram` is caught and the registration
-step is silently skipped, leaving the role functional as a plain dataclass without graph
-integration.
+The class diagram is built lazily on first use, so a role class defined afterwards (for example in
+a notebook cell or a test) would otherwise be absent from it. `_update_mapping_between_roles_and_role_takers`
+calls `SymbolGraph.ensure_class_in_class_diagram` for the role and any role-taker class first, which
+rebuilds the class diagram to include a missing class on demand. This keeps the role registry working
+regardless of the order in which role classes are defined relative to the first graph use. A class
+that still cannot be mapped (for example one whose module is not importable) is handled gracefully:
+`ClassIsUnMappedInClassDiagram` is caught and registration is skipped, leaving the role functional as
+a plain dataclass without graph integration.
 
 ## Attribute Delegation
 
