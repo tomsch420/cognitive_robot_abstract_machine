@@ -96,6 +96,106 @@ print(verbalize_expression(not_(w.tasks[0].completed)))
 A numeric index like `[0]` becomes an ordinal (*"the first …"*), and the terminal boolean
 field maps to *"is completed"* / *"is not completed"*.
 
+Comparing a boolean attribute to a boolean **value** folds the value into the verb's polarity,
+rather than tacking on *"is True"*:
+
+```{code-cell} ipython3
+t = variable(Task, domain=None)
+print(verbalize_expression(t.completed == True))    # "a Task is completed"
+print(verbalize_expression(t.completed == False))   # "a Task is not completed"
+print(verbalize_expression(t.completed == variable(bool, [True, False])))  # left open
+```
+
+`== True` reads *"is completed"*, `== False` (and `!= True`) reads *"is not completed"*, and a
+boolean variable whose domain holds both values reads *"is either completed or not"*.
+
+## Absence Conditions (`== None`)
+
+A comparison to `None` is read as an *absence*, not as a value.  An owned attribute reads
+*"<owner> has no <attribute>"*; a bare variable reads *"<subject> does not exist"*.
+
+```{code-cell} ipython3
+m = variable(Mission, domain=None)
+print(verbalize_expression(m.assigned_to == None))          # "a Mission has no assigned_to"
+print(verbalize_expression(variable(Mission, domain=None) == None))  # "... does not exist"
+```
+
+Inside a query this is said as its own clause (*"such that the Mission has no assigned_to"*) — it
+never folds into the *"whose …"* group, because the subject/object flip cannot sit there.
+
+## Domain-Constrained Values
+
+When a value-typed variable (an `int`/`float`/`str`/`bool` or an `enum`) carries a small explicit
+domain, the verbalizer lists the candidates as *"one of …"* in value position.
+
+```{code-cell} ipython3
+r = variable(Robot, domain=robots)
+print(verbalize_expression(r.battery == variable(int, [10, 50, 90])))
+print(verbalize_expression(r.battery == variable(int, [10, 50])))   # a pair → "one of 10 or 50"
+```
+
+Three or more candidates use the serial comma (*"one of 10, 50, or 90"*); a pair drops it
+(*"one of 10 or 50"*).  An *entity*-typed variable's domain is its inferred population and is never
+listed — it stays *"a Robot"*.
+
+## Concrete Object Values
+
+Comparing against a concrete domain object means its *identity*, so the verbalizer says
+*"a specific <Type>"* rather than printing the object's (possibly huge) `repr`.  When the class has
+an obvious identifying field it is appended:
+
+```{code-cell} ipython3
+m = variable(Mission, domain=None)
+print(verbalize_expression(m.assigned_to == robots[0]))   # robots[0] is Robot("R2D2", …)
+```
+
+The identifying field(s) are taken from the class's `_identifying_attributes_` classmethod if it
+declares one, otherwise the first present of `name` / `id` / `label` / `key` / `uuid`
+(`Robot` has `name`, so this reads *"a specific Robot with name 'R2D2'"*).  With none of those, it
+falls back to a bare *"a specific Robot"*.
+
+## Factoring Repeated Comparisons
+
+Two comparisons that pair the same attribute across sibling chains fold into one natural clause —
+*"the begin and end of the period have the same month and year"* — instead of repeating each.
+
+```{code-cell} ipython3
+from dataclasses import dataclass
+
+@dataclass
+class Date:
+    month: int
+    year: int
+
+@dataclass
+class Period:
+    begin: Date
+    end: Date
+
+p = variable(Period, domain=None)
+query = an(entity(p).where(p.begin.month == p.end.month, p.begin.year == p.end.year))
+print(verbalize_expression(query))
+```
+
+## Underspecified Constructions (`match` / `underspecified`)
+
+An `underspecified(...)` construction is a *generative* request — *"Generate a … given that …"*.
+Several scalar assignments on one object coordinate into a single *"… respectively"* point (capped
+at three; longer or phrase-valued assignments are said separately, and a `None` becomes a
+*"has no"* point):
+
+```{code-cell} ipython3
+from krrood.entity_query_language.factories import underspecified
+
+@dataclass
+class Point:
+    x: float
+    y: float
+    z: float
+
+print(verbalize_expression(underspecified(Point)(x=1, y=2, z=3)))
+```
+
 ## Aggregations
 
 Aggregation functions (`count`, `sum`, `average`, `max`, `min`) are wrapped with
