@@ -22,6 +22,7 @@ from krrood.entity_query_language.query.match import AbstractMatchExpression
 from krrood.ormatic.data_access_objects.dao import DataAccessObject
 from krrood.ormatic.data_access_objects.from_dao import FromDataAccessObjectState
 from krrood.ormatic.data_access_objects.helper import to_dao
+from krrood.parametrization.feature_extraction.aggregations import get_aggregation_class
 from krrood.parametrization.feature_extraction.feature_extractor import (
     FeatureExtractor,
     EntityCompositionDescriptor,
@@ -342,7 +343,7 @@ class RelationalProbabilisticCircuit:
             annotated_variables=variables
         ).fit(class_dataframe)
         self.specification = EntityCompositionDescriptor(type(instances[0]))
-        for exchangeable_part in self.specification.exchangeable_parts:
+        for exchangeable_part in self.specification.many_to_many_relations:
             if exchangeable_part not in self.feature_extractor.exchangeable_features:
                 continue
             self.exchangeable_distribution_templates[exchangeable_part] = (
@@ -381,13 +382,11 @@ class RelationalProbabilisticCircuit:
             feature_name = feature_function._name_
             if feature_name not in latent_variable_by_name:
                 continue
-            aggregation_instance = (
-                queryable_object.from_dao().get_aggregation_class_by_part_name(
-                    exchangeable_part_name
-                )
-            )
-            if aggregation_instance is None:
+            domain_object = queryable_object.from_dao()
+            aggregation_cls = get_aggregation_class(type(domain_object))
+            if aggregation_cls is None:
                 continue
+            aggregation_instance = aggregation_cls(instance=domain_object)
             value = feature_function.apply_mapping_on_external_root(
                 aggregation_instance
             )

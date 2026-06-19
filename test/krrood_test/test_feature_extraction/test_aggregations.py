@@ -7,7 +7,8 @@ from krrood.entity_query_language.factories import variable
 from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.parametrization.feature_extraction.aggregations import (
     AggregationStatistic,
-    statistic,
+    aggregation_statistic,
+    get_aggregation_class,
 )
 from krrood.parametrization.feature_extraction.feature_extractor import (
     FeatureExtractor,
@@ -42,9 +43,10 @@ def example_scenario():
 
 def test_single_aggregation(example_scenario):
     room = example_scenario
-    aggregation_instance = room.get_aggregation_class_by_part_name("objects")
-    aggregations = aggregation_instance.symbolic_aggregation_features
-    values = aggregation_instance.apply_mapping()
+    aggregation_cls = get_aggregation_class(type(room))
+    aggregation_instance = aggregation_cls(instance=room)
+    aggregations = aggregation_instance.symbolic_aggregation_features_for("objects")
+    values = aggregation_instance.apply_mapping_for("objects")
     assert len(aggregations) == 3
     closed = Bound.CLOSED
     assert values == [
@@ -91,39 +93,35 @@ def test_multiple_exchangeable_parts():
 
 def test_aggregation_count_values(example_scenario):
     room = example_scenario
-    aggregation_instance = room.get_aggregation_class_by_part_name("objects")
-    values = aggregation_instance.apply_mapping()
+    aggregation_cls = get_aggregation_class(type(room))
+    aggregation_instance = aggregation_cls(instance=room)
+    values = aggregation_instance.apply_mapping_for("objects")
     assert values[0] == SimpleInterval.from_data(1, 4, Bound.CLOSED, Bound.CLOSED)
 
 
 def test_only_marked_methods_are_statistics():
     @dataclass
-    class PartiallyMarkedAggregations(AggregationStatistic):
-        objects_to_aggregate_on: List[SceneObject]
+    class Owner:
+        items: List[SceneObject]
 
-        @property
-        def _eql_variable(self):
-            return variable(SceneObject, self.objects_to_aggregate_on)
-
-        @statistic
+    @dataclass
+    class PartiallyMarkedAggregations(AggregationStatistic[Owner]):
+        @aggregation_statistic(variable(Owner, None).items)
         def marked_statistic(self) -> int:
             return 1
 
         def unmarked_helper(self) -> int:
             return 2
 
-    instance = PartiallyMarkedAggregations([SceneObject(type=SceneObjectType.TABLE)])
+    owner = Owner(items=[SceneObject(type=SceneObjectType.TABLE)])
+    instance = PartiallyMarkedAggregations(instance=owner)
     statistic_names = {function.__name__ for function in instance.aggregation_features}
     assert statistic_names == {"marked_statistic"}
 
 
-def test_empty_exchangeable_part_yields_no_aggregation_class():
-    room = SceneRoom(
-        position=KRROODPosition(0, 0, 0),
-        orientation=KRROODOrientation(0, 0, 0, 1),
-        objects=[],
-    )
-    assert room.get_aggregation_class_by_part_name("objects") is None
+def test_aggregation_class_discovered_for_concrete_subclasses():
+    assert get_aggregation_class(SceneRoom) is not None
+    assert get_aggregation_class(TestExParts) is not None
 
 
 def test_feature_extraction_over_empty_exchangeable_part_does_not_raise():

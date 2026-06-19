@@ -82,7 +82,7 @@ def test_fit_class_circuit_has_room_scalar_variables(rpc):
 
 def test_fit_class_circuit_has_aggregation_variable(rpc):
     names = {v.name for v in rpc.class_probabilistic_circuit.variables}
-    assert "SceneObjectAggregations.total_count()" in names
+    assert "SceneRoomAggregations.total_count()" in names
 
 
 def test_fit_creates_exchangeable_template_for_objects(rpc):
@@ -94,7 +94,7 @@ def test_fit_creates_exchangeable_template_for_objects(rpc):
 def test_fit_exchangeable_template_latent_is_total_count(rpc):
     template = rpc.exchangeable_distribution_templates["objects"]
     latent_names = {v.name for v in template.latent_variables}
-    assert "SceneObjectAggregations.total_count()" in latent_names
+    assert "SceneRoomAggregations.total_count()" in latent_names
 
 
 def test_fit_exchangeable_template_models_object_type(rpc):

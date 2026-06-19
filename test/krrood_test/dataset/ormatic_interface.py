@@ -148,44 +148,6 @@ class PersonDAO_knows_association(Base, AssociationDataAccessObject):
     )
 
 
-class RoomAggregationsDAO_objects_to_aggregate_on_association(
-    Base, AssociationDataAccessObject
-):
-    __tablename__ = "_11414036677671943841298588721487530740577869993035292873662401"
-
-    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
-
-    source_roomaggregationsdao_id: Mapped[int] = mapped_column(
-        ForeignKey("RoomAggregationsDAO.database_id")
-    )
-    target_sceneroomdao_id: Mapped[int] = mapped_column(
-        ForeignKey("SceneRoomDAO.database_id")
-    )
-
-    target: Mapped[SceneRoomDAO] = relationship(
-        "SceneRoomDAO", foreign_keys=[target_sceneroomdao_id], lazy="selectin"
-    )
-
-
-class SceneObjectAggregationsDAO_objects_to_aggregate_on_association(
-    Base, AssociationDataAccessObject
-):
-    __tablename__ = "_74456429920822652582775147988320869255651435873073371983833452"
-
-    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
-
-    source_sceneobjectaggregationsdao_id: Mapped[int] = mapped_column(
-        ForeignKey("SceneObjectAggregationsDAO.database_id")
-    )
-    target_sceneobjectdao_id: Mapped[int] = mapped_column(
-        ForeignKey("SceneObjectDAO.database_id")
-    )
-
-    target: Mapped[SceneObjectDAO] = relationship(
-        "SceneObjectDAO", foreign_keys=[target_sceneobjectdao_id], lazy="selectin"
-    )
-
-
 class SceneRoomDAO_objects_association(Base, AssociationDataAccessObject):
     __tablename__ = "_41896291563655570123326561014529018280292791361420111771921539"
 
@@ -760,6 +722,34 @@ class GenericClassDAO(
     }
 
 
+class GenericClass_floatDAO(
+    GenericClassDAO,
+    DataAccessObject[test.krrood_test.dataset.example_classes.GenericClass[float]],
+):
+    __tablename__ = "GenericClass_floatDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(GenericClassDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    value: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    optional_value: Mapped[typing.Optional[builtins.float]] = mapped_column(
+        use_existing_column=True
+    )
+
+    container: Mapped[typing.List[builtins.float]] = mapped_column(
+        JSON, nullable=False, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "GenericClass_floatDAO",
+        "inherit_condition": database_id == GenericClassDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
 class GenericClass_KRROODPositionDAO(
     GenericClassDAO,
     DataAccessObject[
@@ -808,34 +798,6 @@ class GenericClass_KRROODPositionDAO(
 
     __mapper_args__ = {
         "polymorphic_identity": "GenericClass_KRROODPositionDAO",
-        "inherit_condition": database_id == GenericClassDAO.database_id,
-        "polymorphic_load": "selectin",
-    }
-
-
-class GenericClass_floatDAO(
-    GenericClassDAO,
-    DataAccessObject[test.krrood_test.dataset.example_classes.GenericClass[float]],
-):
-    __tablename__ = "GenericClass_floatDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(GenericClassDAO.database_id),
-        primary_key=True,
-        use_existing_column=True,
-    )
-
-    value: Mapped[builtins.float] = mapped_column(use_existing_column=True)
-    optional_value: Mapped[typing.Optional[builtins.float]] = mapped_column(
-        use_existing_column=True
-    )
-
-    container: Mapped[typing.List[builtins.float]] = mapped_column(
-        JSON, nullable=False, use_existing_column=True
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "GenericClass_floatDAO",
         "inherit_condition": database_id == GenericClassDAO.database_id,
         "polymorphic_load": "selectin",
     }
@@ -1290,26 +1252,6 @@ class MultipleInheritanceDAO(
     }
 
 
-class RoomAggregationsDAO(
-    Base, DataAccessObject[test.krrood_test.dataset.example_classes.RoomAggregations]
-):
-    __tablename__ = "RoomAggregationsDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        Integer, primary_key=True, use_existing_column=True
-    )
-
-    objects_to_aggregate_on: Mapped[
-        builtins.list[RoomAggregationsDAO_objects_to_aggregate_on_association]
-    ] = relationship(
-        "RoomAggregationsDAO_objects_to_aggregate_on_association",
-        collection_class=builtins.list,
-        cascade="all, delete-orphan",
-        foreign_keys="[RoomAggregationsDAO_objects_to_aggregate_on_association.source_roomaggregationsdao_id]",
-        lazy="selectin",
-    )
-
-
 class SceneObjectDAO(
     Base, DataAccessObject[test.krrood_test.dataset.example_classes.SceneObject]
 ):
@@ -1328,25 +1270,26 @@ class SceneObjectDAO(
     )
 
 
-class SceneObjectAggregationsDAO(
+class SceneObjectAggregationBaseDAO(
     Base,
-    DataAccessObject[test.krrood_test.dataset.example_classes.SceneObjectAggregations],
+    DataAccessObject[
+        test.krrood_test.dataset.example_classes.SceneObjectAggregationBase
+    ],
 ):
-    __tablename__ = "SceneObjectAggregationsDAO"
+    __tablename__ = "SceneObjectAggregationBaseDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
         Integer, primary_key=True, use_existing_column=True
     )
 
-    objects_to_aggregate_on: Mapped[
-        builtins.list[SceneObjectAggregationsDAO_objects_to_aggregate_on_association]
-    ] = relationship(
-        "SceneObjectAggregationsDAO_objects_to_aggregate_on_association",
-        collection_class=builtins.list,
-        cascade="all, delete-orphan",
-        foreign_keys="[SceneObjectAggregationsDAO_objects_to_aggregate_on_association.source_sceneobjectaggregationsdao_id]",
-        lazy="selectin",
+    polymorphic_type: Mapped[str] = mapped_column(
+        String(255), nullable=False, use_existing_column=True
     )
+
+    __mapper_args__ = {
+        "polymorphic_on": "polymorphic_type",
+        "polymorphic_identity": "SceneObjectAggregationBaseDAO",
+    }
 
 
 class SceneRoomDAO(
@@ -1389,6 +1332,35 @@ class SceneRoomDAO(
         foreign_keys="[SceneRoomDAO_objects_association.source_sceneroomdao_id]",
         lazy="selectin",
     )
+
+
+class SceneRoomAggregationsDAO(
+    SceneObjectAggregationBaseDAO,
+    DataAccessObject[test.krrood_test.dataset.example_classes.SceneRoomAggregations],
+):
+    __tablename__ = "SceneRoomAggregationsDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(SceneObjectAggregationBaseDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    instance_id: Mapped[int] = mapped_column(
+        ForeignKey("SceneRoomDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    instance: Mapped[SceneRoomDAO] = relationship(
+        "SceneRoomDAO", uselist=False, foreign_keys=[instance_id], post_update=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "SceneRoomAggregationsDAO",
+        "inherit_condition": database_id == SceneObjectAggregationBaseDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
 
 
 class SymbolDAO(Base, DataAccessObject[krrood.symbol_graph.symbol_graph.Symbol]):
@@ -2558,6 +2530,35 @@ class TestExPartsDAO(
         foreign_keys="[TestExPartsDAO_rooms_association.source_testexpartsdao_id]",
         lazy="selectin",
     )
+
+
+class TestExPartsAggregationsDAO(
+    SceneObjectAggregationBaseDAO,
+    DataAccessObject[test.krrood_test.dataset.example_classes.TestExPartsAggregations],
+):
+    __tablename__ = "TestExPartsAggregationsDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(SceneObjectAggregationBaseDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    instance_id: Mapped[int] = mapped_column(
+        ForeignKey("TestExPartsDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    instance: Mapped[TestExPartsDAO] = relationship(
+        "TestExPartsDAO", uselist=False, foreign_keys=[instance_id], post_update=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "TestExPartsAggregationsDAO",
+        "inherit_condition": database_id == SceneObjectAggregationBaseDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
 
 
 class TestKRROODPositionSetDAO(

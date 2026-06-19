@@ -5,7 +5,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum, auto, StrEnum
-from functools import cached_property
+
 from pathlib import Path
 from types import FunctionType
 from typing import Set, Generic
@@ -32,10 +32,8 @@ from krrood.ormatic.data_access_objects.alternative_mappings import (
     T,
 )
 from krrood.parametrization.feature_extraction.aggregations import (
-    aggregation_for,
     AggregationStatistic,
-    HasExchangeablePartAggregations,
-    statistic,
+    aggregation_statistic,
 )
 from krrood.symbol_graph.symbol_graph import Symbol
 from ..dataset.semantic_world_like_classes import Body, Cabinet
@@ -754,7 +752,7 @@ class SceneObject:
 
 
 @dataclass
-class SceneRoom(HasExchangeablePartAggregations):
+class SceneRoom:
     position: KRROODPosition
     orientation: KRROODOrientation
     objects: List[SceneObject]
@@ -762,33 +760,24 @@ class SceneRoom(HasExchangeablePartAggregations):
 
 
 @dataclass
-class TestExParts(HasExchangeablePartAggregations):
+class TestExParts:
     objects: List[SceneObject]
     rooms: List[SceneRoom]
 
 
-@aggregation_for((SceneRoom, "objects"), (TestExParts, "objects"))
 @dataclass
-class SceneObjectAggregations(AggregationStatistic):
-    objects_to_aggregate_on: List[SceneObject]
+class SceneObjectAggregationBase(AggregationStatistic[T]):
+    """
+    Abstract base providing shared aggregation statistics over a
+    ``objects: List[SceneObject]`` field.
 
-    @cached_property
-    def _eql_variable(self):
-        return variable(SceneObject, self.objects_to_aggregate_on)
+    Concrete subclasses bind ``T`` to the owner type and are auto-registered.
+    """
 
-    @statistic
-    def table_count(self) -> int:
-        type_var = self._eql_variable.type
-        [cou] = (
-            entity(count_range(type_var))
-            .where(type_var == SceneObjectType.TABLE)
-            .tolist()
-        )
-        return cou
-
-    @statistic
+    @aggregation_statistic(variable(SceneRoom, None).objects)
     def chair_count(self) -> int:
-        type_var = self._eql_variable.type
+        """Count of CHAIR-type objects."""
+        type_var = variable(SceneObject, self.instance.objects).type
         [cou] = (
             entity(count_range(type_var))
             .where(type_var == SceneObjectType.CHAIR)
@@ -796,24 +785,40 @@ class SceneObjectAggregations(AggregationStatistic):
         )
         return cou
 
-    @statistic
+    @aggregation_statistic(variable(SceneRoom, None).objects)
+    def table_count(self) -> int:
+        """Count of TABLE-type objects."""
+        type_var = variable(SceneObject, self.instance.objects).type
+        [cou] = (
+            entity(count_range(type_var))
+            .where(type_var == SceneObjectType.TABLE)
+            .tolist()
+        )
+        return cou
+
+    @aggregation_statistic(variable(SceneRoom, None).objects)
     def total_count(self) -> int:
-        [cou] = count(self._eql_variable).tolist()
+        """Total number of objects."""
+        [cou] = count(variable(SceneObject, self.instance.objects)).tolist()
         return cou
 
 
-@aggregation_for((TestExParts, "rooms"))
 @dataclass
-class RoomAggregations(AggregationStatistic):
-    objects_to_aggregate_on: List[SceneRoom]
+class SceneRoomAggregations(SceneObjectAggregationBase[SceneRoom]):
+    """Aggregation statistics for :class:`SceneRoom` over its ``objects`` field."""
 
-    @cached_property
-    def _eql_variable(self):
-        return variable(SceneRoom, self.objects_to_aggregate_on)
 
-    @statistic
+@dataclass
+class TestExPartsAggregations(SceneObjectAggregationBase[TestExParts]):
+    """
+    Aggregation statistics for :class:`TestExParts` over its ``objects`` and
+    ``rooms`` fields.
+    """
+
+    @aggregation_statistic(variable(TestExParts, None).rooms)
     def room_count(self) -> int:
-        [cou] = count(self._eql_variable).tolist()
+        """Total number of rooms."""
+        [cou] = count(variable(SceneRoom, self.instance.rooms)).tolist()
         return cou
 
 

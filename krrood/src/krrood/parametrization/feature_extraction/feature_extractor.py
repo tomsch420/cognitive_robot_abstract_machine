@@ -14,9 +14,7 @@ from krrood.entity_query_language.core.variable import Variable
 from krrood.entity_query_language.factories import variable
 from krrood.ormatic.data_access_objects.from_dao import FromDataAccessObjectState
 from krrood.ormatic.utils import get_python_type_from_sqlalchemy_column, is_data_column
-from krrood.parametrization.feature_extraction.aggregations import (
-    HasExchangeablePartAggregations,
-)
+from krrood.parametrization.feature_extraction.aggregations import get_aggregation_class
 from random_events.variable import compatible_types
 
 if TYPE_CHECKING:
@@ -62,20 +60,14 @@ class FeatureExtractor:
     Mapping from each exchangeable-part field name to its discovered aggregation variables.
     """
 
-    def __post_init__(self):
-        if self.features is None:
-            raise ValueError(
-                "No features provided. If list of instances available, use `FeatureExtractor.from_instances` for instantiation."
-            )
-
     @classmethod
     def from_instances(cls, instances: list[DataAccessObject]) -> FeatureExtractor:
         """
         Create a new feature extractor from the given instances.
 
-        Exchangeable parts whose domain class does not inherit from
-        :class:`HasExchangeablePartAggregations` are silently skipped; the
-        remaining scalar and unique-part features are still extracted.
+        Exchangeable parts whose domain class has no entry in
+        :class:`~krrood.parametrization.feature_extraction.aggregations.AggregationRegistry`
+        are silently skipped; the remaining scalar and unique-part features are still extracted.
 
         :param instances: The instances to create the feature extractor from.
         :return: A new feature extractor.
@@ -126,15 +118,15 @@ class FeatureExtractor:
             )
 
             exchangeable_features.update(
-                FeatureExtractor._process_exchangeable_parts(
-                    current_instance, instance_composition.exchangeable_parts
+                FeatureExtractor._process_many_to_many(
+                    current_instance, instance_composition.many_to_many_relations
                 )
             )
             queue.extend(
-                FeatureExtractor._process_unique_parts(
+                FeatureExtractor._process_many_to_one(
                     current_instance,
                     current_symbolic,
-                    instance_composition.unique_parts,
+                    instance_composition.many_to_one_relations,
                 )
             )
 
@@ -171,21 +163,21 @@ class FeatureExtractor:
         return result
 
     @staticmethod
-    def _process_unique_parts(
+    def _process_many_to_one(
         instance: DataAccessObject,
         symbolic_root: Variable,
-        unique_parts: list[str],
+        many_to_one_relations: list[str],
     ) -> deque[Any]:
         """
-        Enqueues non-null unique-part (many-to-one) relations for further traversal.
+        Enqueues non-null many-to-one relations for further BFS traversal.
 
         :param instance: The DAO instance to inspect.
         :param symbolic_root: The symbolic variable rooted at ``instance``.
-        :param unique_parts: Field names of the instance's many-to-one relations.
+        :param many_to_one_relations: Field names of the instance's many-to-one relations.
         :return: ``(child_instance, child_symbolic)`` pairs ready for BFS expansion.
         """
         queue = deque()
-        for part in unique_parts:
+        for part in many_to_one_relations:
             value = getattr(instance, part)
 
             if value is None:
@@ -195,31 +187,33 @@ class FeatureExtractor:
         return queue
 
     @staticmethod
-    def _process_exchangeable_parts(
+    def _process_many_to_many(
         current_instance: DataAccessObject,
-        exchangeable_parts: list[str],
+        many_to_many_relations: list[str],
     ) -> dict[str, list[MappedVariable]]:
         """
         Collects aggregation statistic variables for all one-to-many relations of ``current_instance``.
 
         :param current_instance: The DAO instance to inspect.
-        :param exchangeable_parts: Field names of the instance's one-to-many relations.
-        :return: A mapping from each exchangeable-part field name to its aggregation variables.
+        :param many_to_many_relations: Field names of the instance's one-to-many relations.
+        :return: A mapping from each one-to-many field name to its aggregation variables.
         """
         result = defaultdict(list)
         dao_state = FromDataAccessObjectState()
         domain_object = current_instance.from_dao(dao_state)
 
-        for exchangeable_part in exchangeable_parts:
-            if not isinstance(domain_object, HasExchangeablePartAggregations):
+        aggregation_cls = get_aggregation_class(type(domain_object))
+        if aggregation_cls is None:
+            return result
+
+        aggregation_instance = aggregation_cls(instance=domain_object)
+        for field_name in many_to_many_relations:
+            if not getattr(domain_object, field_name):
                 continue
-            aggregation_instance = domain_object.get_aggregation_class_by_part_name(
-                exchangeable_part
-            )
-            if aggregation_instance is None:
-                continue
-            for aggregation in aggregation_instance.symbolic_aggregation_features:
-                result[exchangeable_part].append(aggregation)
+            for feature in aggregation_instance.symbolic_aggregation_features_for(
+                field_name
+            ):
+                result[field_name].append(feature)
 
         return result
 
@@ -229,19 +223,22 @@ class FeatureExtractor:
         :param instance: The instance to extract features from.
         :return: A list of mapped values.
         """
-        aggregation_to_part = {
-            aggregation: part
-            for part, aggregations in self.exchangeable_features.items()
+        aggregation_features = {
+            aggregation
+            for aggregations in self.exchangeable_features.values()
             for aggregation in aggregations
         }
         result = []
         dao_state = FromDataAccessObjectState()
         domain_object = instance.from_dao(dao_state)
+        aggregation_cls = get_aggregation_class(type(domain_object))
+        aggregation_instance = (
+            aggregation_cls(instance=domain_object)
+            if aggregation_cls is not None
+            else None
+        )
         for feature in self.features:
-            if feature in aggregation_to_part:
-                aggregation_instance = domain_object.get_aggregation_class_by_part_name(
-                    aggregation_to_part[feature]
-                )
+            if feature in aggregation_features:
                 result.append(
                     feature.apply_mapping_on_external_root(aggregation_instance)
                 )
@@ -282,8 +279,10 @@ class FeatureExtractor:
 @dataclass
 class EntityCompositionDescriptor:
     """
-    Describes the composition of a domain class in terms of its scalar attributes, unique-part relations, and exchangeable-part relations.
-    It is constructed from a DAO class' SQLAlchemy mapper.
+    Describes the scalar attributes and ORM relationships of a DAO class.
+
+    Constructed from the class's SQLAlchemy mapper; used by :class:`FeatureExtractor`
+    to direct BFS traversal and aggregation discovery.
     """
 
     dao_class: Type[DataAccessObject] = field(init=True)
@@ -296,14 +295,14 @@ class EntityCompositionDescriptor:
     Scalar data columns of the DAO class.
     """
 
-    unique_parts: list[str] = field(init=False, default_factory=list)
+    many_to_one_relations: list[str] = field(init=False, default_factory=list)
     """
-    Field names of many-to-one (unique-part) relations.
+    Field names of many-to-one relations (FK on this table).
     """
 
-    exchangeable_parts: list[str] = field(init=False, default_factory=list)
+    many_to_many_relations: list[str] = field(init=False, default_factory=list)
     """
-    Field names of one-to-many (exchangeable-part) relations.
+    Field names of many-to-many relations.
     """
 
     def __post_init__(self):
@@ -311,10 +310,9 @@ class EntityCompositionDescriptor:
 
         for relationship in mapper.relationships:
             if relationship.direction == MANYTOONE:
-                self.unique_parts.append(relationship.key)
-            # not many to many since we have the association table
+                self.many_to_one_relations.append(relationship.key)
             elif relationship.direction == ONETOMANY:
-                self.exchangeable_parts.append(relationship.key)
+                self.many_to_many_relations.append(relationship.key)
         for column in mapper.columns:
             if is_data_column(column) and column not in mapper.relationships:
                 self.attributes.append(column)
