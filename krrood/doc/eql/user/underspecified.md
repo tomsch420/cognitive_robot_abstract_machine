@@ -50,8 +50,19 @@ when exactly one solution is expected.
 
 ## Field Specification: Three Kinds of Values
 
-Every keyword argument passed to the factory call carries a distinct meaning for the generative
-backend.
+Every keyword argument passed to the factory call carries a distinct meaning for a *generative*
+backend. The semantics below describe the
+{py:class}`~krrood.entity_query_language.backends.ProbabilisticBackend` (conditioning, truncation,
+sampling).
+
+```{note}
+The deterministic
+{py:class}`~krrood.entity_query_language.backends.EntityQueryLanguageGenerativeBackend` instead
+*enumerates*: concrete literals and `variable(..., domain=...)` are used directly, enum `...`
+fields are enumerated over their members, but a free `...` on a non-enum field cannot be enumerated
+and raises. Under the default *selective* evaluation (no generative backend), the same kwargs act
+as ordinary structural equality conditions over existing objects.
+```
 
 ### Ellipsis (`...`) — free variable
 
@@ -59,9 +70,9 @@ backend.
 query = an(KRROODPosition)(x=..., y=..., z=...)
 ```
 
-An `Ellipsis` marks the field as *unconstrained*.  The backend samples a value for that dimension
-from the **marginal** of the probabilistic model — no restriction is applied.  Use `...` whenever
-you genuinely have no prior knowledge about a field.
+An `Ellipsis` marks the field as *unconstrained*.  With the `ProbabilisticBackend`, the backend
+samples a value for that dimension from the **marginal** of the probabilistic model — no
+restriction is applied.  Use `...` whenever you genuinely have no prior knowledge about a field.
 
 ```{important}
 `...` can only be used on fields whose Python type appears in
@@ -210,7 +221,7 @@ assert all(p.position.x > 0.5 for p in poses)
 
 ### Example: nested underspecified objects
 
-Complex action types can be described by nesting multiple `underspecified` calls.
+Complex action types can be described by nesting multiple `an(...)` calls.
 Each level of nesting introduces its own field constraints independently:
 
 ```python
