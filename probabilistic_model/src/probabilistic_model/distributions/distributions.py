@@ -296,12 +296,21 @@ class DiscreteDistribution(UnivariateDistribution):
     """
 
     def log_likelihood(self, events: npt.NDArray) -> npt.NDArray:
-        events = events[:, 0]
-
-        events = np.array([hash(e) for e in events])
-        result = np.full(len(events), -np.inf)
-        for x, p in self.probabilities.items():
-            result[events == hash(x)] = np.log(p)
+        values = events[:, 0]
+        result = np.full(len(values), -np.inf)
+        if np.issubdtype(values.dtype, np.number):
+            # Values arriving from ProbabilisticCircuit.log_likelihood() are hash
+            # integers stored as float64 (produced by sample()).  We compare them
+            # as float64 against float64-cast keys so that any precision loss
+            # introduced by the float64 representation is symmetric on both sides.
+            for x, p in self.probabilities.items():
+                result[values == np.float64(x)] = np.log(p)
+        else:
+            # Values are original domain objects (e.g. from log_conditional);
+            # hash them the same way fit() did.
+            keys = np.array([hash(e) for e in values])
+            for x, p in self.probabilities.items():
+                result[keys == hash(x)] = np.log(p)
         return result
 
     def fit(self, data: npt.NDArray) -> Self:

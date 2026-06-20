@@ -283,7 +283,17 @@ class LeafUnit(Unit):
         return []
 
     def log_likelihood(self, events: npt.NDArray):
-        self.result_of_current_query = self.distribution.log_likelihood(events)
+        # NaN means the variable is unobserved for that sample; its contribution
+        # to the joint log-likelihood is 0 (i.e., it is marginalised out).
+        # NaN only exists in floating-point arrays; object/int arrays are always observed.
+        if np.issubdtype(events.dtype, np.floating):
+            nan_mask = np.isnan(events).any(axis=1)
+        else:
+            nan_mask = np.zeros(len(events), dtype=bool)
+        result = np.zeros(len(events))
+        if not nan_mask.all():
+            result[~nan_mask] = self.distribution.log_likelihood(events[~nan_mask])
+        self.result_of_current_query = result
 
     def cumulative_distribution(self, events: npt.NDArray):
         self.result_of_current_query = (
