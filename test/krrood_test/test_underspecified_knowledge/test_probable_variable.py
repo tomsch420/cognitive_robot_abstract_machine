@@ -38,8 +38,6 @@ def test_underspecification_with_where():
         underspecified_pose.variable.position.z <= 1.0,
         underspecified_pose.variable.orientation.x != 1.0,
     )
-    q_verb = VerbalizationPipeline.ansi(True).verbalize(q)
-    print(q_verb)
     t = WhereExpressionToRandomEventTranslator(
         and_(*q._where_conditions_),
     )
