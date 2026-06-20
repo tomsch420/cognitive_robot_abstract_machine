@@ -12,8 +12,10 @@ Relational probabilistic circuits ("RSPNs").
 from __future__ import annotations
 
 import itertools
+import math
 from dataclasses import dataclass, field
 
+import numpy as np
 import pandas as pd
 from sortedcontainers import SortedSet
 from typing_extensions import TYPE_CHECKING, Any, Optional, Type
@@ -44,6 +46,7 @@ from probabilistic_model.probabilistic_circuit.relational.helper import (
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit,
     ProductUnit,
+    SumUnit,
 )
 from random_events.variable import Variable
 
@@ -59,6 +62,12 @@ def _rename_variables_with_part_prefix(
     Produces names of the form ``"{prefix}.{variable.name}"``.
     Variables listed in ``excluded_variables`` are left unchanged.
 
+    .. note::
+        ``ProbabilisticCircuit.leaves`` returns an empty list when the root is
+        itself a leaf (single-node circuit), because ``LeafUnit.leaves`` is defined
+        as ``[]``.  The rename is applied to those root leaves directly to handle
+        that case.
+
     :param circuit: The circuit whose variables are renamed in-place.
     :param prefix: String prefix to prepend to every variable name.
     :param excluded_variables: Variables that should keep their current names.
@@ -69,6 +78,9 @@ def _rename_variables_with_part_prefix(
         if variable not in excluded_variables
     }
     circuit.update_variables(variable_renames)
+    # When the root is a leaf, update_variables misses it (LeafUnit.leaves == []).
+    if circuit.root.is_leaf and circuit.root.variable in variable_renames:
+        circuit.root.distribution.variable = variable_renames[circuit.root.variable]
 
 
 @dataclass
@@ -175,6 +187,16 @@ class RelationalProbabilisticCircuit:
     """
     Mapping from each exchangeable-part field name to its fitted
     ``ExchangeableDistributionTemplate``.
+    """
+
+    n_samples: int = field(default=100)
+    """
+    Number of Monte Carlo samples drawn from the aggregation statistics posterior when
+    grounding an exchangeable distribution template.
+
+    A larger value gives a more accurate integral approximation at the cost of a larger
+    grounded circuit.  Set to ``1`` to recover near-deterministic behaviour when all
+    aggregation statistics are fully observed.
     """
 
     schema_information: Optional[DataAccessObjectSchema] = field(
@@ -390,6 +412,89 @@ class RelationalProbabilisticCircuit:
         ]
         return circuit, surviving_product_nodes
 
+    def _sample_aggregation_statistics(
+        self,
+        circuit: ProbabilisticCircuit,
+        available_statistics: dict[Variable, Any],
+        latent_variables: list[Variable],
+    ) -> list[dict[Variable, Any]]:
+        """
+        Draw samples of aggregation statistics from the class circuit prior.
+
+        Marginalises the circuit (before any conditioning) to the aggregation (latent)
+        variables to obtain ``P(agg_stats)``, conditions on the subset of statistics
+        that are already known (``available_statistics``), then draws :attr:`n_samples`
+        samples of the remaining unknown statistics.  Each returned dict contains the
+        full set of latent variables: known ones take their observed value in every
+        sample; unknown ones are drawn from the posterior
+        ``P(unknown | known, class context)``.
+
+        This method must be called on the **unconditioned** circuit because
+        :meth:`~probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit.ProbabilisticCircuit.log_conditional_in_place`
+        marginalises out conditioned variables, making them unavailable for sampling
+        afterwards.
+
+        :param circuit: The unconditioned deep-copy of the class circuit.
+        :param available_statistics: Aggregation statistics that are computable from the
+            query; may be empty or partial.
+        :param latent_variables: All aggregation statistic variables for this part.
+        :return: One dict per sample mapping every latent variable to a value.
+        """
+        agg_marginal = circuit.marginal(latent_variables)
+        if agg_marginal is None:
+            return [dict(available_statistics)] * self.n_samples
+
+        available_in_marginal = {
+            variable: value
+            for variable, value in available_statistics.items()
+            if variable in agg_marginal.variables
+        }
+        if available_in_marginal:
+            conditioned, _ = agg_marginal.log_conditional_in_place(available_in_marginal)
+            if conditioned is None:
+                agg_marginal = circuit.marginal(latent_variables)
+
+        samples_array = agg_marginal.sample(self.n_samples)
+        variable_to_index = agg_marginal.variable_to_index_map
+        result = []
+        for i in range(self.n_samples):
+            sample = dict(available_statistics)
+            for variable, index in variable_to_index.items():
+                sample[variable] = samples_array[i, index]
+            result.append(sample)
+        return result
+
+    def _build_grounded_mixture(
+        self,
+        template: ExchangeableDistributionTemplate,
+        parts_to_ground: list,
+        aggregation_statistic_samples: list[dict[Variable, Any]],
+    ) -> ProbabilisticCircuit:
+        """
+        Ground the template once per sample and combine the results into a uniform mixture.
+
+        Each sample produces one grounded circuit ``P(x | sᵢ)``.  All circuits are
+        combined in a :class:`~probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit.SumUnit`
+        with equal log-weight ``-log(n_samples)``, approximating the integral
+        ``∫ P(x | s) P(s | class context) ds``.
+
+        :param template: The exchangeable distribution template to ground.
+        :param parts_to_ground: The query parts, one per child object in the relation.
+        :param aggregation_statistic_samples: Sampled aggregation statistics, one dict per sample.
+        :return: A mixture circuit over the grounded distributions.
+        """
+        mixture = ProbabilisticCircuit()
+        mixture_root = SumUnit(probabilistic_circuit=mixture)
+        log_weight = -math.log(len(aggregation_statistic_samples))
+        for aggregation_statistics in aggregation_statistic_samples:
+            grounded = template.ground(parts_to_ground, aggregation_statistics)
+            grounded_root_index = grounded.root.index
+            node_index_map = mixture.mount(grounded.root)
+            mixture_root.add_subcircuit(
+                node_index_map[grounded_root_index], log_weight=log_weight
+            )
+        return mixture
+
     def ground(self, query: Match) -> ProbabilisticCircuit:
         """Ground the relational circuit for a specific query.
 
@@ -417,14 +522,17 @@ class RelationalProbabilisticCircuit:
                 self.feature_extractor.exchangeable_features[exchangeable_part_name],
                 template.latent_variables,
             )
+            samples = self._sample_aggregation_statistics(
+                circuit, aggregation_statistics, template.latent_variables
+            )
             circuit, product_nodes_to_extend = self._condition_class_circuit(
                 circuit, aggregation_statistics, template.latent_variables
             )
-            grounded_exchangeable_circuit = template.ground(
-                query.kwargs[exchangeable_part_name], aggregation_statistics
-            )
-            exchangeable_root = grounded_exchangeable_circuit.root
-            node_index_map = circuit.mount(exchangeable_root)
             for product_node in product_nodes_to_extend:
-                product_node.add_subcircuit(node_index_map[exchangeable_root.index])
+                mixture = self._build_grounded_mixture(
+                    template, query.kwargs[exchangeable_part_name], samples
+                )
+                mixture_root_index = mixture.root.index
+                node_index_map = circuit.mount(mixture.root)
+                product_node.add_subcircuit(node_index_map[mixture_root_index])
         return circuit

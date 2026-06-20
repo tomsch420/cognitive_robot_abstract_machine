@@ -8,6 +8,7 @@ from probabilistic_model.probabilistic_circuit.relational.exceptions import (
 from probabilistic_model.probabilistic_circuit.relational.rspn import (
     RelationalProbabilisticCircuit,
 )
+from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import SumUnit
 from ..dataset import ormatic_interface  # type: ignore
 from ..dataset.example_classes import (
     KRROODOrientation,
@@ -121,6 +122,38 @@ def test_ground_preserves_room_scalar_variables(rpc, room_query_4):
     names = {v.name for v in model.variables}
     assert "SceneRoom.position.x" in names
     assert "SceneRoom.orientation.w" in names
+
+
+def test_ground_circuit_contains_sum_unit_for_exchangeable_part(rpc, room_query_4):
+    model = rpc.ground(room_query_4)
+    nodes = model.nodes()
+    assert any(isinstance(node, SumUnit) for node in nodes)
+
+
+def test_ground_mixture_has_n_samples_components(rpc, room_query_4):
+    model = rpc.ground(room_query_4)
+    sum_units = [node for node in model.nodes() if isinstance(node, SumUnit)]
+    # The top-level SumUnit wrapping the grounded exchangeable parts has n_samples children.
+    assert any(len(su.subcircuits) == rpc.n_samples for su in sum_units)
+
+
+def test_ground_mixture_weights_are_uniform(rpc, room_query_4):
+    import math
+    model = rpc.ground(room_query_4)
+    sum_units = [node for node in model.nodes() if isinstance(node, SumUnit)]
+    mixture = next(su for su in sum_units if len(su.subcircuits) == rpc.n_samples)
+    expected = -math.log(rpc.n_samples)
+    for log_weight, _ in mixture.log_weighted_subcircuits:
+        assert abs(log_weight - expected) < 1e-9
+
+
+def test_ground_with_single_sample_is_valid(rpc, room_query_4):
+    rpc.n_samples = 1
+    model = rpc.ground(room_query_4)
+    assert model.is_valid()
+    names = {v.name for v in model.variables}
+    for i in range(4):
+        assert f"SceneRoom.objects[{i}].type" in names
 
 
 def test_ground_variable_count_scales_with_query_size(rpc):
