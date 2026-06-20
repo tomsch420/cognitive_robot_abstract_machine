@@ -332,25 +332,6 @@ class KRROODVectorsWithPropertyMappedDAO_vectors_association(
     )
 
 
-class LibraryRoomDAO_items_association(Base, AssociationDataAccessObject):
-    __tablename__ = "_11561278050184579149415008504597606721118763150753817581517259"
-
-    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
-
-    source_libraryroomdao_id: Mapped[int] = mapped_column(
-        ForeignKey("LibraryRoomDAO.database_id")
-    )
-    target_polymorphicsceneitemdao_id: Mapped[int] = mapped_column(
-        ForeignKey("PolymorphicSceneItemDAO.database_id")
-    )
-
-    target: Mapped[PolymorphicSceneItemDAO] = relationship(
-        "PolymorphicSceneItemDAO",
-        foreign_keys=[target_polymorphicsceneitemdao_id],
-        lazy="selectin",
-    )
-
-
 class MoreShapesDAO_shapes_association(Base, AssociationDataAccessObject):
     __tablename__ = "_11161716549138335236278923864975586813499160586493777081744432"
 
@@ -952,27 +933,6 @@ class JSONWrapperDAO(
     more_objects: Mapped[
         typing.List[test.krrood_test.dataset.example_classes.JSONSerializableClass]
     ] = mapped_column(JSON, nullable=False, use_existing_column=True)
-
-
-class LibraryRoomAggregationsDAO(
-    Base,
-    DataAccessObject[test.krrood_test.dataset.example_classes.LibraryRoomAggregations],
-):
-    __tablename__ = "LibraryRoomAggregationsDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        Integer, primary_key=True, use_existing_column=True
-    )
-
-    instance_id: Mapped[int] = mapped_column(
-        ForeignKey("LibraryRoomDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
-
-    instance: Mapped[LibraryRoomDAO] = relationship(
-        "LibraryRoomDAO", uselist=False, foreign_keys=[instance_id], post_update=True
-    )
 
 
 class MissingBaseClassDAO(
@@ -2102,39 +2062,6 @@ class KRROODVectorsWithPropertyMappedDAO(
     }
 
 
-class LibraryRoomDAO(
-    SymbolDAO, DataAccessObject[test.krrood_test.dataset.example_classes.LibraryRoom]
-):
-    __tablename__ = "LibraryRoomDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(SymbolDAO.database_id), primary_key=True, use_existing_column=True
-    )
-
-    position_id: Mapped[int] = mapped_column(
-        ForeignKey("KRROODPositionDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
-
-    position: Mapped[KRROODPositionDAO] = relationship(
-        "KRROODPositionDAO", uselist=False, foreign_keys=[position_id], post_update=True
-    )
-    items: Mapped[builtins.list[LibraryRoomDAO_items_association]] = relationship(
-        "LibraryRoomDAO_items_association",
-        collection_class=builtins.list,
-        cascade="all, delete-orphan",
-        foreign_keys="[LibraryRoomDAO_items_association.source_libraryroomdao_id]",
-        lazy="selectin",
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "LibraryRoomDAO",
-        "inherit_condition": database_id == SymbolDAO.database_id,
-        "polymorphic_load": "selectin",
-    }
-
-
 class ListOfEnumDAO(
     SymbolDAO, DataAccessObject[test.krrood_test.dataset.example_classes.ListOfEnum]
 ):
@@ -2373,67 +2300,6 @@ class ChildBaseMappingDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ChildBaseMappingDAO",
         "inherit_condition": database_id == ParentBaseMappingDAO.database_id,
-        "polymorphic_load": "selectin",
-    }
-
-
-class PolymorphicSceneItemDAO(
-    SymbolDAO,
-    DataAccessObject[test.krrood_test.dataset.example_classes.PolymorphicSceneItem],
-):
-    __tablename__ = "PolymorphicSceneItemDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(SymbolDAO.database_id), primary_key=True, use_existing_column=True
-    )
-
-    size: Mapped[builtins.float] = mapped_column(use_existing_column=True)
-
-    __mapper_args__ = {
-        "polymorphic_identity": "PolymorphicSceneItemDAO",
-        "inherit_condition": database_id == SymbolDAO.database_id,
-        "polymorphic_load": "selectin",
-    }
-
-
-class BookSceneItemDAO(
-    PolymorphicSceneItemDAO,
-    DataAccessObject[test.krrood_test.dataset.example_classes.BookSceneItem],
-):
-    __tablename__ = "BookSceneItemDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(PolymorphicSceneItemDAO.database_id),
-        primary_key=True,
-        use_existing_column=True,
-    )
-
-    pages: Mapped[builtins.int] = mapped_column(use_existing_column=True)
-
-    __mapper_args__ = {
-        "polymorphic_identity": "BookSceneItemDAO",
-        "inherit_condition": database_id == PolymorphicSceneItemDAO.database_id,
-        "polymorphic_load": "selectin",
-    }
-
-
-class LampSceneItemDAO(
-    PolymorphicSceneItemDAO,
-    DataAccessObject[test.krrood_test.dataset.example_classes.LampSceneItem],
-):
-    __tablename__ = "LampSceneItemDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(PolymorphicSceneItemDAO.database_id),
-        primary_key=True,
-        use_existing_column=True,
-    )
-
-    brightness: Mapped[builtins.float] = mapped_column(use_existing_column=True)
-
-    __mapper_args__ = {
-        "polymorphic_identity": "LampSceneItemDAO",
-        "inherit_condition": database_id == PolymorphicSceneItemDAO.database_id,
         "polymorphic_load": "selectin",
     }
 
