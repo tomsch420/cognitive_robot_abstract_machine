@@ -227,11 +227,13 @@ class GroupedBy(MultiArityExpressionThatPerformsACartesianProduct):
 
         groups, group_key_count = self.get_groups_and_group_key_count(sources)
 
-        if self.count_occurrences_of_group_keys:
-            for group_key, group in groups.items():
+        for group_key, group in groups.items():
+            if self.count_occurrences_of_group_keys:
                 group[self.count_occurrences_of_group_keys._id_] = group_key_count[
                     group_key
                 ]
+            for count_all in self.count_all_aggregators:
+                group[count_all._id_] = group_key_count[group_key]
 
         yield from groups.values()
 
@@ -262,8 +264,12 @@ class GroupedBy(MultiArityExpressionThatPerformsACartesianProduct):
             self.update_group_from_bindings(groups[group_key], res.bindings)
 
         if len(groups) == 0:
-            # if there are no groups, add one empty group with an empty list for each aggregated variable.
+            # if there are no groups, add one empty group with an empty list for each aggregated
+            # variable. CountAll has no child to seed; the empty group's row count of zero is
+            # injected later by its own identifier.
             for aggregator in self.aggregators:
+                if isinstance(aggregator, CountAll):
+                    continue
                 groups[()][aggregator._child_._id_] = []
 
         return groups, group_key_count
@@ -317,6 +323,13 @@ class GroupedBy(MultiArityExpressionThatPerformsACartesianProduct):
         )
 
     @cached_property
+    def count_all_aggregators(self) -> Tuple[CountAll, ...]:
+        """
+        :return: The aggregators that count all rows per group.
+        """
+        return tuple(agg for agg in self.aggregators if isinstance(agg, CountAll))
+
+    @cached_property
     def aggregators_of_grouped_by_variables(self):
         """
         :return: A list of the aggregators that are aggregating over
@@ -325,7 +338,8 @@ class GroupedBy(MultiArityExpressionThatPerformsACartesianProduct):
         return [
             var
             for var in self.aggregators
-            if var._child_._id_ in self.ids_of_variables_to_group_by
+            if var._child_ is not None
+            and var._child_._id_ in self.ids_of_variables_to_group_by
         ]
 
     @cached_property

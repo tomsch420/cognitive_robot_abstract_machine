@@ -69,7 +69,7 @@ from krrood.entity_query_language.exceptions import (
     UnsupportedNegation,
     NonPositiveLimitValue,
 )
-from krrood.entity_query_language.operators.aggregators import Aggregator, CountAll
+from krrood.entity_query_language.operators.aggregators import Aggregator
 from krrood.entity_query_language.operators.set_operations import (
     MultiArityExpressionThatPerformsACartesianProduct,
 )
@@ -373,8 +373,6 @@ class Query(
         children = self._data_source_chain_head_()
         self._compiled_inner_head_ = children[0] if children else None
 
-        self._if_count_all_is_used_update_its_child_to_be_the_grouped_by_expression_()
-
         children.extend(self._selected_variables_)
         self.update_children(*children)
 
@@ -410,30 +408,6 @@ class Query(
                 continue
             self._expression_ = modifier.rewrap(self._expression_)
             modifier._needs_apply_ = False
-
-    def _if_count_all_is_used_update_its_child_to_be_the_grouped_by_expression_(
-        self,
-    ) -> None:
-        """
-        Update the child of the `CountAll` aggregator to be the `GroupedBy` expression if it exists.
-        """
-        if self._grouped_by_builder_ is None:
-            return
-        count_all = next(
-            (
-                aggregator
-                for aggregator in self._grouped_by_builder_.aggregators_and_non_aggregators[
-                    0
-                ]
-                if isinstance(aggregator, CountAll)
-            ),
-            None,
-        )
-        if count_all is None:
-            return
-        count_all._replace_child_(
-            count_all._child_, self._grouped_by_builder_.expression
-        )
 
     def _evaluate__(
         self,
@@ -611,28 +585,9 @@ class Query(
         self.build()
         if isinstance(parent, MappedVariable):
             return self._expression_
-        if not self._is_snapshotable_():
-            return self._expression_
         if self._embedding_snapshot_ is None:
             self._embedding_snapshot_ = self._compile_snapshot_()
         return self._embedding_snapshot_
-
-    def _is_snapshotable_(self) -> bool:
-        """
-        A snapshot replays this query's spec onto a fresh query that shares the original's selected
-        variables. That is unsound only for :class:`CountAll
-        <krrood.entity_query_language.operators.aggregators.CountAll>`, whose child is rewired to the
-        grouping at build time: building the snapshot would mutate the shared aggregator and corrupt
-        the original. Such queries share the live expression instead.
-
-        .. note:: This narrow fallback is removed once the compiled node no longer mutates shared
-            aggregators.
-
-        :return: Whether the compiled expression can be safely snapshotted.
-        """
-        return not any(
-            isinstance(node, CountAll) for node in self._expression_._descendants_
-        )
 
     def _compile_snapshot_(self) -> SymbolicExpression:
         """

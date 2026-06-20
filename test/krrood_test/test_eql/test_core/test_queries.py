@@ -1233,9 +1233,8 @@ def test_editing_distinct_subquery_after_embedding_leaves_snapshot_unchanged():
 
 
 def test_embedding_a_count_all_subquery_does_not_corrupt_the_original():
-    """A ``count_all`` query rewires its aggregator child to the grouping at build time, so it falls
-    back to sharing its live expression when embedded. Re-evaluating the original after embedding must
-    still produce correct results."""
+    """Embedding a ``count_all`` query must not corrupt it: re-evaluating the original after embedding
+    still produces correct results."""
     group_variable = variable(int, [10, 20])
     counted = set_of(group_variable, eql.count_all()).grouped_by(group_variable)
 
@@ -1245,6 +1244,22 @@ def test_embedding_a_count_all_subquery_does_not_corrupt_the_original():
     embedding.tolist()
 
     assert sorted(tuple(row.values()) for row in counted.tolist()) == before
+
+
+def test_editing_and_rebuilding_a_count_all_subquery_after_embedding_leaves_snapshot_unchanged():
+    """A ``count_all`` subquery is snapshotted on embedding like any other query, so editing **and
+    rebuilding** the original afterwards does not change the already-embedded copy."""
+    group_variable = variable(int, [10, 10, 20])
+    counted = set_of(group_variable, eql.count_all()).grouped_by(group_variable)
+    outer = an(entity(counted))
+
+    before = sorted(tuple(row.values()) for row in outer.tolist())
+    assert before == [(10, 2), (20, 1)]
+
+    counted.where(group_variable != 20)
+    counted.tolist()
+
+    assert sorted(tuple(row.values()) for row in outer.tolist()) == before
 
 
 def test_embedded_subquery_is_a_snapshot_clone_sharing_variable_leaves():
