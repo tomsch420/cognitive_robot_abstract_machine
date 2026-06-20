@@ -842,3 +842,52 @@ class ActionWithMissingAggregationsMixin:
     """Action with a field whose domain type has exchangeable parts but no aggregation mixin."""
 
     domain_object: Cabinet
+
+
+# ── Polymorphic RSPN test classes ────────────────────────────────────────────
+
+
+@dataclass
+class PolymorphicSceneItem(Symbol):
+    """Abstract base for polymorphic scene items used in RSPN grounding tests."""
+
+    size: float
+    """Physical size of the item."""
+
+
+@dataclass
+class BookSceneItem(PolymorphicSceneItem):
+    """Concrete scene item subtype representing a book."""
+
+    pages: int
+    """Number of pages in the book."""
+
+
+@dataclass
+class LampSceneItem(PolymorphicSceneItem):
+    """Concrete scene item subtype representing a lamp."""
+
+    brightness: float
+    """Brightness level of the lamp in lumens."""
+
+
+@dataclass
+class LibraryRoom(Symbol):
+    """A room containing a polymorphic collection of scene items."""
+
+    position: KRROODPosition
+    """3-D position of the room origin."""
+
+    items: List[PolymorphicSceneItem] = field(default_factory=list)
+    """Polymorphic collection of items in the room."""
+
+
+@dataclass
+class LibraryRoomAggregations(AggregationStatistic[LibraryRoom]):
+    """Aggregation statistics for :class:`LibraryRoom` over its ``items`` field."""
+
+    @aggregation_statistic(variable(LibraryRoom, None).items)
+    def total_count(self) -> int:
+        """Total number of items."""
+        [cou] = count(variable(PolymorphicSceneItem, self.instance.items)).tolist()
+        return cou

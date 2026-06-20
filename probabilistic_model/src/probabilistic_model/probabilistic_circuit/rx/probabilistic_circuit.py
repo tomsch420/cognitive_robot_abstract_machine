@@ -456,7 +456,10 @@ class SumUnit(InnerUnit):
 
     @property
     def variables(self) -> SortedSet:
-        return self.subcircuits[0].variables
+        result = SortedSet()
+        for subcircuit in self.subcircuits:
+            result = result.union(subcircuit.variables)
+        return result
 
     @property
     def latent_variable(self) -> Symbolic:
