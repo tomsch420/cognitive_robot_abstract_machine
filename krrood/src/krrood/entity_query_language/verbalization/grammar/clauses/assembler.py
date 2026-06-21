@@ -155,7 +155,7 @@ class HavingAssembler(Assembler[Query, None]):
     >>> verbalize_expression(
     ...     a(set_of(employee.department, total).grouped_by(employee.department).having(total > 30000))
     ... )
-    'For each department, report the sum of salaries of Employees having the sum of salaries of Employees greater than 30000'
+    'For each department, report the sum of salaries of Employees having the sum greater than 30000'
     """
 
     def realize(self, node: Query, plan: None = None) -> Fragment:

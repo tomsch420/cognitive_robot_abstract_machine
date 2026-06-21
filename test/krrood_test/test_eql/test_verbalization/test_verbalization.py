@@ -845,15 +845,15 @@ def test_min_multi_level_attribute_chain():
     ), f"Got: {text!r}"
 
 
-def test_max_re_mention_in_having():
-    """MAX appears in both selected variable and HAVING: both mentions use 'the maximum of …'."""
+def test_max_re_mention_in_having_reduces_to_the_head():
+    """MAX is a computed quantity, so its HAVING re-mention is anaphoric: named in full as the
+    reported column, then reduced to the bare 'the maximum' (not repeated whole)."""
     t = variable(BankTransaction, domain=None)
     max_amount = eql.max(t.amount_details.amount)
     query = a(set_of(max_amount).grouped_by(t.amount_details).having(max_amount > 100))
     text = verbalize_expression(query)
-    assert (
-        text.count("the maximum of") >= 2
-    ), f"Expected ≥2 occurrences of 'the maximum of' in: {text!r}"
+    assert text.count("the maximum of") == 1  # the column names it in full, once
+    assert "having the maximum greater than 100" in text  # the re-mention reduces
 
 
 # ── Nested sub-queries as values (the imperative "Find" is reserved for the top level) ──
@@ -1248,6 +1248,24 @@ def test_verbalize_complex_having(departments_and_employees_fixture):
     assert "grouped by" not in text
     assert "having" in text
     assert "30000" in text
+
+
+def test_grouped_having_reduces_the_repeated_aggregate():
+    """The reported aggregate is a computed quantity: named in full as the column, its HAVING
+    re-mention reduces to the bare 'the sum' rather than repeating the whole phrase."""
+    employee = variable(Employee, domain=None)
+    total = eql.sum(employee.salary)
+    query = a(
+        set_of(employee.department, total)
+        .grouped_by(employee.department)
+        .having(total > 30000)
+    )
+    text = verbalize_expression(query)
+    assert (
+        text
+        == "For each department, report the sum of salaries of Employees having the sum greater than 30000"
+    )
+    assert text.count("the sum of salaries of Employees") == 1
 
 
 def test_verbalize_nested_rule(doors_and_drawers_world):

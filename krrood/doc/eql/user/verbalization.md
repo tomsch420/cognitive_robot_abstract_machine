@@ -330,6 +330,17 @@ print(verbalize_expression(
 
 A `limit` is the exception: it ranks (*"Find the top three …"*), a distinct count-bearing form.
 
+A reported aggregate is a *computed quantity*: named in full where it is first reported, a later
+mention of the same aggregate (in `having`, or an ordering) reduces to its bare head:
+
+```{code-cell} ipython3
+total = eql.sum(employee.salary)
+print(verbalize_expression(
+    a(set_of(employee.department, total).grouped_by(employee.department).having(total > 30000))
+))
+# For each department, report the sum of salaries of Employees having the sum greater than 30000
+```
+
 A plain (non-aggregating, unordered) `set_of` stays a search and also drops the parentheses:
 
 ```{code-cell} ipython3
