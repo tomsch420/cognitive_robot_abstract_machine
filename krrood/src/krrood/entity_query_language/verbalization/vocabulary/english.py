@@ -148,6 +148,7 @@ class Keywords(VocabEnum):
     THEN = KeyWord("then")
     FIND = KeyWord("Find")
     REPORT = KeyWord("report")
+    FOR = KeyWord("for")
     FOR_EACH = KeyWord("For each")
     SUCH_THAT = KeyWord("such that")
     GIVEN_THAT = KeyWord("given that")

@@ -129,15 +129,17 @@ def _pnl_query(n: int):
 
 def test_set_of_limit_renders_ranking_and_suppresses_ordered_by():
     text = verbalize_expression(_pnl_query(3))
+    # The ranked tuple is reframed onto the entity its columns describe — no code-like "(a, b)".
     assert text == (
-        "Find the top three (the period of a ProfitAndLossStatement, "
-        "the sum of the amount of the money of its revenue) "
-        "such that the month of the begin of its period is the month of the end of its period, "
-        "grouped by its period"
+        "Report, for the top three ProfitAndLossStatements, "
+        "their period and the sum of the amount of the money of their revenue "
+        "such that the month of the begin of their period is the month of the end of their period, "
+        "grouped by their period"
     )
     # the ranking conveys the ordering — no standalone clause, and the root appears once
     assert "ordered by" not in text
     assert "descending" not in text
+    assert "(" not in text  # the code-like tuple parentheses are gone
     assert text.count("ProfitAndLossStatement") == 1
 
 
@@ -148,5 +150,6 @@ def test_set_of_limit_ascending_is_bottom():
         set_of(pnl.period, revenue).grouped_by(pnl.period).ordered_by(revenue).limit(2)
     )
     text = verbalize_expression(q)
-    assert text.startswith("Find the bottom two (")
+    assert text.startswith("Report, for the bottom two ProfitAndLossStatements,")
+    assert "(" not in text
     assert "ordered by" not in text

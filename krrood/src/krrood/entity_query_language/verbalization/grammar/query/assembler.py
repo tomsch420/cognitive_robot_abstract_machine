@@ -6,6 +6,7 @@ from dataclasses import replace
 from typing_extensions import List, Optional, Tuple
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
+from krrood.entity_query_language.core.expression_structure import walk_chain
 from krrood.entity_query_language.core.mapped_variable import Attribute
 from krrood.entity_query_language.core.variable import Variable
 from krrood.entity_query_language.query.query import Query, SetOf
@@ -39,6 +40,7 @@ from krrood.entity_query_language.verbalization.grammar.clauses.composer import 
 from krrood.entity_query_language.verbalization.grammar.query.planner import (
     QueryPlan,
     QueryPlanner,
+    RankingKeyRelation,
     ReportKind,
     ReportPlan,
     SelectionKind,
@@ -143,6 +145,8 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
             return self._assemble_grouped_report(node, plan, report)
         if report is not None and report.kind is ReportKind.AGGREGATION:
             return self._assemble_aggregation_report(node, plan, report)
+        if plan.ranking is not None:
+            return self._assemble_ranked_set_of(node, plan)
         return self._query_body(
             node,
             plan,
@@ -152,14 +156,111 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
         )
 
     def _set_of_selection(self, node: SetOf, plan: QueryPlan) -> Fragment:
-        """:return: the set-of's rendered selection — a parenthesised tuple for a ranked set-of (the
-        ranking pre-head needs it as a unit), a plural listing for an ordered report, else natural
-        Oxford-comma prose."""
-        if plan.ranking is not None:
-            return self._parenthesised(node._selected_variables_)
+        """:return: the set-of's rendered selection — a plural listing for an ordered report, else
+        natural Oxford-comma prose."""
         if plan.report is not None:
             return self._selection_list(node._selected_variables_, number=Number.PLURAL)
         return self._selection_list(node._selected_variables_)
+
+    def _assemble_ranked_set_of(self, node: SetOf, plan: QueryPlan) -> Fragment:
+        """:return: a ranked set-of reframed onto the entity its columns describe — *"Report, for the
+        top three Employees by salary, their department and name"* — so the tuple reads as a
+        possessive listing instead of a code-like *"(a, b)"*. The ranking attaches to the subject
+        noun (its order key named when it is an attribute of the subject), and the columns
+        pronominalise to it. A set-of whose columns share no single root keeps the bracketed tuple."""
+        subject = self._tuple_subject(node, plan)
+        if subject is None:
+            return self._query_body(
+                node,
+                plan,
+                self._parenthesised(node._selected_variables_),
+                where_items=[self._where_clause(plan)],
+                find_header=self._set_of_header(plan),
+            )
+        ranking = replace(
+            plan.ranking,
+            relation=self._key_relation_to(subject, plan.ranking.order_key),
+        )
+        surface = ranking_surface(RankingRequest(plan=ranking))
+        subject_noun = NounPhrase(
+            head=RoleFragment.for_variable(
+                subject._type_.__name__, subject, number=surface.number
+            ),
+            number=surface.number,
+            definiteness=Definiteness.DEFINITE,
+            pre_head=surface.pre_head,
+            modifiers=surface.modifiers,
+            referent_id=_subject_id(subject),
+        )
+        columns = self._ranked_columns(node, ranking)
+        if not columns:
+            return self._query_body(
+                node,
+                plan,
+                subject_noun,
+                where_items=[self._where_clause(plan)],
+                find_header=self._sentence_initial(Keywords.REPORT.as_fragment()),
+            )
+        header = PhraseFragment(
+            parts=[
+                self._sentence_initial(Keywords.REPORT.as_fragment()),
+                Punctuation.COMMA.as_fragment(),
+                Keywords.FOR.as_fragment(),
+                subject_noun,
+                Punctuation.COMMA.as_fragment(),
+            ]
+        )
+        # Each column is rendered on its own (not owner-folded) so it pronominalises to the
+        # already-introduced subject ("their department and their name"), agreeing in number.
+        column_list = oxford_comma(
+            [self.context.child(column) for column in columns],
+            Conjunctions.AND.as_fragment(),
+        )
+        return self._query_body(
+            node,
+            plan,
+            column_list,
+            where_items=[self._where_clause(plan)],
+            find_header=header,
+        )
+
+    def _tuple_subject(self, node: SetOf, plan: QueryPlan) -> Optional[Variable]:
+        """:return: the single root variable every selected column navigates from (the entity the
+        ranking reframes onto), or ``None`` when the columns share no single root."""
+        if plan.discourse_root is None:
+            return None
+        for selection in node._selected_variables_:
+            _, root = walk_chain(selection)
+            if isinstance(root, Variable) and root._id_ == plan.discourse_root:
+                return root
+        return None
+
+    def _key_relation_to(
+        self, subject: Variable, order_key: Optional[SymbolicExpression]
+    ) -> RankingKeyRelation:
+        """:return: how *order_key* relates to *subject* — ``SELF`` (it is the subject), ``ATTRIBUTE``
+        (a chain on it, so the ranking reads *"by <attribute>"*), or ``OTHER`` (a different root, e.g.
+        an aggregate — the key is then left to the visible column)."""
+        if order_key is None:
+            return RankingKeyRelation.SELF
+        chain, root = walk_chain(order_key)
+        if not isinstance(root, Variable) or root._id_ != subject._id_:
+            return RankingKeyRelation.OTHER
+        return RankingKeyRelation.ATTRIBUTE if chain else RankingKeyRelation.SELF
+
+    def _ranked_columns(
+        self, node: SetOf, ranking
+    ) -> List[SymbolicExpression]:
+        """:return: the reported columns — the selected tuple, with the order key removed when the
+        ranking already names it (*"by salary"*), so it is not listed twice."""
+        selected = list(node._selected_variables_)
+        names_key = ranking.relation in (
+            RankingKeyRelation.ATTRIBUTE,
+            RankingKeyRelation.SELF,
+        )
+        if names_key and ranking.order_key is not None:
+            selected = [s for s in selected if s._id_ != ranking.order_key._id_]
+        return selected
 
     def _selection_list(
         self,
