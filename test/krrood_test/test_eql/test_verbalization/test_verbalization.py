@@ -496,15 +496,17 @@ def test_aggregation_where_on_measured_quantity_reduces_to_the_attribute():
     assert text.count("to which") == 1  # spelled out once, then the bare attribute
 
 
-def test_aggregation_where_on_other_attribute_still_pronominalises():
-    """A WHERE on a *different* attribute of the measured referent is not the selected quantity, so
-    it still reads *"its <attribute>"* via the local centre."""
+def test_aggregation_where_on_other_attribute_spells_out_the_owner():
+    """The aggregation foregrounds the measured quantity (the battery), not its owner, so a WHERE on
+    a *different* attribute of that owner is **not** *"its power"* (which would misread as the
+    battery's power) — it spells out *"the power of the Robot"*."""
     m = variable(_NavMission, [])
     nested = an(
         entity(eql.average(m.assigned_to.battery)).where(m.assigned_to.power > 5)
     )
     text = verbalize_expression(nested)
-    assert "such that its power is greater than 5" in text
+    assert "such that the power of the _NavRobot is greater than 5" in text
+    assert "its power" not in text
 
 
 def test_boolean_predicative_pronominalises_relational_navigation():

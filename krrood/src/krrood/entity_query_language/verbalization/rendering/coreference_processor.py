@@ -77,10 +77,10 @@ class CoreferenceProcessor:
     """Stack of :class:`SubjectFrame` entries — the number selects *"its"*/*"their"*."""
 
     _center: Optional[uuid.UUID] = field(init=False, default=None)
-    """The local centre — the relational referent the immediately preceding chain was *about* (the
-    owner of its outermost attribute). The next chain's matching attribute pronominalises to *"its
-    …"*; an intervening chain about something else clears it, so *"its"* only ever binds to the
-    referent named directly before (centering theory, Grosz/Joshi/Weinstein 1995)."""
+    """The local centre — the referent the immediately preceding chain *foregrounded* (see
+    :meth:`_chain_topic`). The next chain's attribute on that referent pronominalises to *"its …"*;
+    an intervening chain about something else clears it, so *"its"* only ever binds to the referent
+    named directly before (centering theory, Grosz/Joshi/Weinstein 1995)."""
 
     def process(
         self,
@@ -152,7 +152,7 @@ class CoreferenceProcessor:
             resolved = self._walk(
                 possessive_path(possessive_chain.parts, possessive_chain.root_fragment)
             )
-        self._center = self._chain_topic(possessive_chain.parts)
+        self._center = self._chain_topic(possessive_chain)
         return resolved
 
     def _reduced_selected_quantity(
@@ -189,11 +189,18 @@ class CoreferenceProcessor:
                 )
         return None
 
-    def _chain_topic(self, parts: List[PathStep]) -> Optional[uuid.UUID]:
-        """:return: The referent a chain is *about* — its outermost relational referent — to carry
-        forward as the local centre, or ``None`` for a chain with no relational hop (which clears
-        the centre, so *"its"* never reaches across an unrelated mention)."""
-        relation = self._outermost_relation(parts)
+    def _chain_topic(self, possessive_chain: PossessiveChain) -> Optional[uuid.UUID]:
+        """:return: The referent a chain *foregrounds*, to carry forward as the local centre. An
+        ordinary navigation foregrounds the entity it describes — its outermost relational referent
+        (*"the Robot …"*, so a following attribute is *"its …"*). A query's selected / measured
+        quantity instead foregrounds the *quantity* (*"the average of the **battery** …"*): the
+        battery, not the Robot, is what the clause is about, so a following Robot attribute is no
+        longer *"its"* but spells out *"the power of the Robot"*. ``None`` for a chain with no
+        relational hop (which clears the centre, so *"its"* never reaches an unrelated mention).
+        """
+        if self.discourse.is_selected_quantity(possessive_chain.node_id):
+            return possessive_chain.node_id
+        relation = self._outermost_relation(possessive_chain.parts)
         return relation[0] if relation is not None else None
 
     def _relational_possessive(
