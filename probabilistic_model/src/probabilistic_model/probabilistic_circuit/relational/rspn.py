@@ -270,7 +270,7 @@ class RelationalProbabilisticCircuit:
         aggregation_indices: list[int],
         child_feature_extractor: FeatureExtractor,
         concrete_type: Optional[Type] = None,
-    ) -> list[list]:
+    ) -> list[list[Any]]:
         """
         Collect one feature row per child object across all parent instances.
 
@@ -699,10 +699,12 @@ class RelationalProbabilisticCircuit:
         sample; unknown ones are drawn from the posterior
         ``P(unknown | known, class context)``.
 
-        This method must be called on the **unconditioned** circuit because
+        This method must be called on the **unconditioned** circuit.
         :meth:`~probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit.ProbabilisticCircuit.log_conditional_in_place`
-        marginalises out conditioned variables, making them unavailable for sampling
-        afterwards.
+        replaces conditioned variables with Dirac delta leaves, pinning them to fixed
+        values rather than leaving a joint distribution to sample from.  Sampling
+        aggregation statistics after conditioning would therefore always return the
+        same conditioned values, defeating the Monte Carlo integration.
 
         :param circuit: The unconditioned deep-copy of the class circuit.
         :param available_statistics: Aggregation statistics that are computable from the
@@ -746,7 +748,10 @@ class RelationalProbabilisticCircuit:
         Each sample produces one grounded circuit ``P(x | sᵢ)``.  All circuits are
         combined in a :class:`~probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit.SumUnit`
         with equal log-weight ``-log(aggregation_integration_samples)``, approximating the integral
-        ``∫ P(x | s) P(s | class context) ds``.
+
+        .. math::
+
+            \\int P(x \\mid s)\\, P(s \\mid \\text{class context})\\, ds
 
         :param template: The exchangeable distribution template to ground.
         :param parts_to_ground: The query parts, one per child object in the relation.

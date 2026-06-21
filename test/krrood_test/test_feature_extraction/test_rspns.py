@@ -2,8 +2,10 @@ import math
 
 import pytest
 
+from krrood.entity_query_language.backends import ProbabilisticBackend
 from krrood.entity_query_language.factories import underspecified
 from krrood.ormatic.data_access_objects.helper import to_dao
+from krrood.parametrization.model_registries import RelationalCircuitRegistry
 from probabilistic_model.probabilistic_circuit.relational.exceptions import (
     CircuitNotFittedError,
 )
@@ -313,3 +315,23 @@ def test_library_room_ground_has_item_variables(library_room_relational_circuit,
     model = library_room_relational_circuit.ground(library_query)
     names = {v.name for v in model.variables}
     assert any("items" in name for name in names)
+
+
+# ── Querying interface tests ─────────────────────────────────────────────────
+
+
+def test_probabilistic_backend_samples_scene_room(scene_room_relational_circuit, scenario):
+    """RelationalCircuitRegistry integrates with ProbabilisticBackend to produce typed samples."""
+    registry = RelationalCircuitRegistry(scene_room_relational_circuit)
+    backend = ProbabilisticBackend(registry, number_of_samples=5)
+    query = underspecified(SceneRoom)(
+        position=underspecified(KRROODPosition)(x=..., y=..., z=...),
+        orientation=underspecified(KRROODOrientation)(x=..., y=..., z=..., w=...),
+        objects=[underspecified(SceneObject)(type=...) for _ in range(3)],
+    )
+    query.resolve()
+    samples = list(backend.evaluate(query))
+    assert len(samples) == 5
+    for sample in samples:
+        assert isinstance(sample, SceneRoom)
+        assert len(sample.objects) == 3
