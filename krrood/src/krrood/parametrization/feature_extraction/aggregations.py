@@ -6,7 +6,7 @@ from functools import lru_cache
 from typing_extensions import Callable, Optional, Type, TypeVar, Any
 
 from krrood.entity_query_language.core.mapped_variable import MappedVariable
-from random_events.variable import Variable
+from random_events.variable import Symbolic, Variable
 from krrood.entity_query_language.factories import variable
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from krrood.utils import T, recursive_subclasses
@@ -145,13 +145,8 @@ def compute_aggregation_statistics(
             continue
         value = feature_function.apply_mapping_on_external_root(aggregation_instance)
         latent_variable = latent_variable_by_name[feature_name]
-        # ``make_value`` is the random_events API that validates domain membership;
-        # it signals an out-of-domain value by raising. There is no non-throwing
-        # membership predicate for a raw value against a symbolic domain, so this
-        # boundary adapts that exception into a skip.
-        try:
-            latent_variable.make_value(value)
-            statistics[latent_variable] = value
-        except (ValueError, TypeError):
-            pass
+        if isinstance(latent_variable, Symbolic):
+            if not any(elem.element == value for elem in latent_variable.domain.simple_sets):
+                continue
+        statistics[latent_variable] = value
     return statistics

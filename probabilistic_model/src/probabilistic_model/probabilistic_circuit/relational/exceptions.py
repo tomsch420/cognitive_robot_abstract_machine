@@ -26,3 +26,24 @@ class CircuitNotFittedError(DataclassException):
 
     def suggest_correction(self) -> str:
         return "Call `fit` with training instances before calling `ground`."
+
+
+@dataclass
+class GroundingFailedError(DataclassException):
+    """
+    Raised when grounding a circuit produces an empty or degenerate result.
+    """
+
+    context: str
+    """
+    A description of which grounding step failed (e.g. part index or class name).
+    """
+
+    def error_message(self) -> str:
+        return f"Grounding failed for: {self.context}."
+
+    def suggest_correction(self) -> str:
+        return (
+            "Ensure the query is compatible with the fitted circuit and that "
+            "the conditioning event has non-zero probability."
+        )

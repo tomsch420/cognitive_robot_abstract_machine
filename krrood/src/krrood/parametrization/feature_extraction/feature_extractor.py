@@ -19,6 +19,7 @@ from krrood.ormatic.data_access_objects.dao import (
 from krrood.ormatic.data_access_objects.from_dao import FromDataAccessObjectState
 from krrood.ormatic.utils import get_python_type_from_sqlalchemy_column
 from krrood.parametrization.feature_extraction.aggregations import get_aggregation_class
+from krrood.parametrization.feature_extraction.exceptions import UnsupportedFeatureTypeError
 from random_events.variable import compatible_types
 
 if TYPE_CHECKING:
@@ -263,10 +264,16 @@ class FeatureExtractor:
 
     def preprocess_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        Preprocess the dataframe for JointProbabilityTrees by converting boolean columns to integers and enum columns to hashes.
+        Return a copy of ``df`` in a format compatible with JointProbabilityTree training.
+
+        Converts boolean columns to integers and enum columns to integer hashes.
+        Does not modify the original dataframe.
+
         :param df: The dataframe to preprocess.
-        :return: The dataframe in a JPT compatible format.
+        :return: A preprocessed copy ready for JPT training.
+        :raises UnsupportedFeatureTypeError: If a column has a type that cannot be handled.
         """
+        df = df.copy()
         feature_map = dict(zip(df.columns, self.features))
         for column in df.columns:
             feature = feature_map[column]
@@ -275,7 +282,7 @@ class FeatureExtractor:
             elif isinstance(feature._type_, enum.EnumType):
                 df[column] = df[column].apply(lambda x: hash(x))
             elif feature._type_ not in compatible_types and feature._type_ is not None:
-                raise TypeError(
-                    f"Unsupported type {feature._type_} for column {column}"
+                raise UnsupportedFeatureTypeError(
+                    feature_type=feature._type_, column_name=column
                 )
         return df

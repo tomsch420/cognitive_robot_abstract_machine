@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import itertools
 import math
+from collections import defaultdict
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -39,6 +40,7 @@ from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
 from probabilistic_model.learning.jpt.variables import infer_variables_from_dataframe
 from probabilistic_model.probabilistic_circuit.relational.exceptions import (
     CircuitNotFittedError,
+    GroundingFailedError,
 )
 from probabilistic_model.probabilistic_circuit.relational.helper import (
     find_lowest_product_nodes_that_model_variables,
@@ -142,7 +144,7 @@ class ExchangeableDistributionTemplate:
         )
         _rename_variables_with_part_prefix(part_circuit, prefix, self.latent_variables)
         if len(part_circuit.nodes()) == 0:
-            raise ValueError("The grounding of the part failed.")
+            raise GroundingFailedError(context=str(prefix))
         return part_circuit
 
     def ground(
@@ -257,6 +259,55 @@ class RelationalProbabilisticCircuit:
         dataframe = feature_extractor.preprocess_dataframe(dataframe)
         return dataframe.sort_index(axis=1)
 
+    def _assemble_child_rows(
+        self,
+        exchangeable_part: str,
+        instances: list[DataAccessObject],
+        aggregation_indices: list[int],
+        child_feature_extractor: FeatureExtractor,
+        concrete_type: Optional[Type] = None,
+    ) -> list[list]:
+        """
+        Collect one feature row per child object across all parent instances.
+
+        Each row contains the parent's aggregation values followed by the child's
+        feature values.  When ``concrete_type`` is given, only children whose domain
+        type matches it are included.
+
+        :param exchangeable_part: Field name of the one-to-many relation on each instance.
+        :param instances: Parent training instances.
+        :param aggregation_indices: Positions of aggregation features in the parent feature vector.
+        :param child_feature_extractor: Feature extractor built from the (possibly filtered) child instances.
+        :param concrete_type: If provided, only children of this domain type are included.
+        :return: List of rows, one per qualifying child object.
+        """
+        rows = []
+        for instance in instances:
+            feature_vector = self.feature_extractor.apply_mapping(instance)
+            aggregation_row = [feature_vector[index] for index in aggregation_indices]
+            for association in getattr(instance, exchangeable_part):
+                child = association.target
+                if concrete_type is not None and type(child).original_class() != concrete_type:
+                    continue
+                rows.append(aggregation_row + child_feature_extractor.apply_mapping(child))
+        return rows
+
+    @staticmethod
+    def _strip_class_prefix(
+        feature_extractor: FeatureExtractor, class_prefix: str
+    ) -> list[str]:
+        """
+        Return short feature names with ``class_prefix`` stripped from each entry.
+
+        :param feature_extractor: The extractor whose feature names are shortened.
+        :param class_prefix: The class-name prefix (including trailing dot) to remove.
+        :return: Short column names aligned with the krrood access-path convention.
+        """
+        return [
+            name[len(class_prefix):] if name.startswith(class_prefix) else name
+            for name in (f._name_ for f in feature_extractor.features)
+        ]
+
     def _build_child_joint_dataframe(
         self,
         exchangeable_part: str,
@@ -270,36 +321,21 @@ class RelationalProbabilisticCircuit:
         Build a dataframe combining aggregation statistics with per-child-object attributes.
 
         Each row corresponds to one child object and contains the parent instance's
-        aggregation values followed by all child features (including nested unique-part
-        attributes). Column names strip the child class prefix so that, after variable
-        renaming, they align with the krrood access-path convention.
+        aggregation values followed by all child features. Column names strip the child
+        class prefix so that they align with the krrood access-path convention.
 
         :param exchangeable_part: Field name of the one-to-many relation on each instance.
         :param instances: Training instances from which rows are generated.
         :param aggregation_indices: Positions of aggregation features in the feature vector.
         :param aggregation_names: Column names for the aggregation portion of each row.
         :param child_feature_extractor: Feature extractor built from the child instances.
-        :param child_class_prefix: Class name prefix to strip from child feature names
+        :param child_class_prefix: Class name prefix to strip from child feature names.
         :return: A dataframe with one row per child object across all instances.
         """
-        rows = []
-        for instance in instances:
-            feature_vector = self.feature_extractor.apply_mapping(instance)
-            aggregation_row = [feature_vector[index] for index in aggregation_indices]
-            for association in getattr(instance, exchangeable_part):
-                child_features = child_feature_extractor.apply_mapping(
-                    association.target
-                )
-                rows.append(aggregation_row + child_features)
-        full_names = [f._name_ for f in child_feature_extractor.features]
-        short_names = [
-            (
-                name[len(child_class_prefix) :]
-                if name.startswith(child_class_prefix)
-                else name
-            )
-            for name in full_names
-        ]
+        rows = self._assemble_child_rows(
+            exchangeable_part, instances, aggregation_indices, child_feature_extractor
+        )
+        short_names = self._strip_class_prefix(child_feature_extractor, child_class_prefix)
         return pd.DataFrame(columns=aggregation_names + short_names, data=rows)
 
     def _build_per_type_child_dataframe(
@@ -315,8 +351,8 @@ class RelationalProbabilisticCircuit:
         Build a child joint dataframe restricted to children of one concrete type.
 
         Iterates all parent instances, collects only the children whose domain type
-        matches ``concrete_type``, and pairs them with the parent's aggregation
-        statistics.  Column names strip the concrete class prefix.
+        matches ``concrete_type``, and pairs them with the parent's aggregation statistics.
+        Column names strip the concrete class prefix.
 
         :param exchangeable_part: Field name of the one-to-many relation on each instance.
         :param instances: Training instances from which rows are generated.
@@ -332,21 +368,11 @@ class RelationalProbabilisticCircuit:
             typed_child_instances[0].from_dao(FromDataAccessObjectState())
         ).__name__
         class_prefix = f"{class_name}."
-        rows = []
-        for parent_instance in instances:
-            feature_vector = self.feature_extractor.apply_mapping(parent_instance)
-            aggregation_row = [feature_vector[index] for index in aggregation_indices]
-            for association in getattr(parent_instance, exchangeable_part):
-                child = association.target
-                if type(child).original_class() != concrete_type:
-                    continue
-                child_features = child_feature_extractor.apply_mapping(child)
-                rows.append(aggregation_row + child_features)
-        full_names = [f._name_ for f in child_feature_extractor.features]
-        short_names = [
-            name[len(class_prefix):] if name.startswith(class_prefix) else name
-            for name in full_names
-        ]
+        rows = self._assemble_child_rows(
+            exchangeable_part, instances, aggregation_indices, child_feature_extractor,
+            concrete_type=concrete_type,
+        )
+        short_names = self._strip_class_prefix(child_feature_extractor, class_prefix)
         return pd.DataFrame(columns=aggregation_names + short_names, data=rows)
 
     def _fit_exchangeable_part(
@@ -458,13 +484,10 @@ class RelationalProbabilisticCircuit:
         :param instances: The DAO instances to partition.
         :return: A mapping from each concrete domain type to its instances.
         """
-        partition: dict[Type, list[DataAccessObject]] = {}
+        partition: dict[Type, list[DataAccessObject]] = defaultdict(list)
         for instance in instances:
-            domain_type = type(instance).original_class()
-            if domain_type not in partition:
-                partition[domain_type] = []
-            partition[domain_type].append(instance)
-        return partition
+            partition[type(instance).original_class()].append(instance)
+        return dict(partition)
 
     def _domain_class(self) -> Type:
         """
@@ -526,7 +549,7 @@ class RelationalProbabilisticCircuit:
         instances: list[DataAccessObject],
         dataframe_from_parent: Optional[pd.DataFrame] = None,
         per_type_dataframes: Optional[dict[Type, pd.DataFrame]] = None,
-    ):
+    ) -> RelationalProbabilisticCircuit:
         """
         Fit the relational probabilistic circuit from a list of DAO instances.
 
@@ -601,7 +624,7 @@ class RelationalProbabilisticCircuit:
                 circuit, SortedSet(latent_variables)
             )
         if len(circuit.nodes()) == 0:
-            raise ValueError("The grounding of the class failed.")
+            raise GroundingFailedError(context=self._domain_class().__name__)
         surviving_product_nodes = [
             node for node in product_nodes_to_extend if node.index is not None
         ]
