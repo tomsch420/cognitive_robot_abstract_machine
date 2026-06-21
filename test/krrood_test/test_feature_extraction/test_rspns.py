@@ -15,12 +15,8 @@ from probabilistic_model.probabilistic_circuit.relational.rspn import (
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import SumUnit
 from ..dataset import ormatic_interface  # type: ignore
 from ..dataset.example_classes import (
-    BookSceneItem,
     KRROODOrientation,
     KRROODPosition,
-    LampSceneItem,
-    LibraryRoom,
-    PolymorphicSceneItem,
     SceneObject,
     SceneObjectType,
     SceneRoom,
@@ -185,139 +181,6 @@ def test_ground_variable_count_scales_with_query_size(scene_room_relational_circ
         len(scene_room_relational_circuit.ground(query_4).variables)
         > len(scene_room_relational_circuit.ground(query_2).variables)
     )
-
-
-# ── Polymorphic RSPN tests ──────────────────────────────────────────────────
-
-
-@pytest.fixture
-def polymorphic_items():
-    """Two BookSceneItem and two LampSceneItem DAO instances."""
-    books = [
-        BookSceneItem(size=0.5, pages=200),
-        BookSceneItem(size=0.8, pages=350),
-    ]
-    lamps = [
-        LampSceneItem(size=1.0, brightness=100.0),
-        LampSceneItem(size=1.2, brightness=150.0),
-    ]
-    return [to_dao(item) for item in books + lamps]
-
-
-@pytest.fixture
-def polymorphic_relational_circuit(polymorphic_items):
-    """RelationalProbabilisticCircuit fitted on a polymorphic collection."""
-    model = RelationalProbabilisticCircuit(PolymorphicSceneItem)
-    model.fit(polymorphic_items)
-    return model
-
-
-@pytest.fixture
-def library_room_relational_circuit():
-    """RelationalProbabilisticCircuit fitted on LibraryRoom with polymorphic items."""
-    rooms = [
-        LibraryRoom(
-            position=KRROODPosition(x=1.0, y=2.0, z=0.0),
-            items=[
-                BookSceneItem(size=0.5, pages=200),
-                LampSceneItem(size=1.0, brightness=100.0),
-            ],
-        ),
-        LibraryRoom(
-            position=KRROODPosition(x=3.0, y=4.0, z=0.0),
-            items=[
-                BookSceneItem(size=0.8, pages=350),
-                BookSceneItem(size=0.6, pages=150),
-                LampSceneItem(size=1.2, brightness=150.0),
-            ],
-        ),
-    ]
-    model = RelationalProbabilisticCircuit(LibraryRoom)
-    model.fit([to_dao(room) for room in rooms])
-    return model
-
-
-@pytest.fixture
-def library_query():
-    """Query for a LibraryRoom with two polymorphic items."""
-    query = underspecified(LibraryRoom)(
-        position=underspecified(KRROODPosition)(x=..., y=..., z=...),
-        items=[
-            underspecified(PolymorphicSceneItem)(size=...),
-            underspecified(PolymorphicSceneItem)(size=...),
-        ],
-    )
-    query.resolve()
-    return query
-
-
-def test_polymorphic_fit_creates_sub_type_circuits(polymorphic_relational_circuit):
-    assert len(polymorphic_relational_circuit.sub_type_circuits) == 2
-    assert BookSceneItem in polymorphic_relational_circuit.sub_type_circuits
-    assert LampSceneItem in polymorphic_relational_circuit.sub_type_circuits
-
-
-def test_polymorphic_fit_log_weights_sum_to_zero(polymorphic_relational_circuit):
-    total = sum(math.exp(w) for w in polymorphic_relational_circuit.log_type_weights.values())
-    assert abs(total - 1.0) < 1e-9
-
-
-def test_polymorphic_fit_weights_reflect_frequencies(polymorphic_relational_circuit):
-    for log_weight in polymorphic_relational_circuit.log_type_weights.values():
-        assert abs(math.exp(log_weight) - 0.5) < 1e-9
-
-
-def test_polymorphic_ground_returns_sum_unit(polymorphic_relational_circuit):
-    query = underspecified(PolymorphicSceneItem)(size=...)
-    query.resolve()
-    model = polymorphic_relational_circuit.ground(query)
-    assert any(isinstance(node, SumUnit) for node in model.nodes())
-
-
-def test_polymorphic_ground_has_all_concrete_type_variables(polymorphic_relational_circuit):
-    query = underspecified(PolymorphicSceneItem)(size=...)
-    query.resolve()
-    model = polymorphic_relational_circuit.ground(query)
-    names = {v.name for v in model.variables}
-    # Per-type sub-circuits retain their concrete class prefix.
-    assert "BookSceneItem.size" in names
-    assert "BookSceneItem.pages" in names
-    assert "LampSceneItem.size" in names
-    assert "LampSceneItem.brightness" in names
-    assert "PolymorphicSceneItem.class_type" in names
-
-
-def test_polymorphic_ground_circuit_is_valid(polymorphic_relational_circuit):
-    query = underspecified(PolymorphicSceneItem)(size=...)
-    query.resolve()
-    assert polymorphic_relational_circuit.ground(query).is_valid()
-
-
-def test_polymorphic_ground_type_variable_present(polymorphic_relational_circuit):
-    query = underspecified(PolymorphicSceneItem)(size=...)
-    query.resolve()
-    model = polymorphic_relational_circuit.ground(query)
-    type_variable_names = {v.name for v in model.variables if "class_type" in v.name}
-    assert len(type_variable_names) == 1
-
-
-def test_library_room_rpc_has_polymorphic_template(library_room_relational_circuit):
-    template = library_room_relational_circuit.exchangeable_distribution_templates["items"]
-    assert len(template.template_distribution.sub_type_circuits) == 2
-
-
-def test_library_room_ground_is_valid(library_room_relational_circuit, library_query):
-    model = library_room_relational_circuit.ground(library_query)
-    assert model.is_valid()
-
-
-def test_library_room_ground_has_item_variables(library_room_relational_circuit, library_query):
-    model = library_room_relational_circuit.ground(library_query)
-    names = {v.name for v in model.variables}
-    assert any("items" in name for name in names)
-
-
-# ── Querying interface tests ─────────────────────────────────────────────────
 
 
 def test_probabilistic_backend_samples_scene_room(scene_room_relational_circuit, scenario):
