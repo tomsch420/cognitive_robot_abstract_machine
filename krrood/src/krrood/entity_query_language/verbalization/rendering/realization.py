@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from typing_extensions import Iterable, Optional
+from typing_extensions import Iterable, Mapping, Optional
 
 from krrood.entity_query_language.verbalization.fragments.base import (
     flatten_fragment_to_plain_text,
@@ -35,6 +35,7 @@ def realize_tree(
     fragment: Fragment,
     already_seen: Optional[Iterable[uuid.UUID]] = None,
     discourse: DiscourseView = EMPTY_DISCOURSE,
+    numbered_labels: Optional[Mapping[uuid.UUID, str]] = None,
 ) -> Fragment:
     """
     Run the ordered realisation passes over *fragment* — the one place the lowering passes and
@@ -48,11 +49,13 @@ def realize_tree(
     :param already_seen: Referents introduced by prior builds on a shared context.
     :param discourse: The focus-per-scope view the coreference pass consults (empty for a local
         sub-tree, which has no query scope of its own).
+    :param numbered_labels: Disambiguation numbers for referents the rules cannot label themselves
+        (relational referents) — applied by the coreference pass.
     :return: The fully realised fragment tree.
     """
-    resolved = CoreferenceProcessor(discourse=discourse).process(
-        fragment, already_seen=already_seen
-    )
+    resolved = CoreferenceProcessor(
+        discourse=discourse, numbered_labels=dict(numbered_labels or {})
+    ).process(fragment, already_seen=already_seen)
     inflected = _MORPHOLOGY.process(_DETERMINER.process(resolved))
     return _ORTHOGRAPHY.process(inflected)
 

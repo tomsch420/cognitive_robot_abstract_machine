@@ -254,6 +254,11 @@ class PossessiveChain(Fragment):
     """The root variable's referent id — the chain pronominalises only when this is the current
     subject (and the root is not a numbered label)."""
 
+    node_id: Optional[uuid.UUID] = None
+    """The chain's own terminal node id. When the chain is a query's selected / measured quantity,
+    a later mention of that same quantity (a WHERE on the very attribute being aggregated) reduces
+    to a bare *"the <attribute>"* instead of repeating the whole possessive."""
+
 
 @dataclass
 class BlockFragment(Fragment):

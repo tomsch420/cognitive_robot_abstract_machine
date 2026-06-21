@@ -109,6 +109,50 @@ print(verbalize_expression(t.completed == variable(bool, [True, False])))  # lef
 `== True` reads *"is completed"*, `== False` (and `!= True`) reads *"is not completed"*, and a
 boolean variable whose domain holds both values reads *"is either completed or not"*.
 
+## Relational Attributes
+
+When an attribute is named as a *relation* — a past participle plus a preposition, like
+`assigned_to`, `owned_by`, or `written_by` — navigating through it reads as a **relative clause**
+naming the related type, rather than the bare genitive *"the assigned_to of …"*. The preposition
+moves in front of *"which"* (*"to which"*, *"by which"*):
+
+```{code-cell} ipython3
+m = variable(Mission, domain=None)
+print(verbalize_expression(m.assigned_to))               # the Robot to which a Mission is assigned
+print(verbalize_expression(m.assigned_to.operational))   # … is operational
+```
+
+The head noun (*"the Robot"*) is the attribute's declared type, and the owner stays the subject of
+the verb — so even agentive *by* relations read correctly (*"the Person by which a Book is owned"*,
+never the reversed *"the Person owned by a Book"*). When the owner is the query's subject it
+pronominalises (*"the battery of the Robot **to which it is assigned**"*). A plain noun attribute is
+unaffected and keeps the genitive *"the name of the department of an Employee"*; a noun that merely
+ends in a preposition (e.g. `color_in`) is not treated as a relation.
+
+When the robot is the **subject** of a clause — a boolean attribute, *"the Robot to which it is
+assigned is operational"* — the attributes that follow read *"its battery … its power"*, uniformly
+(once *"its"* refers to the robot it keeps it as the topic):
+
+```{code-cell} ipython3
+query = an(entity(m).where(
+    m.assigned_to.operational, m.assigned_to.battery > 5, m.assigned_to.power > 1,
+))
+print(verbalize_expression(query))
+# Find a Mission such that the Robot to which it is assigned is operational, its battery
+# is greater than 5, and its power is greater than 1
+```
+
+But when the clause is *about an attribute* — *"the battery of the Robot … is greater than 5"* — the
+battery, not the robot, is its subject, so a following *"its power"* would read as the battery's
+power. To stay unambiguous the owner is spelled out instead:
+
+```{code-cell} ipython3
+query = an(entity(m).where(m.assigned_to.battery > 5, m.assigned_to.power > 10))
+print(verbalize_expression(query))
+# Find a Mission such that the battery of the Robot to which it is assigned is greater
+# than 5, and the power of the Robot is greater than 10
+```
+
 ## Absence Conditions (`== None`)
 
 A comparison to `None` is read as an *absence*, not as a value. The exact wording adapts to the
@@ -233,6 +277,16 @@ print(verbalize_expression(eql.min(t.amount_details.amount)))
 All aggregations use the definite article (*"the number of"*, *"the sum of"*, ...).
 The attribute chain following the aggregation uses a possessive *"of the ..."* path.
 
+When a WHERE condition filters the *very attribute being aggregated*, that attribute is named in
+full once (in the aggregate) and the condition refers back to it as a bare *"the battery"*:
+
+```{code-cell} ipython3
+query = an(entity(eql.average(m.assigned_to.battery)).where(m.assigned_to.battery > 5))
+print(verbalize_expression(query))
+# Find the average of the battery of the Robot to which a Mission is assigned such that
+# the battery is greater than 5
+```
+
 ## Date Range Folding
 
 When a lower-bound and an upper-bound comparison on the same datetime attribute appear
@@ -313,6 +367,23 @@ a type:
 emp = variable(Employee, domain=None)
 query_agg = an(entity(eql.average(emp.salary)).where(emp.starting_salary > 20000))
 print(verbalize_expression(query_agg))
+```
+
+It also counts the *related entity* a relational attribute introduces, so two missions assigned to
+two different robots read *"Robot 1"* / *"Robot 2"* rather than two indistinguishable *"the Robot"*s
+— and a repeat of either reduces to its numbered label:
+
+```{code-cell} ipython3
+pair = variable(Pair, domain=None)
+query = an(entity(pair).where(
+    pair.primary.assigned_to.battery > 5,
+    pair.primary.assigned_to.power > 1,
+    pair.secondary.assigned_to.battery > 3,
+))
+print(verbalize_expression(query))
+# Find a Pair such that the battery of Robot 1 to which its primary is assigned is
+# greater than 5, the power of Robot 1 is greater than 1, and the battery of Robot 2
+# to which its secondary is assigned is greater than 3
 ```
 
 ## Custom Predicates

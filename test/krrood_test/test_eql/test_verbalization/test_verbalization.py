@@ -315,6 +315,321 @@ def test_verbalize_second_index_ordinal():
     assert "completed" in text
 
 
+# ── Relational navigation: a verb-named hop reads as a relative clause ────────────
+
+
+@dataclass
+class _NavRobot:
+    operational: bool
+    battery: int
+    power: int
+
+
+@dataclass
+class _NavPerson:
+    pass
+
+
+@dataclass
+class _NavAuthor:
+    pass
+
+
+@dataclass
+class _NavAddress:
+    pass
+
+
+@dataclass
+class _NavMission:
+    assigned_to: _NavRobot  # past participle + preposition → relation
+
+
+@dataclass
+class _NavPair:
+    primary: _NavMission
+    secondary: _NavMission  # two missions, so two distinct assigned_to robots
+
+
+@dataclass
+class _NavBook:
+    owned_by: _NavPerson  # agentive "by"
+
+
+@dataclass
+class _NavDoc:
+    written_by: _NavAuthor  # irregular participle + agentive "by"
+
+
+@dataclass
+class _NavParcel:
+    sent_to: _NavAddress  # irregular participle + goal "to"
+
+
+@dataclass
+class _NavPanel:
+    lit: bool
+
+
+@dataclass
+class _NavGadget:
+    color_in: _NavPanel  # "color" is not a participle → plain genitive hop
+
+
+@dataclass
+class _NavDept:
+    name: str
+
+
+@dataclass
+class _NavEmp:
+    department: _NavDept
+
+
+def test_relational_navigation_reads_as_relative_clause():
+    """A relational hop before a boolean terminal reads *"the <Type> which <owner> is <verb>"*,
+    using the field's type as the head and dropping the genitive *of*."""
+    m = variable(_NavMission, [])
+    text = verbalize_expression(m.assigned_to.operational)
+    assert text == "the _NavRobot to which a _NavMission is assigned is operational"
+    assert "assigned_to" not in text and " of " not in text
+
+
+def test_relational_navigation_standalone():
+    m = variable(_NavMission, [])
+    assert (
+        verbalize_expression(m.assigned_to)
+        == "the _NavRobot to which a _NavMission is assigned"
+    )
+
+
+def test_relational_navigation_agentive_by_does_not_reverse():
+    """The relative-clause frame keeps the owner the verb's subject, so agentive *by* relations
+    read correctly rather than reversed (*not* "the Person owned by a Book")."""
+    assert (
+        verbalize_expression(variable(_NavBook, []).owned_by)
+        == "the _NavPerson by which a _NavBook is owned"
+    )
+    assert (
+        verbalize_expression(variable(_NavDoc, []).written_by)
+        == "the _NavAuthor by which a _NavDoc is written"
+    )
+
+
+def test_relational_navigation_irregular_participle():
+    """The participle check is morphological, so an irregular participle (*sent*) is recognised."""
+    assert (
+        verbalize_expression(variable(_NavParcel, []).sent_to)
+        == "the _NavAddress to which a _NavParcel is sent"
+    )
+
+
+def test_relational_navigation_multi_hop_outer_genitive():
+    """A plain hop after a relational one keeps the genitive, wrapping the relative clause."""
+    m = variable(_NavMission, [])
+    assert (
+        verbalize_expression(m.assigned_to.battery)
+        == "the battery of the _NavRobot to which a _NavMission is assigned"
+    )
+
+
+def test_noun_hop_ending_in_preposition_is_not_relativized():
+    """A hop whose name merely ends in a preposition (*color_in*) is not a participle, so it stays
+    the genitive form."""
+    text = verbalize_expression(variable(_NavGadget, []).color_in.lit)
+    assert text == "the color_in of a _NavGadget is lit"
+    assert "which" not in text
+
+
+def test_non_relational_navigation_unchanged():
+    """A purely noun chain renders the familiar genitive path, unchanged."""
+    assert (
+        verbalize_expression(variable(_NavEmp, []).department.name)
+        == "the name of the department of a _NavEmp"
+    )
+
+
+# ── Relational navigation: pronominalisation of the relative-clause owner ─────────
+
+
+def test_relational_navigation_pronominalises_the_subject():
+    """When the chain root is the query subject, a deferred relational chain pronominalises the
+    owner to the nominative *it* inside the relative clause."""
+    m = variable(_NavMission, [])
+    text = verbalize_expression(an(entity(m).where(m.assigned_to.battery > 5)))
+    assert (
+        "the battery of the _NavRobot to which it is assigned is greater than 5" in text
+    )
+    assert (
+        "_NavMission is assigned" not in text
+    )  # the owner is pronominalised, not repeated
+
+
+def test_genitive_then_genitive_does_not_pronominalise_the_owner():
+    """Two attributes of the relational referent in a row do *not* read *"its power"*: the first
+    clause's subject is *the battery* (the head of its subject phrase), not the robot, so *"its"*
+    would bind to the battery. The owner is spelled out instead — *"the power of the Robot"* (the
+    robot reduced, already named)."""
+    m = variable(_NavMission, [])
+    text = verbalize_expression(
+        an(entity(m).where(m.assigned_to.battery > 5, m.assigned_to.power > 10))
+    )
+    assert text == (
+        "Find a _NavMission such that the battery of the _NavRobot to which it is "
+        "assigned is greater than 5, and the power of the _NavRobot is greater than 10"
+    )
+    assert (
+        "its power" not in text
+    )  # the battery, not the robot, headed the first clause
+
+
+def test_aggregation_where_on_measured_quantity_reduces_to_the_attribute():
+    """When the WHERE filters the very attribute being aggregated, the relative clause is spelled
+    out once (in the measure) and the repeat reduces to a bare *"the battery"* — not the whole
+    possessive, and not *"its battery"* (which would re-introduce the owner)."""
+    m = variable(_NavMission, [])
+    nested = an(
+        entity(eql.average(m.assigned_to.battery)).where(m.assigned_to.battery > 5)
+    )
+    text = verbalize_expression(nested)
+    assert text == (
+        "Find the average of the battery of the _NavRobot to which a _NavMission is "
+        "assigned such that the battery is greater than 5"
+    )
+    assert text.count("to which") == 1  # spelled out once, then the bare attribute
+
+
+def test_aggregation_where_on_other_attribute_spells_out_the_owner():
+    """The aggregation foregrounds the measured quantity (the battery), not its owner, so a WHERE on
+    a *different* attribute of that owner is **not** *"its power"* (which would misread as the
+    battery's power) — it spells out *"the power of the Robot"*."""
+    m = variable(_NavMission, [])
+    nested = an(
+        entity(eql.average(m.assigned_to.battery)).where(m.assigned_to.power > 5)
+    )
+    text = verbalize_expression(nested)
+    assert "such that the power of the _NavRobot is greater than 5" in text
+    assert "its power" not in text
+
+
+def test_boolean_predicative_pronominalises_relational_navigation():
+    """A boolean-terminal chain on the subject's relational navigation reads *"the <Type> to which
+    it is <verb> is <attribute>"* — the navigation prefix is recursed through the standard grammar,
+    so it pronominalises to the subject just like a deferred possessive chain."""
+    m = variable(_NavMission, [])
+    text = verbalize_expression(an(entity(m).where(m.assigned_to.operational)))
+    assert "the _NavRobot to which it is assigned is operational" in text
+    assert "_NavMission is assigned" not in text
+
+
+def test_boolean_predicative_standalone_navigation_unchanged():
+    """Outside a subject scope the same predicative keeps the full relative clause (no subject to
+    pronominalise to)."""
+    m = variable(_NavMission, [])
+    assert (
+        verbalize_expression(m.assigned_to.operational)
+        == "the _NavRobot to which a _NavMission is assigned is operational"
+    )
+
+
+def test_attribute_through_relational_referent_pronominalises():
+    """An attribute reached through the local centre reads as *"its <attribute>"* — a boolean
+    predicative makes its relational referent the centre just as a possessive does."""
+    m = variable(_NavMission, [])
+    text = verbalize_expression(
+        an(entity(m).where(m.assigned_to.operational, m.assigned_to.battery > 5))
+    )
+    assert text == (
+        "Find a _NavMission such that the _NavRobot to which it is assigned is "
+        "operational, and its battery is greater than 5"
+    )
+
+
+def test_its_continues_uniformly_once_the_subject_licenses_it():
+    """A boolean predicative makes the robot the subject, so the attributes that follow read
+    *"its battery … its power"* — uniformly pronominal. Once *"its"* refers to the robot it keeps it
+    as the topic (a centering CONTINUE), so the run never mixes *"its battery"* with a re-named
+    *"the power of the Robot"*."""
+    m = variable(_NavMission, [])
+    text = verbalize_expression(
+        an(
+            entity(m).where(
+                m.assigned_to.operational,
+                m.assigned_to.battery > 5,
+                m.assigned_to.power > 1,
+            )
+        )
+    )
+    assert text == (
+        "Find a _NavMission such that the _NavRobot to which it is assigned is "
+        "operational, its battery is greater than 5, and its power is greater than 1"
+    )
+
+
+def test_two_distinct_relational_referents_are_numbered():
+    """Two distinct relational referents of the same type are numbered *"Robot 1"* / *"Robot 2"*
+    (bare, matching the variable convention) to tell them apart. A following attribute spells the
+    numbered owner out (*"the power of Robot 1"*) rather than *"its power"* — the first clause's
+    subject was the battery, not the robot."""
+    p = variable(_NavPair, [])
+    text = verbalize_expression(
+        an(
+            entity(p).where(
+                p.primary.assigned_to.battery > 5,
+                p.primary.assigned_to.power > 1,
+                p.secondary.assigned_to.battery > 3,
+            )
+        )
+    )
+    assert text == (
+        "Find a _NavPair such that the battery of _NavRobot 1 to which its primary is "
+        "assigned is greater than 5, the power of _NavRobot 1 is greater than 1, and the "
+        "battery of _NavRobot 2 to which its secondary is assigned is greater than 3"
+    )
+
+
+def test_single_relational_referent_is_not_numbered():
+    """A lone relational referent (no same-type collision) keeps the plain definite form."""
+    m = variable(_NavMission, [])
+    text = verbalize_expression(an(entity(m).where(m.assigned_to.battery > 5)))
+    assert "_NavRobot 1" not in text
+    assert "the _NavRobot to which it is assigned" in text
+
+
+def test_pronominal_relative_clause_agrees_with_subject_number():
+    """The relative-clause copula agrees with the subject: *it is* (singular) / *they are*
+    (plural) — exercised directly on the pronominal path."""
+    from krrood.entity_query_language.verbalization.navigation_path import (
+        PathStep,
+        RelationStep,
+    )
+    from krrood.entity_query_language.verbalization.microplanning.possessive import (
+        pronominal_path,
+    )
+    from krrood.entity_query_language.verbalization.fragments.features import Number
+    from krrood.entity_query_language.verbalization.rendering.realization import (
+        realize_subtree,
+    )
+
+    @dataclass
+    class _Target:
+        pass
+
+    step = PathStep(
+        "assigned_to",
+        None,
+        relation=RelationStep(_Target, _NavMission, "assigned", "to"),
+    )
+    assert (
+        realize_subtree(pronominal_path([step], Number.SINGULAR))
+        == "the _Target to which it is assigned"
+    )
+    assert (
+        realize_subtree(pronominal_path([step], Number.PLURAL))
+        == "the _Target to which they are assigned"
+    )
+
+
 def test_verbalize_non_bool_indexed_attribute_possession():
     r = variable(_Robot, [])
     text = verbalize_expression(r.tasks[0].name)

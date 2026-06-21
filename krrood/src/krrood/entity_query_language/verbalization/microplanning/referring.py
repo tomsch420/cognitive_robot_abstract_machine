@@ -3,12 +3,16 @@ from __future__ import annotations
 import uuid
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing_extensions import Dict, List, Set
+from typing_extensions import Dict, List, Optional, Set, Tuple
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
+from krrood.entity_query_language.core.mapped_variable import Attribute
 from krrood.entity_query_language.core.variable import Variable, Literal
 from krrood.entity_query_language.query.query import Entity, Query
 from krrood.entity_query_language.verbalization.fragments.features import Definiteness
+from krrood.entity_query_language.verbalization.grammar.conditions.recognition import (
+    relational_verb,
+)
 from krrood.entity_query_language.verbalization.subquery import (
     aggregation_source_root,
     selected_aggregator,
@@ -58,14 +62,40 @@ def _aggregation_source_ids(expression: SymbolicExpression) -> Set[uuid.UUID]:
     return ids
 
 
-def _build_disambiguation_map(expression: SymbolicExpression) -> Dict[uuid.UUID, str]:
+def _numberable_type_name(node: SymbolicExpression) -> Optional[str]:
+    """:return: The type name a node is disambiguated under — its own type for a (non-literal)
+    variable, or the *value* type for a relational attribute (a verb-named hop such as
+    ``assigned_to``, whose relative clause names a distinct entity that must be told apart from
+    other same-type entities). ``None`` for anything that does not denote a numberable entity.
+    """
+    if isinstance(node, Variable) and not isinstance(node, Literal):
+        return (
+            node._type_.__name__
+            if getattr(node, "_type_", None)
+            else node.__class__.__name__
+        )
+    if (
+        isinstance(node, Attribute)
+        and relational_verb(node._attribute_name_) is not None
+    ):
+        value_type = getattr(node, "_type_", None)
+        return value_type.__name__ if isinstance(value_type, type) else None
+    return None
+
+
+def _build_disambiguation_map(
+    expression: SymbolicExpression,
+) -> Tuple[Dict[uuid.UUID, str], Dict[uuid.UUID, str]]:
     """
     Types appearing once keep the plain type name; types appearing two or more times get
-    "TypeName 1", "TypeName 2", … labels in encounter order. Literal nodes are excluded, as are
-    variables that only serve as the source population of an aggregation sub-query.
+    "TypeName 1", "TypeName 2", … labels in encounter order. Both free variables and relational
+    referents (the related entity a verb-named hop introduces) count toward a type's occurrences, so
+    two distinct entities of one type are told apart wherever they appear. Literal nodes are
+    excluded, as are variables that only serve as the source population of an aggregation sub-query.
 
     :param expression: Root expression to pre-scan.
-    :return: A mapping of ``variable._id_`` → display label.
+    :return: ``(labels, numbered)`` — the full ``_id_`` → label map, and the subset whose label was
+        actually numbered (the collisions).
     """
     if isinstance(expression, Query):
         expression.build()
@@ -76,26 +106,23 @@ def _build_disambiguation_map(expression: SymbolicExpression) -> Dict[uuid.UUID,
     seen_ids: Set[uuid.UUID] = set()
 
     for node in expression._all_expressions_:
-        if isinstance(node, Variable) and not isinstance(node, Literal):
-            if node._id_ in suppressed:
-                continue
-            type_name = (
-                node._type_.__name__
-                if getattr(node, "_type_", None)
-                else node.__class__.__name__
-            )
-            if node._id_ not in seen_ids:
-                seen_ids.add(node._id_)
-                type_to_ids[type_name].append(node._id_)
+        type_name = _numberable_type_name(node)
+        if type_name is None or node._id_ in suppressed or node._id_ in seen_ids:
+            continue
+        seen_ids.add(node._id_)
+        type_to_ids[type_name].append(node._id_)
 
-    result: Dict[uuid.UUID, str] = {}
+    labels: Dict[uuid.UUID, str] = {}
+    numbered: Dict[uuid.UUID, str] = {}
     for type_name, ids in type_to_ids.items():
         if len(ids) == 1:
-            result[ids[0]] = type_name
-        else:
-            for ordinal, variable_id in enumerate(ids, 1):
-                result[variable_id] = f"{type_name} {ordinal}"
-    return result
+            labels[ids[0]] = type_name
+            continue
+        for ordinal, referent_id in enumerate(ids, 1):
+            label = f"{type_name} {ordinal}"
+            labels[referent_id] = label
+            numbered[referent_id] = label
+    return labels, numbered
 
 
 @dataclass
@@ -126,13 +153,19 @@ class ReferringExpressions:
     begins.  Single-type variables keep the plain type name; colliding types get
     ``"TypeName 1"``, ``"TypeName 2"`` labels."""
 
+    numbered_labels: Dict[uuid.UUID, str] = field(default_factory=dict)
+    """The subset of :attr:`disambiguation_map` whose label was actually numbered (the collisions).
+    Relational referents carry no rule-resolved label — their relative-clause noun phrase is built
+    deep in the microplanner — so the coreference pass applies these to number them *"Robot 1"*."""
+
     @classmethod
     def from_expression(cls, expression: SymbolicExpression) -> ReferringExpressions:
         """
         :param expression: Root EQL expression or query to scan.
         :return: An instance with the disambiguation map pre-built for *expression*.
         """
-        return cls(disambiguation_map=_build_disambiguation_map(expression))
+        labels, numbered = _build_disambiguation_map(expression)
+        return cls(disambiguation_map=labels, numbered_labels=numbered)
 
     def numbered_label(self, variable: Variable) -> NumberedLabel:
         """Records *variable* as introduced.

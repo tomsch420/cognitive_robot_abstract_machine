@@ -151,6 +151,7 @@ class Keywords(VocabEnum):
     GIVEN_THAT = KeyWord("given that")
     WHERE = KeyWord("where")
     WHOSE = KeyWord("whose")
+    WHICH = KeyWord("which")
     GROUPED_BY = KeyWord("grouped by")
     GROUPED = KeyWord("grouped")
     HAVING = KeyWord("having")
@@ -391,6 +392,18 @@ class Pronouns(VocabEnum):
 
     ITS = PronounWord("its")
     THEIR = PronounWord("their")
+    IT = PronounWord("it")
+    THEY = PronounWord("they")
+
+    @classmethod
+    def possessive(cls, number: Number) -> "Pronouns":
+        """:return: The possessive pronoun — ``THEIR`` for a plural subject, else ``ITS``."""
+        return cls.THEIR if number is Number.PLURAL else cls.ITS
+
+    @classmethod
+    def nominative(cls, number: Number) -> "Pronouns":
+        """:return: The nominative (subject) pronoun — ``THEY`` for a plural subject, else ``IT``."""
+        return cls.THEY if number is Number.PLURAL else cls.IT
 
 
 class RangePhrases(VocabEnum):
