@@ -45,6 +45,10 @@ from krrood.entity_query_language.query.quantifiers import (
     ResultQuantifier,
     An,
 )
+from krrood.entity_query_language.query.result_transformers import (
+    Ordering,
+    ResultTransformer,
+)
 from krrood.entity_query_language.core.base_expressions import (
     Bindings,
     OperationResult,
@@ -534,34 +538,41 @@ class Query(
                 self._evaluate_product_(sources),
             )
         )
-        if self._ordered_by_builder_ is not None:
-            results = iter(
-                sorted(
-                    results,
-                    key=self._ordering_key_,
-                    reverse=self._ordered_by_builder_.descending,
-                )
-            )
+        for transformer in self._result_transformers_:
+            results = transformer.transform(results)
         yield from results
 
         if self._seen_results is not None:
             self._seen_results.clear()
 
-    def _ordering_key_(self, result: OperationResult) -> Any:
+    @cached_property
+    def _result_transformers_(self) -> List[ResultTransformer]:
         """
-        :param result: A result row to order.
-        :return: The value to order *result* by, resolving the ordering variable against the row's
-            bindings (evaluating it when not already bound) and applying the optional key function.
+        :return: The ordered result-pipeline stages applied to this query's produced rows (ordering,
+            then quantification). Inspectable as :attr:`result_stages`.
         """
-        ordering = self._ordered_by_builder_
-        variable_id = ordering.variable._id_
-        if variable_id not in result.all_bindings:
-            ordering_value = next(
-                ordering.variable._evaluate_(OperationResult(result.all_bindings))
-            ).value
-        else:
-            ordering_value = result.all_bindings[variable_id]
-        return ordering.key(ordering_value) if ordering.key else ordering_value
+        transformers: List[ResultTransformer] = []
+        if self._ordered_by_builder_ is not None:
+            ordering = self._ordered_by_builder_
+            transformers.append(
+                Ordering(
+                    variable=ordering.variable,
+                    descending=ordering.descending,
+                    key=ordering.key,
+                )
+            )
+        return transformers
+
+    @property
+    def result_stages(self) -> List[ResultTransformer]:
+        """
+        :return: The result-pipeline stages of this query's compiled product (ordering,
+            quantification), so an inspector can identify how results are ordered and quantified
+            without traversing or evaluating.
+        """
+        self.build()
+        compiled_product = self._compiled_product_node_ or self
+        return compiled_product._result_transformers_
 
     def _get_operation_result_(self, child_result: OperationResult) -> OperationResult:
         """
