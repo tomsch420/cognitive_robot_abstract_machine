@@ -16,7 +16,7 @@ from krrood.entity_query_language.factories import a, variable, set_of
 import krrood.entity_query_language.factories as eql
 from krrood.entity_query_language.verbalization.pipeline import verbalize_expression
 
-from ...dataset.department_and_employee import Employee
+from ...dataset.department_and_employee import Department, Employee
 
 
 @dataclass
@@ -52,9 +52,23 @@ class ProfitAndLossStatement:
 def test_set_of_drops_the_sets_of_head():
     e = variable(Employee, [])
     text = verbalize_expression(a(set_of(e.department, e.salary)))
-    assert text == "Find the department of an Employee and its salary"
+    # the two attributes of one owner fold into a shared genitive, not "… and its salary"
+    assert text == "Find the department and salary of an Employee"
     assert "sets of" not in text
     assert "(" not in text  # the code-like tuple parentheses are gone
+
+
+def test_three_co_owned_attributes_fold_with_oxford_comma():
+    e = variable(Employee, [])
+    text = verbalize_expression(a(set_of(e.name, e.salary, e.starting_salary)))
+    assert text == "Find the name, salary, and starting_salary of an Employee"
+
+
+def test_attributes_of_different_owners_do_not_fold():
+    e = variable(Employee, [])
+    d = variable(Department, [])
+    text = verbalize_expression(a(set_of(e.salary, d.name)))
+    assert text == "Find the salary of an Employee and the name of a Department"
 
 
 # ── single-root pronominalisation ─────────────────────────────────────────────

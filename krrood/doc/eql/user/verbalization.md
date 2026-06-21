@@ -341,11 +341,12 @@ print(verbalize_expression(
 # For each department, report the sum of salaries of Employees having the sum greater than 30000
 ```
 
-A plain (non-aggregating, unordered) `set_of` stays a search and also drops the parentheses:
+A plain (non-aggregating, unordered) `set_of` stays a search and also drops the parentheses.
+Several attributes of the *same* owner fold into a shared genitive rather than repeating the owner:
 
 ```{code-cell} ipython3
 print(verbalize_expression(a(set_of(employee.department, employee.name))))
-# Find the department of an Employee and its name
+# Find the department and name of an Employee
 ```
 
 ## Date Range Folding

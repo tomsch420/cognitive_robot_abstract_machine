@@ -9,6 +9,7 @@ from krrood.entity_query_language.core.base_expressions import SymbolicExpressio
 from krrood.entity_query_language.core.mapped_variable import Attribute
 from krrood.entity_query_language.core.variable import Variable
 from krrood.entity_query_language.query.query import Query, SetOf
+from krrood.entity_query_language.verbalization.navigation_path import PathStep
 from krrood.entity_query_language.verbalization.fragments.base import (
     BlockFragment,
     NounPhrase,
@@ -29,6 +30,9 @@ from krrood.entity_query_language.verbalization.grammar.aggregation.assembler im
 from krrood.entity_query_language.verbalization.grammar.framework.assembler import (
     Assembler,
 )
+from krrood.entity_query_language.verbalization.grammar.chain.planner import (
+    ChainPlanner,
+)
 from krrood.entity_query_language.verbalization.grammar.clauses.composer import (
     ClauseComposer,
 )
@@ -42,6 +46,10 @@ from krrood.entity_query_language.verbalization.grammar.query.planner import (
 from krrood.entity_query_language.verbalization.grammar.query.ranking import (
     ranking_surface,
     RankingRequest,
+)
+from krrood.entity_query_language.verbalization.microplanning.possessive import (
+    attribute_fragment,
+    coordinated_genitive,
 )
 from krrood.entity_query_language.verbalization.vocabulary.english import (
     Articles,
@@ -155,11 +163,68 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
     ) -> Fragment:
         """:return: the selections joined as natural prose *"a, b, and c"* (Oxford comma, no
         parentheses) — the tuple shape reads fine without the code-like brackets. A plural *number*
-        lists them as populations (*"Employees"*) for an ordered report."""
-        return oxford_comma(
-            [self._selected(variable, number) for variable in variables],
-            Conjunctions.AND.as_fragment(),
-        )
+        lists them as populations (*"Employees"*) for an ordered report; otherwise contiguous
+        attributes of one owner fold into a shared genitive (*"the department and salary of an
+        Employee"*)."""
+        if number is Number.PLURAL:
+            selections = [self._selected(variable, number) for variable in variables]
+        else:
+            selections = self._folded_selections(variables)
+        return oxford_comma(selections, Conjunctions.AND.as_fragment())
+
+    def _folded_selections(self, variables: List[SymbolicExpression]) -> List[Fragment]:
+        """:return: the rendered selections, with each maximal run of plain attributes sharing one
+        owner folded into a single coordinated genitive, and every other selection rendered alone.
+        """
+        fragments: List[Fragment] = []
+        index = 0
+        while index < len(variables):
+            run = self._co_owned_run(variables, index)
+            if len(run) > 1:
+                owner = run[0][0]._child_
+                fragments.append(
+                    coordinated_genitive(
+                        [attribute_fragment(terminal) for _, terminal in run],
+                        self.context.child(owner, inline=True),
+                    )
+                )
+                index += len(run)
+                continue
+            fragments.append(self._selected(variables[index], Number.SINGULAR))
+            index += 1
+        return fragments
+
+    def _co_owned_run(
+        self, variables: List[SymbolicExpression], start: int
+    ) -> List[Tuple[SymbolicExpression, PathStep]]:
+        """:return: the maximal run of selections from *start* that are plain attributes sharing one
+        owner — each as ``(selection, terminal_step)`` — empty when the start selection is not such
+        an attribute."""
+        run: List[Tuple[SymbolicExpression, PathStep]] = []
+        owner_id: Optional[uuid.UUID] = None
+        for selection in variables[start:]:
+            foldable = self._foldable_attribute(selection)
+            if foldable is None:
+                break
+            owner, terminal = foldable
+            if run and owner._id_ != owner_id:
+                break
+            owner_id = owner._id_
+            run.append((selection, terminal))
+        return run
+
+    def _foldable_attribute(
+        self, selection: SymbolicExpression
+    ) -> Optional[Tuple[SymbolicExpression, PathStep]]:
+        """:return: ``(owner, terminal_step)`` when *selection* is a plain genitive attribute that
+        can share an owner with siblings, else ``None`` — a relational terminal (*"the Robot to
+        which …"*) does not coordinate cleanly, so it is left alone."""
+        if not isinstance(selection, Attribute):
+            return None
+        plan = self.context.microplan.plan_for(selection, ChainPlanner)
+        if not plan.parts or plan.parts[-1].is_relation:
+            return None
+        return selection._child_, plan.parts[-1]
 
     def _selected(self, variable: SymbolicExpression, number: Number) -> Fragment:
         """:return: a single selection, as a bare plural population (*"Employees"*) when *number* is
