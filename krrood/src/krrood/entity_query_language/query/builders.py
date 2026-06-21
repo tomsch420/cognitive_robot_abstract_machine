@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import itertools
 import uuid
-from abc import ABC, abstractmethod
+from abc import ABC
 from dataclasses import dataclass, field
 from functools import cached_property, lru_cache
 
@@ -46,7 +46,6 @@ from krrood.entity_query_language.query.quantifiers import (
 from krrood.entity_query_language.query.operations import (
     Where,
     Having,
-    OrderedBy,
     GroupedBy,
 )
 from krrood.entity_query_language.operators.aggregators import Aggregator, CountAll
@@ -94,41 +93,6 @@ class ExpressionBuilder(ABC):
 
     def __hash__(self) -> int:
         return hash((self.__class__, self.query))
-
-
-@dataclass(eq=False)
-class WrappingModifier(ExpressionBuilder, ABC):
-    """
-    A modifier that wraps the whole compiled product expression in an outer node, such as ordering
-    or quantification. ``OrderedBy`` nests inside ``ResultQuantifier``.
-    """
-
-    @abstractmethod
-    def wrap(self, child: SymbolicExpression) -> SymbolicExpression:
-        """
-        :param child: The current compiled expression to wrap.
-        :return: A new expression wrapping ``child``.
-        """
-        ...
-
-    def wrap_around(self, current_expression: SymbolicExpression) -> SymbolicExpression:
-        """
-        Wrap ``current_expression`` in a wrapper of this modifier's kind and configure it.
-
-        :param current_expression: The compiled expression to wrap.
-        :return: ``current_expression`` wrapped by this modifier's wrapper.
-        """
-        wrapper = self.wrap(current_expression)
-        self._configure_wrapper_(wrapper)
-        return wrapper
-
-    def _configure_wrapper_(self, wrapper: SymbolicExpression) -> None:
-        """
-        Configure a freshly produced wrapper. The default does nothing; subclasses override to
-        propagate state such as the result limit.
-
-        :param wrapper: The wrapper just produced by :meth:`wrap`.
-        """
 
 
 @dataclass(eq=False)
@@ -413,41 +377,27 @@ class GroupedByBuilder(ExpressionBuilder):
 
 
 @dataclass(eq=False)
-class QuantifierBuilder(WrappingModifier):
+class QuantifierBuilder(ExpressionBuilder):
     """
-    Wraps the compiled query in a result quantifier (An/The) of the specified type with the given
-    quantification constraint. It is the outermost wrapper.
+    Holds the result-quantifier specification (kind ``An``/``The`` and an optional constraint) that
+    the query's quantification pipeline stage enforces.
     """
 
     type: Type[ResultQuantifier] = An
     """
-    The type of the quantifier to be built.
+    The kind of quantifier requested.
     """
     quantification_constraint: Optional[ResultQuantificationConstraint] = None
     """
-    The quantification constraint that must be satisfied by the result quantifier if present.
+    The quantification constraint that must be satisfied, if any.
     """
-
-    def wrap(self, child: SymbolicExpression) -> ResultQuantifier:
-        """
-        Wrap ``child`` in a result quantifier of the specified type and quantification constraint.
-        """
-        if self.type is An:
-            return self.type(
-                child,
-                _quantification_constraint_=self.quantification_constraint,
-            )
-        return self.type(child)
-
-    def _configure_wrapper_(self, wrapper: ResultQuantifier) -> None:
-        """Propagate the query's result limit onto the quantifier."""
-        wrapper._limit_ = self.query._limit_
 
 
 @dataclass(eq=False)
-class OrderedByBuilder(WrappingModifier):
+class OrderedByBuilder(ExpressionBuilder):
     """
-    Wraps the compiled query in an ``OrderedBy`` clause. It nests inside the quantifier.
+    Holds the ordering specification (variable, direction, key) that the query's ordering pipeline
+    stage applies.
     """
 
     variable: Selectable
@@ -462,6 +412,3 @@ class OrderedByBuilder(WrappingModifier):
     """
     A function to extract the key from the variable value.
     """
-
-    def wrap(self, child: SymbolicExpression) -> OrderedBy:
-        return OrderedBy(child, self.variable, self.descending, self.key)
