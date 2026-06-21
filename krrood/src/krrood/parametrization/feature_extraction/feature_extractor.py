@@ -252,6 +252,18 @@ class FeatureExtractor:
                 result.append(feature.apply_mapping_on_external_root(instance))
         return result
 
+    def strip_class_prefix(self, class_prefix: str) -> list[str]:
+        """
+        Return feature names with ``class_prefix`` removed from each entry.
+
+        :param class_prefix: The class-name prefix (including trailing dot) to remove.
+        :return: Shortened column names aligned with the krrood access-path convention.
+        """
+        return [
+            name[len(class_prefix):] if name.startswith(class_prefix) else name
+            for name in (feature._name_ for feature in self.features)
+        ]
+
     def create_dataframe(self, instances: list[DataAccessObject]) -> pd.DataFrame:
         """
         Create a dataframe from the given instances.

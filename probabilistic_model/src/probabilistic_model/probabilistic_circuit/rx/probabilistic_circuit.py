@@ -50,6 +50,49 @@ from krrood.adapters.json_serializer import SubclassJSONSerializer, to_json, fro
 from random_events.variable import Variable, Symbolic, Continuous, Integer
 
 
+def _unobserved_event_mask(events: npt.NDArray) -> npt.NDArray:
+    """
+    Return a boolean mask that is ``True`` for rows where the variable is unobserved (NaN).
+
+    NaN values only exist in floating-point arrays; object and integer arrays are always
+    fully observed, so this returns an all-False mask for them.
+
+    :param events: A 2-D event array of shape ``(n_samples, n_variables)``.
+    :return: Boolean array of shape ``(n_samples,)``.
+    """
+    if np.issubdtype(events.dtype, np.floating):
+        return np.isnan(events).any(axis=1)
+    return np.zeros(len(events), dtype=bool)
+
+
+def _decode_symbolic_events(
+    distribution: "UnivariateDistribution", events: npt.NDArray
+) -> npt.NDArray:
+    """
+    Decode float64-encoded hash values back to symbolic domain elements when necessary.
+
+    :func:`~probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit.ProbabilisticCircuit.sample`
+    stores samples as ``float64(hash(element))`` columns.  When ``log_likelihood`` is
+    called on those samples, the distribution must receive the original domain objects, not
+    their float64 hashes.  This function performs the reverse lookup for
+    :class:`~random_events.variable.Symbolic` distributions; all other distribution types
+    pass the events through unchanged.
+
+    :param distribution: The leaf distribution to decode for.
+    :param events: A 2-D event array of shape ``(n_samples, n_variables)``.
+    :return: The decoded event array, with float64 hashes replaced by domain elements for
+        Symbolic distributions.
+    """
+    if not (np.issubdtype(events.dtype, np.floating) and isinstance(distribution.variable, Symbolic)):
+        return events
+    hash_to_element = {
+        np.float64(hash(se.element)): se.element
+        for se in distribution.variable.domain.simple_sets
+    }
+    decoded = np.array([hash_to_element.get(val, val) for val in events[:, 0]], dtype=object)
+    return decoded.reshape(-1, 1)
+
+
 def invalidates_topology_cache(method):
     """
     Decorator for :class:`ProbabilisticCircuit` methods that change the graph topology.
@@ -283,16 +326,11 @@ class LeafUnit(Unit):
         return []
 
     def log_likelihood(self, events: npt.NDArray):
-        # NaN means the variable is unobserved for that sample; its contribution
-        # to the joint log-likelihood is 0 (i.e., it is marginalised out).
-        # NaN only exists in floating-point arrays; object/int arrays are always observed.
-        if np.issubdtype(events.dtype, np.floating):
-            nan_mask = np.isnan(events).any(axis=1)
-        else:
-            nan_mask = np.zeros(len(events), dtype=bool)
+        nan_mask = _unobserved_event_mask(events)
         result = np.zeros(len(events))
         if not nan_mask.all():
-            result[~nan_mask] = self.distribution.log_likelihood(events[~nan_mask])
+            decoded = _decode_symbolic_events(self.distribution, events[~nan_mask])
+            result[~nan_mask] = self.distribution.log_likelihood(decoded)
         self.result_of_current_query = result
 
     def cumulative_distribution(self, events: npt.NDArray):
@@ -569,8 +607,8 @@ class SumUnit(InnerUnit):
         Create a distribution that factorizes as follows:
 
         .. math::
-            p(self.latent\_variable) \cdot p(self.variables | self.latent\_variable) \cdot
-            p(other.latent\_variable | self.latent\_variable) \cdot p(other.variables | other.latent\_variable)
+            p(self.latent\\_variable) \\cdot p(self.variables | self.latent\\_variable) \\cdot
+            p(other.latent\\_variable | self.latent\\_variable) \\cdot p(other.variables | other.latent\\_variable)
 
         where `self.latent_variable` and `other.latent_variable` are the results of the latent variable interpretation
         of mixture models.

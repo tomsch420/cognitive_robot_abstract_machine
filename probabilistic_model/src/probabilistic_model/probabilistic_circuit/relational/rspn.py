@@ -144,7 +144,10 @@ class ExchangeableDistributionTemplate:
         )
         _rename_variables_with_part_prefix(part_circuit, prefix, self.latent_variables)
         if len(part_circuit.nodes()) == 0:
-            raise GroundingFailedError(context=str(prefix))
+            raise GroundingFailedError(
+                class_name=type(self.template_distribution).__name__,
+                step=f"exchangeable part '{prefix}'",
+            )
         return part_circuit
 
     def ground(
@@ -194,14 +197,15 @@ class RelationalProbabilisticCircuit:
     ``ExchangeableDistributionTemplate``.
     """
 
-    n_samples: int = field(default=100)
+    aggregation_integration_samples: int = field(default=100)
     """
-    Number of Monte Carlo samples drawn from the aggregation statistics posterior when
-    grounding an exchangeable distribution template.
+    Number of Monte Carlo samples used to approximate the integral over aggregation
+    statistics when grounding an exchangeable distribution template.
 
-    A larger value gives a more accurate integral approximation at the cost of a larger
-    grounded circuit.  Set to ``1`` to recover near-deterministic behaviour when all
-    aggregation statistics are fully observed.
+    This sampling is only performed when the aggregation statistics are not fully
+    computable from the query (e.g. when the count is underspecified).  A larger value
+    gives a more accurate integral approximation at the cost of a larger grounded circuit.
+    Set to ``1`` to recover near-deterministic behaviour when all statistics are observed.
     """
 
     sub_type_circuits: dict[Type, RelationalProbabilisticCircuit] = field(
@@ -292,22 +296,6 @@ class RelationalProbabilisticCircuit:
                 rows.append(aggregation_row + child_feature_extractor.apply_mapping(child))
         return rows
 
-    @staticmethod
-    def _strip_class_prefix(
-        feature_extractor: FeatureExtractor, class_prefix: str
-    ) -> list[str]:
-        """
-        Return short feature names with ``class_prefix`` stripped from each entry.
-
-        :param feature_extractor: The extractor whose feature names are shortened.
-        :param class_prefix: The class-name prefix (including trailing dot) to remove.
-        :return: Short column names aligned with the krrood access-path convention.
-        """
-        return [
-            name[len(class_prefix):] if name.startswith(class_prefix) else name
-            for name in (f._name_ for f in feature_extractor.features)
-        ]
-
     def _build_child_joint_dataframe(
         self,
         exchangeable_part: str,
@@ -335,7 +323,7 @@ class RelationalProbabilisticCircuit:
         rows = self._assemble_child_rows(
             exchangeable_part, instances, aggregation_indices, child_feature_extractor
         )
-        short_names = self._strip_class_prefix(child_feature_extractor, child_class_prefix)
+        short_names = child_feature_extractor.strip_class_prefix(child_class_prefix)
         return pd.DataFrame(columns=aggregation_names + short_names, data=rows)
 
     def _build_per_type_child_dataframe(
@@ -372,8 +360,112 @@ class RelationalProbabilisticCircuit:
             exchangeable_part, instances, aggregation_indices, child_feature_extractor,
             concrete_type=concrete_type,
         )
-        short_names = self._strip_class_prefix(child_feature_extractor, class_prefix)
+        short_names = child_feature_extractor.strip_class_prefix(class_prefix)
         return pd.DataFrame(columns=aggregation_names + short_names, data=rows)
+
+    def _fit_polymorphic_exchangeable_part(
+        self,
+        exchangeable_part: str,
+        instances: list[DataAccessObject],
+        aggregation_indices: list[int],
+        aggregation_names: list[str],
+        child_instances: list[DataAccessObject],
+        child_type: Type,
+        child_partition: dict[Type, list[DataAccessObject]],
+    ) -> ExchangeableDistributionTemplate:
+        """
+        Fit an ``ExchangeableDistributionTemplate`` when children span multiple concrete types.
+
+        Builds one per-type child dataframe for each concrete type in ``child_partition``,
+        infers latent (aggregation) variables from a reference dataframe, and passes
+        all per-type dataframes to the child ``RelationalProbabilisticCircuit`` via
+        :meth:`fit`.
+
+        :param exchangeable_part: Field name of the one-to-many relation on each instance.
+        :param instances: Training instances whose children are used to fit the template.
+        :param aggregation_indices: Positions of aggregation features in the feature vector.
+        :param aggregation_names: Column names for the aggregation portion of each row.
+        :param child_instances: All child DAO instances (union of all concrete types).
+        :param child_type: DAO class of the children.
+        :param child_partition: Mapping from each concrete domain type to its child DAO instances.
+        :return: A fitted ``ExchangeableDistributionTemplate`` for the given part.
+        """
+        per_type_dataframes = {
+            concrete_type: self._build_per_type_child_dataframe(
+                exchangeable_part,
+                instances,
+                aggregation_indices,
+                aggregation_names,
+                typed_children,
+                concrete_type,
+            )
+            for concrete_type, typed_children in child_partition.items()
+        }
+        reference_dataframe = next(iter(per_type_dataframes.values()))
+        latent_variables = [
+            inferred.variable
+            for inferred in infer_variables_from_dataframe(reference_dataframe)
+            if inferred.variable.name in aggregation_names
+        ]
+        template = ExchangeableDistributionTemplate(
+            RelationalProbabilisticCircuit(child_type),
+            latent_variables,
+        )
+        template.template_distribution.fit(
+            child_instances, per_type_dataframes=per_type_dataframes
+        )
+        return template
+
+    def _fit_monomorphic_exchangeable_part(
+        self,
+        exchangeable_part: str,
+        instances: list[DataAccessObject],
+        aggregation_indices: list[int],
+        aggregation_names: list[str],
+        child_instances: list[DataAccessObject],
+        child_type: Type,
+    ) -> ExchangeableDistributionTemplate:
+        """
+        Fit an ``ExchangeableDistributionTemplate`` when all children share a single concrete type.
+
+        Builds a joint dataframe pairing each child's features with the parent's aggregation
+        statistics, infers latent variables, and recursively fits a
+        ``RelationalProbabilisticCircuit`` on the child instances.
+
+        :param exchangeable_part: Field name of the one-to-many relation on each instance.
+        :param instances: Training instances whose children are used to fit the template.
+        :param aggregation_indices: Positions of aggregation features in the feature vector.
+        :param aggregation_names: Column names for the aggregation portion of each row.
+        :param child_instances: All child DAO instances.
+        :param child_type: DAO class of the children.
+        :return: A fitted ``ExchangeableDistributionTemplate`` for the given part.
+        """
+        child_feature_extractor = FeatureExtractor.from_instances(child_instances)
+        child_class_name = type(
+            child_instances[0].from_dao(FromDataAccessObjectState())
+        ).__name__
+        child_class_prefix = f"{child_class_name}."
+        child_dataframe = self._build_child_joint_dataframe(
+            exchangeable_part,
+            instances,
+            aggregation_indices,
+            aggregation_names,
+            child_feature_extractor,
+            child_class_prefix,
+        )
+        latent_variables = [
+            inferred.variable
+            for inferred in infer_variables_from_dataframe(child_dataframe)
+            if inferred.variable.name in aggregation_names
+        ]
+        template = ExchangeableDistributionTemplate(
+            RelationalProbabilisticCircuit(child_type),
+            latent_variables,
+        )
+        template.template_distribution.fit(
+            child_instances, dataframe_from_parent=child_dataframe
+        )
+        return template
 
     def _fit_exchangeable_part(
         self,
@@ -419,57 +511,14 @@ class RelationalProbabilisticCircuit:
         child_partition = self._partition_by_concrete_type(child_instances)
 
         if len(child_partition) > 1:
-            per_type_dfs = {
-                concrete_type: self._build_per_type_child_dataframe(
-                    exchangeable_part,
-                    instances,
-                    aggregation_indices,
-                    aggregation_names,
-                    typed_children,
-                    concrete_type,
-                )
-                for concrete_type, typed_children in child_partition.items()
-            }
-            reference_df = next(iter(per_type_dfs.values()))
-            latent_variables = [
-                inferred.variable
-                for inferred in infer_variables_from_dataframe(reference_df)
-                if inferred.variable.name in aggregation_names
-            ]
-            template = ExchangeableDistributionTemplate(
-                RelationalProbabilisticCircuit(child_type),
-                latent_variables,
+            return self._fit_polymorphic_exchangeable_part(
+                exchangeable_part, instances, aggregation_indices, aggregation_names,
+                child_instances, child_type, child_partition,
             )
-            template.template_distribution.fit(
-                child_instances, per_type_dataframes=per_type_dfs
-            )
-        else:
-            child_feature_extractor = FeatureExtractor.from_instances(child_instances)
-            child_class_name = type(
-                child_instances[0].from_dao(FromDataAccessObjectState())
-            ).__name__
-            child_class_prefix = f"{child_class_name}."
-            child_dataframe = self._build_child_joint_dataframe(
-                exchangeable_part,
-                instances,
-                aggregation_indices,
-                aggregation_names,
-                child_feature_extractor,
-                child_class_prefix,
-            )
-            latent_variables = [
-                inferred.variable
-                for inferred in infer_variables_from_dataframe(child_dataframe)
-                if inferred.variable.name in aggregation_names
-            ]
-            template = ExchangeableDistributionTemplate(
-                RelationalProbabilisticCircuit(child_type),
-                latent_variables,
-            )
-            template.template_distribution.fit(
-                child_instances, dataframe_from_parent=child_dataframe
-            )
-        return template
+        return self._fit_monomorphic_exchangeable_part(
+            exchangeable_part, instances, aggregation_indices, aggregation_names,
+            child_instances, child_type,
+        )
 
     @staticmethod
     def _partition_by_concrete_type(
@@ -499,7 +548,7 @@ class RelationalProbabilisticCircuit:
 
         :return: The domain class of this circuit.
         """
-        if hasattr(self.class_, "original_class"):
+        if issubclass(self.class_, DataAccessObject):
             return self.class_.original_class()
         return self.class_
 
@@ -534,12 +583,12 @@ class RelationalProbabilisticCircuit:
             domain=Set.from_iterable(type_names),
         )
         for concrete_type, sub_instances in partition.items():
-            sub_rpc = RelationalProbabilisticCircuit(
-                concrete_type, n_samples=self.n_samples
+            sub_relational_circuit = RelationalProbabilisticCircuit(
+                concrete_type, aggregation_integration_samples=self.aggregation_integration_samples
             )
-            df = per_type_dataframes.get(concrete_type) if per_type_dataframes else None
-            sub_rpc.fit(sub_instances, dataframe_from_parent=df)
-            self.sub_type_circuits[concrete_type] = sub_rpc
+            type_dataframe = per_type_dataframes.get(concrete_type) if per_type_dataframes else None
+            sub_relational_circuit.fit(sub_instances, dataframe_from_parent=type_dataframe)
+            self.sub_type_circuits[concrete_type] = sub_relational_circuit
             self.log_type_weights[concrete_type] = (
                 math.log(len(sub_instances)) - log_total
             )
@@ -624,7 +673,10 @@ class RelationalProbabilisticCircuit:
                 circuit, SortedSet(latent_variables)
             )
         if len(circuit.nodes()) == 0:
-            raise GroundingFailedError(context=self._domain_class().__name__)
+            raise GroundingFailedError(
+                class_name=self._domain_class().__name__,
+                step="class circuit after conditioning",
+            )
         surviving_product_nodes = [
             node for node in product_nodes_to_extend if node.index is not None
         ]
@@ -641,7 +693,7 @@ class RelationalProbabilisticCircuit:
 
         Marginalises the circuit (before any conditioning) to the aggregation (latent)
         variables to obtain ``P(agg_stats)``, conditions on the subset of statistics
-        that are already known (``available_statistics``), then draws :attr:`n_samples`
+        that are already known (``available_statistics``), then draws :attr:`aggregation_integration_samples`
         samples of the remaining unknown statistics.  Each returned dict contains the
         full set of latent variables: known ones take their observed value in every
         sample; unknown ones are drawn from the posterior
@@ -660,7 +712,7 @@ class RelationalProbabilisticCircuit:
         """
         agg_marginal = circuit.marginal(latent_variables)
         if agg_marginal is None:
-            return [dict(available_statistics)] * self.n_samples
+            return [dict(available_statistics)] * self.aggregation_integration_samples
 
         available_in_marginal = {
             variable: value
@@ -672,10 +724,10 @@ class RelationalProbabilisticCircuit:
             if conditioned is None:
                 agg_marginal = circuit.marginal(latent_variables)
 
-        samples_array = agg_marginal.sample(self.n_samples)
+        samples_array = agg_marginal.sample(self.aggregation_integration_samples)
         variable_to_index = agg_marginal.variable_to_index_map
         result = []
-        for i in range(self.n_samples):
+        for i in range(self.aggregation_integration_samples):
             sample = dict(available_statistics)
             for variable, index in variable_to_index.items():
                 sample[variable] = samples_array[i, index]
@@ -693,7 +745,7 @@ class RelationalProbabilisticCircuit:
 
         Each sample produces one grounded circuit ``P(x | sᵢ)``.  All circuits are
         combined in a :class:`~probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit.SumUnit`
-        with equal log-weight ``-log(n_samples)``, approximating the integral
+        with equal log-weight ``-log(aggregation_integration_samples)``, approximating the integral
         ``∫ P(x | s) P(s | class context) ds``.
 
         :param template: The exchangeable distribution template to ground.
@@ -731,8 +783,8 @@ class RelationalProbabilisticCircuit:
             raise CircuitNotFittedError(self.class_)
         mixture = ProbabilisticCircuit()
         mixture_root = SumUnit(probabilistic_circuit=mixture)
-        for concrete_type, sub_rpc in self.sub_type_circuits.items():
-            feature_circuit = sub_rpc.ground(query)
+        for concrete_type, sub_relational_circuit in self.sub_type_circuits.items():
+            feature_circuit = sub_relational_circuit.ground(query)
             type_dirac = make_dirac(self.type_variable, concrete_type.__name__)
             type_circuit = ProbabilisticCircuit()
             leaf(type_dirac, probabilistic_circuit=type_circuit)
@@ -740,11 +792,11 @@ class RelationalProbabilisticCircuit:
             product_root = ProductUnit(probabilistic_circuit=product_circuit)
             type_node_map = product_circuit.mount(type_circuit.root)
             product_root.add_subcircuit(type_node_map[type_circuit.root.index])
-            feat_node_map = product_circuit.mount(feature_circuit.root)
-            product_root.add_subcircuit(feat_node_map[feature_circuit.root.index])
-            prod_node_map = mixture.mount(product_circuit.root)
+            feature_node_map = product_circuit.mount(feature_circuit.root)
+            product_root.add_subcircuit(feature_node_map[feature_circuit.root.index])
+            product_node_map = mixture.mount(product_circuit.root)
             mixture_root.add_subcircuit(
-                prod_node_map[product_circuit.root.index],
+                product_node_map[product_circuit.root.index],
                 log_weight=self.log_type_weights[concrete_type],
             )
         return mixture

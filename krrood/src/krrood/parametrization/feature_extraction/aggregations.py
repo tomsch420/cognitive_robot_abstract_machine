@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+import warnings
 from dataclasses import dataclass
 from functools import lru_cache
 from typing_extensions import Callable, Optional, Type, TypeVar, Any
@@ -147,6 +148,11 @@ def compute_aggregation_statistics(
         latent_variable = latent_variable_by_name[feature_name]
         if isinstance(latent_variable, Symbolic):
             if not any(elem.element == value for elem in latent_variable.domain.simple_sets):
+                warnings.warn(
+                    f"Value {value!r} for aggregation feature '{feature_name}' is outside the "
+                    f"training domain of variable '{latent_variable.name}'. Skipping.",
+                    stacklevel=2,
+                )
                 continue
         statistics[latent_variable] = value
     return statistics

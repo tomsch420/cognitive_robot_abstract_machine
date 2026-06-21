@@ -32,18 +32,30 @@ class CircuitNotFittedError(DataclassException):
 class GroundingFailedError(DataclassException):
     """
     Raised when grounding a circuit produces an empty or degenerate result.
+
+    Carries the class name and the grounding step that failed so that stack traces
+    immediately show which part of the relational query could not be resolved.
     """
 
-    context: str
+    class_name: str
     """
-    A description of which grounding step failed (e.g. part index or class name).
+    Name of the domain class whose circuit was being grounded.
+    """
+
+    step: str
+    """
+    Human-readable description of the grounding step that produced an empty circuit
+    (e.g. ``"class circuit"`` or ``"exchangeable part at index 2"``).
     """
 
     def error_message(self) -> str:
-        return f"Grounding failed for: {self.context}."
+        return (
+            f"Grounding '{self.class_name}' failed at step '{self.step}': "
+            f"the resulting circuit is empty."
+        )
 
     def suggest_correction(self) -> str:
         return (
-            "Ensure the query is compatible with the fitted circuit and that "
-            "the conditioning event has non-zero probability."
+            "Ensure the query structure is compatible with the fitted circuit and that "
+            "every conditioning event has non-zero probability under the training distribution."
         )
