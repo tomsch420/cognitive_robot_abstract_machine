@@ -13,6 +13,8 @@ Node kinds:
 * **Template node** (``<<template>>``) — one per exchangeable-distribution
   template; sits between parent and child class, listing the latent
   conditioning variables.
+* **Enum node** (``<<enumeration>>``) — one per unique enum type, placed in
+  a side column and referenced by dashed use-dependency arrows.
 
 Output: a single SVG file (or PNG / PDF).
 """
@@ -24,6 +26,7 @@ from typing import TYPE_CHECKING, Union
 
 import matplotlib
 import matplotlib.pyplot as plt
+from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from matplotlib.patches import Rectangle
 import numpy as np
@@ -40,49 +43,80 @@ if TYPE_CHECKING:
     )
 
 
-# ── palette (giskard-inspired) ────────────────────────────────────────────────
+# ── palette ───────────────────────────────────────────────────────────────────
 
-# Class node
-_CC_HEADER: str = "#1B2631"       # dark navy header
-_CC_HEADER_FG: str = "#FFFFFF"
-_CC_STEREO: str = "#85C1E9"       # light-blue stereotype
-_CC_STAT_A: str = "#1A9641"       # green  — parameters
-_CC_STAT_B: str = "#2B83BA"       # blue   — variables
-_CC_STAT_C: str = "#6C3483"       # purple — nodes
+@dataclass(frozen=True)
+class _NodeStyle:
+    """Colour scheme for one node kind."""
+
+    header: str
+    header_fg: str
+    row_odd: str
+    row_even: str
+    border: str
+    stereo_fg: str = "#FFFFFF"
+    legend_label: str = ""
+
+
+_SHARED_ROW_ODD: str = "#EBF5FB"
+_SHARED_ROW_EVEN: str = "#D6EAF8"
+
+_STYLE_CLASS = _NodeStyle(
+    header="#1B2631",
+    header_fg="#FFFFFF",
+    row_odd=_SHARED_ROW_ODD,
+    row_even=_SHARED_ROW_EVEN,
+    border="#1B2631",
+    stereo_fg="#85C1E9",
+    legend_label="<<circuit>>  class  (name + stats)",
+)
+_STYLE_ATTR = _NodeStyle(
+    header="#1A5276",
+    header_fg="#FFFFFF",
+    row_odd=_SHARED_ROW_ODD,
+    row_even=_SHARED_ROW_EVEN,
+    border="#1A5276",
+    legend_label="attribute group / sub-object",
+)
+_STYLE_EDT = _NodeStyle(
+    header="#6E2F1A",
+    header_fg="#FFFFFF",
+    row_odd="#FDF2E9",
+    row_even="#FAE5D3",
+    border="#6E2F1A",
+    stereo_fg="#F0B27A",
+    legend_label="<<template>>  EDT  (latent conditioning vars)",
+)
+_STYLE_ENUM = _NodeStyle(
+    header="#4A235A",
+    header_fg="#FFFFFF",
+    row_odd="#F5EEF8",
+    row_even="#EAD9F4",
+    border="#4A235A",
+    stereo_fg="#D7BDE2",
+    legend_label="<<enumeration>>  enum type",
+)
+
+# Stat-band colours (class node only)
+_CC_STAT_A: str = "#1A9641"   # green  — parameters
+_CC_STAT_B: str = "#2B83BA"   # blue   — variables
+_CC_STAT_C: str = "#6C3483"   # purple — nodes
 _CC_STAT_FG: str = "#FFFFFF"
-_CC_ROW_ODD: str = "#EBF5FB"
-_CC_ROW_EVEN: str = "#D6EAF8"
-_CC_BORDER: str = "#1B2631"
 
-# Attribute node
-_CA_HEADER: str = "#1A5276"
-_CA_HEADER_FG: str = "#FFFFFF"
-_CA_ROW_ODD: str = "#EBF5FB"
-_CA_ROW_EVEN: str = "#D6EAF8"
-_CA_BORDER: str = "#1A5276"
-
-# Template (EDT) node
-_CT_HEADER: str = "#6E2F1A"
-_CT_HEADER_FG: str = "#FFFFFF"
-_CT_STEREO: str = "#F0B27A"
-_CT_ROW_ODD: str = "#FDF2E9"
-_CT_ROW_EVEN: str = "#FAE5D3"
-_CT_BORDER: str = "#6E2F1A"
-
-# Arrows / multiplicity
-_CARR_COMP: str = "#1B2631"   # composition (class → attribute node)
-_CARR_EDT: str = "#6E2F1A"    # class → template  and  template → child class
+# Arrow colours
+_CARR_COMP: str = "#1B2631"   # composition (class → attr node)
+_CARR_EDT: str = "#6E2F1A"    # class → template and template → child class
+_CARR_ENUM: str = "#7B2D8B"   # dashed use-dependency to enum
 _CMULT: str = "#C0392B"
 
-_TYPE_SHORT: dict[str, str] = {
-    "Continuous": "float",
-    "Integer": "int",
-    "Symbolic": "<<enum>>",
-}
 _TYPE_COLOR: dict[str, str] = {
     "Continuous": "#1A9641",
     "Integer": "#2B83BA",
     "Symbolic": "#7B2D8B",
+}
+_TYPE_SHORT: dict[str, str] = {
+    "Continuous": "float",
+    "Integer": "int",
 }
 
 # ── geometry ──────────────────────────────────────────────────────────────────
@@ -94,9 +128,9 @@ _ENUM_W: float = 3.2
 
 _LH: float = 0.29            # row height
 _HEADER_H: float = 0.76
-_STAT_BAR_H: float = 0.40    # two-column stat band
-_ROW_PAD_V: float = 0.10     # extra vertical padding above/below row block
-_BW: float = 2.8             # border (line)width in points — giskard-style thick
+_STAT_BAR_H: float = 0.40
+_ROW_PAD_V: float = 0.10     # vertical padding above/below row block
+_BW: float = 2.8             # border line-width in points (giskard-style thick)
 
 _COL_GAP: float = 1.0
 _ROW_GAP: float = 2.0
@@ -118,8 +152,8 @@ class _EnumNode:
     """
     A standalone UML ``<<enumeration>>`` box for one enum type.
 
-    Placed outside the main class hierarchy and connected to referencing
-    classes by dashed dependency arrows.
+    Placed in a side column and connected to referencing nodes by dashed
+    dependency arrows.
     """
 
     type_name: str
@@ -156,9 +190,7 @@ class _AttrNode:
 
 @dataclass
 class _EDTNode:
-    """
-    An exchangeable-distribution template box sitting between parent and child.
-    """
+    """An exchangeable-distribution template box sitting between parent and child."""
 
     relation_name: str
     latent_attributes: list[_Attribute]
@@ -205,16 +237,9 @@ class _ClassNode:
     height: float = field(default=0.0, init=False)
 
 
-_AnyNode = Union[_ClassNode, _AttrNode, _EDTNode, _EnumNode]
-
-# Enum node colours
-_CE_HEADER: str = "#4A235A"
-_CE_HEADER_FG: str = "#FFFFFF"
-_CE_STEREO: str = "#D7BDE2"
-_CE_ROW_ODD: str = "#F5EEF8"
-_CE_ROW_EVEN: str = "#EAD9F4"
-_CE_BORDER: str = "#4A235A"
-_CARR_ENUM: str = "#7B2D8B"   # dashed use-dependency to enum
+# _EnumNode is excluded from _AnyNode because it lives outside the tree and is
+# managed separately in _build (side-column placement, explicit draw loop).
+_AnyNode = Union[_ClassNode, _AttrNode, _EDTNode]
 
 
 # ── extraction ────────────────────────────────────────────────────────────────
@@ -251,14 +276,12 @@ def _count_parameters(rspn: RelationalProbabilisticCircuit) -> int:
     total = 0
     for node in pc.nodes():
         if isinstance(node, SumUnit):
-            k = len(list(pc.graph.successors(node.index)))
+            k = sum(1 for _ in pc.graph.successors(node.index))
             total += max(k - 1, 0)
     for leaf in pc.leaves:
         d = leaf.distribution
         if hasattr(d, "probabilities"):
             total += len(d.probabilities)
-        elif hasattr(d, "location"):
-            total += 1
         else:
             total += 1
     return total
@@ -274,15 +297,14 @@ def _build_tree(
 
     Scalar variables with a sub-object prefix (e.g. ``orientation.w``) are
     separated into :class:`_AttrNode` sub-object boxes; the remaining flat
-    attributes and aggregation statistics are listed directly in the class
-    box.  Latent conditioning variables shared with the parent circuit are
-    excluded.
+    attributes are listed directly in the class box.  Latent conditioning
+    variables and aggregation statistics are excluded.
 
     :param rspn: The fitted RSPN to visualise.
     :param latent_names: Variable names to suppress in this class.
-    :param enum_registry: Shared dict accumulating unique :class:`_EnumNode` instances
-        keyed by enum type name.  Callers pass the same dict for all recursive calls so
-        each enum type produces exactly one box.
+    :param enum_registry: Shared dict accumulating unique :class:`_EnumNode`
+        instances keyed by enum type name.  Passing the same dict for all
+        recursive calls ensures each enum type produces exactly one box.
     :return: Root :class:`_ClassNode` of the diagram tree.
     """
     if enum_registry is None:
@@ -306,7 +328,7 @@ def _build_tree(
         enum_type_name = ""
         if isinstance(var, Symbolic):
             members = list(var.domain)
-            raw_type = str(members[0]).split(".")[0] if members else "Enum"
+            raw_type = type(members[0]).__name__ if members else "Enum"
             enum_type_name = raw_type
             if raw_type not in enum_registry:
                 enum_registry[raw_type] = _EnumNode(
@@ -362,30 +384,31 @@ def _build_tree(
 # ── height calculation ────────────────────────────────────────────────────────
 
 
-def _attrs_height(attrs: list[_Attribute]) -> float:
-    return len(attrs) * _LH
+def _rows_height(row_count: int) -> float:
+    return row_count * _LH
+
+
+def _boxed_rows_height(row_count: int) -> float:
+    """Header + vertical padding + rows + vertical padding."""
+    return _HEADER_H + _ROW_PAD_V + _rows_height(row_count) + _ROW_PAD_V
 
 
 def _attr_node_height(n: _AttrNode) -> float:
-    return _HEADER_H + _ROW_PAD_V + _attrs_height(n.attributes) + _ROW_PAD_V
+    return _boxed_rows_height(len(n.attributes))
 
 
 def _enum_node_height(n: _EnumNode) -> float:
-    return _HEADER_H + _ROW_PAD_V + len(n.values) * _LH + _ROW_PAD_V
+    return _boxed_rows_height(len(n.values))
 
 
 def _edt_node_height(n: _EDTNode) -> float:
-    inner = _attrs_height(n.latent_attributes) if n.latent_attributes else _LH
-    return _HEADER_H + _ROW_PAD_V + inner + _ROW_PAD_V
+    return _boxed_rows_height(max(len(n.latent_attributes), 1))
 
 
 def _class_node_height(n: _ClassNode) -> float:
-    inner = _attrs_height(n.attributes)
-    return (
-        _HEADER_H
-        + (_ROW_PAD_V + inner + _ROW_PAD_V if n.attributes else 0.0)
-        + _STAT_BAR_H
-    )
+    inner = (_ROW_PAD_V + _rows_height(len(n.attributes)) + _ROW_PAD_V
+             if n.attributes else 0.0)
+    return _HEADER_H + inner + _STAT_BAR_H
 
 
 def _assign_heights(node: _AnyNode) -> None:
@@ -401,6 +424,8 @@ def _assign_heights(node: _AnyNode) -> None:
                 _assign_heights(a)
             for e in node.edt_children:
                 _assign_heights(e)
+        case _:
+            raise TypeError(f"Unexpected node type: {type(node)}")
 
 
 # ── layout ────────────────────────────────────────────────────────────────────
@@ -413,15 +438,17 @@ def _subtree_w(node: _AnyNode) -> float:
         case _EDTNode():
             return max(node.width, _subtree_w(node.child))
         case _ClassNode():
-            all_ch: list[_AnyNode] = list(node.sub_object_nodes) + list(node.edt_children)
-            if not all_ch:
+            children: list[_AnyNode] = [*node.sub_object_nodes, *node.edt_children]
+            if not children:
                 return node.width
-            ch_total = sum(_subtree_w(c) for c in all_ch) + _COL_GAP * (len(all_ch) - 1)
-            return max(node.width, ch_total)
+            total = sum(_subtree_w(c) for c in children) + _COL_GAP * (len(children) - 1)
+            return max(node.width, total)
+        case _:
+            raise TypeError(f"Unexpected node type: {type(node)}")
 
 
 def _place(node: _AnyNode, x_ctr: float, y_top: float) -> None:
-    """Recursively assign positions; y_top is the top edge of *node*."""
+    """Recursively assign positions; ``y_top`` is the top edge of *node*."""
     match node:
         case _AttrNode():
             node.x = x_ctr - node.width / 2
@@ -435,16 +462,19 @@ def _place(node: _AnyNode, x_ctr: float, y_top: float) -> None:
         case _ClassNode():
             node.x = x_ctr - node.width / 2
             node.y = y_top - node.height
-            all_ch: list[_AnyNode] = list(node.sub_object_nodes) + list(node.edt_children)
-            if not all_ch:
+            children: list[_AnyNode] = [*node.sub_object_nodes, *node.edt_children]
+            if not children:
                 return
-            total_w = sum(_subtree_w(c) for c in all_ch) + _COL_GAP * (len(all_ch) - 1)
+            child_widths = [_subtree_w(c) for c in children]
+            total_w = sum(child_widths) + _COL_GAP * (len(children) - 1)
             cursor = x_ctr - total_w / 2
             child_top = node.y - _ROW_GAP
-            for ch in all_ch:
-                sw = _subtree_w(ch)
+            for ch, sw in zip(children, child_widths):
                 _place(ch, cursor + sw / 2, child_top)
                 cursor += sw + _COL_GAP
+
+        case _:
+            raise TypeError(f"Unexpected node type: {type(node)}")
 
 
 def _collect(node: _AnyNode) -> list[_AnyNode]:
@@ -459,10 +489,12 @@ def _collect(node: _AnyNode) -> list[_AnyNode]:
                 result += _collect(a)
             for e in node.edt_children:
                 result += _collect(e)
+        case _:
+            raise TypeError(f"Unexpected node type: {type(node)}")
     return result
 
 
-def _bounds(nodes: list[_AnyNode]) -> tuple[float, float, float, float]:
+def _bounds(nodes: list[_AnyNode] | list[_EnumNode]) -> tuple[float, float, float, float]:
     return (
         min(n.x for n in nodes),
         min(n.y for n in nodes),
@@ -474,52 +506,48 @@ def _bounds(nodes: list[_AnyNode]) -> tuple[float, float, float, float]:
 # ── drawing primitives ────────────────────────────────────────────────────────
 
 
-def _filled_rect(ax, x, y, w, h, fc, ec="none", lw=0.0, z=2):
+def _filled_rect(ax: Axes, x: float, y: float, w: float, h: float,
+                 fc: str, ec: str = "none", lw: float = 0.0, z: int = 2) -> None:
     ax.add_patch(Rectangle((x, y), w, h, facecolor=fc, edgecolor=ec,
                             linewidth=lw, zorder=z))
 
 
-def _border(ax, x, y, w, h, ec, lw=_BW, z=6):
+def _border(ax: Axes, x: float, y: float, w: float, h: float,
+            ec: str, lw: float = _BW, z: int = 6) -> None:
     ax.add_patch(Rectangle((x, y), w, h, facecolor="none", edgecolor=ec,
                             linewidth=lw, zorder=z))
 
 
-def _hline(ax, x, y, w, color, lw=1.0, z=3):
+def _hline(ax: Axes, x: float, y: float, w: float, color: str,
+           lw: float = 1.0, z: int = 3) -> None:
     ax.plot([x, x + w], [y, y], color=color, linewidth=lw, zorder=z)
 
 
-# ── shared row drawing ───────────────────────────────────────────────────────
+# ── shared row drawing ────────────────────────────────────────────────────────
 
 
 def _draw_attr_row(
-    ax,
+    ax: Axes,
     x: float,
     row_y: float,
     w: float,
     attr: _Attribute,
     row_bg: str,
-    index: int,
 ) -> float:
     """
     Draw one attribute row and return the y coordinate after the row.
 
-    For Symbolic variables an extra line listing the enum values
-    (``{VALUE_A, VALUE_B}``) is rendered below the name/type line,
-    following standard UML enumeration notation.
-
     :param ax: Matplotlib axes.
     :param x: Left edge of the containing box.
-    :param row_y: Vertical centre of the first (name/type) line.
+    :param row_y: Vertical centre of the name/type line.
     :param w: Width of the containing box.
     :param attr: The attribute to render.
     :param row_bg: Background fill colour for this row.
-    :param index: Row index (unused here, kept for parity with callers).
-    :return: New row_y after consuming this attribute's vertical space.
+    :return: New row_y after consuming this row's vertical space.
     """
-    _filled_rect(ax, x, row_y - _LH / 2, w, _LH, row_bg, z=2)
-
+    _filled_rect(ax, x, row_y - _LH / 2, w, _LH, row_bg)
     type_color = _TYPE_COLOR.get(attr.type_name, "#555")
-    type_label = attr.enum_type_name if attr.enum_type_name else _TYPE_SHORT.get(attr.type_name, attr.type_name)
+    type_label = attr.enum_type_name or _TYPE_SHORT.get(attr.type_name, attr.type_name)
     name_w = len(attr.name) * 0.057
     ax.text(x + 0.20, row_y, attr.name,
             fontsize=6.5, color="#17202A", va="center", ha="left",
@@ -527,39 +555,62 @@ def _draw_attr_row(
     ax.text(x + 0.20 + name_w, row_y, f" : {type_label}",
             fontsize=6.5, color=type_color, va="center", ha="left",
             fontfamily="sans-serif", fontstyle="italic", zorder=4)
-
     return row_y - _LH
 
 
-# ── class node drawing ────────────────────────────────────────────────────────
+def _draw_rows(
+    ax: Axes,
+    x: float,
+    top: float,
+    w: float,
+    attrs: list[_Attribute],
+    style: _NodeStyle,
+) -> None:
+    """Draw the alternating-row attribute table, starting just below *top*."""
+    _hline(ax, x, top, w, style.border, lw=1.0)
+    row_y = top - _ROW_PAD_V - _LH / 2
+    for i, attr in enumerate(attrs):
+        row_bg = style.row_odd if i % 2 == 0 else style.row_even
+        row_y = _draw_attr_row(ax, x, row_y, w, attr, row_bg)
 
 
-def _draw_class_node(ax, node: _ClassNode) -> None:
+# ── node drawing ──────────────────────────────────────────────────────────────
+
+
+def _draw_header(
+    ax: Axes,
+    x: float,
+    top: float,
+    w: float,
+    title: str,
+    stereotype: str,
+    style: _NodeStyle,
+    title_fontsize: float = 9.0,
+) -> None:
+    """Draw the coloured header band with a title and UML stereotype line."""
+    _filled_rect(ax, x, top - _HEADER_H, w, _HEADER_H, style.header, z=3)
+    ax.text(x + w / 2, top - _HEADER_H * 0.28, title,
+            fontsize=title_fontsize, color=style.header_fg, ha="center", va="center",
+            fontfamily="sans-serif", fontweight="bold", zorder=4)
+    ax.text(x + w / 2, top - _HEADER_H * 0.78, stereotype,
+            fontsize=6, color=style.stereo_fg, ha="center", va="center",
+            fontfamily="sans-serif", fontstyle="italic", zorder=4)
+
+
+def _draw_class_node(ax: Axes, node: _ClassNode) -> None:
     x, y, w, h = node.x, node.y, node.width, node.height
     top = y + h
 
-    # ── header band ───────────────────────────────────────────────────────
-    _filled_rect(ax, x, top - _HEADER_H, w, _HEADER_H, _CC_HEADER, z=3)
-    ax.text(x + w / 2, top - _HEADER_H * 0.28, node.class_name,
-            fontsize=10, color=_CC_HEADER_FG, ha="center", va="center",
-            fontfamily="sans-serif", fontweight="bold", zorder=4)
-    ax.text(x + w / 2, top - _HEADER_H * 0.78, "<<circuit>>",
-            fontsize=6, color=_CC_STEREO, ha="center", va="center",
-            fontfamily="sans-serif", fontstyle="italic", zorder=4)
+    _draw_header(ax, x, top, w, node.class_name, "<<circuit>>", _STYLE_CLASS,
+                 title_fontsize=10.0)
 
-    # ── attribute rows ────────────────────────────────────────────────────
     cursor = top - _HEADER_H
     if node.attributes:
-        _hline(ax, x, cursor, w, _CC_BORDER, lw=0.8)
-        row_y = cursor - _ROW_PAD_V - _LH / 2
-        for i, attr in enumerate(node.attributes):
-            row_bg = _CC_ROW_ODD if i % 2 == 0 else _CC_ROW_EVEN
-            row_y = _draw_attr_row(ax, x, row_y, w, attr, row_bg, i)
-        cursor -= _ROW_PAD_V + _attrs_height(node.attributes) + _ROW_PAD_V
+        _draw_rows(ax, x, cursor, w, node.attributes, _STYLE_CLASS)
+        cursor -= _ROW_PAD_V + _rows_height(len(node.attributes)) + _ROW_PAD_V
 
-    # ── three-cell stat band ──────────────────────────────────────────────
-    # parameters (green) | variables (blue) | nodes (purple)
-    _hline(ax, x, cursor, w, _CC_BORDER, lw=0.8)
+    # Three-cell stat band: parameters (green) | variables (blue) | nodes (purple)
+    _hline(ax, x, cursor, w, _STYLE_CLASS.border, lw=0.8)
     bar_y = cursor - _STAT_BAR_H
     third = w / 3
     stats = [
@@ -574,114 +625,71 @@ def _draw_class_node(ax, node: _ClassNode) -> None:
             ax.plot([cell_x, cell_x], [bar_y, cursor],
                     color="white", linewidth=0.8, zorder=4)
         mid_x = cell_x + third / 2
-        mid_y = bar_y + _STAT_BAR_H / 2
-        ax.text(mid_x, mid_y + _STAT_BAR_H * 0.16, str(value),
+        ax.text(mid_x, bar_y + _STAT_BAR_H * 0.66, str(value),
                 fontsize=9, color=_CC_STAT_FG, ha="center", va="center",
                 fontfamily="sans-serif", fontweight="bold", zorder=4)
-        ax.text(mid_x, bar_y + _STAT_BAR_H * 0.82, label,
+        ax.text(mid_x, bar_y + _STAT_BAR_H * 0.18, label,
                 fontsize=5, color=_CC_STAT_FG, ha="center", va="center",
                 fontfamily="sans-serif", alpha=0.88, zorder=4)
 
-    _border(ax, x, y, w, h, _CC_BORDER)
+    _border(ax, x, y, w, h, _STYLE_CLASS.border)
 
 
-# ── attribute node drawing ────────────────────────────────────────────────────
-
-
-def _draw_attr_node(ax, node: _AttrNode) -> None:
+def _draw_attr_node(ax: Axes, node: _AttrNode) -> None:
     x, y, w, h = node.x, node.y, node.width, node.height
     top = y + h
-
-    # header
-    _filled_rect(ax, x, top - _HEADER_H, w, _HEADER_H, _CA_HEADER, z=3)
-    ax.text(x + w / 2, top - _HEADER_H / 2, node.label,
-            fontsize=8, color=_CA_HEADER_FG, ha="center", va="center",
-            fontfamily="sans-serif", fontweight="bold", zorder=4)
-
-    # alternating-row attribute table
-    _hline(ax, x, top - _HEADER_H, w, _CA_BORDER, lw=1.0)
-    row_y = top - _HEADER_H - _ROW_PAD_V - _LH / 2
-    for i, attr in enumerate(node.attributes):
-        row_bg = _CA_ROW_ODD if i % 2 == 0 else _CA_ROW_EVEN
-        row_y = _draw_attr_row(ax, x, row_y, w, attr, row_bg, i)
-
-    _border(ax, x, y, w, h, _CA_BORDER)
+    _draw_header(ax, x, top, w, node.label, "", _STYLE_ATTR, title_fontsize=8.0)
+    _draw_rows(ax, x, top - _HEADER_H, w, node.attributes, _STYLE_ATTR)
+    _border(ax, x, y, w, h, _STYLE_ATTR.border)
 
 
-# ── EDT node drawing ──────────────────────────────────────────────────────────
-
-
-def _draw_edt_node(ax, node: _EDTNode) -> None:
+def _draw_edt_node(ax: Axes, node: _EDTNode) -> None:
     x, y, w, h = node.x, node.y, node.width, node.height
     top = y + h
-
-    # header
-    _filled_rect(ax, x, top - _HEADER_H, w, _HEADER_H, _CT_HEADER, z=3)
-    ax.text(x + w / 2, top - _HEADER_H * 0.28, node.relation_name,
-            fontsize=9, color=_CT_HEADER_FG, ha="center", va="center",
-            fontfamily="sans-serif", fontweight="bold", zorder=4)
-    ax.text(x + w / 2, top - _HEADER_H * 0.78, "<<template>>",
-            fontsize=6, color=_CT_STEREO, ha="center", va="center",
-            fontfamily="sans-serif", fontstyle="italic", zorder=4)
-
-    _hline(ax, x, top - _HEADER_H, w, _CT_BORDER, lw=1.0)
-    row_y = top - _HEADER_H - _ROW_PAD_V - _LH / 2
-    for i, attr in enumerate(node.latent_attributes):
-        row_bg = _CT_ROW_ODD if i % 2 == 0 else _CT_ROW_EVEN
-        row_y = _draw_attr_row(ax, x, row_y, w, attr, row_bg, i)
-
-    _border(ax, x, y, w, h, _CT_BORDER)
+    _draw_header(ax, x, top, w, node.relation_name, "<<template>>", _STYLE_EDT)
+    _draw_rows(ax, x, top - _HEADER_H, w, node.latent_attributes, _STYLE_EDT)
+    _border(ax, x, y, w, h, _STYLE_EDT.border)
 
 
-# ── enum node drawing ────────────────────────────────────────────────────────
-
-
-def _draw_enum_node(ax, node: _EnumNode) -> None:
+def _draw_enum_node(ax: Axes, node: _EnumNode) -> None:
     x, y, w, h = node.x, node.y, node.width, node.height
     top = y + h
-
-    _filled_rect(ax, x, top - _HEADER_H, w, _HEADER_H, _CE_HEADER, z=3)
-    ax.text(x + w / 2, top - _HEADER_H * 0.28, node.type_name,
-            fontsize=8, color=_CE_HEADER_FG, ha="center", va="center",
-            fontfamily="sans-serif", fontweight="bold", zorder=4)
-    ax.text(x + w / 2, top - _HEADER_H * 0.78, "<<enumeration>>",
-            fontsize=6, color=_CE_STEREO, ha="center", va="center",
-            fontfamily="sans-serif", fontstyle="italic", zorder=4)
-
-    _hline(ax, x, top - _HEADER_H, w, _CE_BORDER, lw=1.0)
+    _draw_header(ax, x, top, w, node.type_name, "<<enumeration>>", _STYLE_ENUM,
+                 title_fontsize=8.0)
+    _hline(ax, x, top - _HEADER_H, w, _STYLE_ENUM.border, lw=1.0)
     row_y = top - _HEADER_H - _ROW_PAD_V - _LH / 2
     for i, value in enumerate(node.values):
-        row_bg = _CE_ROW_ODD if i % 2 == 0 else _CE_ROW_EVEN
-        _filled_rect(ax, x, row_y - _LH / 2, w, _LH, row_bg, z=2)
+        row_bg = _STYLE_ENUM.row_odd if i % 2 == 0 else _STYLE_ENUM.row_even
+        _filled_rect(ax, x, row_y - _LH / 2, w, _LH, row_bg)
         ax.text(x + 0.22, row_y, value,
-                fontsize=6.5, color=_CE_HEADER, va="center", ha="left",
+                fontsize=6.5, color=_STYLE_ENUM.header, va="center", ha="left",
                 fontfamily="monospace", zorder=4)
         row_y -= _LH
-
-    _border(ax, x, y, w, h, _CE_BORDER)
+    _border(ax, x, y, w, h, _STYLE_ENUM.border)
 
 
 # ── arrow drawing ─────────────────────────────────────────────────────────────
 
 
-def _diamond(ax, cx, cy, color, size=0.15):
+def _diamond(ax: Axes, cx: float, cy: float, color: str, size: float = 0.15) -> None:
     pts = np.array([
-        [cx,                cy + size],
-        [cx + size * 0.55,  cy],
-        [cx,                cy - size],
-        [cx - size * 0.55,  cy],
+        [cx,               cy + size],
+        [cx + size * 0.55, cy],
+        [cx,               cy - size],
+        [cx - size * 0.55, cy],
     ])
     ax.fill(pts[:, 0], pts[:, 1], color=color, zorder=5)
 
 
-def _open_arrow_up(ax, tip_x, tip_y, color):
+def _open_arrow_up(ax: Axes, tip_x: float, tip_y: float, color: str) -> None:
     ax.annotate("", xy=(tip_x, tip_y + 0.01), xytext=(tip_x, tip_y + 0.30),
                 arrowprops=dict(arrowstyle="-|>", color=color, lw=1.2,
                                 mutation_scale=9),
                 zorder=4)
 
 
-def _elbow(ax, x1, y1, x2, y2, color, lw=1.2):
+def _elbow(ax: Axes, x1: float, y1: float, x2: float, y2: float,
+           color: str, lw: float = 1.2) -> None:
     if abs(x1 - x2) < 0.05:
         ax.plot([x1, x2], [y1, y2], color=color, linewidth=lw,
                 zorder=2, solid_capstyle="round")
@@ -691,8 +699,9 @@ def _elbow(ax, x1, y1, x2, y2, color, lw=1.2):
                 color=color, linewidth=lw, zorder=2, solid_capstyle="round")
 
 
-def _dashed_use_arrow(ax, x1, y1, x2, y2, color=_CARR_ENUM):
-    """Draw a dashed ``<<use>>`` dependency arrow from (x1,y1) to (x2,y2)."""
+def _dashed_use_arrow(ax: Axes, x1: float, y1: float,
+                      x2: float, y2: float, color: str = _CARR_ENUM) -> None:
+    """Draw a dashed ``<<use>>`` dependency arrow from (x1, y1) to (x2, y2)."""
     ax.annotate(
         "", xy=(x2, y2), xytext=(x1, y1),
         arrowprops=dict(arrowstyle="-|>", color=color, lw=1.0,
@@ -701,13 +710,13 @@ def _dashed_use_arrow(ax, x1, y1, x2, y2, color=_CARR_ENUM):
     )
 
 
-def _mult_label(ax, x, y, text, color=_CMULT):
+def _mult_label(ax: Axes, x: float, y: float, text: str, color: str = _CMULT) -> None:
     ax.text(x, y, text, fontsize=8, color=color, va="center",
             fontweight="bold", fontfamily="sans-serif", zorder=4)
 
 
-def _draw_arrows(ax, node: _AnyNode) -> None:
-    """Recursively draw all arrows in the tree."""
+def _draw_arrows(ax: Axes, node: _AnyNode) -> None:
+    """Recursively draw all structural arrows in the tree."""
     match node:
         case _AttrNode():
             pass
@@ -723,20 +732,17 @@ def _draw_arrows(ax, node: _AnyNode) -> None:
         case _ClassNode():
             px, py = node.x + node.width / 2, node.y
             for sub in node.sub_object_nodes:
-                sx = sub.x + sub.width / 2
-                sy = sub.y + sub.height
+                sx, sy = sub.x + sub.width / 2, sub.y + sub.height
                 _elbow(ax, px, py, sx, sy, _CARR_COMP)
                 _diamond(ax, px, py, _CARR_COMP)
-
             for edt in node.edt_children:
-                ex = edt.x + edt.width / 2
-                ey = edt.y + edt.height
+                ex, ey = edt.x + edt.width / 2, edt.y + edt.height
                 _elbow(ax, px, py, ex, ey, _CARR_EDT, lw=1.4)
                 _mult_label(ax, (px + ex) / 2 + 0.12, (py + ey) / 2, "1")
                 _draw_arrows(ax, edt)
 
 
-def _draw_nodes(ax, node: _AnyNode) -> None:
+def _draw_nodes(ax: Axes, node: _AnyNode) -> None:
     """Recursively draw all node boxes."""
     match node:
         case _AttrNode():
@@ -753,40 +759,35 @@ def _draw_nodes(ax, node: _AnyNode) -> None:
 
 
 def _enum_refs(node: _AnyNode) -> set[str]:
-    """Return all enum type names referenced by attributes in *node*."""
-    refs: set[str] = set()
+    """Return enum type names referenced by attributes in *node*."""
     match node:
         case _ClassNode():
-            for a in node.attributes:
-                if a.enum_type_name:
-                    refs.add(a.enum_type_name)
+            attrs = node.attributes
         case _AttrNode():
-            for a in node.attributes:
-                if a.enum_type_name:
-                    refs.add(a.enum_type_name)
+            attrs = node.attributes
         case _EDTNode():
-            for a in node.latent_attributes:
-                if a.enum_type_name:
-                    refs.add(a.enum_type_name)
-    return refs
+            attrs = node.latent_attributes
+        case _:
+            return set()
+    return {a.enum_type_name for a in attrs if a.enum_type_name}
 
 
 def _draw_enum_use_arrows(
-    ax,
-    root: _AnyNode,
+    ax: Axes,
+    tree_nodes: list[_AnyNode],
     enum_registry: dict[str, _EnumNode],
 ) -> None:
     """
     Draw dashed ``<<use>>`` arrows from every node that references an enum
     to the corresponding :class:`_EnumNode` box.
+
+    :param tree_nodes: Pre-collected flat list of all tree nodes (from :func:`_collect`).
+    :param enum_registry: Enum boxes keyed by type name.
     """
-    seen: set[tuple[int, str]] = set()
-    for node in _collect(root):
+    for node in tree_nodes:
         for enum_name in _enum_refs(node):
-            key = (id(node), enum_name)
-            if key in seen or enum_name not in enum_registry:
+            if enum_name not in enum_registry:
                 continue
-            seen.add(key)
             enum_node = enum_registry[enum_name]
             src_x = node.x + node.width
             src_y = node.y + node.height / 2
@@ -797,20 +798,18 @@ def _draw_enum_use_arrows(
 
 # ── legend ────────────────────────────────────────────────────────────────────
 
+_LEGEND_STYLES: list[_NodeStyle] = [_STYLE_CLASS, _STYLE_ATTR, _STYLE_EDT, _STYLE_ENUM]
 
-def _draw_legend(ax, x: float, y: float) -> None:
-    kinds = [
-        (_CC_HEADER,  "<<circuit>>  class  (name + stats)"),
-        (_CA_HEADER,  "attribute group / sub-object"),
-        (_CT_HEADER,  "<<template>>  EDT  (latent conditioning vars)"),
-    ]
-    for i, (color, label) in enumerate(kinds):
+
+def _draw_legend(ax: Axes, x: float, y: float) -> None:
+    for i, style in enumerate(_LEGEND_STYLES):
+        if not style.legend_label:
+            continue
         rx = x + i * 5.2
         ax.add_patch(Rectangle((rx, y - 0.12), 0.28, 0.28,
-                                facecolor=color, edgecolor="none", zorder=3))
-        ax.text(rx + 0.38, y + 0.02, label,
-                fontsize=7, color="#5D6D7E", va="center",
-                fontfamily="sans-serif")
+                                facecolor=style.header, edgecolor="none", zorder=3))
+        ax.text(rx + 0.38, y + 0.02, style.legend_label,
+                fontsize=7, color="#5D6D7E", va="center", fontfamily="sans-serif")
 
     ty = y - 0.55
     ax.text(x, ty + 0.24, "Attribute types:",
@@ -825,8 +824,7 @@ def _draw_legend(ax, x: float, y: float) -> None:
                 bbox=dict(boxstyle="round,pad=0.2", facecolor="#F0F0F0",
                           edgecolor=color, linewidth=0.8))
         ax.text(x + off + 0.32, ty, f"= {type_name}  ",
-                fontsize=7, color="#5D6D7E", va="center",
-                fontfamily="sans-serif")
+                fontsize=7, color="#5D6D7E", va="center", fontfamily="sans-serif")
         off += 2.2
 
 
@@ -841,18 +839,6 @@ class RSPNPosterPlotter:
 
     Visual language is inspired by the giskard motion-statechart plotter:
     thick borders, coloured info bands, alternating-row attribute tables.
-
-    Three node kinds are drawn:
-
-    * **Class nodes** (dark header, ``<<circuit>>``) — minimal: just the class
-      name and a two-cell stat band showing cluster count and leaf count.
-      No attributes live here; they are in separate association boxes.
-    * **Attribute nodes** (blue header) — one per sub-object group (e.g.
-      ``orientation``, ``position``) and one catch-all for flat scalars.
-      Connected to the owning class by a composition arrow.
-    * **Template nodes** (brown header, ``<<template>>``) — one per
-      exchangeable-distribution template, listing the latent conditioning
-      variables.  Sits between the parent class and the child class.
 
     .. note::
         The RSPN must be fitted before calling :meth:`save` or :meth:`show`.
@@ -878,21 +864,21 @@ class RSPNPosterPlotter:
         _assign_heights(root)
         _place(root, _subtree_w(root) / 2, 0.0)
 
-        # Place enum nodes in a column to the right of the main tree
         tree_nodes = _collect(root)
-        x0, y0, x1, y1 = _bounds(tree_nodes)
 
+        # Place enum nodes in a column to the right of the main tree
         enum_nodes = list(enum_registry.values())
         for enum_node in enum_nodes:
             enum_node.height = _enum_node_height(enum_node)
-        enum_x = x1 + _COL_GAP * 1.5
-        enum_y_cursor = y1
+        enum_x = max(n.x + n.width for n in tree_nodes) + _COL_GAP * 1.5
+        enum_top = max(n.y + n.height for n in tree_nodes)
+        enum_y_cursor = enum_top
         for enum_node in enum_nodes:
             enum_node.x = enum_x
             enum_node.y = enum_y_cursor - enum_node.height
             enum_y_cursor -= enum_node.height + _COL_GAP * 0.5
 
-        all_nodes: list[_AnyNode] = tree_nodes + enum_nodes
+        all_nodes: list = tree_nodes + enum_nodes
         bx0, by0, bx1, by1 = _bounds(all_nodes)
 
         pad = self.padding
@@ -909,13 +895,13 @@ class RSPNPosterPlotter:
         ax.text(
             (bx0 + bx1) / 2, by1 + pad * 0.65,
             f"Relational Probabilistic Circuit  —  {self.rspn.class_.__name__}",
-            fontsize=11, fontweight="bold", color=_CC_HEADER,
+            fontsize=11, fontweight="bold", color=_STYLE_CLASS.header,
             ha="center", va="center", fontfamily="sans-serif",
         )
 
-        # draw arrows first (behind nodes), then nodes on top
+        # Draw arrows first (behind nodes), then nodes on top
         _draw_arrows(ax, root)
-        _draw_enum_use_arrows(ax, root, enum_registry)
+        _draw_enum_use_arrows(ax, tree_nodes, enum_registry)
         _draw_nodes(ax, root)
         for enum_node in enum_nodes:
             _draw_enum_node(ax, enum_node)
