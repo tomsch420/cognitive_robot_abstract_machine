@@ -192,7 +192,7 @@ class GiskardExecutable(Executable):
         executor.compile(motion_state_chart)
 
         counter = 0
-        while counter < len(self.motion_mappings) * 1500:
+        while counter < len(self.motion_mappings) * 2000:
             if self.is_interrupted:
                 return
             elif self.is_paused:

@@ -435,7 +435,7 @@ class TiagoTorso(
 @dataclass(eq=False)
 class TiagoMobileBase(MobileBase, HasTorso[TiagoTorso]):
 
-    full_body_controlled: bool = field(default=True, kw_only=True)
+    full_body_controlled: bool = field(default=False, kw_only=True)
 
     def setup_hardware_interfaces(self):
         pass

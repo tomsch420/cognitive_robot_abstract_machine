@@ -213,9 +213,11 @@ def test_move_torso_multi(immutable_multiple_robot_apartment):
         assert connection.position == pytest.approx(target, abs=0.01)
 
 
-def test_navigate_multi(immutable_multiple_robot_apartment):
+def test_navigate_multi(immutable_multiple_robot_apartment, rclpy_node):
     world, view, context = immutable_multiple_robot_apartment
     target_position = [2, -2, 0]
+
+    VizMarkerPublisher(_world=world, node=rclpy_node).with_tf_publisher()
 
     plan = execute_single(
         NavigateAction(
@@ -471,8 +473,8 @@ def test_pick_up_multi(mutable_multiple_robot_apartment, rclpy_node):
     )
 
     assert np.allclose(
-        world.get_body_by_name("milk.stl").global_pose.to_np(),
-        left_arm.end_effector.tool_frame.global_pose.to_np(),
+        world.get_body_by_name("milk.stl").global_pose.to_position().to_np(),
+        left_arm.end_effector.tool_frame.global_pose.to_position().to_np(),
         atol=0.01,
     )
 
@@ -670,8 +672,9 @@ def test_transport(mutable_multiple_robot_apartment, rclpy_node):
     plan.plan.validate()
 
 
-def test_move_to_reach(immutable_multiple_robot_apartment):
+def test_move_to_reach(immutable_multiple_robot_apartment, rclpy_node):
     world, robot, context = immutable_multiple_robot_apartment
+    VizMarkerPublisher(_world=world, node=rclpy_node).with_tf_publisher()
     move_to_reach = MoveToReach(
         target_pose_offset_robot=Pose2D(0.2, -0.55),
         target_pose_end_effector=Pose.from_xyz_rpy(

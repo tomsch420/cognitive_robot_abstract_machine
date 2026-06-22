@@ -11,6 +11,7 @@ from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from giskardpy.qp.qp_controller_config import QPControllerConfig
+from pycram.plans.plan_node import ActionNode, MotionNode
 from pycram.alternative_motion_mapping import AlternativeMotion
 from pycram.datastructures.dataclasses import Context
 from pycram.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
@@ -191,7 +192,7 @@ class AreReachableBy(PoseValidator):
                     correct_arm,
                     True,
                 )
-                node = PlanNode()
+                node = MotionNode(designator=motion)
                 # Imagine a plan for the motion node
                 plan = Plan(Context(self.world, self.robot))
                 plan.add_node(node)

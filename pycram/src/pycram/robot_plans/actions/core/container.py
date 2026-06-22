@@ -89,7 +89,8 @@ class OpenAction(ActionDescription):
         return and_(
             GripperIsFree(end_effector),
             IsObjectReachableBy(
-                context=context,
+                robot=context.robot,
+                world=context.world,
                 arm=kwargs["arm"],
                 object_designator=kwargs["object_designator"],
                 as_single_grasp=True,
@@ -99,7 +100,7 @@ class OpenAction(ActionDescription):
     @staticmethod
     def post_condition(
         variables, context: Context, kwargs: Dict[str, Any]
-    ) -> SymbolicExpression | bool:
+    ) -> ConditionType:
         """
         The handle has to be in the gripper of the robot and the container has to be open.
         """
@@ -114,7 +115,9 @@ class OpenAction(ActionDescription):
                 )
                 > 0.9,
                 allclose(
-                    variable_from(kwargs["object_designator"]).global_pose.to_position(),
+                    variable_from(
+                        kwargs["object_designator"]
+                    ).global_pose.to_position(),
                     variable_from(end_effector.tool_frame).global_pose.to_position(),
                     atol=3e-2,
                 ),
