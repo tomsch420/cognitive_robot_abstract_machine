@@ -264,8 +264,10 @@ def _build_tree(
             continue
         display = _strip_prefix(var.name, class_name)
         attr = _Attribute(name=display, type_name=_var_type(var))
+        if var.name in agg_names:
+            continue
         parts = display.split(".")
-        if len(parts) >= 2 and var.name not in agg_names:
+        if len(parts) >= 2:
             sub_groups.setdefault(parts[0], []).append(
                 _Attribute(name=".".join(parts[1:]), type_name=attr.type_name)
             )
