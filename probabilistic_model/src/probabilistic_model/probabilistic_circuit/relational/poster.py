@@ -74,10 +74,12 @@ _CARR_COMP: str = "#1B2631"   # composition (class → attribute node)
 _CARR_EDT: str = "#6E2F1A"    # class → template  and  template → child class
 _CMULT: str = "#C0392B"
 
+_ENUM_LH: float = 0.22   # extra height per enum attribute (for the values line)
+
 _TYPE_SHORT: dict[str, str] = {
     "Continuous": "float",
     "Integer": "int",
-    "Symbolic": "cat",
+    "Symbolic": "<<enum>>",
 }
 _TYPE_COLOR: dict[str, str] = {
     "Continuous": "#1A9641",
@@ -108,6 +110,8 @@ _ROW_GAP: float = 2.0
 class _Attribute:
     name: str
     type_name: str
+    enum_values: list[str] = field(default_factory=list)
+    """For Symbolic variables, the list of enum member names."""
 
 
 @dataclass
@@ -263,7 +267,10 @@ def _build_tree(
         if var.name in latent_names:
             continue
         display = _strip_prefix(var.name, class_name)
-        attr = _Attribute(name=display, type_name=_var_type(var))
+        enum_values: list[str] = []
+        if isinstance(var, Symbolic):
+            enum_values = [str(v).split(".")[-1] for v in list(var.domain)]
+        attr = _Attribute(name=display, type_name=_var_type(var), enum_values=enum_values)
         if var.name in agg_names:
             continue
         parts = display.split(".")
@@ -312,19 +319,24 @@ def _build_tree(
 # ── height calculation ────────────────────────────────────────────────────────
 
 
+def _attrs_height(attrs: list[_Attribute]) -> float:
+    return sum(_LH + (_ENUM_LH if a.enum_values else 0.0) for a in attrs)
+
+
 def _attr_node_height(n: _AttrNode) -> float:
-    return _HEADER_H + _ROW_PAD_V + len(n.attributes) * _LH + _ROW_PAD_V
+    return _HEADER_H + _ROW_PAD_V + _attrs_height(n.attributes) + _ROW_PAD_V
 
 
 def _edt_node_height(n: _EDTNode) -> float:
-    return _HEADER_H + _ROW_PAD_V + max(len(n.latent_attributes), 1) * _LH + _ROW_PAD_V
+    inner = _attrs_height(n.latent_attributes) if n.latent_attributes else _LH
+    return _HEADER_H + _ROW_PAD_V + inner + _ROW_PAD_V
 
 
 def _class_node_height(n: _ClassNode) -> float:
-    attr_rows = len(n.attributes)
+    inner = _attrs_height(n.attributes)
     return (
         _HEADER_H
-        + (_ROW_PAD_V + attr_rows * _LH + _ROW_PAD_V if attr_rows else 0.0)
+        + (_ROW_PAD_V + inner + _ROW_PAD_V if n.attributes else 0.0)
         + _STAT_BAR_H
     )
 
@@ -429,6 +441,56 @@ def _hline(ax, x, y, w, color, lw=1.0, z=3):
     ax.plot([x, x + w], [y, y], color=color, linewidth=lw, zorder=z)
 
 
+# ── shared row drawing ───────────────────────────────────────────────────────
+
+
+def _draw_attr_row(
+    ax,
+    x: float,
+    row_y: float,
+    w: float,
+    attr: _Attribute,
+    row_bg: str,
+    index: int,
+) -> float:
+    """
+    Draw one attribute row and return the y coordinate after the row.
+
+    For Symbolic variables an extra line listing the enum values
+    (``{VALUE_A, VALUE_B}``) is rendered below the name/type line,
+    following standard UML enumeration notation.
+
+    :param ax: Matplotlib axes.
+    :param x: Left edge of the containing box.
+    :param row_y: Vertical centre of the first (name/type) line.
+    :param w: Width of the containing box.
+    :param attr: The attribute to render.
+    :param row_bg: Background fill colour for this row.
+    :param index: Row index (unused here, kept for parity with callers).
+    :return: New row_y after consuming this attribute's vertical space.
+    """
+    row_h = _LH + (_ENUM_LH if attr.enum_values else 0.0)
+    _filled_rect(ax, x, row_y - _LH / 2, w, row_h, row_bg, z=2)
+
+    type_short = _TYPE_SHORT.get(attr.type_name, attr.type_name)
+    type_color = _TYPE_COLOR.get(attr.type_name, "#555")
+    name_w = len(attr.name) * 0.057
+    ax.text(x + 0.20, row_y, attr.name,
+            fontsize=6.5, color="#17202A", va="center", ha="left",
+            fontfamily="sans-serif", zorder=4)
+    ax.text(x + 0.20 + name_w, row_y, f" : {type_short}",
+            fontsize=6.5, color=type_color, va="center", ha="left",
+            fontfamily="sans-serif", fontstyle="italic", zorder=4)
+
+    if attr.enum_values:
+        values_str = "{" + ", ".join(attr.enum_values) + "}"
+        ax.text(x + 0.36, row_y - _LH * 0.72, values_str,
+                fontsize=5.5, color=type_color, va="center", ha="left",
+                fontfamily="monospace", fontstyle="italic", zorder=4)
+
+    return row_y - row_h
+
+
 # ── class node drawing ────────────────────────────────────────────────────────
 
 
@@ -452,18 +514,8 @@ def _draw_class_node(ax, node: _ClassNode) -> None:
         row_y = cursor - _ROW_PAD_V - _LH / 2
         for i, attr in enumerate(node.attributes):
             row_bg = _CC_ROW_ODD if i % 2 == 0 else _CC_ROW_EVEN
-            _filled_rect(ax, x, row_y - _LH / 2, w, _LH, row_bg, z=2)
-            type_short = _TYPE_SHORT.get(attr.type_name, attr.type_name)
-            type_color = _TYPE_COLOR.get(attr.type_name, "#555")
-            name_w = len(attr.name) * 0.057
-            ax.text(x + 0.20, row_y, attr.name,
-                    fontsize=6.5, color="#17202A", va="center", ha="left",
-                    fontfamily="sans-serif", zorder=4)
-            ax.text(x + 0.20 + name_w, row_y, f" : {type_short}",
-                    fontsize=6.5, color=type_color, va="center", ha="left",
-                    fontfamily="sans-serif", fontstyle="italic", zorder=4)
-            row_y -= _LH
-        cursor -= _ROW_PAD_V + len(node.attributes) * _LH + _ROW_PAD_V
+            row_y = _draw_attr_row(ax, x, row_y, w, attr, row_bg, i)
+        cursor -= _ROW_PAD_V + _attrs_height(node.attributes) + _ROW_PAD_V
 
     # ── three-cell stat band ──────────────────────────────────────────────
     # parameters (green) | variables (blue) | nodes (purple)
@@ -511,17 +563,7 @@ def _draw_attr_node(ax, node: _AttrNode) -> None:
     row_y = top - _HEADER_H - _ROW_PAD_V - _LH / 2
     for i, attr in enumerate(node.attributes):
         row_bg = _CA_ROW_ODD if i % 2 == 0 else _CA_ROW_EVEN
-        _filled_rect(ax, x, row_y - _LH / 2, w, _LH, row_bg, z=2)
-        type_short = _TYPE_SHORT.get(attr.type_name, attr.type_name)
-        type_color = _TYPE_COLOR.get(attr.type_name, "#555")
-        name_w = len(attr.name) * 0.057
-        ax.text(x + 0.22, row_y, attr.name,
-                fontsize=6.5, color="#17202A", va="center", ha="left",
-                fontfamily="sans-serif", zorder=4)
-        ax.text(x + 0.22 + name_w, row_y, f" : {type_short}",
-                fontsize=6.5, color=type_color, va="center", ha="left",
-                fontfamily="sans-serif", fontstyle="italic", zorder=4)
-        row_y -= _LH
+        row_y = _draw_attr_row(ax, x, row_y, w, attr, row_bg, i)
 
     _border(ax, x, y, w, h, _CA_BORDER)
 
@@ -546,17 +588,7 @@ def _draw_edt_node(ax, node: _EDTNode) -> None:
     row_y = top - _HEADER_H - _ROW_PAD_V - _LH / 2
     for i, attr in enumerate(node.latent_attributes):
         row_bg = _CT_ROW_ODD if i % 2 == 0 else _CT_ROW_EVEN
-        _filled_rect(ax, x, row_y - _LH / 2, w, _LH, row_bg, z=2)
-        type_short = _TYPE_SHORT.get(attr.type_name, attr.type_name)
-        type_color = _TYPE_COLOR.get(attr.type_name, "#555")
-        name_w = len(attr.name) * 0.057
-        ax.text(x + 0.22, row_y, attr.name,
-                fontsize=6.5, color="#17202A", va="center", ha="left",
-                fontfamily="sans-serif", zorder=4)
-        ax.text(x + 0.22 + name_w, row_y, f" : {type_short}",
-                fontsize=6.5, color=type_color, va="center", ha="left",
-                fontfamily="sans-serif", fontstyle="italic", zorder=4)
-        row_y -= _LH
+        row_y = _draw_attr_row(ax, x, row_y, w, attr, row_bg, i)
 
     _border(ax, x, y, w, h, _CT_BORDER)
 
