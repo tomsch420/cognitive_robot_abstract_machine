@@ -7,14 +7,14 @@ Visual language is inspired by the giskard motion-statechart plotter
 Node kinds:
 
 * **Class node** (``<<circuit>>``) — header + alternating-row attribute
-  table + three-cell stat band (parameters | variables | nodes).
+  table + three-cell stat band (sum nodes | product nodes | leaf nodes).
 * **Sub-object node** — one per nested value-object group (e.g.
   ``orientation``), connected to its class by a composition arrow.
 * **Template node** (``<<template>>``) — one per exchangeable-distribution
   template; sits between parent and child class, listing the latent
   conditioning variables.
-* **Enum node** (``<<enumeration>>``) — one per unique enum type, placed in
-  a side column and referenced by dashed use-dependency arrows.
+* **Enum node** (``<<enumeration>>``) — one per unique enum type, placed to
+  the right of its referencing class and linked by a dashed use-dependency.
 
 Output: a single SVG file (or PNG / PDF).
 """
@@ -35,7 +35,11 @@ matplotlib.use("Agg")
 
 from random_events.variable import Continuous, Symbolic, Integer
 
-from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import SumUnit
+from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
+    LeafUnit,
+    ProductUnit,
+    SumUnit,
+)
 
 if TYPE_CHECKING:
     from probabilistic_model.probabilistic_circuit.relational.rspn import (
@@ -97,10 +101,10 @@ _STYLE_ENUM = _NodeStyle(
     legend_label="<<enumeration>>  enum type",
 )
 
-# Stat-band colours (class node only)
-_CC_STAT_A: str = "#1A9641"   # green  — parameters
-_CC_STAT_B: str = "#2B83BA"   # blue   — variables
-_CC_STAT_C: str = "#6C3483"   # purple — nodes
+# Stat-band colours (class node only) — sum (green) | product (blue) | leaf (purple)
+_CC_STAT_SUM: str = "#1A9641"
+_CC_STAT_PROD: str = "#2B83BA"
+_CC_STAT_LEAF: str = "#6C3483"
 _CC_STAT_FG: str = "#FFFFFF"
 
 # Arrow colours
@@ -134,6 +138,7 @@ _BW: float = 2.8             # border line-width in points (giskard-style thick)
 
 _COL_GAP: float = 1.0
 _ROW_GAP: float = 2.0
+_ENUM_GAP: float = 1.2       # horizontal gap between a class node and its enum
 
 
 # ── data model ────────────────────────────────────────────────────────────────
@@ -148,12 +153,29 @@ class _Attribute:
 
 
 @dataclass
+class _CircuitStats:
+    """Node-count breakdown of a probabilistic circuit DAG."""
+
+    num_sum: int
+    """Number of :class:`SumUnit` nodes (mixture components)."""
+
+    num_product: int
+    """Number of :class:`ProductUnit` nodes (independence factorisations)."""
+
+    num_leaf: int
+    """Number of leaf distribution nodes."""
+
+    num_parameters: int
+    """Total learnable parameters (sum weights + leaf distribution params)."""
+
+
+@dataclass
 class _EnumNode:
     """
     A standalone UML ``<<enumeration>>`` box for one enum type.
 
-    Placed in a side column and connected to referencing nodes by dashed
-    dependency arrows.
+    Placed to the right of its primary referencing class node and linked
+    by a dashed use-dependency arrow.
     """
 
     type_name: str
@@ -208,20 +230,14 @@ class _ClassNode:
     A circuit-class box.
 
     Shows the class header, all modelled scalar attributes in an
-    alternating-row table, and a three-cell stat band (parameters |
-    variables | nodes).  Sub-object groups and EDT children are rendered
-    as separate connected nodes.
+    alternating-row table, and a three-cell stat band (sum nodes |
+    product nodes | leaf nodes).  Sub-object groups and EDT children are
+    rendered as separate connected nodes.
     """
 
     class_name: str
-    num_parameters: int
-    """Total learnable parameters across all leaf distributions and sum weights."""
-
-    num_variables: int
-    """Number of variables modelled by the class circuit."""
-
-    num_nodes: int
-    """Total node count in the circuit DAG."""
+    stats: _CircuitStats
+    """Circuit node-count breakdown and parameter count."""
 
     attributes: list[_Attribute]
     """All scalar attributes shown inside the class box."""
@@ -238,7 +254,7 @@ class _ClassNode:
 
 
 # _EnumNode is excluded from _AnyNode because it lives outside the tree and is
-# managed separately in _build (side-column placement, explicit draw loop).
+# managed separately in _build (placed beside its referencing class).
 _AnyNode = Union[_ClassNode, _AttrNode, _EDTNode]
 
 
@@ -262,29 +278,45 @@ def _strip_prefix(name: str, class_name: str) -> str:
     return name
 
 
-def _count_parameters(rspn: RelationalProbabilisticCircuit) -> int:
+def _compute_stats(rspn: RelationalProbabilisticCircuit) -> _CircuitStats:
     """
-    Count the total number of learnable parameters in a class circuit.
+    Compute the node-count breakdown and parameter count for a class circuit.
 
-    Includes leaf distribution parameters and sum-node mixture weights
-    (one free weight per child minus one, since weights sum to one).
+    Learnable parameters are: one free mixture weight per sum-node child
+    minus one (since weights are normalised), plus the parameters of each
+    leaf distribution.  :class:`DiracDelta` distributions have no free
+    parameters and are excluded from the count.
 
     :param rspn: Fitted RSPN whose class circuit to inspect.
-    :return: Total parameter count.
+    :return: :class:`_CircuitStats` with counts and parameter total.
     """
     pc = rspn.class_probabilistic_circuit
-    total = 0
+    num_sum = num_product = num_leaf = num_parameters = 0
+
     for node in pc.nodes():
         if isinstance(node, SumUnit):
+            num_sum += 1
             k = sum(1 for _ in pc.graph.successors(node.index))
-            total += max(k - 1, 0)
+            num_parameters += max(k - 1, 0)
+        elif isinstance(node, ProductUnit):
+            num_product += 1
+        elif isinstance(node, LeafUnit):
+            num_leaf += 1
+
     for leaf in pc.leaves:
         d = leaf.distribution
         if hasattr(d, "probabilities"):
-            total += len(d.probabilities)
-        else:
-            total += 1
-    return total
+            num_parameters += len(d.probabilities)
+        elif not hasattr(d, "location"):
+            # Non-Dirac continuous distributions without a probabilities table
+            num_parameters += 1
+
+    return _CircuitStats(
+        num_sum=num_sum,
+        num_product=num_product,
+        num_leaf=num_leaf,
+        num_parameters=num_parameters,
+    )
 
 
 def _build_tree(
@@ -372,9 +404,7 @@ def _build_tree(
 
     return _ClassNode(
         class_name=class_name,
-        num_parameters=_count_parameters(rspn),
-        num_variables=len(pc.variables),
-        num_nodes=len(pc.nodes()),
+        stats=_compute_stats(rspn),
         attributes=class_box_attrs,
         sub_object_nodes=sub_object_nodes,
         edt_children=edt_children,
@@ -494,13 +524,67 @@ def _collect(node: _AnyNode) -> list[_AnyNode]:
     return result
 
 
-def _bounds(nodes: list[_AnyNode] | list[_EnumNode]) -> tuple[float, float, float, float]:
+def _bounds(nodes: list) -> tuple[float, float, float, float]:
     return (
         min(n.x for n in nodes),
         min(n.y for n in nodes),
         max(n.x + n.width for n in nodes),
         max(n.y + n.height for n in nodes),
     )
+
+
+# ── enum placement ────────────────────────────────────────────────────────────
+
+
+def _place_enum_nodes(
+    tree_nodes: list[_AnyNode],
+    enum_registry: dict[str, _EnumNode],
+) -> None:
+    """
+    Position each enum node to the right of the leftmost tree node that
+    references it, vertically centred on that node.
+
+    Nodes that share the same horizontal anchor are stacked vertically with
+    a small gap so they never overlap.
+
+    :param tree_nodes: Flat list of all placed tree nodes.
+    :param enum_registry: Enum boxes keyed by type name (x/y will be set here).
+    """
+    for enum_node in enum_registry.values():
+        enum_node.height = _enum_node_height(enum_node)
+
+    # Map each enum name to the tree nodes that reference it
+    referencing: dict[str, list[_AnyNode]] = {name: [] for name in enum_registry}
+    for node in tree_nodes:
+        for enum_name in _enum_refs(node):
+            if enum_name in referencing:
+                referencing[enum_name].append(node)
+
+    # Group enums by their anchor x so we can stack them without overlap
+    anchor_stacks: dict[float, list[_EnumNode]] = {}
+    for name, enum_node in enum_registry.items():
+        refs = referencing[name]
+        if refs:
+            anchor_node = min(refs, key=lambda n: n.x)
+            anchor_x = anchor_node.x + anchor_node.width + _ENUM_GAP
+            anchor_y = anchor_node.y + anchor_node.height / 2
+        else:
+            # No referencing node found — fall back to far right at top
+            anchor_x = max(n.x + n.width for n in tree_nodes) + _ENUM_GAP
+            anchor_y = max(n.y + n.height for n in tree_nodes)
+        enum_node.x = anchor_x
+        # Store anchor_y temporarily; resolve stacking below
+        enum_node.y = anchor_y
+        anchor_stacks.setdefault(anchor_x, []).append(enum_node)
+
+    # Resolve vertical stacking: centre the group around the anchor y
+    for anchor_x, stack in anchor_stacks.items():
+        total_h = sum(e.height for e in stack) + _COL_GAP * 0.4 * (len(stack) - 1)
+        anchor_y = stack[0].y  # all share the same anchor from above
+        cursor = anchor_y + total_h / 2
+        for enum_node in stack:
+            enum_node.y = cursor - enum_node.height
+            cursor -= enum_node.height + _COL_GAP * 0.4
 
 
 # ── drawing primitives ────────────────────────────────────────────────────────
@@ -537,6 +621,9 @@ def _draw_attr_row(
     """
     Draw one attribute row and return the y coordinate after the row.
 
+    The attribute name is left-aligned and the type tag is right-aligned
+    inside the box, eliminating any dependency on text-width estimates.
+
     :param ax: Matplotlib axes.
     :param x: Left edge of the containing box.
     :param row_y: Vertical centre of the name/type line.
@@ -548,12 +635,11 @@ def _draw_attr_row(
     _filled_rect(ax, x, row_y - _LH / 2, w, _LH, row_bg)
     type_color = _TYPE_COLOR.get(attr.type_name, "#555")
     type_label = attr.enum_type_name or _TYPE_SHORT.get(attr.type_name, attr.type_name)
-    name_w = len(attr.name) * 0.057
     ax.text(x + 0.20, row_y, attr.name,
             fontsize=6.5, color="#17202A", va="center", ha="left",
             fontfamily="sans-serif", zorder=4)
-    ax.text(x + 0.20 + name_w, row_y, f" : {type_label}",
-            fontsize=6.5, color=type_color, va="center", ha="left",
+    ax.text(x + w - 0.15, row_y, f"{type_label}",
+            fontsize=6.5, color=type_color, va="center", ha="right",
             fontfamily="sans-serif", fontstyle="italic", zorder=4)
     return row_y - _LH
 
@@ -592,9 +678,10 @@ def _draw_header(
     ax.text(x + w / 2, top - _HEADER_H * 0.28, title,
             fontsize=title_fontsize, color=style.header_fg, ha="center", va="center",
             fontfamily="sans-serif", fontweight="bold", zorder=4)
-    ax.text(x + w / 2, top - _HEADER_H * 0.78, stereotype,
-            fontsize=6, color=style.stereo_fg, ha="center", va="center",
-            fontfamily="sans-serif", fontstyle="italic", zorder=4)
+    if stereotype:
+        ax.text(x + w / 2, top - _HEADER_H * 0.78, stereotype,
+                fontsize=6, color=style.stereo_fg, ha="center", va="center",
+                fontfamily="sans-serif", fontstyle="italic", zorder=4)
 
 
 def _draw_class_node(ax: Axes, node: _ClassNode) -> None:
@@ -609,14 +696,14 @@ def _draw_class_node(ax: Axes, node: _ClassNode) -> None:
         _draw_rows(ax, x, cursor, w, node.attributes, _STYLE_CLASS)
         cursor -= _ROW_PAD_V + _rows_height(len(node.attributes)) + _ROW_PAD_V
 
-    # Three-cell stat band: parameters (green) | variables (blue) | nodes (purple)
+    # Three-cell stat band: sum nodes (green) | product nodes (blue) | leaf nodes (purple)
     _hline(ax, x, cursor, w, _STYLE_CLASS.border, lw=0.8)
     bar_y = cursor - _STAT_BAR_H
     third = w / 3
     stats = [
-        (_CC_STAT_A, "params",    node.num_parameters),
-        (_CC_STAT_B, "variables", node.num_variables),
-        (_CC_STAT_C, "nodes",     node.num_nodes),
+        (_CC_STAT_SUM,  "sum",     node.stats.num_sum),
+        (_CC_STAT_PROD, "product", node.stats.num_product),
+        (_CC_STAT_LEAF, "leaf",    node.stats.num_leaf),
     ]
     for i, (color, label, value) in enumerate(stats):
         cell_x = x + i * third
@@ -865,18 +952,8 @@ class RSPNPosterPlotter:
         _place(root, _subtree_w(root) / 2, 0.0)
 
         tree_nodes = _collect(root)
-
-        # Place enum nodes in a column to the right of the main tree
+        _place_enum_nodes(tree_nodes, enum_registry)
         enum_nodes = list(enum_registry.values())
-        for enum_node in enum_nodes:
-            enum_node.height = _enum_node_height(enum_node)
-        enum_x = max(n.x + n.width for n in tree_nodes) + _COL_GAP * 1.5
-        enum_top = max(n.y + n.height for n in tree_nodes)
-        enum_y_cursor = enum_top
-        for enum_node in enum_nodes:
-            enum_node.x = enum_x
-            enum_node.y = enum_y_cursor - enum_node.height
-            enum_y_cursor -= enum_node.height + _COL_GAP * 0.5
 
         all_nodes: list = tree_nodes + enum_nodes
         bx0, by0, bx1, by1 = _bounds(all_nodes)
