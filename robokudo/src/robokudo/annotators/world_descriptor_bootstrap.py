@@ -11,12 +11,9 @@ from py_trees.common import Status
 
 import robokudo.world as rk_world
 from robokudo.annotators.core import BaseAnnotator
+from robokudo.exceptions import WorldDescriptorBootstrapError
 from robokudo.utils.world_descriptor import load_world_descriptor
 from robokudo.world_descriptor import BaseWorldDescriptor
-
-
-class WorldDescriptorBootstrapError(RuntimeError):
-    """Raised when world descriptor bootstrap fails."""
 
 
 @dataclass
@@ -168,7 +165,7 @@ class WorldDescriptorBootstrapAnnotator(BaseAnnotator):
                         runtime_world.remove_kinematic_structure_entity(entity)
         except Exception as error:
             raise WorldDescriptorBootstrapError(
-                "Failed to remove previous world descriptor contribution."
+                operation="remove previous world descriptor contribution"
             ) from error
 
         self._merged_descriptor_entities.clear()
@@ -195,7 +192,7 @@ class WorldDescriptorBootstrapAnnotator(BaseAnnotator):
             )
         except Exception as error:
             raise WorldDescriptorBootstrapError(
-                "Failed to merge world descriptor into the current world."
+                operation="merge world descriptor into the current world"
             ) from error
 
         self._update_tracker_if_active()

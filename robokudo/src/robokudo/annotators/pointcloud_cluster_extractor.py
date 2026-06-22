@@ -28,6 +28,11 @@ from typing_extensions import TYPE_CHECKING, List, Tuple
 
 from robokudo.annotators.core import BaseAnnotator, ThreadedAnnotator
 from robokudo.cas import CASViews
+from robokudo.exceptions import (
+    EmptyPointCloud,
+    PlaneModelMissing,
+    PointCloudTooSmallForClustering,
+)
 from robokudo.types.annotation import Plane
 from robokudo.types.cv import ImageROI
 from robokudo.types.scene import ObjectHypothesis
@@ -207,7 +212,7 @@ class PointCloudClusterExtractor(ThreadedAnnotator):
             on_plane_cloud = Points found in on_plane_obb
             on_plane_cloud_indices = Indices of Points found in on_plane_obb
             outlier_cloud = All points that do not belong to the plane/table itself.
-        :raises Exception: If insufficient points found above plane
+        :raises PointCloudTooSmallForClustering: If insufficient points are found above the plane
 
         .. note::
            The function ensures the plane normal points upward by rotating
@@ -262,7 +267,13 @@ class PointCloudClusterExtractor(ThreadedAnnotator):
                 f"points ({on_plane_point_count} "
                 f"< {self.descriptor.parameters.min_on_plane_point_count}). Skipping"
             )
-            raise Exception(self.feedback_message)
+            raise PointCloudTooSmallForClustering(
+                point_count=on_plane_point_count,
+                minimum_point_count=(
+                    self.descriptor.parameters.min_on_plane_point_count
+                ),
+                context="above-plane point cloud clustering",
+            )
 
         return (
             plane_obb,
@@ -285,7 +296,8 @@ class PointCloudClusterExtractor(ThreadedAnnotator):
         * Visualizes clusters with unique colors
 
         :return: SUCCESS if clusters are found, FAILURE if no clusters or errors
-        :raises Exception: If no plane model in CAS or insufficient points
+        :raises PlaneModelMissing: If no plane model exists in CAS
+        :raises PointCloudTooSmallForClustering: If insufficient points are found above the plane
         """
         start_timer = default_timer()
         self.rk_logger.info("PCE Start")
@@ -300,7 +312,7 @@ class PointCloudClusterExtractor(ThreadedAnnotator):
         plane_models = self.get_cas().filter_annotations_by_type(Plane)
         if plane_models is None or plane_models == []:
             self.feedback_message = "No plane model in CAS. Aborting."
-            raise Exception(self.feedback_message)
+            raise PlaneModelMissing(context="point cloud clustering")
 
         plane_model: Plane = plane_models[0]
 
@@ -477,7 +489,7 @@ class NaivePointCloudClusterExtractor(ThreadedAnnotator):
         * Visualizes clusters with unique colors
 
         :return: SUCCESS if clusters found, FAILURE if no clusters or errors
-        :raises Exception: If insufficient points in clusters
+        :raises EmptyPointCloud: If the input cloud is empty
         """
         start_timer = default_timer()
         cloud = self.get_cas().get(CASViews.CLOUD)
@@ -491,7 +503,7 @@ class NaivePointCloudClusterExtractor(ThreadedAnnotator):
 
         if len(cloud.points) == 0:
             self.feedback_message = "Input cloud is empty - Can't compute clustering"
-            raise Exception("Input cloud is empty - Can't compute clustering")
+            raise EmptyPointCloud(context="point cloud clustering")
 
         # Cluster the points above the plane to get a list of point indices for each cluster
         all_cluster_indices = cluster_points(

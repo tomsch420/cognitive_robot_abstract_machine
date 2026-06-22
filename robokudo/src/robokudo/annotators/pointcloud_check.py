@@ -27,6 +27,7 @@ from py_trees.common import Status
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
+from robokudo.exceptions import PointCloudThresholdError
 from robokudo.utils.error_handling import catch_and_raise_to_blackboard
 
 
@@ -87,7 +88,7 @@ class PointcloudCheckAnnotator(BaseAnnotator):
         * Logs detailed check results
 
         :return: Configured status based on point count
-        :raises Exception: If point count fails threshold and raise_on_failure is True
+        :raises PointCloudThresholdError: If point count fails threshold and raise_on_failure is True
         """
         start_timer = default_timer()
 
@@ -96,13 +97,13 @@ class PointcloudCheckAnnotator(BaseAnnotator):
         point_count = len(cloud.points)
         if point_count < self.descriptor.parameters.point_threshold:
             if (
-                self.descriptor.parameters.status_below_threshold
-                == py_trees.Status.FAILURE
+                self.descriptor.parameters.status_below_threshold == Status.FAILURE
                 and self.descriptor.parameters.raise_on_failure
             ):
-                raise Exception(
-                    f"Scene Pointcloud size({point_count}) is below "
-                    f"threshold of {self.descriptor.parameters.point_threshold}"
+                raise PointCloudThresholdError(
+                    point_count=point_count,
+                    threshold=self.descriptor.parameters.point_threshold,
+                    relation="below",
                 )
 
             self.rk_logger.info(
@@ -114,13 +115,13 @@ class PointcloudCheckAnnotator(BaseAnnotator):
             return self.descriptor.parameters.status_below_threshold
         else:
             if (
-                self.descriptor.parameters.status_above_threshold
-                == py_trees.Status.FAILURE
+                self.descriptor.parameters.status_above_threshold == Status.FAILURE
                 and self.descriptor.parameters.raise_on_failure
             ):
-                raise Exception(
-                    f"Scene Pointcloud size({point_count}) is above "
-                    f"threshold of {self.descriptor.parameters.point_threshold}"
+                raise PointCloudThresholdError(
+                    point_count=point_count,
+                    threshold=self.descriptor.parameters.point_threshold,
+                    relation="above",
                 )
 
             self.rk_logger.info(

@@ -24,6 +24,7 @@ from typing_extensions import TYPE_CHECKING, Optional
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
+from robokudo.exceptions import ColorToDepthRatioMissing
 from robokudo.utils.annotator_helper import scale_cam_intrinsics
 from robokudo.utils.cv_helper import get_scaled_color_image_for_depth_image
 
@@ -101,7 +102,7 @@ class ImagePreprocessorAnnotator(BaseAnnotator):
         * Updates visualization based on view mode
 
         :return: SUCCESS after processing
-        :raises RuntimeError: If color-to-depth ratio is not set
+        :raises ColorToDepthRatioMissing: If color-to-depth ratio is not set
         """
         start_timer = default_timer()
 
@@ -121,10 +122,11 @@ class ImagePreprocessorAnnotator(BaseAnnotator):
             resized_color = get_scaled_color_image_for_depth_image(
                 self.get_cas(), self.color
             )
-        except RuntimeError as e:
+        except ColorToDepthRatioMissing:
             self.rk_logger.error(
                 "No color to depth ratio set by your camera driver! Can't preprocess."
             )
+            raise
 
         # o3d expects color images in RGB order
         color_rgb = cv2.cvtColor(resized_color, cv2.COLOR_BGR2RGB)

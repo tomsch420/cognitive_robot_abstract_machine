@@ -24,6 +24,7 @@ from typing_extensions import TYPE_CHECKING, Dict, List, Optional
 import robokudo.world as rk_world
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
+from robokudo.exceptions import ColorToDepthRatioMissing, UnknownMode
 from robokudo.types.annotation import (
     BoundingBox3DAnnotation,
     Classification,
@@ -349,7 +350,8 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
           * Mask if enabled
 
         :return: SUCCESS if detection completed, FAILURE if required transforms not found
-        :raises Exception: If camera parameters are invalid or missing
+        :raises ColorToDepthRatioMissing: If color-to-depth ratio is not set
+        :raises UnknownMode: If the configured static object mode is unsupported
         """
         start_timer = default_timer()
 
@@ -406,13 +408,11 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
                 self.get_cas(), self.color
             )
             scale_cam_intrinsics(self)
-        except RuntimeError as e:
+        except ColorToDepthRatioMissing:
             self.rk_logger.error(
                 "No color to depth ratio set by your camera driver! Can't scale image for Point Cloud creation."
             )
-            raise Exception(
-                "No color to depth ratio set by your camera driver! Can't scale image for Point Cloud creation."
-            )
+            raise
 
         color_rgb = cv2.cvtColor(resized_color, cv2.COLOR_BGR2RGB)
 
@@ -431,7 +431,10 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
                 # Simply return early but don't die
                 return Status.SUCCESS
         else:
-            raise Exception("Unknown static object mode")
+            raise UnknownMode(
+                mode=self.descriptor.parameters.mode,
+                context="StaticObjectDetectorAnnotator",
+            )
 
         self.get_cas().annotations.extend(object_hypotheses)
 

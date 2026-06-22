@@ -5,14 +5,11 @@ from __future__ import annotations
 from typing_extensions import TYPE_CHECKING
 
 import robokudo.utils.module_loader as module_loader
+from robokudo.exceptions import WorldDescriptorLoadError
 
 if TYPE_CHECKING:
     from robokudo.annotators.core import BaseAnnotator
     from robokudo.world_descriptor import BaseWorldDescriptor
-
-
-class WorldDescriptorLoadError(RuntimeError):
-    """Raised when loading a world descriptor from annotator parameters fails."""
 
 
 def load_world_descriptor(annotator: BaseAnnotator) -> BaseWorldDescriptor:
@@ -24,5 +21,6 @@ def load_world_descriptor(annotator: BaseAnnotator) -> BaseWorldDescriptor:
         return loader.load_world_descriptor(ros_package, module_name)
     except Exception as error:
         raise WorldDescriptorLoadError(
-            f"Failed to load world descriptor '{ros_package}.{module_name}'."
+            ros_package=ros_package,
+            module_name=module_name,
         ) from error

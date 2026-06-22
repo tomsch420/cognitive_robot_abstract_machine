@@ -27,6 +27,7 @@ from typing_extensions import TYPE_CHECKING, Dict, Optional, Tuple
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
+from robokudo.exceptions import ColorToDepthRatioMissing, ImageContourMissing
 from robokudo.types.scene import ObjectHypothesis
 from robokudo.utils.annotator_helper import scale_cam_intrinsics
 from robokudo.utils.cv_helper import get_scaled_color_image_for_depth_image
@@ -203,7 +204,7 @@ class ImageClusterExtractor(BaseAnnotator):
         * Generates visualization output
 
         :return: SUCCESS if clusters found, FAILURE if no clusters
-        :raises Exception: If no contours found or processing fails
+        :raises ImageContourMissing: If no contours are found
         """
         start_timer = default_timer()
 
@@ -218,13 +219,11 @@ class ImageClusterExtractor(BaseAnnotator):
                 self.get_cas(), self.color
             )
             scale_cam_intrinsics(self)
-        except RuntimeError as e:
+        except ColorToDepthRatioMissing:
             self.rk_logger.error(
                 "No color to depth ratio set by your camera driver! Can't scale image for Point Cloud creation."
             )
-            raise Exception(
-                "No color to depth ratio set by your camera driver! Can't scale image for Point Cloud creation."
-            )
+            raise
 
         self.hsv = cv2.cvtColor(resized_color, cv2.COLOR_BGR2HSV_FULL)
 
@@ -242,7 +241,7 @@ class ImageClusterExtractor(BaseAnnotator):
 
         if len(contours) == 0:
             # Fail if no contours have been found
-            raise Exception(f"Couldn't find contour")
+            raise ImageContourMissing(context="image cluster extraction")
 
         # Visualization purposes
         result = copy.deepcopy(resized_color)
