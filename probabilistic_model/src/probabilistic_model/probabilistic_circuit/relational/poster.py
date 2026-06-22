@@ -927,31 +927,40 @@ def _draw_enum_use_arrows(
 _LEGEND_STYLES: list[_NodeStyle] = [_STYLE_CLASS, _STYLE_ATTR, _STYLE_EDT, _STYLE_ENUM]
 
 
+_LEGEND_COL_W: float = 5.0   # horizontal step between legend columns
+_LEGEND_ROW_H: float = 0.42  # vertical step between legend rows
+
+
 def _draw_legend(ax: Axes, x: float, y: float) -> None:
-    for i, style in enumerate(_LEGEND_STYLES):
-        if not style.legend_label:
-            continue
-        rx = x + i * 5.2
-        ax.add_patch(Rectangle((rx, y - 0.12), 0.28, 0.28,
+    """Render the legend as a two-column grid of node-kind swatches followed
+    by a one-column list of attribute-type badges."""
+    labeled = [s for s in _LEGEND_STYLES if s.legend_label]
+    cols = 2
+    for i, style in enumerate(labeled):
+        col, row = i % cols, i // cols
+        rx = x + col * _LEGEND_COL_W
+        ry = y - row * _LEGEND_ROW_H
+        ax.add_patch(Rectangle((rx, ry - 0.12), 0.28, 0.28,
                                 facecolor=style.header, edgecolor="none", zorder=3))
-        ax.text(rx + 0.38, y + 0.02, style.legend_label,
+        ax.text(rx + 0.38, ry + 0.02, style.legend_label,
                 fontsize=7, color="#5D6D7E", va="center", fontfamily="sans-serif")
 
-    ty = y - 0.55
-    ax.text(x, ty + 0.24, "Attribute types:",
+    legend_rows = (len(labeled) + cols - 1) // cols
+    ty_start = y - legend_rows * _LEGEND_ROW_H - 0.25
+
+    ax.text(x, ty_start + 0.24, "Attribute types:",
             fontsize=7, color="#5D6D7E", fontweight="bold",
             va="center", fontfamily="sans-serif")
-    off = 0.0
-    for type_name, short in _TYPE_SHORT.items():
+    for i, (type_name, short) in enumerate(_TYPE_SHORT.items()):
         color = _TYPE_COLOR[type_name]
-        ax.text(x + off, ty, short,
+        ty = ty_start - i * _LEGEND_ROW_H
+        ax.text(x + 0.08, ty, short,
                 fontsize=7, color=color, va="center",
                 fontfamily="sans-serif", fontstyle="italic",
                 bbox=dict(boxstyle="round,pad=0.2", facecolor="#F0F0F0",
                           edgecolor=color, linewidth=0.8))
-        ax.text(x + off + 0.32, ty, f"= {type_name}  ",
+        ax.text(x + 0.40, ty, f"= {type_name}",
                 fontsize=7, color="#5D6D7E", va="center", fontfamily="sans-serif")
-        off += 2.2
 
 
 # ── public API ────────────────────────────────────────────────────────────────
