@@ -1148,12 +1148,15 @@ def test_verbalize_order_by_aggregation(handles_and_containers_world):
     text = verbalize_expression(query)
 
     assert "Cabinet" in text
-    assert "grouped by" in text
+    # The selection IS the group key, so the grouping is fronted as a distinct listing,
+    # never a trailing "grouped by".
+    assert "distinct" in text
+    assert "grouped by" not in text
     assert "ordered by" in text
     assert "number" in text
     assert "Cabinets" in text
     assert "drawers" in text
-    assert "descending" in text
+    assert "from highest to lowest" in text
 
 
 def test_ordered_by_rule_standalone_ascending(handles_and_containers_world):
@@ -1174,11 +1177,11 @@ def test_ordered_by_rule_standalone_ascending(handles_and_containers_world):
     text = ParagraphRenderer(PlainFormatter()).render(frag)
 
     assert "ordered by" in text.lower()
-    assert "ascending" in text.lower()
+    assert "from lowest to highest" in text.lower()
 
 
 def test_ordered_by_rule_standalone_descending(handles_and_containers_world):
-    """OrderedByRule.transform produces (descending) for descending=True."""
+    """OrderedByRule.transform produces 'from highest to lowest' for descending=True."""
     world = handles_and_containers_world
     cabinet = variable(Cabinet, domain=world.views)
     drawer = flat_variable(cabinet.drawers)
@@ -1195,7 +1198,7 @@ def test_ordered_by_rule_standalone_descending(handles_and_containers_world):
     text = ParagraphRenderer(PlainFormatter()).render(frag)
 
     assert "ordered by" in text.lower()
-    assert "descending" in text.lower()
+    assert "from highest to lowest" in text.lower()
 
 
 def test_grouped_by_rule_standalone(handles_and_containers_world):
@@ -1266,6 +1269,24 @@ def test_grouped_having_reduces_the_repeated_aggregate():
         == "For each department, report the sum of salaries of Employees having the sum greater than 30000"
     )
     assert text.count("the sum of salaries of Employees") == 1
+
+
+def test_grouped_selection_equal_to_key_reports_distinct():
+    """A grouped query whose selection IS the group key reports the distinct keys, fronted —
+    never a trailing 'grouped by'."""
+    employee = variable(Employee, domain=None)
+    text = verbalize_expression(a(set_of(employee.department).grouped_by(employee.department)))
+    assert text == "Report the distinct departments"
+    assert "grouped by" not in text
+
+
+def test_grouped_selection_other_than_key_fronts_for_each_all():
+    """A grouped query with a non-key selection fronts the grouping as 'For each <key>' and lists
+    the per-group population with 'all'."""
+    employee = variable(Employee, domain=None)
+    text = verbalize_expression(an(entity(employee).grouped_by(employee.department)))
+    assert text == "For each department, report all Employees"
+    assert "grouped by" not in text
 
 
 def test_verbalize_nested_rule(doors_and_drawers_world):
@@ -1942,7 +1963,7 @@ def test_inference_planner_decomposes_rule_without_rendering(
 
     # The planner only collects each antecedent's raw conditions; choosing the surface form
     # (whose / standalone) is the condition-form registry's concern at render time.
-    from krrood.entity_query_language.verbalization.grammar.conditions.forms import (
+    from krrood.entity_query_language.verbalization.grammar.conditions.placement import (
         ConditionForm,
         Placement,
         Slot,
@@ -1969,7 +1990,7 @@ def test_query_planner_collects_subject_restriction_without_placing():
         QueryPlanner,
         SelectionKind,
     )
-    from krrood.entity_query_language.verbalization.grammar.conditions.forms import (
+    from krrood.entity_query_language.verbalization.grammar.conditions.placement import (
         ConditionForm,
         Placement,
         Slot,
@@ -2046,7 +2067,8 @@ def test_plural_field_binding_uses_are(handles_and_containers_world):
 
 
 def test_grouped_by_without_instantiated_variable(handles_and_containers_world):
-    """grouped_by on a plain variable query falls back to 'grouped by X' (no aggregated subject)."""
+    """grouped_by where the selection IS the group key renders a fronted distinct listing
+    (never a trailing 'grouped by')."""
     cabinet = variable(Cabinet, handles_and_containers_world.views)
     drawer = flat_variable(cabinet.drawers)
     query = an(
@@ -2055,10 +2077,10 @@ def test_grouped_by_without_instantiated_variable(handles_and_containers_world):
         .ordered_by(eql.count(drawer), descending=True)
     )
     text = verbalize_expression(query)
-    # The selected variable IS the group key, so there are no extra aggregated nouns;
-    # the sentence should still contain "grouped by" without crashing.
-    assert "grouped by" in text, f"Expected 'grouped by' in: {text!r}"
-    assert "Cabinet" in text, f"Expected 'Cabinet' in: {text!r}"
+    assert (
+        text
+        == "Report the distinct Cabinets ordered by the number of drawers of Cabinets from highest to lowest"
+    )
 
 
 # ── Fixture ────────────────────────────────────────────────────────────────────
@@ -2373,7 +2395,7 @@ def test_second_domain_calc_equality_in_whose():
 
 
 def test_is_calculation_value_predicate():
-    from krrood.entity_query_language.verbalization.subquery import is_calculation_value
+    from krrood.entity_query_language.query.aggregation_structure import is_calculation_value
 
     bank_transaction = variable(BankTransaction, domain=None)
     assert is_calculation_value(eql.max(bank_transaction.amount_details.amount)) is True

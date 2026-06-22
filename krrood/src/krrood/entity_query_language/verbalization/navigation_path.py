@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, is_dataclass
 
 from typing_extensions import TYPE_CHECKING, Callable, List, Optional
 
@@ -18,7 +18,7 @@ from krrood.entity_query_language.verbalization.fragments.source_reference impor
 )
 
 if TYPE_CHECKING:
-    from krrood.entity_query_language.verbalization.grammar.conditions.recognition import (
+    from krrood.entity_query_language.verbalization.relational_attributes import (
         RelationVerb,
     )
 
@@ -67,9 +67,23 @@ class PathStep:
     clause *"the <Type> which <owner> is <verb-phrase>"* instead of the genitive *"the <attr> of
     <owner>"*; ``None`` for a plain noun hop."""
 
+    is_scalar_value: bool = False
+    """``True`` when this hop's value is an atomic scalar (a number / string / date), not an entity.
+    A scalar leaf possessed by a plural subject distributes (*"their salaries"*); an entity owner of
+    further structure does not (*"the begin and end of their period"*)."""
+
     @property
     def is_relation(self) -> bool:
-        """:return: ``True`` when this hop renders as a relative clause rather than a genitive."""
+        """:return: ``True`` when this hop renders as a relative clause rather than a genitive.
+
+        >>> from krrood.entity_query_language.core.expression_structure import walk_chain
+        >>> from krrood.entity_query_language.verbalization.relational_attributes import relational_verb
+        >>> chain, _ = walk_chain(variable(Mission, []).assigned_to)
+        >>> build_path_parts(chain, relational_verb)[0].is_relation
+        True
+        >>> build_path_parts(walk_chain(variable(Robot, []).battery)[0])[0].is_relation
+        False
+        """
         return self.relation is not None
 
 
@@ -95,6 +109,11 @@ def build_path_parts(
     :param relation_verb: Optional name → split-verb recogniser, injected so this module stays
         decoupled from the grammar's recognizers; ``None`` disables relational rendering.
     :return: Ordered list of :class:`PathStep`, innermost hop first.
+
+    >>> from krrood.entity_query_language.core.expression_structure import walk_chain
+    >>> chain, _ = walk_chain(variable(BankTransaction, []).amount_details.amount)
+    >>> [step.name for step in build_path_parts(chain)]
+    ['amount_details', 'amount']
     """
     parts: List[PathStep] = []
     for node in chain:
@@ -118,6 +137,7 @@ def build_path_parts(
                     name,
                     SourceReference.for_attribute(owner, name),
                     relation=relation,
+                    is_scalar_value=_is_scalar_value(node._type_),
                 )
             )
         elif isinstance(node, Index):
@@ -129,8 +149,22 @@ def build_path_parts(
     return parts
 
 
+def _is_scalar_value(value_type: object) -> bool:
+    """:return: ``True`` when *value_type* is an atomic scalar — a primitive value, not an entity
+    (an entity is a dataclass and reads as an owner, not a distributable value).
+
+    >>> _is_scalar_value(int), _is_scalar_value(Robot), _is_scalar_value(None)
+    (True, False, False)
+    """
+    return value_type is not None and not is_dataclass(value_type)
+
+
 def _index_step(key: object) -> PathStep:
-    """:return: An ordinal hop (*"first"*) for an integer *key*, else the bracketed *"[key]"* form."""
+    """:return: An ordinal hop (*"first"*) for an integer *key*, else the bracketed *"[key]"* form.
+
+    >>> _index_step(0).name, _index_step("a").name
+    ('first', "['a']")
+    """
     if isinstance(key, int) and not isinstance(key, bool):
         return PathStep(morphology.ordinal(key), None)
     return PathStep(f"[{repr(key)}]", None)

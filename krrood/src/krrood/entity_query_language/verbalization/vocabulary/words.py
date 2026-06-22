@@ -29,7 +29,11 @@ class PlainWord:
     """The raw English text (e.g. ``"of"``, ``"and"``, ``"the"``, ``"ascending"``)."""
 
     def as_fragment(self) -> WordFragment:
-        """:return: A neutral word fragment."""
+        """:return: A neutral word fragment.
+
+        >>> PlainWord("and").as_fragment().text
+        'and'
+        """
         return WordFragment(text=self.text)
 
 
@@ -44,7 +48,11 @@ class PunctuationWord(PlainWord):
     """Which side hugs its neighbour (``LEFT`` for *","* / *")"*; ``RIGHT`` for *"("*)."""
 
     def as_fragment(self) -> WordFragment:
-        """:return: A role-less word fragment carrying this token's spacing."""
+        """:return: A role-less word fragment carrying this token's spacing.
+
+        >>> PunctuationWord(",", spacing=Spacing.LEFT).as_fragment().spacing
+        <Spacing.LEFT: 'left'>
+        """
         return WordFragment(text=self.text, spacing=self.spacing)
 
 
@@ -63,7 +71,11 @@ class RoleWord:
     """The semantic role for this word type (set by each subclass)."""
 
     def as_fragment(self) -> RoleFragment:
-        """:return: A role-tagged fragment."""
+        """:return: A role-tagged fragment, carrying the ``_role_`` its subclass declares.
+
+        >>> KeyWord("Find").as_fragment().role
+        <SemanticRole.KEYWORD: 'keyword'>
+        """
         return RoleFragment(text=self.text, role=self._role_)
 
 
@@ -164,24 +176,25 @@ class OperatorPhrase:
         :param compact: Use the copula-less variant (for HAVING clauses).
         :param temporal: Use the temporal variant (for datetime comparisons).
         :return: The appropriate operator word.
+
+        >>> phrase = OperatorPhrase(standard="is greater than", compact="greater than",
+        ...                         negated="is not greater than", negated_compact="not greater than")
+        >>> phrase.select().text
+        'is greater than'
+        >>> phrase.select(compact=True).text
+        'greater than'
         """
-        if temporal:
-            if negated and compact:
-                text = self.temporal_negated_compact
-            elif negated:
-                text = self.temporal_negated
-            elif compact:
-                text = self.temporal_compact
-            else:
-                text = self.temporal
-        elif negated and compact:
-            text = self.negated_compact
-        elif negated:
-            text = self.negated
-        elif compact:
-            text = self.compact
-        else:
-            text = self.standard
+        by_flags = {
+            (False, False, False): self.standard,
+            (False, False, True): self.compact,
+            (False, True, False): self.negated,
+            (False, True, True): self.negated_compact,
+            (True, False, False): self.temporal,
+            (True, False, True): self.temporal_compact,
+            (True, True, False): self.temporal_negated,
+            (True, True, True): self.temporal_negated_compact,
+        }
+        text = by_flags[(temporal, negated, compact)]
         return OperatorWord(text=text or self.standard)
 
 
@@ -194,10 +207,22 @@ class VocabEnum(Enum):
     """
 
     def as_fragment(self) -> Fragment:
-        """:return: The fragment representing this vocabulary item."""
+        """:return: The fragment representing this vocabulary item.
+
+        >>> class Connective(VocabEnum):
+        ...     AND = PlainWord("and")
+        >>> Connective.AND.as_fragment().text
+        'and'
+        """
         return self.value.as_fragment()
 
     @property
     def text(self) -> str:
-        """:return: The raw English text of this vocabulary item."""
+        """:return: The raw English text of this vocabulary item.
+
+        >>> class Connective(VocabEnum):
+        ...     AND = PlainWord("and")
+        >>> Connective.AND.text
+        'and'
+        """
         return self.value.text

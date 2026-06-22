@@ -26,6 +26,12 @@ class AggregatorRule(PhraseRule):
     name = "aggregator"
 
     def build(self, node: Aggregator, context: RuleContext) -> Fragment:
+        """:return: the definite noun phrase for *node* — *"the <aggregation> of <child>"* — or the
+        bare aggregation word for a childless aggregate.
+
+        >>> verbalize_expression(max(variable(BankTransaction, []).amount_details.amount))
+        'the maximum of the amount of the amount_details of a BankTransaction'
+        """
         # The aggregation word owns its complement realisation (the "of" and the child's number);
         # the rule only chooses the structure — a childless aggregate is the bare word, otherwise a
         # definite noun phrase around the lexicon-built complement.

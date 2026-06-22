@@ -316,17 +316,22 @@ print(verbalize_expression(query))
 
 An **ordered** query is also a report — ordering presents *all* the (matching) results in
 sequence, which is a listing, not a hunt for one match. The subject is therefore plural, and a
-filter does not change that (it just narrows the list):
+filter does not change that (it just narrows the list). A plural subject governs its predicate:
+the restricted attribute pluralises and its copula agrees (*"whose salaries are …"*), and a scalar
+possessive distributes (*"their salaries"*):
 
 ```{code-cell} ipython3
 print(verbalize_expression(an(entity(employee).ordered_by(employee.salary))))
-# Report Employees ordered by their salary (ascending)
+# Report Employees ordered by their salaries (ascending)
 
 print(verbalize_expression(
     an(entity(employee).where(employee.salary > 5).ordered_by(employee.salary))
 ))
-# Report Employees whose salary is greater than 5, ordered by their salary (ascending)
+# Report Employees whose salaries are greater than 5, ordered by their salaries (ascending)
 ```
+
+The same agreement applies wherever the subject is plural — including a `limit` ranking of several
+(*"the top three Employees … whose salaries are greater than 1000"*).
 
 A `limit` is the exception: it ranks (*"Find the top three …"*), a distinct count-bearing form.
 

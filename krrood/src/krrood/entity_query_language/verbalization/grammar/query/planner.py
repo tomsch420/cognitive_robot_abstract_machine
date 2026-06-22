@@ -21,10 +21,10 @@ from krrood.entity_query_language.operators.core_logical_operators import (
 from krrood.entity_query_language.query.quantifiers import The
 from krrood.entity_query_language.query.query import Entity, Query, SetOf
 from krrood.entity_query_language.verbalization.grammar.framework.planner import Planner
-from krrood.entity_query_language.verbalization.grammar.conditions.restriction import (
+from krrood.entity_query_language.verbalization.grammar.conditions.subject import (
     restriction_subject,
 )
-from krrood.entity_query_language.verbalization.subquery import (
+from krrood.entity_query_language.query.aggregation_structure import (
     aggregation_leaf_attribute,
     aggregation_source_root,
     is_aggregation_subquery,
@@ -51,6 +51,9 @@ class ReportKind(Enum):
 
     AGGREGATION = auto()
     """The selection computes aggregates — *"Report the sum …"* / *"For each …, report …"*."""
+    GROUPING = auto()
+    """A grouped selection with no aggregates — fronted as *"For each <key>, report all <selection>"*,
+    or *"Report the distinct <keys>"* when the selection is exactly the group key."""
     ORDERING = auto()
     """An unranked ordered listing — *"Report Employees ordered by their salary"* (plural, because
     ordering ranges over all the results)."""
@@ -148,7 +151,13 @@ class ReportPlan:
 
     @property
     def is_grouped(self) -> bool:
-        """:return: ``True`` when the report has a GROUP BY (the *"for each …"* frame applies)."""
+        """:return: ``True`` when the report has a GROUP BY (the *"for each …"* frame applies).
+
+        >>> ReportPlan(kind=ReportKind.AGGREGATION).is_grouped
+        False
+        >>> ReportPlan(kind=ReportKind.AGGREGATION, group_keys=['department']).is_grouped
+        True
+        """
         return bool(self.group_keys)
 
 
@@ -209,7 +218,11 @@ class QueryPlanner(Planner[Query, QueryPlan]):
     """
 
     def plan(self) -> QueryPlan:
-        """:return: The plan: selection shape, definiteness, restriction partition, aggregation."""
+        """:return: The plan: selection shape, definiteness, restriction partition, aggregation.
+
+        >>> QueryPlanner(entity(variable(Robot, []))).plan().kind.name
+        'SUBJECT'
+        """
         self.node.build()
         ranking = self._ranking()
         return QueryPlan(
@@ -238,23 +251,59 @@ class QueryPlanner(Planner[Query, QueryPlan]):
         aggregation = self._aggregation_report()
         if aggregation is not None:
             return aggregation
+        grouping = self._grouping_report()
+        if grouping is not None:
+            return grouping
         if self.node._ordered_by_builder_ is not None:
             return ReportPlan(kind=ReportKind.ORDERING)
         return None
+
+    def _selections(self) -> List[SymbolicExpression]:
+        """:return: the query's selected expressions — the tuple members of a set-of, else the
+        single selected variable (empty when there is none)."""
+        if isinstance(self.node, SetOf):
+            return list(self.node._selected_variables_)
+        selected = self._selected
+        return [selected] if selected is not None else []
+
+    def _group_keys(self) -> List[SymbolicExpression]:
+        """:return: the query's GROUP BY key expressions (empty when it is not grouped)."""
+        grouped = self.node._grouped_by_expression_
+        return list(grouped.variables_to_group_by) if grouped is not None else []
+
+    def _columns_without_keys(
+        self, keys: List[SymbolicExpression]
+    ) -> List[SymbolicExpression]:
+        """:return: the selected expressions with the group keys removed (so a key is named once, in
+        the *"For each …"* frame, not restated as a reported column)."""
+        key_ids = {key._id_ for key in keys}
+        return [s for s in self._selections() if s._id_ not in key_ids]
 
     def _aggregation_report(self) -> Optional[ReportPlan]:
         """:return: The ``AGGREGATION`` report for a set-of selecting at least one aggregate (its
         GROUP BY keys split out of the reported columns), else ``None``."""
         if not isinstance(self.node, SetOf):
             return None
-        selections = list(self.node._selected_variables_)
-        if not any(isinstance(selection, Aggregator) for selection in selections):
+        if not any(isinstance(s, Aggregator) for s in self.node._selected_variables_):
             return None
-        grouped = self.node._grouped_by_expression_
-        keys = list(grouped.variables_to_group_by) if grouped is not None else []
-        key_ids = {key._id_ for key in keys}
-        columns = [s for s in selections if s._id_ not in key_ids]
-        return ReportPlan(kind=ReportKind.AGGREGATION, group_keys=keys, columns=columns)
+        keys = self._group_keys()
+        return ReportPlan(
+            kind=ReportKind.AGGREGATION,
+            group_keys=keys,
+            columns=self._columns_without_keys(keys),
+        )
+
+    def _grouping_report(self) -> Optional[ReportPlan]:
+        """:return: The ``GROUPING`` report for a grouped query with no aggregates — its columns are
+        the selection minus the keys (empty when the selection is exactly the key), else ``None``."""
+        keys = self._group_keys()
+        if not keys:
+            return None
+        return ReportPlan(
+            kind=ReportKind.GROUPING,
+            group_keys=keys,
+            columns=self._columns_without_keys(keys),
+        )
 
     # ── selection shape ──────────────────────────────────────────────────────
 
@@ -263,6 +312,11 @@ class QueryPlanner(Planner[Query, QueryPlan]):
         return getattr(self.node, "selected_variable", None)
 
     def _kind(self) -> SelectionKind:
+        """:return: The selection kind — ``SET_OF``, ``ENTITY_SELECTOR``, ``EMPTY`` or ``SUBJECT``.
+
+        >>> QueryPlanner(entity(variable(Robot, []))).plan().kind
+        <SelectionKind.SUBJECT: 3>
+        """
         if isinstance(self.node, SetOf):
             return SelectionKind.SET_OF
         selected = self._selected
@@ -273,14 +327,23 @@ class QueryPlanner(Planner[Query, QueryPlan]):
         return SelectionKind.SUBJECT
 
     def _is_the(self) -> bool:
+        """:return: ``True`` when the query is quantified by ``the`` (a uniqueness claim).
+
+        >>> QueryPlanner(the(entity(variable(Robot, [])))).plan().is_the
+        True
+        >>> QueryPlanner(entity(variable(Robot, []))).plan().is_the
+        False
+        """
         builder = getattr(self.node, "_quantifier_builder_", None)
         return builder is not None and builder.type is The
 
     def _selected_type(self) -> str:
-        selected = self._selected
-        if selected is not None and getattr(selected, "_type_", None):
-            return selected._type_.__name__
-        return FallbackNouns.ENTITY.text
+        """:return: The display name of the selected entity's type (*"Robot"*).
+
+        >>> QueryPlanner(entity(variable(Robot, []))).plan().selected_type
+        'Robot'
+        """
+        return FallbackNouns.ENTITY.name_of(self._selected)
 
     # ── subject restriction (WHERE partition) ────────────────────────────────
 
