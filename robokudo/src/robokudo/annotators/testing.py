@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import copy
 import time
+import datetime
 
 import cv2
 import numpy as np
@@ -78,8 +79,6 @@ class SlowAnnotator(ThreadedAnnotator):
 
         self.color = self.get_cas().get(CASViews.COLOR_IMAGE)
         vis = copy.deepcopy(self.color)
-
-        import datetime
 
         vis = cv2.putText(
             vis,
