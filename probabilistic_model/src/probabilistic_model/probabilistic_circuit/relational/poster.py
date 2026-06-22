@@ -74,8 +74,6 @@ _CARR_COMP: str = "#1B2631"   # composition (class → attribute node)
 _CARR_EDT: str = "#6E2F1A"    # class → template  and  template → child class
 _CMULT: str = "#C0392B"
 
-_ENUM_LH: float = 0.22   # extra height per enum attribute (for the values line)
-
 _TYPE_SHORT: dict[str, str] = {
     "Continuous": "float",
     "Integer": "int",
@@ -92,6 +90,7 @@ _TYPE_COLOR: dict[str, str] = {
 _CLASS_W: float = 4.4
 _ATTR_W: float = 3.6
 _EDT_W: float = 4.2
+_ENUM_W: float = 3.2
 
 _LH: float = 0.29            # row height
 _HEADER_H: float = 0.76
@@ -110,8 +109,29 @@ _ROW_GAP: float = 2.0
 class _Attribute:
     name: str
     type_name: str
-    enum_values: list[str] = field(default_factory=list)
-    """For Symbolic variables, the list of enum member names."""
+    enum_type_name: str = ""
+    """For Symbolic variables, the name of the referenced enum type (e.g. ``SceneObjectType``)."""
+
+
+@dataclass
+class _EnumNode:
+    """
+    A standalone UML ``<<enumeration>>`` box for one enum type.
+
+    Placed outside the main class hierarchy and connected to referencing
+    classes by dashed dependency arrows.
+    """
+
+    type_name: str
+    """Python enum class name (e.g. ``SceneObjectType``)."""
+
+    values: list[str]
+    """Enum member names in declaration order."""
+
+    x: float = field(default=0.0, init=False)
+    y: float = field(default=0.0, init=False)
+    width: float = field(default=_ENUM_W, init=False)
+    height: float = field(default=0.0, init=False)
 
 
 @dataclass
@@ -185,7 +205,16 @@ class _ClassNode:
     height: float = field(default=0.0, init=False)
 
 
-_AnyNode = Union[_ClassNode, _AttrNode, _EDTNode]
+_AnyNode = Union[_ClassNode, _AttrNode, _EDTNode, _EnumNode]
+
+# Enum node colours
+_CE_HEADER: str = "#4A235A"
+_CE_HEADER_FG: str = "#FFFFFF"
+_CE_STEREO: str = "#D7BDE2"
+_CE_ROW_ODD: str = "#F5EEF8"
+_CE_ROW_EVEN: str = "#EAD9F4"
+_CE_BORDER: str = "#4A235A"
+_CARR_ENUM: str = "#7B2D8B"   # dashed use-dependency to enum
 
 
 # ── extraction ────────────────────────────────────────────────────────────────
@@ -238,6 +267,7 @@ def _count_parameters(rspn: RelationalProbabilisticCircuit) -> int:
 def _build_tree(
     rspn: RelationalProbabilisticCircuit,
     latent_names: set[str],
+    enum_registry: dict[str, _EnumNode] | None = None,
 ) -> _ClassNode:
     """
     Recursively extract the diagram node tree from a fitted RSPN.
@@ -250,8 +280,14 @@ def _build_tree(
 
     :param rspn: The fitted RSPN to visualise.
     :param latent_names: Variable names to suppress in this class.
+    :param enum_registry: Shared dict accumulating unique :class:`_EnumNode` instances
+        keyed by enum type name.  Callers pass the same dict for all recursive calls so
+        each enum type produces exactly one box.
     :return: Root :class:`_ClassNode` of the diagram tree.
     """
+    if enum_registry is None:
+        enum_registry = {}
+
     pc = rspn.class_probabilistic_circuit
     class_name = rspn.class_.__name__
 
@@ -264,19 +300,25 @@ def _build_tree(
     class_box_attrs: list[_Attribute] = []
 
     for var in pc.variables:
-        if var.name in latent_names:
+        if var.name in latent_names or var.name in agg_names:
             continue
         display = _strip_prefix(var.name, class_name)
-        enum_values: list[str] = []
+        enum_type_name = ""
         if isinstance(var, Symbolic):
-            enum_values = [str(v).split(".")[-1] for v in list(var.domain)]
-        attr = _Attribute(name=display, type_name=_var_type(var), enum_values=enum_values)
-        if var.name in agg_names:
-            continue
+            members = list(var.domain)
+            raw_type = str(members[0]).split(".")[0] if members else "Enum"
+            enum_type_name = raw_type
+            if raw_type not in enum_registry:
+                enum_registry[raw_type] = _EnumNode(
+                    type_name=raw_type,
+                    values=[str(v).split(".")[-1] for v in members],
+                )
+        attr = _Attribute(name=display, type_name=_var_type(var), enum_type_name=enum_type_name)
         parts = display.split(".")
         if len(parts) >= 2:
             sub_groups.setdefault(parts[0], []).append(
-                _Attribute(name=".".join(parts[1:]), type_name=attr.type_name)
+                _Attribute(name=".".join(parts[1:]), type_name=attr.type_name,
+                           enum_type_name=enum_type_name)
             )
         else:
             class_box_attrs.append(attr)
@@ -296,7 +338,8 @@ def _build_tree(
             )
             for v in template.latent_variables
         ]
-        child_node = _build_tree(template.template_distribution, child_latent_names)
+        child_node = _build_tree(template.template_distribution, child_latent_names,
+                                 enum_registry)
         edt_children.append(
             _EDTNode(
                 relation_name=rel_name,
@@ -320,11 +363,15 @@ def _build_tree(
 
 
 def _attrs_height(attrs: list[_Attribute]) -> float:
-    return sum(_LH + (_ENUM_LH if a.enum_values else 0.0) for a in attrs)
+    return len(attrs) * _LH
 
 
 def _attr_node_height(n: _AttrNode) -> float:
     return _HEADER_H + _ROW_PAD_V + _attrs_height(n.attributes) + _ROW_PAD_V
+
+
+def _enum_node_height(n: _EnumNode) -> float:
+    return _HEADER_H + _ROW_PAD_V + len(n.values) * _LH + _ROW_PAD_V
 
 
 def _edt_node_height(n: _EDTNode) -> float:
@@ -469,26 +516,19 @@ def _draw_attr_row(
     :param index: Row index (unused here, kept for parity with callers).
     :return: New row_y after consuming this attribute's vertical space.
     """
-    row_h = _LH + (_ENUM_LH if attr.enum_values else 0.0)
-    _filled_rect(ax, x, row_y - _LH / 2, w, row_h, row_bg, z=2)
+    _filled_rect(ax, x, row_y - _LH / 2, w, _LH, row_bg, z=2)
 
-    type_short = _TYPE_SHORT.get(attr.type_name, attr.type_name)
     type_color = _TYPE_COLOR.get(attr.type_name, "#555")
+    type_label = attr.enum_type_name if attr.enum_type_name else _TYPE_SHORT.get(attr.type_name, attr.type_name)
     name_w = len(attr.name) * 0.057
     ax.text(x + 0.20, row_y, attr.name,
             fontsize=6.5, color="#17202A", va="center", ha="left",
             fontfamily="sans-serif", zorder=4)
-    ax.text(x + 0.20 + name_w, row_y, f" : {type_short}",
+    ax.text(x + 0.20 + name_w, row_y, f" : {type_label}",
             fontsize=6.5, color=type_color, va="center", ha="left",
             fontfamily="sans-serif", fontstyle="italic", zorder=4)
 
-    if attr.enum_values:
-        values_str = "{" + ", ".join(attr.enum_values) + "}"
-        ax.text(x + 0.36, row_y - _LH * 0.72, values_str,
-                fontsize=5.5, color=type_color, va="center", ha="left",
-                fontfamily="monospace", fontstyle="italic", zorder=4)
-
-    return row_y - row_h
+    return row_y - _LH
 
 
 # ── class node drawing ────────────────────────────────────────────────────────
@@ -593,6 +633,34 @@ def _draw_edt_node(ax, node: _EDTNode) -> None:
     _border(ax, x, y, w, h, _CT_BORDER)
 
 
+# ── enum node drawing ────────────────────────────────────────────────────────
+
+
+def _draw_enum_node(ax, node: _EnumNode) -> None:
+    x, y, w, h = node.x, node.y, node.width, node.height
+    top = y + h
+
+    _filled_rect(ax, x, top - _HEADER_H, w, _HEADER_H, _CE_HEADER, z=3)
+    ax.text(x + w / 2, top - _HEADER_H * 0.28, node.type_name,
+            fontsize=8, color=_CE_HEADER_FG, ha="center", va="center",
+            fontfamily="sans-serif", fontweight="bold", zorder=4)
+    ax.text(x + w / 2, top - _HEADER_H * 0.78, "<<enumeration>>",
+            fontsize=6, color=_CE_STEREO, ha="center", va="center",
+            fontfamily="sans-serif", fontstyle="italic", zorder=4)
+
+    _hline(ax, x, top - _HEADER_H, w, _CE_BORDER, lw=1.0)
+    row_y = top - _HEADER_H - _ROW_PAD_V - _LH / 2
+    for i, value in enumerate(node.values):
+        row_bg = _CE_ROW_ODD if i % 2 == 0 else _CE_ROW_EVEN
+        _filled_rect(ax, x, row_y - _LH / 2, w, _LH, row_bg, z=2)
+        ax.text(x + 0.22, row_y, value,
+                fontsize=6.5, color=_CE_HEADER, va="center", ha="left",
+                fontfamily="monospace", zorder=4)
+        row_y -= _LH
+
+    _border(ax, x, y, w, h, _CE_BORDER)
+
+
 # ── arrow drawing ─────────────────────────────────────────────────────────────
 
 
@@ -621,6 +689,16 @@ def _elbow(ax, x1, y1, x2, y2, color, lw=1.2):
         mid = (y1 + y2) / 2
         ax.plot([x1, x1, x2, x2], [y1, mid, mid, y2],
                 color=color, linewidth=lw, zorder=2, solid_capstyle="round")
+
+
+def _dashed_use_arrow(ax, x1, y1, x2, y2, color=_CARR_ENUM):
+    """Draw a dashed ``<<use>>`` dependency arrow from (x1,y1) to (x2,y2)."""
+    ax.annotate(
+        "", xy=(x2, y2), xytext=(x1, y1),
+        arrowprops=dict(arrowstyle="-|>", color=color, lw=1.0,
+                        linestyle="dashed", mutation_scale=8),
+        zorder=2,
+    )
 
 
 def _mult_label(ax, x, y, text, color=_CMULT):
@@ -672,6 +750,49 @@ def _draw_nodes(ax, node: _AnyNode) -> None:
                 _draw_nodes(ax, a)
             for e in node.edt_children:
                 _draw_nodes(ax, e)
+
+
+def _enum_refs(node: _AnyNode) -> set[str]:
+    """Return all enum type names referenced by attributes in *node*."""
+    refs: set[str] = set()
+    match node:
+        case _ClassNode():
+            for a in node.attributes:
+                if a.enum_type_name:
+                    refs.add(a.enum_type_name)
+        case _AttrNode():
+            for a in node.attributes:
+                if a.enum_type_name:
+                    refs.add(a.enum_type_name)
+        case _EDTNode():
+            for a in node.latent_attributes:
+                if a.enum_type_name:
+                    refs.add(a.enum_type_name)
+    return refs
+
+
+def _draw_enum_use_arrows(
+    ax,
+    root: _AnyNode,
+    enum_registry: dict[str, _EnumNode],
+) -> None:
+    """
+    Draw dashed ``<<use>>`` arrows from every node that references an enum
+    to the corresponding :class:`_EnumNode` box.
+    """
+    seen: set[tuple[int, str]] = set()
+    for node in _collect(root):
+        for enum_name in _enum_refs(node):
+            key = (id(node), enum_name)
+            if key in seen or enum_name not in enum_registry:
+                continue
+            seen.add(key)
+            enum_node = enum_registry[enum_name]
+            src_x = node.x + node.width
+            src_y = node.y + node.height / 2
+            dst_x = enum_node.x
+            dst_y = enum_node.y + enum_node.height / 2
+            _dashed_use_arrow(ax, src_x, src_y, dst_x, dst_y)
 
 
 # ── legend ────────────────────────────────────────────────────────────────────
@@ -752,26 +873,41 @@ class RSPNPosterPlotter:
     """Resolution used for raster output (ignored for SVG)."""
 
     def _build(self) -> Figure:
-        root = _build_tree(self.rspn, set())
+        enum_registry: dict[str, _EnumNode] = {}
+        root = _build_tree(self.rspn, set(), enum_registry)
         _assign_heights(root)
         _place(root, _subtree_w(root) / 2, 0.0)
 
-        all_nodes = _collect(root)
-        x0, y0, x1, y1 = _bounds(all_nodes)
+        # Place enum nodes in a column to the right of the main tree
+        tree_nodes = _collect(root)
+        x0, y0, x1, y1 = _bounds(tree_nodes)
+
+        enum_nodes = list(enum_registry.values())
+        for enum_node in enum_nodes:
+            enum_node.height = _enum_node_height(enum_node)
+        enum_x = x1 + _COL_GAP * 1.5
+        enum_y_cursor = y1
+        for enum_node in enum_nodes:
+            enum_node.x = enum_x
+            enum_node.y = enum_y_cursor - enum_node.height
+            enum_y_cursor -= enum_node.height + _COL_GAP * 0.5
+
+        all_nodes: list[_AnyNode] = tree_nodes + enum_nodes
+        bx0, by0, bx1, by1 = _bounds(all_nodes)
 
         pad = self.padding
-        fig_w = max((x1 - x0) + 2 * pad, 8.0)
-        fig_h = (y1 - y0) + 2 * pad + 1.3
+        fig_w = max((bx1 - bx0) + 2 * pad, 8.0)
+        fig_h = (by1 - by0) + 2 * pad + 1.3
 
         fig, ax = plt.subplots(figsize=(fig_w, fig_h), dpi=self.dpi)
-        ax.set_xlim(x0 - pad, x1 + pad)
-        ax.set_ylim(y0 - pad - 1.2, y1 + pad)
+        ax.set_xlim(bx0 - pad, bx1 + pad)
+        ax.set_ylim(by0 - pad - 1.2, by1 + pad)
         ax.set_aspect("equal")
         ax.axis("off")
         fig.patch.set_facecolor("white")
 
         ax.text(
-            (x0 + x1) / 2, y1 + pad * 0.65,
+            (bx0 + bx1) / 2, by1 + pad * 0.65,
             f"Relational Probabilistic Circuit  —  {self.rspn.class_.__name__}",
             fontsize=11, fontweight="bold", color=_CC_HEADER,
             ha="center", va="center", fontfamily="sans-serif",
@@ -779,8 +915,11 @@ class RSPNPosterPlotter:
 
         # draw arrows first (behind nodes), then nodes on top
         _draw_arrows(ax, root)
+        _draw_enum_use_arrows(ax, root, enum_registry)
         _draw_nodes(ax, root)
-        _draw_legend(ax, x0, y0 - pad * 0.55)
+        for enum_node in enum_nodes:
+            _draw_enum_node(ax, enum_node)
+        _draw_legend(ax, bx0, by0 - pad * 0.55)
 
         fig.tight_layout(pad=0.1)
         return fig
