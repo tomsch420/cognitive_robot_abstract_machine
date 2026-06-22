@@ -58,9 +58,7 @@ class QPDataFactory(Generic[T], ABC):
         for subclass in cls.__subclasses__():
             if subclass.qp_data_type() == qp_data_type:
                 return subclass
-        raise NoFactoryForQPDataTypeError(
-            f"No QPDataFactory registered for QPData type {qp_data_type.__name__}."
-        )
+        raise NoFactoryForQPDataTypeError(qp_data_type=qp_data_type)
 
     @abstractmethod
     def compile(

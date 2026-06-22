@@ -101,9 +101,7 @@ class ConstraintCollection:
         constraint.name = constraint.name or f"{len(self._constraints)}"
         existing_names = {c.name for c in self._constraints}
         if constraint.name in existing_names:
-            raise DuplicateNameException(
-                f"Constraint named {constraint.name} already exists."
-            )
+            raise DuplicateNameException(name=constraint.name)
         self._constraints.append(constraint)
 
     def _are_names_unique(self) -> None:
@@ -115,9 +113,7 @@ class ConstraintCollection:
         names = set()
         for c in self._constraints:
             if c.name in names:
-                raise DuplicateNameException(
-                    f"Constraint named {c.name} already exists."
-                )
+                raise DuplicateNameException(name=c.name)
             names.add(c.name)
 
     def get_all_float_variable_names(self) -> set[str]:

@@ -56,7 +56,7 @@ class QPSolverPIQP(QPSolver[QPDataExplicit]):
 
         status = self.solver.solve()
         if status.value != piqp.PIQP_SOLVED and not self.ignore_solver_failures:
-            raise InfeasibleException(f"Solver status: {status.value}")
+            raise InfeasibleException(solver_status=str(status.value))
         return self.solver.result.x
 
     solver_call = solver_call_explicit_interface

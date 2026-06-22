@@ -198,9 +198,7 @@ class Executor:
             # to not build controller, if there are no constraints
             return
         elif controller_config is None:
-            raise NoQPControllerConfigException(
-                "constraints but no controller config given."
-            )
+            raise NoQPControllerConfigException()
         self.qp_controller = QPController(
             config=controller_config,
             degrees_of_freedom=ordered_dofs,

@@ -179,8 +179,10 @@ class ExpressionEnforcementStrategy(EnforcementStrategy, ABC):
         for constraint in self.constraints:
             if not isinstance(constraint, expected):
                 raise ConstraintTypeMismatchError(
-                    f"{type(self).__name__} expected constraints of type {expected.__name__}, "
-                    f"but got {type(constraint).__name__} for constraint {constraint.name!r}."
+                    strategy_name=type(self).__name__,
+                    expected_type=expected,
+                    actual_type=type(constraint),
+                    constraint_name=constraint.name,
                 )
 
 

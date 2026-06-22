@@ -6,7 +6,7 @@ from enum import IntEnum
 import numpy as np
 import qpSWIFT_sparse_bindings as qpSWIFT
 
-from giskardpy.qp.exceptions import QPSolverException
+from giskardpy.qp.exceptions import SolverReturnedFailureError
 from giskardpy.qp.qp_data import QPDataExplicit
 from giskardpy.qp.solvers.qp_solver import QPSolver
 
@@ -54,7 +54,7 @@ class QPSolverQPSwift(QPSolver[QPDataExplicit]):
         if not self.ignore_solver_failures:
             if exit_flag != QPSWIFTExitFlags.Optimal:
                 error_code = QPSWIFTExitFlags(exit_flag)
-                raise QPSolverException(f"Failed to solve qp: {str(error_code)}")
+                raise SolverReturnedFailureError(solver_status=str(error_code))
         return result.x
 
     solver_call = solver_call_explicit_interface

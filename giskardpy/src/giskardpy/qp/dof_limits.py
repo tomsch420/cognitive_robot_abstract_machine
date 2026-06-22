@@ -119,9 +119,7 @@ class DirectLimits:
             "names": len(self.names),
         }
         if len(set(lengths.values())) > 1:
-            raise MismatchedLimitLengthsError(
-                f"All DirectLimits fields must have the same length, got {lengths}."
-            )
+            raise MismatchedLimitLengthsError(field_lengths=lengths)
 
     @classmethod
     def empty(cls) -> DirectLimits:
@@ -450,13 +448,16 @@ class DofLimitProfiler:
                 solver_class=config.qp_solver_class,
             )[0]
             if max_reachable_vel < upper_limits.velocity:
-                error_msg = (
-                    f'Free variable "{degree_of_freedom.name}" can\'t reach velocity limit of "{upper_limits.velocity}". '
-                    f'Maximum reachable with prediction horizon = "{config.prediction_horizon}", '
-                    f'jerk limit = "{upper_limits.jerk}" and dt = "{config.mpc_dt}" is "{max_reachable_vel}".'
+                exception = VelocityLimitUnreachableException(
+                    degree_of_freedom_name=degree_of_freedom.name,
+                    velocity_limit=upper_limits.velocity,
+                    prediction_horizon=config.prediction_horizon,
+                    jerk_limit=upper_limits.jerk,
+                    mpc_dt=config.mpc_dt,
+                    max_reachable_velocity=max_reachable_vel,
                 )
-                logger.error(error_msg)
-                raise VelocityLimitUnreachableException(error_msg)
+                logger.error(str(exception))
+                raise exception
             else:
                 raise
 
