@@ -1,17 +1,22 @@
 """
-UML-style class diagram explainer for :class:`RelationalProbabilisticCircuit`.
+UML-style class diagram for :class:`RelationalProbabilisticCircuit`.
 
-The diagram contains three kinds of nodes:
+Visual language is inspired by the giskard motion-statechart plotter
+(thick borders, coloured info bands, structured HTML-table compartments).
 
-* **Class boxes** (``<<circuit>>``) — one per RSPN class, showing its direct
-  scalar attributes, aggregation statistics, and circuit summary.
-* **Sub-object boxes** — one per nested value-object (e.g. ``orientation``,
-  ``position``), connected to the owning class with a composition arrow.
-* **Template boxes** (``<<template>>``) — one per exchangeable-distribution
-  template, sitting between the parent class and the child class, listing the
-  latent variables that act as the conditioning bridge.
+Node kinds:
 
-Output is a single SVG file suitable for printing or documentation.
+* **Class node** (``<<circuit>>``) — minimal box: stereotype + class name +
+  two-column circuit-stat band (clusters | leaves).  Scalar attributes are
+  *not* shown here; they live in dedicated association boxes.
+* **Attribute node** — one per sub-object group (e.g. ``orientation``) *or*
+  one catch-all node for flat direct scalar attributes.  Connected to its
+  owning class by a UML composition arrow (filled diamond).
+* **Template node** (``<<template>>``) — one per exchangeable-distribution
+  template; sits on the relation edge between parent and child class and
+  lists the latent conditioning variables.
+
+Output: a single SVG file (or PNG / PDF).
 """
 
 from __future__ import annotations
@@ -22,7 +27,7 @@ from typing import TYPE_CHECKING, Union
 import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
-from matplotlib.patches import Rectangle, FancyArrowPatch
+from matplotlib.patches import Rectangle
 import numpy as np
 
 matplotlib.use("Agg")
@@ -37,35 +42,36 @@ if TYPE_CHECKING:
     )
 
 
-# ── palette ──────────────────────────────────────────────────────────────────
+# ── palette (giskard-inspired) ────────────────────────────────────────────────
 
-_C_CLASS_HEADER_BG: str = "#1B2631"
-_C_CLASS_HEADER_FG: str = "#FFFFFF"
-_C_STEREOTYPE_FG: str = "#85C1E9"
+# Class node
+_CC_HEADER: str = "#1B2631"      # dark navy header
+_CC_HEADER_FG: str = "#FFFFFF"
+_CC_STEREO: str = "#85C1E9"      # light-blue stereotype
+_CC_STAT_LEFT: str = "#1A9641"   # green  — clusters
+_CC_STAT_RIGHT: str = "#2B83BA"  # blue   — leaves
+_CC_STAT_FG: str = "#FFFFFF"
+_CC_BORDER: str = "#1B2631"
 
-_C_SUBOBJ_HEADER_BG: str = "#1A5276"
-_C_SUBOBJ_HEADER_FG: str = "#FFFFFF"
+# Attribute node
+_CA_HEADER: str = "#1A5276"
+_CA_HEADER_FG: str = "#FFFFFF"
+_CA_ROW_ODD: str = "#EBF5FB"
+_CA_ROW_EVEN: str = "#D6EAF8"
+_CA_BORDER: str = "#1A5276"
 
-_C_EDT_HEADER_BG: str = "#784212"
-_C_EDT_HEADER_FG: str = "#FFFFFF"
-_C_EDT_STEREOTYPE_FG: str = "#F0B27A"
+# Template (EDT) node
+_CT_HEADER: str = "#6E2F1A"
+_CT_HEADER_FG: str = "#FFFFFF"
+_CT_STEREO: str = "#F0B27A"
+_CT_ROW_ODD: str = "#FDF2E9"
+_CT_ROW_EVEN: str = "#FAE5D3"
+_CT_BORDER: str = "#6E2F1A"
 
-_C_SECTION_SCALAR: str = "#EBF5FB"
-_C_SECTION_AGG: str = "#FEF9E7"
-_C_SECTION_CIRCUIT: str = "#F9F9F9"
-_C_SECTION_LATENT: str = "#FDF2E9"
-
-_C_BORDER_CLASS: str = "#1B2631"
-_C_BORDER_SUBOBJ: str = "#1A5276"
-_C_BORDER_EDT: str = "#784212"
-
-_C_TEXT: str = "#17202A"
-_C_MUTED: str = "#5D6D7E"
-
-_C_ARROW_COMP: str = "#1B2631"   # composition (class → sub-object)
-_C_ARROW_EDT: str = "#784212"    # class → template
-_C_ARROW_INST: str = "#784212"   # template → child class
-_C_MULT: str = "#C0392B"
+# Arrows / multiplicity
+_CARR_COMP: str = "#1B2631"   # composition (class → attribute node)
+_CARR_EDT: str = "#6E2F1A"    # class → template  and  template → child class
+_CMULT: str = "#C0392B"
 
 _TYPE_SHORT: dict[str, str] = {
     "Continuous": "float",
@@ -80,71 +86,58 @@ _TYPE_COLOR: dict[str, str] = {
 
 # ── geometry ──────────────────────────────────────────────────────────────────
 
-_CLASS_W: float = 4.8
-_SUBOBJ_W: float = 3.4
+_CLASS_W: float = 4.4
+_ATTR_W: float = 3.6
 _EDT_W: float = 4.2
 
-_LH: float = 0.30            # line height inside a section
-_HEADER_H: float = 0.78
-_SEC_PAD_TOP: float = 0.16
-_SEC_PAD_BOT: float = 0.10
-_COL_GAP: float = 1.0        # horizontal gap between sibling subtrees
-_ROW_GAP: float = 2.2        # vertical gap between parent row and child row
+_LH: float = 0.29            # row height
+_HEADER_H: float = 0.76
+_STAT_BAR_H: float = 0.40    # two-column stat band
+_ROW_PAD_V: float = 0.10     # extra vertical padding above/below row block
+_BW: float = 2.8             # border (line)width in points — giskard-style thick
+
+_COL_GAP: float = 1.0
+_ROW_GAP: float = 2.0
 
 
-# ── attribute data ────────────────────────────────────────────────────────────
+# ── data model ────────────────────────────────────────────────────────────────
 
 
 @dataclass
 class _Attribute:
-    """A single modelled variable shown as one row in a compartment."""
-
     name: str
     type_name: str
 
 
-# ── node types ────────────────────────────────────────────────────────────────
-
-
 @dataclass
-class _SubObjectNode:
+class _AttrNode:
     """
-    A value-object whose scalar attributes are grouped under a common prefix.
+    An association box that holds a group of related scalar variables.
 
-    For example, variables ``SceneRoom.orientation.{w,x,y,z}`` become one
-    ``_SubObjectNode`` named ``orientation``.
+    Each sub-object group (e.g. ``orientation``) or the flat direct-attribute
+    catch-all becomes one :class:`_AttrNode`.
     """
 
-    sub_object_name: str
-    """Prefix component used to group variables (e.g. ``orientation``)."""
+    label: str
+    """Display title for this attribute group."""
 
     attributes: list[_Attribute]
-    """Scalar attributes belonging to this sub-object."""
 
     x: float = field(default=0.0, init=False)
     y: float = field(default=0.0, init=False)
-    width: float = field(default=_SUBOBJ_W, init=False)
+    width: float = field(default=_ATTR_W, init=False)
     height: float = field(default=0.0, init=False)
 
 
 @dataclass
 class _EDTNode:
     """
-    An exchangeable-distribution template — the probabilistic bridge between
-    a parent class and its child class.
-
-    Displays the latent variables that are jointly modelled in the parent
-    circuit and used to condition the child circuit.
+    An exchangeable-distribution template box sitting between parent and child.
     """
 
     relation_name: str
-    """Field name of the relation on the parent class."""
-
     latent_attributes: list[_Attribute]
-    """Aggregation statistics that act as conditioning context."""
-
     child: _ClassNode
-    """The downstream RSPN class this template instantiates."""
 
     x: float = field(default=0.0, init=False)
     y: float = field(default=0.0, init=False)
@@ -155,29 +148,19 @@ class _EDTNode:
 @dataclass
 class _ClassNode:
     """
-    A fitted RSPN class — the central node type in the diagram.
+    A minimal circuit-class box.
 
-    Groups its variables into direct scalar attributes (for flat fields),
-    aggregation statistics (for relational summaries), and circuit metadata.
-    Sub-objects and EDT children are laid out as separate nodes connected by
-    edges.
+    Attribute display is delegated to :class:`_AttrNode` association boxes.
     """
 
     class_name: str
     num_clusters: int
     num_leaves: int
 
-    direct_attributes: list[_Attribute]
-    """Scalar variables that belong directly to the class (not sub-objects)."""
-
-    aggregation_attributes: list[_Attribute]
-    """Aggregation statistics jointly modelled with the class attributes."""
-
-    sub_objects: list[_SubObjectNode]
-    """Value-object groups extracted from dotted variable names."""
+    attr_nodes: list[_AttrNode]
+    """Association boxes for all scalar-attribute groups."""
 
     edt_children: list[_EDTNode]
-    """Exchangeable-distribution templates for 1:N relations."""
 
     x: float = field(default=0.0, init=False)
     y: float = field(default=0.0, init=False)
@@ -185,7 +168,7 @@ class _ClassNode:
     height: float = field(default=0.0, init=False)
 
 
-_AnyNode = Union[_ClassNode, _SubObjectNode, _EDTNode]
+_AnyNode = Union[_ClassNode, _AttrNode, _EDTNode]
 
 
 # ── extraction ────────────────────────────────────────────────────────────────
@@ -201,28 +184,27 @@ def _var_type(variable) -> str:
     return type(variable).__name__
 
 
-def _strip_class_prefix(name: str, class_name: str) -> str:
-    """Remove leading ``ClassName.`` or ``ClassNameAggregations.`` prefix."""
+def _strip_prefix(name: str, class_name: str) -> str:
     for prefix in (f"{class_name}Aggregations.", f"{class_name}."):
         if name.startswith(prefix):
             return name[len(prefix):]
     return name
 
 
-def _build_class_node(
+def _build_tree(
     rspn: RelationalProbabilisticCircuit,
     latent_names: set[str],
 ) -> _ClassNode:
     """
-    Recursively extract a :class:`_ClassNode` tree from an RSPN.
+    Recursively extract the diagram node tree from a fitted RSPN.
 
-    Variables with three dot-separated components (``Class.sub.attr``) are
-    grouped into :class:`_SubObjectNode` instances.  Latent variables shared
-    with the parent circuit are excluded from the child's display.
+    Scalar variables are sorted into sub-object attribute groups or a flat
+    direct-attributes group.  Latent conditioning variables shared with the
+    parent circuit are excluded.
 
-    :param rspn: The fitted RSPN to extract from.
-    :param latent_names: Variable names to exclude (latent conditioning vars).
-    :return: Populated :class:`_ClassNode` with sub-objects and EDT children.
+    :param rspn: The fitted RSPN to visualise.
+    :param latent_names: Variable names to suppress in this class.
+    :return: Root :class:`_ClassNode` of the diagram tree.
     """
     pc = rspn.class_probabilistic_circuit
     class_name = rspn.class_.__name__
@@ -235,46 +217,48 @@ def _build_class_node(
         for variables in rspn.feature_extractor.exchangeable_features.values():
             agg_names.update(v._name_ for v in variables)
 
-    # sort variables into: latent (skip), aggregation, direct scalar, sub-object
-    sub_object_groups: dict[str, list[_Attribute]] = {}
-    direct_attrs: list[_Attribute] = []
-    agg_attrs: list[_Attribute] = []
+    # sort variables into groups
+    sub_groups: dict[str, list[_Attribute]] = {}
+    direct: list[_Attribute] = []
+    agg: list[_Attribute] = []
 
     for var in pc.variables:
         if var.name in latent_names:
             continue
-
-        display = _strip_class_prefix(var.name, class_name)
+        display = _strip_prefix(var.name, class_name)
         attr = _Attribute(name=display, type_name=_var_type(var))
 
         if var.name in agg_names:
-            agg_attrs.append(attr)
+            agg.append(attr)
         else:
-            # detect sub-object grouping: "sub_object.field" (two components remaining)
             parts = display.split(".")
             if len(parts) >= 2:
-                group_name = parts[0]
-                attr.name = ".".join(parts[1:])
-                sub_object_groups.setdefault(group_name, []).append(attr)
+                leaf_name = ".".join(parts[1:])
+                sub_groups.setdefault(parts[0], []).append(
+                    _Attribute(name=leaf_name, type_name=attr.type_name)
+                )
             else:
-                direct_attrs.append(attr)
+                direct.append(attr)
 
-    sub_objects = [
-        _SubObjectNode(sub_object_name=name, attributes=attrs)
-        for name, attrs in sub_object_groups.items()
-    ]
+    attr_nodes: list[_AttrNode] = []
+    for group_name, attrs in sub_groups.items():
+        attr_nodes.append(_AttrNode(label=group_name, attributes=attrs))
+    if direct:
+        attr_nodes.append(_AttrNode(label="attributes", attributes=direct))
+    if agg:
+        attr_nodes.append(_AttrNode(label="aggregations", attributes=agg))
 
     edt_children: list[_EDTNode] = []
     for rel_name, template in rspn.exchangeable_distribution_templates.items():
         child_latent_names = {v.name for v in template.latent_variables}
         latent_attrs = [
             _Attribute(
-                name=_strip_class_prefix(v.name, class_name),
+                name=_strip_prefix(v.name, class_name),
                 type_name=_var_type(v),
             )
             for v in template.latent_variables
         ]
-        child_node = _build_class_node(template.template_distribution, child_latent_names)
+        child_node = _build_tree(template.template_distribution, child_latent_names)
         edt_children.append(
             _EDTNode(
                 relation_name=rel_name,
@@ -287,399 +271,353 @@ def _build_class_node(
         class_name=class_name,
         num_clusters=num_clusters,
         num_leaves=num_leaves,
-        direct_attributes=direct_attrs,
-        aggregation_attributes=agg_attrs,
-        sub_objects=sub_objects,
+        attr_nodes=attr_nodes,
         edt_children=edt_children,
     )
 
 
-# ── height computation ────────────────────────────────────────────────────────
+# ── height calculation ────────────────────────────────────────────────────────
 
 
-def _section_h(num_rows: int) -> float:
-    """Height of one compartment with *num_rows* attribute lines."""
-    return _SEC_PAD_TOP + max(num_rows, 1) * _LH + _SEC_PAD_BOT
+def _attr_node_height(n: _AttrNode) -> float:
+    return _HEADER_H + _ROW_PAD_V + len(n.attributes) * _LH + _ROW_PAD_V
 
 
-def _compute_heights(node: _AnyNode) -> None:
-    """Recursively compute and assign heights to all nodes in the tree."""
+def _edt_node_height(n: _EDTNode) -> float:
+    return _HEADER_H + _ROW_PAD_V + max(len(n.latent_attributes), 1) * _LH + _ROW_PAD_V
+
+
+def _class_node_height(_: _ClassNode) -> float:
+    return _HEADER_H + _STAT_BAR_H
+
+
+def _assign_heights(node: _AnyNode) -> None:
     match node:
-        case _SubObjectNode():
-            node.height = _HEADER_H + _section_h(len(node.attributes))
-
+        case _AttrNode():
+            node.height = _attr_node_height(node)
         case _EDTNode():
-            node.height = _HEADER_H + _section_h(len(node.latent_attributes))
-            _compute_heights(node.child)
-
+            node.height = _edt_node_height(node)
+            _assign_heights(node.child)
         case _ClassNode():
-            h = (
-                _HEADER_H
-                + (_section_h(len(node.direct_attributes)) if node.direct_attributes else 0.0)
-                + (_section_h(len(node.aggregation_attributes)) if node.aggregation_attributes else 0.0)
-                + _section_h(2)   # circuit stats: clusters + leaves
-            )
-            node.height = h
-            for sub in node.sub_objects:
-                _compute_heights(sub)
-            for edt in node.edt_children:
-                _compute_heights(edt)
+            node.height = _class_node_height(node)
+            for a in node.attr_nodes:
+                _assign_heights(a)
+            for e in node.edt_children:
+                _assign_heights(e)
 
 
 # ── layout ────────────────────────────────────────────────────────────────────
 
 
-def _subtree_width(node: _AnyNode) -> float:
-    """
-    Total horizontal footprint needed to render a node and all its descendants.
-    """
+def _subtree_w(node: _AnyNode) -> float:
     match node:
-        case _SubObjectNode():
+        case _AttrNode():
             return node.width
         case _EDTNode():
-            return max(node.width, _subtree_width(node.child))
+            return max(node.width, _subtree_w(node.child))
         case _ClassNode():
-            all_children: list[_AnyNode] = list(node.sub_objects) + list(node.edt_children)
-            if not all_children:
+            all_ch: list[_AnyNode] = list(node.attr_nodes) + list(node.edt_children)
+            if not all_ch:
                 return node.width
-            children_total = (
-                sum(_subtree_width(c) for c in all_children)
-                + _COL_GAP * (len(all_children) - 1)
-            )
-            return max(node.width, children_total)
+            ch_total = sum(_subtree_w(c) for c in all_ch) + _COL_GAP * (len(all_ch) - 1)
+            return max(node.width, ch_total)
 
 
-def _place(node: _AnyNode, x_center: float, y_top: float) -> None:
-    """
-    Recursively assign ``(x, y)`` positions to every node in the subtree.
-
-    :param node: The root of the subtree to place.
-    :param x_center: Horizontal centre of the subtree's allocated column.
-    :param y_top: Top edge of this node's allocated row.
-    """
+def _place(node: _AnyNode, x_ctr: float, y_top: float) -> None:
+    """Recursively assign positions; y_top is the top edge of *node*."""
     match node:
-        case _SubObjectNode():
-            node.x = x_center - node.width / 2.0
+        case _AttrNode():
+            node.x = x_ctr - node.width / 2
             node.y = y_top - node.height
 
         case _EDTNode():
-            node.x = x_center - node.width / 2.0
+            node.x = x_ctr - node.width / 2
             node.y = y_top - node.height
-            _place(node.child, x_center, node.y - _ROW_GAP)
+            _place(node.child, x_ctr, node.y - _ROW_GAP)
 
         case _ClassNode():
-            node.x = x_center - node.width / 2.0
+            node.x = x_ctr - node.width / 2
             node.y = y_top - node.height
-
-            all_children: list[_AnyNode] = list(node.sub_objects) + list(node.edt_children)
-            if not all_children:
+            all_ch: list[_AnyNode] = list(node.attr_nodes) + list(node.edt_children)
+            if not all_ch:
                 return
-
-            total_w = (
-                sum(_subtree_width(c) for c in all_children)
-                + _COL_GAP * (len(all_children) - 1)
-            )
-            cursor_x = x_center - total_w / 2.0
-            child_y_top = node.y - _ROW_GAP
-            for child in all_children:
-                sw = _subtree_width(child)
-                _place(child, cursor_x + sw / 2.0, child_y_top)
-                cursor_x += sw + _COL_GAP
+            total_w = sum(_subtree_w(c) for c in all_ch) + _COL_GAP * (len(all_ch) - 1)
+            cursor = x_ctr - total_w / 2
+            child_top = node.y - _ROW_GAP
+            for ch in all_ch:
+                sw = _subtree_w(ch)
+                _place(ch, cursor + sw / 2, child_top)
+                cursor += sw + _COL_GAP
 
 
-def _collect_all(node: _AnyNode) -> list[_AnyNode]:
-    """Gather every node in the tree into a flat list."""
+def _collect(node: _AnyNode) -> list[_AnyNode]:
     result: list[_AnyNode] = [node]
     match node:
-        case _SubObjectNode():
+        case _AttrNode():
             pass
         case _EDTNode():
-            result.extend(_collect_all(node.child))
+            result += _collect(node.child)
         case _ClassNode():
-            for sub in node.sub_objects:
-                result.extend(_collect_all(sub))
-            for edt in node.edt_children:
-                result.extend(_collect_all(edt))
+            for a in node.attr_nodes:
+                result += _collect(a)
+            for e in node.edt_children:
+                result += _collect(e)
     return result
 
 
 def _bounds(nodes: list[_AnyNode]) -> tuple[float, float, float, float]:
-    x0 = min(n.x for n in nodes)
-    y0 = min(n.y for n in nodes)
-    x1 = max(n.x + n.width for n in nodes)
-    y1 = max(n.y + n.height for n in nodes)
-    return x0, y0, x1, y1
+    return (
+        min(n.x for n in nodes),
+        min(n.y for n in nodes),
+        max(n.x + n.width for n in nodes),
+        max(n.y + n.height for n in nodes),
+    )
 
 
-# ── drawing helpers ───────────────────────────────────────────────────────────
+# ── drawing primitives ────────────────────────────────────────────────────────
 
 
-def _rect(ax, x, y, w, h, facecolor, edgecolor="none", lw=0.0, zorder=2):
-    ax.add_patch(Rectangle((x, y), w, h, facecolor=facecolor,
-                            edgecolor=edgecolor, linewidth=lw, zorder=zorder))
+def _filled_rect(ax, x, y, w, h, fc, ec="none", lw=0.0, z=2):
+    ax.add_patch(Rectangle((x, y), w, h, facecolor=fc, edgecolor=ec,
+                            linewidth=lw, zorder=z))
 
 
-def _hline(ax, x, y, w, color=_C_BORDER_CLASS, lw=0.7):
-    ax.plot([x, x + w], [y, y], color=color, linewidth=lw, zorder=3)
+def _border(ax, x, y, w, h, ec, lw=_BW, z=6):
+    ax.add_patch(Rectangle((x, y), w, h, facecolor="none", edgecolor=ec,
+                            linewidth=lw, zorder=z))
 
 
-def _attr_row(ax, x, y, attr: _Attribute, indent=0.22):
-    """Draw ``name : type`` on one row."""
-    type_short = _TYPE_SHORT.get(attr.type_name, attr.type_name)
-    type_color = _TYPE_COLOR.get(attr.type_name, _C_MUTED)
-    name_w = len(attr.name) * 0.057
-    ax.text(x + indent, y, attr.name,
-            fontsize=6.5, color=_C_TEXT, va="center", ha="left",
-            fontfamily="sans-serif", zorder=4)
-    ax.text(x + indent + name_w, y, f" : {type_short}",
-            fontsize=6.5, color=type_color, va="center", ha="left",
-            fontfamily="sans-serif", fontstyle="italic", zorder=4)
+def _hline(ax, x, y, w, color, lw=1.0, z=3):
+    ax.plot([x, x + w], [y, y], color=color, linewidth=lw, zorder=z)
 
 
-def _section(ax, x, cursor_y, w, bg_color, label, attrs: list[_Attribute],
-             border_color=_C_BORDER_CLASS) -> float:
-    """
-    Draw one compartment and return the new cursor_y (bottom of the section).
-    """
-    h = _section_h(len(attrs))
-    sec_y = cursor_y - h
-    _rect(ax, x, sec_y, w, h, bg_color)
-    _hline(ax, x, cursor_y, w, color=border_color)
-    if label:
-        ax.text(x + 0.14, cursor_y - _SEC_PAD_TOP * 0.6,
-                label, fontsize=5.5, color=_C_MUTED, va="center",
-                fontfamily="sans-serif", fontstyle="italic", zorder=4)
-    row_y = cursor_y - _SEC_PAD_TOP - _LH / 2
-    for attr in attrs:
-        _attr_row(ax, x, row_y, attr)
-        row_y -= _LH
-    return sec_y
-
-
-def _outer_border(ax, x, y, w, h, color, lw=1.4):
-    ax.add_patch(Rectangle((x, y), w, h, facecolor="none",
-                            edgecolor=color, linewidth=lw, zorder=5))
-
-
-# ── node drawing ──────────────────────────────────────────────────────────────
+# ── class node drawing ────────────────────────────────────────────────────────
 
 
 def _draw_class_node(ax, node: _ClassNode) -> None:
     x, y, w, h = node.x, node.y, node.width, node.height
     top = y + h
 
-    # header
-    _rect(ax, x, top - _HEADER_H, w, _HEADER_H, _C_CLASS_HEADER_BG)
+    # header band
+    _filled_rect(ax, x, top - _HEADER_H, w, _HEADER_H, _CC_HEADER, z=3)
     ax.text(x + w / 2, top - _HEADER_H * 0.28, node.class_name,
-            fontsize=9.0, color=_C_CLASS_HEADER_FG, ha="center", va="center",
+            fontsize=10, color=_CC_HEADER_FG, ha="center", va="center",
             fontfamily="sans-serif", fontweight="bold", zorder=4)
-    ax.text(x + w / 2, top - _HEADER_H * 0.76, "<<circuit>>",
-            fontsize=6.0, color=_C_STEREOTYPE_FG, ha="center", va="center",
+    ax.text(x + w / 2, top - _HEADER_H * 0.78, "<<circuit>>",
+            fontsize=6, color=_CC_STEREO, ha="center", va="center",
             fontfamily="sans-serif", fontstyle="italic", zorder=4)
 
-    cursor = top - _HEADER_H
+    # two-column stat band (giskard-style coloured cells)
+    bar_y = top - _HEADER_H - _STAT_BAR_H
+    half = w / 2
+    _filled_rect(ax, x,        bar_y, half, _STAT_BAR_H, _CC_STAT_LEFT,  z=3)
+    _filled_rect(ax, x + half, bar_y, half, _STAT_BAR_H, _CC_STAT_RIGHT, z=3)
+    _hline(ax, x, top - _HEADER_H, w, _CC_HEADER, lw=1.2)
+    # vertical divider between cells
+    ax.plot([x + half, x + half], [bar_y, bar_y + _STAT_BAR_H],
+            color="white", linewidth=1.0, zorder=4)
 
-    if node.direct_attributes:
-        cursor = _section(ax, x, cursor, w, _C_SECTION_SCALAR, None,
-                          node.direct_attributes, _C_BORDER_CLASS)
+    cy = bar_y + _STAT_BAR_H / 2
+    ax.text(x + half / 2, cy, f"{node.num_clusters}",
+            fontsize=9, color=_CC_STAT_FG, ha="center", va="center",
+            fontfamily="sans-serif", fontweight="bold", zorder=4)
+    ax.text(x + half * 1.5, cy, f"{node.num_leaves}",
+            fontsize=9, color=_CC_STAT_FG, ha="center", va="center",
+            fontfamily="sans-serif", fontweight="bold", zorder=4)
 
-    if node.aggregation_attributes:
-        cursor = _section(ax, x, cursor, w, _C_SECTION_AGG, "aggregations",
-                          node.aggregation_attributes, _C_BORDER_CLASS)
+    # sub-labels
+    ax.text(x + half / 2, bar_y + _STAT_BAR_H * 0.82, "clusters",
+            fontsize=5, color=_CC_STAT_FG, ha="center", va="center",
+            fontfamily="sans-serif", alpha=0.85, zorder=4)
+    ax.text(x + half * 1.5, bar_y + _STAT_BAR_H * 0.82, "leaves",
+            fontsize=5, color=_CC_STAT_FG, ha="center", va="center",
+            fontfamily="sans-serif", alpha=0.85, zorder=4)
 
-    # circuit stats
-    stats_h = _section_h(2)
-    _rect(ax, x, cursor - stats_h, w, stats_h, _C_SECTION_CIRCUIT)
-    _hline(ax, x, cursor, w, color=_C_BORDER_CLASS)
-    ax.text(x + 0.14, cursor - _SEC_PAD_TOP * 0.6, "circuit",
-            fontsize=5.5, color=_C_MUTED, va="center",
-            fontfamily="sans-serif", fontstyle="italic", zorder=4)
-    row_y = cursor - _SEC_PAD_TOP - _LH / 2
-    for label, val in [("clusters", node.num_clusters), ("leaves", node.num_leaves)]:
-        ax.text(x + 0.22, row_y, label,
-                fontsize=6.5, color=_C_TEXT, va="center", ha="left",
-                fontfamily="sans-serif", zorder=4)
-        ax.text(x + w - 0.22, row_y, str(val),
-                fontsize=6.5, color=_C_MUTED, va="center", ha="right",
-                fontfamily="sans-serif", fontweight="bold", zorder=4)
-        row_y -= _LH
-
-    _outer_border(ax, x, y, w, h, _C_BORDER_CLASS)
+    _border(ax, x, y, w, h, _CC_BORDER)
 
 
-def _draw_subobj_node(ax, node: _SubObjectNode) -> None:
+# ── attribute node drawing ────────────────────────────────────────────────────
+
+
+def _draw_attr_node(ax, node: _AttrNode) -> None:
     x, y, w, h = node.x, node.y, node.width, node.height
     top = y + h
 
-    _rect(ax, x, top - _HEADER_H, w, _HEADER_H, _C_SUBOBJ_HEADER_BG)
-    ax.text(x + w / 2, top - _HEADER_H / 2, node.sub_object_name,
-            fontsize=8.0, color=_C_SUBOBJ_HEADER_FG, ha="center", va="center",
+    # header
+    _filled_rect(ax, x, top - _HEADER_H, w, _HEADER_H, _CA_HEADER, z=3)
+    ax.text(x + w / 2, top - _HEADER_H / 2, node.label,
+            fontsize=8, color=_CA_HEADER_FG, ha="center", va="center",
             fontfamily="sans-serif", fontweight="bold", zorder=4)
 
-    _section(ax, x, top - _HEADER_H, w, _C_SECTION_SCALAR, None,
-             node.attributes, _C_BORDER_SUBOBJ)
-    _outer_border(ax, x, y, w, h, _C_BORDER_SUBOBJ, lw=1.1)
+    # alternating-row attribute table
+    _hline(ax, x, top - _HEADER_H, w, _CA_BORDER, lw=1.0)
+    row_y = top - _HEADER_H - _ROW_PAD_V - _LH / 2
+    for i, attr in enumerate(node.attributes):
+        row_bg = _CA_ROW_ODD if i % 2 == 0 else _CA_ROW_EVEN
+        _filled_rect(ax, x, row_y - _LH / 2, w, _LH, row_bg, z=2)
+        type_short = _TYPE_SHORT.get(attr.type_name, attr.type_name)
+        type_color = _TYPE_COLOR.get(attr.type_name, "#555")
+        name_w = len(attr.name) * 0.057
+        ax.text(x + 0.22, row_y, attr.name,
+                fontsize=6.5, color="#17202A", va="center", ha="left",
+                fontfamily="sans-serif", zorder=4)
+        ax.text(x + 0.22 + name_w, row_y, f" : {type_short}",
+                fontsize=6.5, color=type_color, va="center", ha="left",
+                fontfamily="sans-serif", fontstyle="italic", zorder=4)
+        row_y -= _LH
+
+    _border(ax, x, y, w, h, _CA_BORDER)
+
+
+# ── EDT node drawing ──────────────────────────────────────────────────────────
 
 
 def _draw_edt_node(ax, node: _EDTNode) -> None:
     x, y, w, h = node.x, node.y, node.width, node.height
     top = y + h
 
-    _rect(ax, x, top - _HEADER_H, w, _HEADER_H, _C_EDT_HEADER_BG)
+    # header
+    _filled_rect(ax, x, top - _HEADER_H, w, _HEADER_H, _CT_HEADER, z=3)
     ax.text(x + w / 2, top - _HEADER_H * 0.28, node.relation_name,
-            fontsize=8.5, color=_C_EDT_HEADER_FG, ha="center", va="center",
+            fontsize=9, color=_CT_HEADER_FG, ha="center", va="center",
             fontfamily="sans-serif", fontweight="bold", zorder=4)
-    ax.text(x + w / 2, top - _HEADER_H * 0.76, "<<template>>",
-            fontsize=6.0, color=_C_EDT_STEREOTYPE_FG, ha="center", va="center",
+    ax.text(x + w / 2, top - _HEADER_H * 0.78, "<<template>>",
+            fontsize=6, color=_CT_STEREO, ha="center", va="center",
             fontfamily="sans-serif", fontstyle="italic", zorder=4)
 
-    cursor = top - _HEADER_H
-    _section(ax, x, cursor, w, _C_SECTION_LATENT, "latent variables",
-             node.latent_attributes, _C_BORDER_EDT)
-    _outer_border(ax, x, y, w, h, _C_BORDER_EDT, lw=1.2)
+    _hline(ax, x, top - _HEADER_H, w, _CT_BORDER, lw=1.0)
+    row_y = top - _HEADER_H - _ROW_PAD_V - _LH / 2
+    for i, attr in enumerate(node.latent_attributes):
+        row_bg = _CT_ROW_ODD if i % 2 == 0 else _CT_ROW_EVEN
+        _filled_rect(ax, x, row_y - _LH / 2, w, _LH, row_bg, z=2)
+        type_short = _TYPE_SHORT.get(attr.type_name, attr.type_name)
+        type_color = _TYPE_COLOR.get(attr.type_name, "#555")
+        name_w = len(attr.name) * 0.057
+        ax.text(x + 0.22, row_y, attr.name,
+                fontsize=6.5, color="#17202A", va="center", ha="left",
+                fontfamily="sans-serif", zorder=4)
+        ax.text(x + 0.22 + name_w, row_y, f" : {type_short}",
+                fontsize=6.5, color=type_color, va="center", ha="left",
+                fontfamily="sans-serif", fontstyle="italic", zorder=4)
+        row_y -= _LH
+
+    _border(ax, x, y, w, h, _CT_BORDER)
 
 
 # ── arrow drawing ─────────────────────────────────────────────────────────────
 
 
-def _diamond(ax, cx: float, cy: float, color: str, size: float = 0.16) -> None:
-    """Draw a filled UML diamond centred at (cx, cy)."""
+def _diamond(ax, cx, cy, color, size=0.15):
     pts = np.array([
-        [cx,            cy + size],
-        [cx + size * 0.55, cy],
-        [cx,            cy - size],
-        [cx - size * 0.55, cy],
+        [cx,                cy + size],
+        [cx + size * 0.55,  cy],
+        [cx,                cy - size],
+        [cx - size * 0.55,  cy],
     ])
     ax.fill(pts[:, 0], pts[:, 1], color=color, zorder=5)
 
 
-def _open_arrowhead(ax, tip_x: float, tip_y: float, color: str) -> None:
-    """Draw an open arrowhead pointing upward at (tip_x, tip_y)."""
-    ax.annotate(
-        "", xy=(tip_x, tip_y + 0.01), xytext=(tip_x, tip_y + 0.35),
-        arrowprops=dict(arrowstyle="-|>", color=color, lw=1.1, mutation_scale=10),
-        zorder=4,
-    )
+def _open_arrow_up(ax, tip_x, tip_y, color):
+    ax.annotate("", xy=(tip_x, tip_y + 0.01), xytext=(tip_x, tip_y + 0.30),
+                arrowprops=dict(arrowstyle="-|>", color=color, lw=1.2,
+                                mutation_scale=9),
+                zorder=4)
 
 
-def _draw_elbow(ax, x1: float, y1: float, x2: float, y2: float,
-                color: str) -> None:
-    """Draw an L-shaped (or straight) connector from (x1,y1) to (x2,y2)."""
-    if abs(x1 - x2) < 0.01:
-        ax.plot([x1, x2], [y1, y2], color=color, linewidth=1.0, zorder=2)
+def _elbow(ax, x1, y1, x2, y2, color, lw=1.2):
+    if abs(x1 - x2) < 0.05:
+        ax.plot([x1, x2], [y1, y2], color=color, linewidth=lw,
+                zorder=2, solid_capstyle="round")
     else:
-        mid_y = (y1 + y2) / 2
-        ax.plot([x1, x1, x2, x2], [y1, mid_y, mid_y, y2],
-                color=color, linewidth=1.0, zorder=2, solid_capstyle="round")
+        mid = (y1 + y2) / 2
+        ax.plot([x1, x1, x2, x2], [y1, mid, mid, y2],
+                color=color, linewidth=lw, zorder=2, solid_capstyle="round")
 
 
-def _draw_class_to_subobj_arrow(ax, parent: _ClassNode, child: _SubObjectNode) -> None:
-    """Composition arrow: filled diamond on parent bottom, line to child top."""
-    px = parent.x + parent.width / 2
-    py = parent.y
-
-    cx = child.x + child.width / 2
-    cy = child.y + child.height
-
-    _draw_elbow(ax, px, py, cx, cy, _C_ARROW_COMP)
-    _diamond(ax, px, py, _C_ARROW_COMP)
-
-    mid_y = (py + cy) / 2
-    ax.text((px + cx) / 2 + 0.12, mid_y, "1",
-            fontsize=7, color=_C_MULT, va="center", fontweight="bold",
-            fontfamily="sans-serif", zorder=4)
-
-
-def _draw_class_to_edt_arrow(ax, parent: _ClassNode, edt: _EDTNode) -> None:
-    """Solid line from parent bottom to EDT top, with '1' multiplicity."""
-    px = parent.x + parent.width / 2
-    py = parent.y
-
-    ex = edt.x + edt.width / 2
-    ey = edt.y + edt.height
-
-    _draw_elbow(ax, px, py, ex, ey, _C_ARROW_EDT)
-    # no diamond here — just a plain association line
-    ax.text((px + ex) / 2 + 0.12, (py + ey) / 2,
-            "1", fontsize=7, color=_C_MULT, va="center",
+def _mult_label(ax, x, y, text, color=_CMULT):
+    ax.text(x, y, text, fontsize=8, color=color, va="center",
             fontweight="bold", fontfamily="sans-serif", zorder=4)
 
 
-def _draw_edt_to_child_arrow(ax, edt: _EDTNode, child: _ClassNode) -> None:
-    """Open arrowhead from EDT bottom to child class top, with '*' multiplicity."""
-    ex = edt.x + edt.width / 2
-    ey = edt.y
-
-    cx = child.x + child.width / 2
-    cy = child.y + child.height
-
-    _draw_elbow(ax, ex, ey, cx, cy, _C_ARROW_INST)
-    _open_arrowhead(ax, cx, cy, _C_ARROW_INST)
-
-    ax.text((ex + cx) / 2 + 0.12, (ey + cy) / 2,
-            "*", fontsize=9, color=_C_MULT, va="center",
-            fontweight="bold", fontfamily="sans-serif", zorder=4)
-
-
-def _draw_all(ax, node: _AnyNode) -> None:
-    """Recursively draw all nodes and their connecting arrows."""
+def _draw_arrows(ax, node: _AnyNode) -> None:
+    """Recursively draw all arrows in the tree."""
     match node:
-        case _SubObjectNode():
-            _draw_subobj_node(ax, node)
+        case _AttrNode():
+            pass
 
         case _EDTNode():
-            _draw_edt_node(ax, node)
-            _draw_edt_to_child_arrow(ax, node, node.child)
-            _draw_all(ax, node.child)
+            ex, ey = node.x + node.width / 2, node.y
+            cx, cy = node.child.x + node.child.width / 2, node.child.y + node.child.height
+            _elbow(ax, ex, ey, cx, cy, _CARR_EDT)
+            _open_arrow_up(ax, cx, cy, _CARR_EDT)
+            _mult_label(ax, (ex + cx) / 2 + 0.12, (ey + cy) / 2, "*")
+            _draw_arrows(ax, node.child)
 
         case _ClassNode():
-            _draw_class_node(ax, node)
-            for sub in node.sub_objects:
-                _draw_class_to_subobj_arrow(ax, node, sub)
-                _draw_all(ax, sub)
+            px, py = node.x + node.width / 2, node.y
+            for attr in node.attr_nodes:
+                ax_x = attr.x + attr.width / 2
+                ay = attr.y + attr.height
+                _elbow(ax, px, py, ax_x, ay, _CARR_COMP)
+                _diamond(ax, px, py, _CARR_COMP)
+
             for edt in node.edt_children:
-                _draw_class_to_edt_arrow(ax, node, edt)
-                _draw_all(ax, edt)
+                ex = edt.x + edt.width / 2
+                ey = edt.y + edt.height
+                _elbow(ax, px, py, ex, ey, _CARR_EDT, lw=1.4)
+                _mult_label(ax, (px + ex) / 2 + 0.12, (py + ey) / 2, "1")
+                _draw_arrows(ax, edt)
+
+
+def _draw_nodes(ax, node: _AnyNode) -> None:
+    """Recursively draw all node boxes."""
+    match node:
+        case _AttrNode():
+            _draw_attr_node(ax, node)
+        case _EDTNode():
+            _draw_edt_node(ax, node)
+            _draw_nodes(ax, node.child)
+        case _ClassNode():
+            _draw_class_node(ax, node)
+            for a in node.attr_nodes:
+                _draw_nodes(ax, a)
+            for e in node.edt_children:
+                _draw_nodes(ax, e)
 
 
 # ── legend ────────────────────────────────────────────────────────────────────
 
 
 def _draw_legend(ax, x: float, y: float) -> None:
-    """Draw a compact type and node-kind legend."""
-    gap = 2.2
-    # node kinds
     kinds = [
-        (_C_CLASS_HEADER_BG, "<<circuit>>  class"),
-        (_C_SUBOBJ_HEADER_BG, "value object (sub-object)"),
-        (_C_EDT_HEADER_BG, "<<template>>  EDT"),
+        (_CC_HEADER,  "<<circuit>>  class  (name + stats)"),
+        (_CA_HEADER,  "attribute group / sub-object"),
+        (_CT_HEADER,  "<<template>>  EDT  (latent conditioning vars)"),
     ]
     for i, (color, label) in enumerate(kinds):
-        rx = x + i * gap * 1.5
+        rx = x + i * 5.2
         ax.add_patch(Rectangle((rx, y - 0.12), 0.28, 0.28,
                                 facecolor=color, edgecolor="none", zorder=3))
-        ax.text(rx + 0.35, y + 0.02, label,
-                fontsize=7, color=_C_MUTED, va="center",
+        ax.text(rx + 0.38, y + 0.02, label,
+                fontsize=7, color="#5D6D7E", va="center",
                 fontfamily="sans-serif")
 
-    # type colours
-    type_x = x
-    type_y = y - 0.52
-    ax.text(type_x, type_y + 0.24, "Attribute types:",
-            fontsize=7, color=_C_MUTED, va="center",
-            fontfamily="sans-serif", fontweight="bold")
-    offset = 0.0
+    ty = y - 0.55
+    ax.text(x, ty + 0.24, "Attribute types:",
+            fontsize=7, color="#5D6D7E", fontweight="bold",
+            va="center", fontfamily="sans-serif")
+    off = 0.0
     for type_name, short in _TYPE_SHORT.items():
         color = _TYPE_COLOR[type_name]
-        ax.text(type_x + offset, type_y, f"{short}",
+        ax.text(x + off, ty, short,
                 fontsize=7, color=color, va="center",
                 fontfamily="sans-serif", fontstyle="italic",
                 bbox=dict(boxstyle="round,pad=0.2", facecolor="#F0F0F0",
                           edgecolor=color, linewidth=0.8))
-        ax.text(type_x + offset + 0.32, type_y, f"= {type_name}  ",
-                fontsize=7, color=_C_MUTED, va="center",
+        ax.text(x + off + 0.32, ty, f"= {type_name}  ",
+                fontsize=7, color="#5D6D7E", va="center",
                 fontfamily="sans-serif")
-        offset += 2.2
+        off += 2.2
 
 
 # ── public API ────────────────────────────────────────────────────────────────
@@ -691,16 +629,20 @@ class RSPNPosterPlotter:
     Renders a fitted :class:`~probabilistic_model.probabilistic_circuit.relational.rspn.RelationalProbabilisticCircuit`
     as a UML-style class diagram in SVG (or PNG / PDF).
 
-    The diagram contains three node kinds:
+    Visual language is inspired by the giskard motion-statechart plotter:
+    thick borders, coloured info bands, alternating-row attribute tables.
 
-    * **Class boxes** (dark header, ``<<circuit>>``) — one per RSPN class,
-      with compartments for scalar attributes, aggregation statistics, and
-      circuit summary (clusters / leaves).
-    * **Sub-object boxes** (blue header) — one per nested value-object group,
-      connected to its owning class by a composition arrow with diamond.
-    * **Template boxes** (brown header, ``<<template>>``) — one per
-      exchangeable-distribution template, sitting between the parent class
-      and its child class, listing the latent conditioning variables.
+    Three node kinds are drawn:
+
+    * **Class nodes** (dark header, ``<<circuit>>``) — minimal: just the class
+      name and a two-cell stat band showing cluster count and leaf count.
+      No attributes live here; they are in separate association boxes.
+    * **Attribute nodes** (blue header) — one per sub-object group (e.g.
+      ``orientation``, ``position``) and one catch-all for flat scalars.
+      Connected to the owning class by a composition arrow.
+    * **Template nodes** (brown header, ``<<template>>``) — one per
+      exchangeable-distribution template, listing the latent conditioning
+      variables.  Sits between the parent class and the child class.
 
     .. note::
         The RSPN must be fitted before calling :meth:`save` or :meth:`show`.
@@ -721,23 +663,20 @@ class RSPNPosterPlotter:
     """Resolution used for raster output (ignored for SVG)."""
 
     def _build(self) -> Figure:
-        """Construct and return the matplotlib figure."""
-        root = _build_class_node(self.rspn, set())
-        _compute_heights(root)
+        root = _build_tree(self.rspn, set())
+        _assign_heights(root)
+        _place(root, _subtree_w(root) / 2, 0.0)
 
-        tree_w = _subtree_width(root)
-        _place(root, tree_w / 2.0, 0.0)
-
-        all_nodes = _collect_all(root)
+        all_nodes = _collect(root)
         x0, y0, x1, y1 = _bounds(all_nodes)
 
         pad = self.padding
         fig_w = max((x1 - x0) + 2 * pad, 8.0)
-        fig_h = (y1 - y0) + 2 * pad + 1.2   # bottom margin for legend
+        fig_h = (y1 - y0) + 2 * pad + 1.3
 
         fig, ax = plt.subplots(figsize=(fig_w, fig_h), dpi=self.dpi)
         ax.set_xlim(x0 - pad, x1 + pad)
-        ax.set_ylim(y0 - pad - 1.1, y1 + pad)
+        ax.set_ylim(y0 - pad - 1.2, y1 + pad)
         ax.set_aspect("equal")
         ax.axis("off")
         fig.patch.set_facecolor("white")
@@ -745,11 +684,13 @@ class RSPNPosterPlotter:
         ax.text(
             (x0 + x1) / 2, y1 + pad * 0.65,
             f"Relational Probabilistic Circuit  —  {self.rspn.class_.__name__}",
-            fontsize=11, fontweight="bold", color=_C_CLASS_HEADER_BG,
+            fontsize=11, fontweight="bold", color=_CC_HEADER,
             ha="center", va="center", fontfamily="sans-serif",
         )
 
-        _draw_all(ax, root)
+        # draw arrows first (behind nodes), then nodes on top
+        _draw_arrows(ax, root)
+        _draw_nodes(ax, root)
         _draw_legend(ax, x0, y0 - pad * 0.55)
 
         fig.tight_layout(pad=0.1)
@@ -757,7 +698,7 @@ class RSPNPosterPlotter:
 
     def save(self, path: str) -> None:
         """
-        Render and save to *path*.
+        Render and save the diagram.
 
         The output format is inferred from the file extension
         (``.svg``, ``.png``, ``.pdf``).
