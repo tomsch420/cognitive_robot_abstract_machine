@@ -134,11 +134,13 @@ _LH: float = 0.29            # row height
 _HEADER_H: float = 0.76
 _STAT_BAR_H: float = 0.40
 _ROW_PAD_V: float = 0.10     # vertical padding above/below row block
-_BW: float = 2.8             # border line-width in points (giskard-style thick)
+_BW: float = 2.8             # border line-width for class nodes
+_THIN_BW: float = 1.6        # border line-width for attr and EDT nodes
 
 _COL_GAP: float = 1.0
 _ROW_GAP: float = 2.0
-_ENUM_GAP: float = 1.2       # horizontal gap between a class node and its enum
+_SUBOBJ_GAP: float = 1.2     # vertical gap between class box and its sub-object row
+_ENUM_GAP: float = 1.4       # horizontal gap between the tree right edge and the enum column
 
 
 # ── data model ────────────────────────────────────────────────────────────────
@@ -461,6 +463,12 @@ def _assign_heights(node: _AnyNode) -> None:
 # ── layout ────────────────────────────────────────────────────────────────────
 
 
+def _row_total_w(items: list[_AnyNode], widths: list[float]) -> float:
+    if not items:
+        return 0.0
+    return sum(widths) + _COL_GAP * (len(items) - 1)
+
+
 def _subtree_w(node: _AnyNode) -> float:
     match node:
         case _AttrNode():
@@ -468,13 +476,23 @@ def _subtree_w(node: _AnyNode) -> float:
         case _EDTNode():
             return max(node.width, _subtree_w(node.child))
         case _ClassNode():
-            children: list[_AnyNode] = [*node.sub_object_nodes, *node.edt_children]
-            if not children:
-                return node.width
-            total = sum(_subtree_w(c) for c in children) + _COL_GAP * (len(children) - 1)
-            return max(node.width, total)
+            edt_widths = [_subtree_w(e) for e in node.edt_children]
+            sub_widths = [s.width for s in node.sub_object_nodes]
+            edt_row_w = _row_total_w(node.edt_children, edt_widths)
+            sub_row_w = _row_total_w(node.sub_object_nodes, sub_widths)
+            return max(node.width, edt_row_w, sub_row_w)
         case _:
             raise TypeError(f"Unexpected node type: {type(node)}")
+
+
+def _place_row(items: list[_AnyNode], widths: list[float],
+               x_ctr: float, y_top: float) -> None:
+    """Centre a list of items at *x_ctr* on the same horizontal band."""
+    total_w = _row_total_w(items, widths)
+    cursor = x_ctr - total_w / 2
+    for item, w in zip(items, widths):
+        _place(item, cursor + w / 2, y_top)
+        cursor += w + _COL_GAP
 
 
 def _place(node: _AnyNode, x_ctr: float, y_top: float) -> None:
@@ -492,16 +510,19 @@ def _place(node: _AnyNode, x_ctr: float, y_top: float) -> None:
         case _ClassNode():
             node.x = x_ctr - node.width / 2
             node.y = y_top - node.height
-            children: list[_AnyNode] = [*node.sub_object_nodes, *node.edt_children]
-            if not children:
-                return
-            child_widths = [_subtree_w(c) for c in children]
-            total_w = sum(child_widths) + _COL_GAP * (len(children) - 1)
-            cursor = x_ctr - total_w / 2
-            child_top = node.y - _ROW_GAP
-            for ch, sw in zip(children, child_widths):
-                _place(ch, cursor + sw / 2, child_top)
-                cursor += sw + _COL_GAP
+
+            # Sub-object nodes occupy a dedicated row just below the class box.
+            # EDT children go one further row below the sub-object row.
+            cursor_y = node.y - _SUBOBJ_GAP
+            if node.sub_object_nodes:
+                sub_widths = [s.width for s in node.sub_object_nodes]
+                _place_row(node.sub_object_nodes, sub_widths, x_ctr, cursor_y)
+                tallest_sub = max(s.height for s in node.sub_object_nodes)
+                cursor_y -= tallest_sub + _ROW_GAP
+
+            if node.edt_children:
+                edt_widths = [_subtree_w(e) for e in node.edt_children]
+                _place_row(node.edt_children, edt_widths, x_ctr, cursor_y)
 
         case _:
             raise TypeError(f"Unexpected node type: {type(node)}")
@@ -536,16 +557,29 @@ def _bounds(nodes: list) -> tuple[float, float, float, float]:
 # ── enum placement ────────────────────────────────────────────────────────────
 
 
+def _first_reference_depth(
+    name: str,
+    tree_nodes: list[_AnyNode],
+) -> float:
+    """Return the highest (most-positive) y top-edge among nodes referencing *name*.
+
+    This sorts enum boxes so that those referenced by higher (earlier) levels
+    appear at the top of the enum column.
+    """
+    tops = [n.y + n.height for n in tree_nodes if name in _enum_refs(n)]
+    return max(tops) if tops else 0.0
+
+
 def _place_enum_nodes(
     tree_nodes: list[_AnyNode],
     enum_registry: dict[str, _EnumNode],
 ) -> None:
     """
-    Position each enum node to the right of the leftmost tree node that
-    references it, vertically centred on that node.
+    Place all enum boxes in a single vertical column to the right of the tree.
 
-    Nodes that share the same horizontal anchor are stacked vertically with
-    a small gap so they never overlap.
+    Enums are sorted so that those first referenced at a higher tree level
+    appear nearer the top of the column.  All boxes share the same x coordinate
+    so they never overlap the tree or each other.
 
     :param tree_nodes: Flat list of all placed tree nodes.
     :param enum_registry: Enum boxes keyed by type name (x/y will be set here).
@@ -553,38 +587,24 @@ def _place_enum_nodes(
     for enum_node in enum_registry.values():
         enum_node.height = _enum_node_height(enum_node)
 
-    # Map each enum name to the tree nodes that reference it
-    referencing: dict[str, list[_AnyNode]] = {name: [] for name in enum_registry}
-    for node in tree_nodes:
-        for enum_name in _enum_refs(node):
-            if enum_name in referencing:
-                referencing[enum_name].append(node)
+    if not enum_registry:
+        return
 
-    # Group enums by their anchor x so we can stack them without overlap
-    anchor_stacks: dict[float, list[_EnumNode]] = {}
-    for name, enum_node in enum_registry.items():
-        refs = referencing[name]
-        if refs:
-            anchor_node = min(refs, key=lambda n: n.x)
-            anchor_x = anchor_node.x + anchor_node.width + _ENUM_GAP
-            anchor_y = anchor_node.y + anchor_node.height / 2
-        else:
-            # No referencing node found — fall back to far right at top
-            anchor_x = max(n.x + n.width for n in tree_nodes) + _ENUM_GAP
-            anchor_y = max(n.y + n.height for n in tree_nodes)
-        enum_node.x = anchor_x
-        # Store anchor_y temporarily; resolve stacking below
-        enum_node.y = anchor_y
-        anchor_stacks.setdefault(anchor_x, []).append(enum_node)
+    column_x = max(n.x + n.width for n in tree_nodes) + _ENUM_GAP
 
-    # Resolve vertical stacking: centre the group around the anchor y
-    for anchor_x, stack in anchor_stacks.items():
-        total_h = sum(e.height for e in stack) + _COL_GAP * 0.4 * (len(stack) - 1)
-        anchor_y = stack[0].y  # all share the same anchor from above
-        cursor = anchor_y + total_h / 2
-        for enum_node in stack:
-            enum_node.y = cursor - enum_node.height
-            cursor -= enum_node.height + _COL_GAP * 0.4
+    sorted_enums = sorted(
+        enum_registry.values(),
+        key=lambda e: _first_reference_depth(e.type_name, tree_nodes),
+        reverse=True,
+    )
+
+    top_anchor = max(n.y + n.height for n in tree_nodes)
+    cursor_y = top_anchor
+    gap = _COL_GAP * 0.5
+    for enum_node in sorted_enums:
+        enum_node.x = column_x
+        enum_node.y = cursor_y - enum_node.height
+        cursor_y -= enum_node.height + gap
 
 
 # ── drawing primitives ────────────────────────────────────────────────────────
@@ -727,7 +747,7 @@ def _draw_attr_node(ax: Axes, node: _AttrNode) -> None:
     top = y + h
     _draw_header(ax, x, top, w, node.label, "", _STYLE_ATTR, title_fontsize=8.0)
     _draw_rows(ax, x, top - _HEADER_H, w, node.attributes, _STYLE_ATTR)
-    _border(ax, x, y, w, h, _STYLE_ATTR.border)
+    _border(ax, x, y, w, h, _STYLE_ATTR.border, lw=_THIN_BW)
 
 
 def _draw_edt_node(ax: Axes, node: _EDTNode) -> None:
@@ -735,7 +755,7 @@ def _draw_edt_node(ax: Axes, node: _EDTNode) -> None:
     top = y + h
     _draw_header(ax, x, top, w, node.relation_name, "<<template>>", _STYLE_EDT)
     _draw_rows(ax, x, top - _HEADER_H, w, node.latent_attributes, _STYLE_EDT)
-    _border(ax, x, y, w, h, _STYLE_EDT.border)
+    _border(ax, x, y, w, h, _STYLE_EDT.border, lw=_THIN_BW)
 
 
 def _draw_enum_node(ax: Axes, node: _EnumNode) -> None:
@@ -752,7 +772,7 @@ def _draw_enum_node(ax: Axes, node: _EnumNode) -> None:
                 fontsize=6.5, color=_STYLE_ENUM.header, va="center", ha="left",
                 fontfamily="monospace", zorder=4)
         row_y -= _LH
-    _border(ax, x, y, w, h, _STYLE_ENUM.border)
+    _border(ax, x, y, w, h, _STYLE_ENUM.border, lw=_THIN_BW)
 
 
 # ── arrow drawing ─────────────────────────────────────────────────────────────
@@ -803,12 +823,17 @@ def _mult_label(ax: Axes, x: float, y: float, text: str, color: str = _CMULT) ->
 
 
 def _draw_arrows(ax: Axes, node: _AnyNode) -> None:
-    """Recursively draw all structural arrows in the tree."""
+    """Recursively draw all structural arrows in the tree.
+
+    All arrows exit from the bottom-centre of the parent and enter the
+    top-centre of the child, so lines never cross node bodies.
+    """
     match node:
         case _AttrNode():
             pass
 
         case _EDTNode():
+            # EDT bottom → child top
             ex, ey = node.x + node.width / 2, node.y
             cx, cy = node.child.x + node.child.width / 2, node.child.y + node.child.height
             _elbow(ax, ex, ey, cx, cy, _CARR_EDT)
@@ -817,12 +842,26 @@ def _draw_arrows(ax: Axes, node: _AnyNode) -> None:
             _draw_arrows(ax, node.child)
 
         case _ClassNode():
-            px, py = node.x + node.width / 2, node.y
+            # class bottom → sub-object top
             for sub in node.sub_object_nodes:
+                px, py = node.x + node.width / 2, node.y
                 sx, sy = sub.x + sub.width / 2, sub.y + sub.height
                 _elbow(ax, px, py, sx, sy, _CARR_COMP)
                 _diamond(ax, px, py, _CARR_COMP)
+            # class bottom → EDT top
             for edt in node.edt_children:
+                # If there are sub-object nodes, arrows originate from their bottoms
+                if node.sub_object_nodes:
+                    # find the sub-object node that is horizontally closest to this EDT
+                    closest_sub = min(
+                        node.sub_object_nodes,
+                        key=lambda s: abs(s.x + s.width / 2 - (edt.x + edt.width / 2)),
+                    )
+                    px = closest_sub.x + closest_sub.width / 2
+                    py = closest_sub.y
+                else:
+                    px = node.x + node.width / 2
+                    py = node.y
                 ex, ey = edt.x + edt.width / 2, edt.y + edt.height
                 _elbow(ax, px, py, ex, ey, _CARR_EDT, lw=1.4)
                 _mult_label(ax, (px + ex) / 2 + 0.12, (py + ey) / 2, "1")
@@ -982,9 +1021,12 @@ class RSPNPosterPlotter:
         _draw_nodes(ax, root)
         for enum_node in enum_nodes:
             _draw_enum_node(ax, enum_node)
-        _draw_legend(ax, bx0, by0 - pad * 0.55)
 
-        fig.tight_layout(pad=0.1)
+        # Legend anchored to the figure bottom-left in axes coordinates
+        legend_y = by0 - pad * 0.35
+        _draw_legend(ax, bx0, legend_y)
+
+        fig.subplots_adjust(left=0.01, right=0.99, top=0.99, bottom=0.01)
         return fig
 
     def save(self, path: str) -> None:
