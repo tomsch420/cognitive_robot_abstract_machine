@@ -155,7 +155,7 @@ class GiskardExecutable(Executable):
         if skip_end_conditions:
             end_trigger = trinary_logic_or(end_trigger, *skip_end_conditions)
 
-        if self.pre_condition_node is not None:
+        if self.pre_condition_node is not None and self.context.evaluate_conditions:
             pre_monitor = condition_monitor(self.pre_condition_node)
             motion_state_chart.add_node(pre_monitor)
             # only start the motion once the pre-condition holds
@@ -172,7 +172,7 @@ class GiskardExecutable(Executable):
             )
             motion_state_chart.add_node(pre_cancel)
 
-        if self.post_condition_node is not None:
+        if self.post_condition_node is not None and self.context.evaluate_conditions:
             post_monitor = condition_monitor(self.post_condition_node)
             # only evaluate the post-condition once the motion is done
             post_monitor.start_condition = end_trigger

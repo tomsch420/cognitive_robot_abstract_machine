@@ -195,7 +195,7 @@ class PickUpAction(ActionDescription):
             IsObjectReachableBy(
                 robot=context.robot,
                 world=context.world,
-                arm=kwargs["arm"],
+                arm=variables["arm"],
                 object_designator=kwargs["object_designator"],
                 grasp_description=kwargs["grasp_description"],
             ),

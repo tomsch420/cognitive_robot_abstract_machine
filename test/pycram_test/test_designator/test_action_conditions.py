@@ -3,6 +3,7 @@ import pytest
 from krrood.entity_query_language.factories import (
     get_false_statements,
     evaluate_condition,
+    ConditionType,
 )
 from pycram.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
 from pycram.datastructures.grasp import GraspDescription
@@ -12,6 +13,21 @@ from pycram.plans.factories import sequential
 from pycram.robot_plans.actions.core.pick_up import PickUpAction
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.world_entity import Body
+
+
+def _construct_and_evaluate_condition(action, action_condition):
+
+    condition = action_condition(
+        action.bound_variables,
+        action.context,
+        action.designator_parameter,
+    )
+    evaluation = evaluate_condition(condition)
+    if evaluation:
+        return True
+    raise ConditionNotSatisfied(
+        pre_condition=True, action=action.__class__, condition=condition
+    )
 
 
 def test_get_bound_variables(immutable_model_world):
@@ -59,7 +75,10 @@ def test_pick_up_pre_conditions(mutable_model_world):
     plan = sequential([pick_action], context)
 
     with pytest.raises(ConditionNotSatisfied):
-        pick_action.evaluate_pre_condition()
+        _construct_and_evaluate_condition(
+            pick_action,
+            pick_action.pre_condition,
+        )
 
     pre_condition = pick_action.pre_condition(
         pick_action.bound_variables, context, pick_action.designator_parameter
@@ -68,10 +87,11 @@ def test_pick_up_pre_conditions(mutable_model_world):
     false_statements = get_false_statements(pre_condition)
 
     assert len(false_statements) == 1
-    assert false_statements[0]._name_ == "AreReachableBy"
+    assert false_statements[0]._name_ == "IsObjectReachableBy"
 
     with pytest.raises(ConditionNotSatisfied):
-        pick_action.evaluate_pre_condition()
+        _construct_and_evaluate_condition(pick_action, pick_action.pre_condition)
+        # pick_action.evaluate_pre_condition()
 
     view.root.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
         1.9, 1.4, 0
@@ -87,8 +107,8 @@ def test_pick_up_pre_conditions(mutable_model_world):
         plan.perform()
 
     assert evaluate_condition(pre_condition) == False
-    pick_action.evaluate_post_condition()
-    assert pick_action.evaluate_post_condition() == True
+    _construct_and_evaluate_condition(pick_action, pick_action.post_condition)
+    assert _construct_and_evaluate_condition(pick_action, pick_action.post_condition)
 
 
 def test_pick_up_post_condition(mutable_model_world):
@@ -108,7 +128,8 @@ def test_pick_up_post_condition(mutable_model_world):
 
     plan = sequential([pick_action], context)
 
-    assert pick_action.evaluate_pre_condition()
+    # assert pick_action.evaluate_pre_condition()
+    assert _construct_and_evaluate_condition(pick_action, pick_action.pre_condition)
 
     with simulated_robot:
         plan.perform()
@@ -119,7 +140,8 @@ def test_pick_up_post_condition(mutable_model_world):
         view.left_arm.end_effector.tool_frame
     )
 
-    assert pick_action.evaluate_post_condition()
+    # assert pick_action.evaluate_post_condition()
+    assert _construct_and_evaluate_condition(pick_action, pick_action.post_condition)
 
 
 def test_context_evaluate_condition(mutable_model_world):
