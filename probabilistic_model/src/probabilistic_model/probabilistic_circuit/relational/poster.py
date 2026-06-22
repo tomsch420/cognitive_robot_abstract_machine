@@ -1,9 +1,10 @@
 """
-Poster-style SVG explainer for :class:`RelationalProbabilisticCircuit`.
+UML-style class diagram explainer for :class:`RelationalProbabilisticCircuit`.
 
-Renders a high-level architectural overview of an ungrounded RSPN as a
-tree of annotated class cards connected by relation arrows.  The output is
-a single SVG file suitable for printing or embedding in documentation.
+Renders a fitted RSPN as a class diagram where each class in the relational
+hierarchy is a compartmented box (class name / scalar attributes /
+aggregation statistics / circuit summary) connected by UML composition
+arrows with multiplicity labels.  Output is a single SVG file.
 """
 
 from __future__ import annotations
@@ -12,20 +13,17 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 import matplotlib
-import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
-from matplotlib.patches import FancyArrowPatch, FancyBboxPatch
 from matplotlib.figure import Figure
+from matplotlib.patches import FancyArrowPatch, Rectangle, FancyBboxPatch
+import matplotlib.patheffects as pe
+import numpy as np
 
 matplotlib.use("Agg")
 
 from random_events.variable import Continuous, Symbolic, Integer
 
-from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
-    SumUnit,
-    ProductUnit,
-    LeafUnit,
-)
+from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import SumUnit
 
 if TYPE_CHECKING:
     from probabilistic_model.probabilistic_circuit.relational.rspn import (
@@ -33,89 +31,90 @@ if TYPE_CHECKING:
     )
 
 
-# ── visual constants ─────────────────────────────────────────────────────────
+# ── palette ──────────────────────────────────────────────────────────────────
 
-_CARD_WIDTH: float = 5.0
-_CARD_MIN_HEIGHT: float = 3.5
-_ROW_GAP: float = 2.8  # vertical gap between card rows
-_COL_GAP: float = 1.2  # horizontal gap between sibling cards
+_C_HEADER_BG: str = "#1B2631"        # dark navy — class name band
+_C_HEADER_FG: str = "#FFFFFF"
+_C_STEREOTYPE_FG: str = "#85C1E9"    # light blue for «circuit»
+_C_SECTION_BG: str = "#EBF5FB"       # very light blue — scalar section
+_C_AGG_BG: str = "#FEF9E7"           # light yellow — aggregation section
+_C_CIRCUIT_BG: str = "#F9F9F9"       # near-white — circuit stats section
+_C_BORDER: str = "#2C3E50"
+_C_TEXT: str = "#17202A"
+_C_MUTED: str = "#5D6D7E"
+_C_ARROW: str = "#2C3E50"
+_C_MULT: str = "#C0392B"             # red multiplicities
+_C_REL_NAME: str = "#1A5276"         # dark blue relation name
 
-_COLOR_HEADER: str = "#2C3E50"
-_COLOR_SCALAR: str = "#EAF4FB"
-_COLOR_AGG: str = "#FEF9E7"
-_COLOR_BORDER: str = "#BDC3C7"
-_COLOR_ARROW: str = "#7F8C8D"
-_COLOR_RELATION_LABEL: str = "#E67E22"
-
-_FONT_FAMILY: str = "monospace"
-
-# type-tag colours
-_TYPE_COLORS: dict[str, str] = {
-    "Continuous": "#2ECC71",
-    "Integer": "#3498DB",
-    "Symbolic": "#9B59B6",
-}
-_TYPE_LABELS: dict[str, str] = {
-    "Continuous": "cont",
+_TYPE_SHORT: dict[str, str] = {
+    "Continuous": "float",
     "Integer": "int",
     "Symbolic": "cat",
 }
+_TYPE_COLOR: dict[str, str] = {
+    "Continuous": "#1A9641",
+    "Integer": "#2B83BA",
+    "Symbolic": "#7B2D8B",
+}
+
+# ── geometry ─────────────────────────────────────────────────────────────────
+
+_BOX_W: float = 4.8          # card width
+_LH: float = 0.32            # line height inside sections
+_HEADER_H: float = 0.80      # class name + stereotype band
+_SECTION_PAD_TOP: float = 0.18
+_SECTION_PAD_BOT: float = 0.12
+_COL_GAP: float = 1.4        # horizontal gap between sibling subtrees
+_ROW_GAP: float = 2.6        # vertical gap between parent and child row
 
 
-# ── data model ───────────────────────────────────────────────────────────────
+# ── data ─────────────────────────────────────────────────────────────────────
+
+
+@dataclass
+class _Attribute:
+    """A single modelled variable shown in the class box."""
+
+    name: str
+    """Stripped display name (class prefix removed)."""
+
+    type_name: str
+    """One of Continuous / Integer / Symbolic."""
 
 
 @dataclass
 class _CardData:
-    """All display information for a single class card."""
+    """All display information for one class node in the diagram."""
 
     class_name: str
-    """Human-readable class name."""
-
     num_clusters: int
-    """Number of sum-node mixture components in the class circuit."""
-
     num_leaves: int
-    """Number of leaf distributions."""
-
-    scalar_variables: list[tuple[str, str]]
-    """(display_name, variable_type_name) for each scalar variable."""
-
-    aggregation_variables: list[tuple[str, str]]
-    """(display_name, variable_type_name) for each aggregation statistic."""
-
-    relation_name: str | None = None
-    """Field name of the relation that produced this card (None for root)."""
+    scalar_attributes: list[_Attribute]
+    aggregation_attributes: list[_Attribute]
+    relation_name: str | None
+    """Field name of the incoming relation from the parent (None for root)."""
 
     children: list[_CardData] = field(default_factory=list)
-    """Child cards connected via exchangeable-distribution templates."""
 
-    # layout fields populated during placement
-    x: float = 0.0
-    """Left edge of the card in figure coordinates."""
-
-    y: float = 0.0
-    """Bottom edge of the card in figure coordinates."""
-
-    width: float = _CARD_WIDTH
-    """Card width."""
-
-    height: float = _CARD_MIN_HEIGHT
-    """Card height, expanded to fit content."""
+    # ── placed by layout ──────────────────────────────────────────────────
+    x: float = 0.0   # left edge
+    y: float = 0.0   # bottom edge
+    width: float = _BOX_W
+    height: float = 0.0
 
 
 # ── extraction ───────────────────────────────────────────────────────────────
 
 
-def _strip_class_prefix(name: str, class_name: str) -> str:
-    """Remove the leading ``ClassName.`` or ``ClassNameAggregations.`` prefix."""
+def _strip_prefix(name: str, class_name: str) -> str:
+    """Remove leading ``ClassName.`` or ``ClassNameAggregations.`` prefix."""
     for prefix in (f"{class_name}Aggregations.", f"{class_name}."):
         if name.startswith(prefix):
             return name[len(prefix):]
     return name
 
 
-def _variable_type_name(variable) -> str:
+def _var_type(variable) -> str:
     if isinstance(variable, Continuous):
         return "Continuous"
     if isinstance(variable, Symbolic):
@@ -125,19 +124,19 @@ def _variable_type_name(variable) -> str:
     return type(variable).__name__
 
 
-def _extract_card(
+def _extract(
     rspn: RelationalProbabilisticCircuit,
     relation_name: str | None,
-    latent_variable_names: set[str],
+    latent_names: set[str],
 ) -> _CardData:
     """
-    Recursively extract display data from an RSPN node.
+    Recursively build :class:`_CardData` from an RSPN node.
 
     :param rspn: The RSPN to summarise.
-    :param relation_name: The field name linking this node to its parent.
-    :param latent_variable_names: Variable names that are latent (shared with
-        the parent circuit and used only for conditioning).
-    :return: A fully populated :class:`_CardData` tree.
+    :param relation_name: Incoming relation field name from parent.
+    :param latent_names: Variable names treated as latent (conditioning
+        context shared with the parent) that should not appear in the card.
+    :return: A populated :class:`_CardData` tree.
     """
     pc = rspn.class_probabilistic_circuit
     class_name = rspn.class_.__name__
@@ -150,34 +149,29 @@ def _extract_card(
         for variables in rspn.feature_extractor.exchangeable_features.values():
             agg_names.update(v._name_ for v in variables)
 
-    scalar_vars: list[tuple[str, str]] = []
-    agg_vars: list[tuple[str, str]] = []
+    scalar_attrs: list[_Attribute] = []
+    agg_attrs: list[_Attribute] = []
     for var in pc.variables:
-        if var.name in latent_variable_names:
+        if var.name in latent_names:
             continue
-        display = _strip_class_prefix(var.name, class_name)
-        type_name = _variable_type_name(var)
+        display = _strip_prefix(var.name, class_name)
+        attr = _Attribute(name=display, type_name=_var_type(var))
         if var.name in agg_names:
-            agg_vars.append((display, type_name))
+            agg_attrs.append(attr)
         else:
-            scalar_vars.append((display, type_name))
+            scalar_attrs.append(attr)
 
     children: list[_CardData] = []
     for rel_name, template in rspn.exchangeable_distribution_templates.items():
-        child_latent_names = {v.name for v in template.latent_variables}
-        child_card = _extract_card(
-            template.template_distribution,
-            rel_name,
-            child_latent_names,
-        )
-        children.append(child_card)
+        child_latents = {v.name for v in template.latent_variables}
+        children.append(_extract(template.template_distribution, rel_name, child_latents))
 
     return _CardData(
         class_name=class_name,
         num_clusters=num_clusters,
         num_leaves=num_leaves,
-        scalar_variables=scalar_vars,
-        aggregation_variables=agg_vars,
+        scalar_attributes=scalar_attrs,
+        aggregation_attributes=agg_attrs,
         relation_name=relation_name,
         children=children,
     )
@@ -185,388 +179,400 @@ def _extract_card(
 
 # ── layout ───────────────────────────────────────────────────────────────────
 
-_LINE_HEIGHT: float = 0.30
-_HEADER_HEIGHT: float = 1.10
-_SECTION_TITLE_HEIGHT: float = 0.32
-_BOTTOM_PAD: float = 0.25
+
+def _section_height(num_rows: int) -> float:
+    """Height of one compartment with *num_rows* attribute lines."""
+    return _SECTION_PAD_TOP + max(num_rows, 1) * _LH + _SECTION_PAD_BOT
 
 
-def _compute_card_height(card: _CardData) -> float:
-    """Compute the height needed to display all rows in a card."""
-    num_rows = max(len(card.scalar_variables), 1) + max(len(card.aggregation_variables), 0)
-    content_height = (
-        _SECTION_TITLE_HEIGHT  # "Scalar features" header
-        + num_rows * _LINE_HEIGHT
-        + (_SECTION_TITLE_HEIGHT if card.aggregation_variables else 0.0)
-        + _BOTTOM_PAD
+def _compute_height(card: _CardData) -> float:
+    """Total card height based on its content."""
+    h = (
+        _HEADER_H
+        + _section_height(len(card.scalar_attributes))
+        + (_section_height(len(card.aggregation_attributes)) if card.aggregation_attributes else 0.0)
+        + _section_height(2)  # circuit stats: clusters + leaves
     )
-    return max(_CARD_MIN_HEIGHT, _HEADER_HEIGHT + content_height)
+    return h
 
 
 def _subtree_width(card: _CardData) -> float:
-    """Total horizontal space required by a card and all its descendants."""
+    """Horizontal footprint of a card and all its descendants."""
     if not card.children:
         return card.width
-    children_total = sum(_subtree_width(c) for c in card.children) + _COL_GAP * (
-        len(card.children) - 1
+    children_total = (
+        sum(_subtree_width(c) for c in card.children)
+        + _COL_GAP * (len(card.children) - 1)
     )
     return max(card.width, children_total)
 
 
-def _place_cards(card: _CardData, x_center: float, y_bottom: float) -> None:
-    """Recursively assign (x, y) positions to every card in the tree."""
-    card.height = _compute_card_height(card)
+def _place(card: _CardData, x_center: float, y_top: float) -> None:
+    """Recursively assign positions; y_top is the top edge of the card."""
+    card.height = _compute_height(card)
     card.x = x_center - card.width / 2.0
-    card.y = y_bottom
+    card.y = y_top - card.height
 
     if not card.children:
         return
 
-    total_children_width = sum(_subtree_width(c) for c in card.children) + _COL_GAP * (
-        len(card.children) - 1
+    total_children_w = (
+        sum(_subtree_width(c) for c in card.children)
+        + _COL_GAP * (len(card.children) - 1)
     )
-    child_y = y_bottom - card.height - _ROW_GAP
-    cursor_x = x_center - total_children_width / 2.0
+    child_top = card.y - _ROW_GAP
+    cursor_x = x_center - total_children_w / 2.0
     for child in card.children:
-        child_sw = _subtree_width(child)
-        child_center = cursor_x + child_sw / 2.0
-        _place_cards(child, child_center, child_y)
-        cursor_x += child_sw + _COL_GAP
+        sw = _subtree_width(child)
+        _place(child, cursor_x + sw / 2.0, child_top)
+        cursor_x += sw + _COL_GAP
 
 
-def _total_tree_height(card: _CardData) -> float:
-    card.height = _compute_card_height(card)
-    if not card.children:
-        return card.height
-    return card.height + _ROW_GAP + max(_total_tree_height(c) for c in card.children)
+def _collect(card: _CardData) -> list[_CardData]:
+    result = [card]
+    for child in card.children:
+        result.extend(_collect(child))
+    return result
 
 
-# ── drawing ──────────────────────────────────────────────────────────────────
+def _bounds(cards: list[_CardData]) -> tuple[float, float, float, float]:
+    x0 = min(c.x for c in cards)
+    y0 = min(c.y for c in cards)
+    x1 = max(c.x + c.width for c in cards)
+    y1 = max(c.y + c.height for c in cards)
+    return x0, y0, x1, y1
 
 
-def _draw_type_badge(ax, x: float, y: float, type_name: str) -> None:
-    """Draw a small coloured type pill at (x, y)."""
-    color = _TYPE_COLORS.get(type_name, "#95A5A6")
-    label = _TYPE_LABELS.get(type_name, type_name[:3])
+# ── drawing ───────────────────────────────────────────────────────────────────
+
+
+def _rect(ax, x: float, y: float, w: float, h: float, facecolor: str, border: bool = True) -> None:
+    """Draw a plain filled rectangle."""
+    ax.add_patch(Rectangle(
+        (x, y), w, h,
+        facecolor=facecolor,
+        edgecolor=_C_BORDER if border else "none",
+        linewidth=0.8,
+        zorder=2,
+    ))
+
+
+def _divider(ax, x: float, y: float, w: float) -> None:
+    """Draw a thin horizontal divider line."""
+    ax.plot([x, x + w], [y, y], color=_C_BORDER, linewidth=0.8, zorder=3)
+
+
+def _attr_line(ax, x: float, y: float, attr: _Attribute, indent: float = 0.22) -> None:
+    """Draw one ``name : type`` attribute line."""
+    type_short = _TYPE_SHORT.get(attr.type_name, attr.type_name)
+    type_color = _TYPE_COLOR.get(attr.type_name, _C_MUTED)
     ax.text(
-        x,
-        y,
-        f" {label} ",
-        fontsize=5.5,
-        fontfamily=_FONT_FAMILY,
-        color="white",
-        va="center",
-        ha="left",
-        bbox=dict(boxstyle="round,pad=0.15", facecolor=color, edgecolor="none"),
+        x + indent, y,
+        attr.name,
+        fontsize=6.5, color=_C_TEXT, va="center", ha="left",
+        fontfamily="sans-serif", zorder=4,
+    )
+    ax.text(
+        x + indent, y,
+        f"{attr.name} :",
+        fontsize=6.5, color=_C_TEXT, va="center", ha="left",
+        fontfamily="sans-serif", zorder=4, alpha=0,  # invisible — just for width estimation
+    )
+    # draw " : type" after the name
+    name_approx_width = len(attr.name) * 0.055  # rough character width in data units
+    ax.text(
+        x + indent + name_approx_width, y,
+        f" : {type_short}",
+        fontsize=6.5, color=type_color, va="center", ha="left",
+        fontfamily="sans-serif", fontstyle="italic", zorder=4,
     )
 
 
 def _draw_card(ax, card: _CardData) -> None:
-    """Draw a single class card onto *ax*."""
+    """Draw one UML-style class box."""
     x, y, w, h = card.x, card.y, card.width, card.height
+    top = y + h
 
-    # outer box
-    box = FancyBboxPatch(
-        (x, y),
-        w,
-        h,
-        boxstyle="round,pad=0.05",
-        linewidth=1.2,
-        edgecolor=_COLOR_BORDER,
-        facecolor="white",
-        zorder=2,
+    # ── outer border (drawn last so it clips nothing) ─────────────────────
+    ax.add_patch(Rectangle(
+        (x, y), w, h,
+        facecolor="none",
+        edgecolor=_C_BORDER,
+        linewidth=1.4,
+        zorder=5,
+    ))
+
+    # ── header compartment ────────────────────────────────────────────────
+    header_y = top - _HEADER_H
+    _rect(ax, x, header_y, w, _HEADER_H, _C_HEADER_BG, border=False)
+    # stereotype
+    ax.text(
+        x + w / 2, header_y + _HEADER_H * 0.72,
+        "<<circuit>>",
+        fontsize=6.0, color=_C_STEREOTYPE_FG, ha="center", va="center",
+        fontfamily="sans-serif", fontstyle="italic", zorder=4,
     )
-    ax.add_patch(box)
-
-    # header band
-    header = FancyBboxPatch(
-        (x, y + h - _HEADER_HEIGHT),
-        w,
-        _HEADER_HEIGHT,
-        boxstyle="round,pad=0.05",
-        linewidth=0,
-        facecolor=_COLOR_HEADER,
-        zorder=3,
-    )
-    ax.add_patch(header)
-
     # class name
     ax.text(
-        x + w / 2,
-        y + h - _HEADER_HEIGHT / 2 - 0.08,
+        x + w / 2, header_y + _HEADER_H * 0.30,
         card.class_name,
-        fontsize=9,
-        fontweight="bold",
-        color="white",
-        ha="center",
-        va="center",
-        fontfamily=_FONT_FAMILY,
-        zorder=4,
+        fontsize=9.0, color=_C_HEADER_FG, ha="center", va="center",
+        fontfamily="sans-serif", fontweight="bold", zorder=4,
     )
 
-    # circuit summary row
-    summary = (
-        f"vars: {card.num_leaves}   "
-        f"clusters: {card.num_clusters}"
-    )
-    ax.text(
-        x + w / 2,
-        y + h - _HEADER_HEIGHT + 0.22,
-        summary,
-        fontsize=6.0,
-        color="#BDC3C7",
-        ha="center",
-        va="center",
-        fontfamily=_FONT_FAMILY,
-        zorder=4,
-    )
+    cursor_y = header_y
 
-    # divider
-    ax.plot(
-        [x + 0.15, x + w - 0.15],
-        [y + h - _HEADER_HEIGHT, y + h - _HEADER_HEIGHT],
-        color=_COLOR_BORDER,
-        linewidth=0.5,
-        zorder=4,
-    )
+    # ── scalar attributes compartment ─────────────────────────────────────
+    scalar_h = _section_height(len(card.scalar_attributes))
+    scalar_y = cursor_y - scalar_h
+    _rect(ax, x, scalar_y, w, scalar_h, _C_SECTION_BG, border=False)
+    _divider(ax, x, cursor_y, w)
 
-    cursor_y = y + h - _HEADER_HEIGHT - _SECTION_TITLE_HEIGHT * 0.9
+    row_y = cursor_y - _SECTION_PAD_TOP - _LH / 2
+    for attr in card.scalar_attributes:
+        _attr_line(ax, x, row_y, attr)
+        row_y -= _LH
+    cursor_y = scalar_y
 
-    # ── scalar features ───────────────────────────────────────────────────
-    ax.text(
-        x + 0.18,
-        cursor_y,
-        "Scalar features",
-        fontsize=6.5,
-        fontweight="bold",
-        color="#566573",
-        va="center",
-        zorder=4,
-    )
-    cursor_y -= _LINE_HEIGHT * 0.7
+    # ── aggregation compartment (only if non-empty) ───────────────────────
+    if card.aggregation_attributes:
+        agg_h = _section_height(len(card.aggregation_attributes))
+        agg_y = cursor_y - agg_h
+        _rect(ax, x, agg_y, w, agg_h, _C_AGG_BG, border=False)
+        _divider(ax, x, cursor_y, w)
 
-    col_mid = x + w / 2 + 0.05
-    for display_name, type_name in card.scalar_variables:
+        # section label
         ax.text(
-            x + 0.25,
-            cursor_y,
-            f"• {display_name}",
-            fontsize=6.0,
-            color="#2C3E50",
-            va="center",
-            fontfamily=_FONT_FAMILY,
-            zorder=4,
+            x + 0.14, cursor_y - _SECTION_PAD_TOP * 0.55,
+            "aggregations",
+            fontsize=5.5, color=_C_MUTED, va="center",
+            fontfamily="sans-serif", fontstyle="italic", zorder=4,
         )
-        _draw_type_badge(ax, col_mid, cursor_y, type_name)
-        cursor_y -= _LINE_HEIGHT
 
-    # ── aggregation statistics ─────────────────────────────────────────────
-    if card.aggregation_variables:
-        cursor_y -= 0.05
+        row_y = cursor_y - _SECTION_PAD_TOP - _LH / 2
+        for attr in card.aggregation_attributes:
+            _attr_line(ax, x, row_y, attr)
+            row_y -= _LH
+        cursor_y = agg_y
+
+    # ── circuit stats compartment ─────────────────────────────────────────
+    stats_h = _section_height(2)
+    stats_y = cursor_y - stats_h
+    _rect(ax, x, stats_y, w, stats_h, _C_CIRCUIT_BG, border=False)
+    _divider(ax, x, cursor_y, w)
+
+    ax.text(
+        x + 0.14, cursor_y - _SECTION_PAD_TOP * 0.55,
+        "circuit",
+        fontsize=5.5, color=_C_MUTED, va="center",
+        fontfamily="sans-serif", fontstyle="italic", zorder=4,
+    )
+
+    stats_row_y = cursor_y - _SECTION_PAD_TOP - _LH / 2
+    for label, value in [("clusters", card.num_clusters), ("leaves", card.num_leaves)]:
         ax.text(
-            x + 0.18,
-            cursor_y,
-            "Aggregation statistics",
-            fontsize=6.5,
-            fontweight="bold",
-            color="#566573",
-            va="center",
-            zorder=4,
+            x + 0.22, stats_row_y,
+            f"{label}",
+            fontsize=6.5, color=_C_TEXT, va="center", ha="left",
+            fontfamily="sans-serif", zorder=4,
         )
-        cursor_y -= _LINE_HEIGHT * 0.7
-
-        for display_name, type_name in card.aggregation_variables:
-            ax.text(
-                x + 0.25,
-                cursor_y,
-                f"• {display_name}",
-                fontsize=6.0,
-                color="#2C3E50",
-                va="center",
-                fontfamily=_FONT_FAMILY,
-                zorder=4,
-            )
-            _draw_type_badge(ax, col_mid, cursor_y, type_name)
-            cursor_y -= _LINE_HEIGHT
+        ax.text(
+            x + w - 0.22, stats_row_y,
+            str(value),
+            fontsize=6.5, color=_C_MUTED, va="center", ha="right",
+            fontfamily="sans-serif", fontweight="bold", zorder=4,
+        )
+        stats_row_y -= _LH
 
 
-def _draw_arrow(ax, parent: _CardData, child: _CardData) -> None:
-    """Draw a labeled arrow from the bottom of *parent* to the top of *child*."""
+def _diamond(ax, x: float, y: float, size: float = 0.18) -> None:
+    """Draw a filled composition diamond centred at (x, y)."""
+    pts = np.array([
+        [x, y + size],          # top
+        [x + size * 0.55, y],   # right
+        [x, y - size],          # bottom
+        [x - size * 0.55, y],   # left
+    ])
+    ax.fill(pts[:, 0], pts[:, 1], color=_C_ARROW, zorder=5)
+
+
+def _draw_relation(ax, parent: _CardData, child: _CardData) -> None:
+    """
+    Draw a UML composition arrow from *parent* to *child*.
+
+    Uses a filled diamond on the parent end (composition) and an open
+    arrowhead on the child end, with ``1`` and ``*`` multiplicities and
+    the relation field name on the line.
+    """
+    # anchor points: bottom-centre of parent, top-centre of child
     px = parent.x + parent.width / 2
-    py = parent.y  # bottom of parent
-
+    py = parent.y
     cx = child.x + child.width / 2
-    cy = child.y + child.height  # top of child
+    cy = child.y + child.height
 
-    arrow = FancyArrowPatch(
-        (px, py),
-        (cx, cy),
-        arrowstyle="-|>",
-        color=_COLOR_ARROW,
-        linewidth=1.2,
-        mutation_scale=10,
-        connectionstyle="arc3,rad=0.0",
-        zorder=1,
-    )
-    ax.add_patch(arrow)
-
-    mid_x = (px + cx) / 2
+    # elbow: straight vertical segments joined by a horizontal if needed
     mid_y = (py + cy) / 2
 
-    label = child.relation_name or ""
-    ax.text(
-        mid_x + 0.15,
-        mid_y,
-        f"{label}  1:N",
-        fontsize=6.5,
-        color=_COLOR_RELATION_LABEL,
-        va="center",
-        fontweight="bold",
-        fontfamily=_FONT_FAMILY,
+    if abs(px - cx) < 0.01:
+        # perfectly vertical — single straight line
+        line_xs = [px, cx]
+        line_ys = [py, cy]
+    else:
+        # L-shaped elbow
+        line_xs = [px, px, cx, cx]
+        line_ys = [py, mid_y, mid_y, cy]
+
+    ax.plot(line_xs, line_ys, color=_C_ARROW, linewidth=1.1, zorder=3,
+            solid_capstyle="round")
+
+    # open arrowhead at child end (pointing up into the child top)
+    ax.annotate(
+        "", xy=(cx, cy + 0.01), xytext=(cx, cy + 0.35),
+        arrowprops=dict(arrowstyle="-|>", color=_C_ARROW, lw=1.1,
+                        mutation_scale=10),
         zorder=4,
     )
+
+    # composition diamond at parent bottom
+    _diamond(ax, px, py)
+
+    # multiplicities
+    offset_x = 0.12
+    ax.text(px + offset_x, py - 0.22, "1",
+            fontsize=7, color=_C_MULT, va="center", fontweight="bold",
+            fontfamily="sans-serif", zorder=4)
+    ax.text(cx + offset_x, cy + 0.22, "*",
+            fontsize=9, color=_C_MULT, va="center", fontweight="bold",
+            fontfamily="sans-serif", zorder=4)
+
+    # relation field name on the elbow midpoint
+    label = child.relation_name or ""
+    label_x = (px + cx) / 2 + 0.15
+    label_y = mid_y if abs(px - cx) >= 0.01 else (py + cy) / 2
+    ax.text(label_x, label_y, label,
+            fontsize=6.5, color=_C_REL_NAME, va="center",
+            fontfamily="sans-serif", fontstyle="italic", fontweight="bold",
+            zorder=4)
 
 
 def _draw_tree(ax, card: _CardData) -> None:
-    """Recursively draw all cards and arrows."""
+    """Recursively draw all cards and relation arrows."""
     _draw_card(ax, card)
     for child in card.children:
-        _draw_arrow(ax, card, child)
+        _draw_relation(ax, card, child)
         _draw_tree(ax, child)
 
 
-def _collect_all(card: _CardData) -> list[_CardData]:
-    result = [card]
-    for child in card.children:
-        result.extend(_collect_all(child))
-    return result
-
-
-def _figure_bounds(cards: list[_CardData]) -> tuple[float, float, float, float]:
-    """Return (x_min, y_min, x_max, y_max) across all cards."""
-    xs = [c.x for c in cards]
-    ys = [c.y for c in cards]
-    x2s = [c.x + c.width for c in cards]
-    y2s = [c.y + c.height for c in cards]
-    return min(xs), min(ys), max(x2s), max(y2s)
-
-
-# ── legend ───────────────────────────────────────────────────────────────────
+# ── legend ────────────────────────────────────────────────────────────────────
 
 
 def _draw_legend(ax, x: float, y: float) -> None:
-    """Draw a small type-badge legend at (x, y)."""
-    ax.text(x, y + 0.3, "Variable types", fontsize=7, fontweight="bold", color="#566573")
+    """Draw a compact type legend."""
+    ax.text(x, y + 0.28, "Type notation:",
+            fontsize=7, color=_C_MUTED, va="center",
+            fontfamily="sans-serif", fontweight="bold")
     offset = 0.0
-    for type_name, label in _TYPE_LABELS.items():
-        color = _TYPE_COLORS[type_name]
-        ax.text(
-            x + offset,
-            y,
-            f" {label} ",
-            fontsize=6,
-            color="white",
-            va="center",
-            bbox=dict(boxstyle="round,pad=0.2", facecolor=color, edgecolor="none"),
-        )
-        ax.text(x + offset + 0.35, y, f"= {type_name}", fontsize=6, va="center", color="#2C3E50")
-        offset += 1.8
+    for type_name, short in _TYPE_SHORT.items():
+        color = _TYPE_COLOR[type_name]
+        ax.text(x + offset, y, f"{short}",
+                fontsize=7, color=color, va="center",
+                fontfamily="sans-serif", fontstyle="italic",
+                bbox=dict(boxstyle="round,pad=0.2", facecolor="#F0F0F0",
+                          edgecolor=color, linewidth=0.8))
+        ax.text(x + offset + 0.32, y, f"= {type_name}   ",
+                fontsize=7, color=_C_MUTED, va="center",
+                fontfamily="sans-serif")
+        offset += 2.1
 
 
-# ── public API ───────────────────────────────────────────────────────────────
+# ── public API ────────────────────────────────────────────────────────────────
 
 
 @dataclass
 class RSPNPosterPlotter:
     """
-    Generates a poster-style SVG diagram for a fitted
+    Generates a UML-style class diagram for a fitted
     :class:`~probabilistic_model.probabilistic_circuit.relational.rspn.RelationalProbabilisticCircuit`.
 
-    The diagram shows each class in the relational hierarchy as an annotated
-    card listing its scalar features, aggregation statistics, and circuit
-    summary (variable count, cluster count).  Cards are connected by labeled
-    arrows that indicate the relation field name and ``1:N`` multiplicity.
+    Each class in the relational hierarchy is drawn as a compartmented box:
+
+    - **Header**: stereotype ``<<circuit>>`` and class name.
+    - **Scalar attributes**: one ``name : type`` line per modelled feature.
+    - **Aggregation statistics**: computed summaries over child collections.
+    - **Circuit**: cluster count (mixture components) and leaf count.
+
+    Classes are connected by UML composition arrows (filled diamond on the
+    parent, open arrowhead on the child) labelled with the relation field
+    name and ``1 / *`` multiplicities.
 
     .. note::
-        The RSPN must be fitted (i.e. :meth:`fit` must have been called)
-        before this plotter can be used.
+        The RSPN must be fitted before this plotter can be used.
 
     Example usage::
 
         plotter = RSPNPosterPlotter(rspn)
-        plotter.save("rspn_poster.svg")
+        plotter.save("rspn_diagram.svg")
     """
 
     rspn: RelationalProbabilisticCircuit
     """The fitted relational probabilistic circuit to visualise."""
 
-    padding: float = 0.8
+    padding: float = 0.9
     """White-space margin around the diagram in figure units."""
 
     dpi: int = 150
-    """Resolution used when rasterising (ignored for SVG output)."""
+    """Resolution used for raster formats (ignored for SVG)."""
 
     def _build(self) -> Figure:
         """Construct and return the matplotlib figure."""
-        root_card = _extract_card(self.rspn, None, set())
-        tree_w = _subtree_width(root_card)
-        tree_h = _total_tree_height(root_card)
+        root = _extract(self.rspn, None, set())
+        tree_w = _subtree_width(root)
+        _place(root, tree_w / 2.0, 0.0)
 
-        _place_cards(root_card, tree_w / 2.0, 0.0)
-
-        all_cards = _collect_all(root_card)
-        x_min, y_min, x_max, y_max = _figure_bounds(all_cards)
+        all_cards = _collect(root)
+        x0, y0, x1, y1 = _bounds(all_cards)
 
         pad = self.padding
-        fig_w = (x_max - x_min) + 2 * pad
-        fig_h = (y_max - y_min) + 2 * pad + 1.0  # +1 for legend
+        fig_w = (x1 - x0) + 2 * pad
+        fig_h = (y1 - y0) + 2 * pad + 0.9  # bottom margin for legend
 
         fig, ax = plt.subplots(figsize=(fig_w, fig_h), dpi=self.dpi)
-        ax.set_xlim(x_min - pad, x_max + pad)
-        ax.set_ylim(y_min - pad - 0.9, y_max + pad)
+        ax.set_xlim(x0 - pad, x1 + pad)
+        ax.set_ylim(y0 - pad - 0.8, y1 + pad)
         ax.set_aspect("equal")
         ax.axis("off")
-        fig.patch.set_facecolor("#F8F9FA")
+        fig.patch.set_facecolor("white")
 
-        # title
+        # diagram title
         ax.text(
-            (x_min + x_max) / 2,
-            y_max + pad * 0.6,
-            f"Relational Probabilistic Circuit — {self.rspn.class_.__name__}",
-            fontsize=12,
-            fontweight="bold",
-            color=_COLOR_HEADER,
-            ha="center",
-            va="center",
+            (x0 + x1) / 2, y1 + pad * 0.65,
+            f"Relational Probabilistic Circuit  —  {self.rspn.class_.__name__}",
+            fontsize=11, fontweight="bold", color=_C_HEADER_BG,
+            ha="center", va="center", fontfamily="sans-serif",
         )
 
-        _draw_tree(ax, root_card)
-        _draw_legend(ax, x_min, y_min - pad * 0.5)
+        _draw_tree(ax, root)
+        _draw_legend(ax, x0, y0 - pad * 0.55)
 
-        fig.tight_layout(pad=0.2)
+        fig.tight_layout(pad=0.1)
         return fig
 
     def save(self, path: str) -> None:
         """
-        Render and save the poster to *path*.
+        Render and save the diagram.
 
-        The output format is inferred from the file extension.  Use ``.svg``
-        for a lossless vector graphic, or ``.png`` / ``.pdf`` for raster /
-        print formats.
+        The output format is inferred from the file extension
+        (``.svg``, ``.png``, ``.pdf``).
 
-        :param path: Destination file path, e.g. ``"rspn_poster.svg"``.
+        :param path: Destination file path.
         """
         fig = self._build()
-        fig.savefig(path, format=path.rsplit(".", 1)[-1], bbox_inches="tight")
+        fig.savefig(path, format=path.rsplit(".", 1)[-1], bbox_inches="tight",
+                    facecolor=fig.get_facecolor())
         plt.close(fig)
 
     def show(self) -> None:
-        """
-        Render and display the poster interactively.
-
-        Calls :func:`matplotlib.pyplot.show`; behaviour depends on the
-        active matplotlib backend.
-        """
+        """Display the diagram interactively via :func:`matplotlib.pyplot.show`."""
         matplotlib.use("TkAgg")
         fig = self._build()
         plt.show()
