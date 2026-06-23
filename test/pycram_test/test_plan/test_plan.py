@@ -18,6 +18,7 @@ from probabilistic_model.probabilistic_circuit.rx.helper import fully_factorized
 from pycram.datastructures.dataclasses import Context
 from pycram.datastructures.enums import TaskStatus, ApproachDirection, VerticalAlignment
 from pycram.exceptions import MotionDidNotFinish
+from pycram.plans.failures import EmptyUnderspecified
 from pycram.language import CodeNode
 from pycram.motion_executor import simulated_robot
 from pycram.plans.executables import GiskardExecutable
@@ -545,7 +546,6 @@ def test_parameterization_of_pick_up(apartment_world_pr2_copy_with_context):
             end_effector=variable(EndEffector, world.semantic_annotations),
         ),
     )
-    pick_up_description.resolve()
 
     parameters = UnderspecifiedParameters(pick_up_description)
 
@@ -569,7 +569,7 @@ def test_parameterization_of_pick_up(apartment_world_pr2_copy_with_context):
     with simulated_robot:
         try:
             plan.perform()
-        except MotionDidNotFinish:
+        except EmptyUnderspecified:
             pass
 
 
