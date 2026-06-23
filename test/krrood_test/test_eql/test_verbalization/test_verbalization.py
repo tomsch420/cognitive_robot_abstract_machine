@@ -1963,7 +1963,7 @@ def test_inference_planner_decomposes_rule_without_rendering(
 
     # The planner only collects each antecedent's raw conditions; choosing the surface form
     # (whose / standalone) is the condition-form registry's concern at render time.
-    from krrood.entity_query_language.verbalization.grammar.conditions.forms import (
+    from krrood.entity_query_language.verbalization.grammar.conditions.placement import (
         ConditionForm,
         Placement,
         Slot,
@@ -1990,7 +1990,7 @@ def test_query_planner_collects_subject_restriction_without_placing():
         QueryPlanner,
         SelectionKind,
     )
-    from krrood.entity_query_language.verbalization.grammar.conditions.forms import (
+    from krrood.entity_query_language.verbalization.grammar.conditions.placement import (
         ConditionForm,
         Placement,
         Slot,
@@ -2395,7 +2395,7 @@ def test_second_domain_calc_equality_in_whose():
 
 
 def test_is_calculation_value_predicate():
-    from krrood.entity_query_language.verbalization.subquery import is_calculation_value
+    from krrood.entity_query_language.query.aggregation_structure import is_calculation_value
 
     bank_transaction = variable(BankTransaction, domain=None)
     assert is_calculation_value(eql.max(bank_transaction.amount_details.amount)) is True

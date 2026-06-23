@@ -21,10 +21,10 @@ from krrood.entity_query_language.operators.core_logical_operators import (
 from krrood.entity_query_language.query.quantifiers import The
 from krrood.entity_query_language.query.query import Entity, Query, SetOf
 from krrood.entity_query_language.verbalization.grammar.framework.planner import Planner
-from krrood.entity_query_language.verbalization.grammar.conditions.restriction import (
+from krrood.entity_query_language.verbalization.grammar.conditions.subject import (
     restriction_subject,
 )
-from krrood.entity_query_language.verbalization.subquery import (
+from krrood.entity_query_language.query.aggregation_structure import (
     aggregation_leaf_attribute,
     aggregation_source_root,
     is_aggregation_subquery,
@@ -151,7 +151,13 @@ class ReportPlan:
 
     @property
     def is_grouped(self) -> bool:
-        """:return: ``True`` when the report has a GROUP BY (the *"for each …"* frame applies)."""
+        """:return: ``True`` when the report has a GROUP BY (the *"for each …"* frame applies).
+
+        >>> ReportPlan(kind=ReportKind.AGGREGATION).is_grouped
+        False
+        >>> ReportPlan(kind=ReportKind.AGGREGATION, group_keys=['department']).is_grouped
+        True
+        """
         return bool(self.group_keys)
 
 
@@ -212,7 +218,11 @@ class QueryPlanner(Planner[Query, QueryPlan]):
     """
 
     def plan(self) -> QueryPlan:
-        """:return: The plan: selection shape, definiteness, restriction partition, aggregation."""
+        """:return: The plan: selection shape, definiteness, restriction partition, aggregation.
+
+        >>> QueryPlanner(entity(variable(Robot, []))).plan().kind.name
+        'SUBJECT'
+        """
         self.node.build()
         ranking = self._ranking()
         return QueryPlan(
@@ -305,6 +315,11 @@ class QueryPlanner(Planner[Query, QueryPlan]):
         return getattr(self.node, "selected_variable", None)
 
     def _kind(self) -> SelectionKind:
+        """:return: The selection kind — ``SET_OF``, ``ENTITY_SELECTOR``, ``EMPTY`` or ``SUBJECT``.
+
+        >>> QueryPlanner(entity(variable(Robot, []))).plan().kind
+        <SelectionKind.SUBJECT: 3>
+        """
         if isinstance(self.node, SetOf):
             return SelectionKind.SET_OF
         selected = self._selected
@@ -315,10 +330,22 @@ class QueryPlanner(Planner[Query, QueryPlan]):
         return SelectionKind.SUBJECT
 
     def _is_the(self) -> bool:
+        """:return: ``True`` when the query is quantified by ``the`` (a uniqueness claim).
+
+        >>> QueryPlanner(the(entity(variable(Robot, [])))).plan().is_the
+        True
+        >>> QueryPlanner(entity(variable(Robot, []))).plan().is_the
+        False
+        """
         builder = getattr(self.node, "_quantifier_builder_", None)
         return builder is not None and builder.type is The
 
     def _selected_type(self) -> str:
+        """:return: The display name of the selected entity's type (*"Robot"*).
+
+        >>> QueryPlanner(entity(variable(Robot, []))).plan().selected_type
+        'Robot'
+        """
         return FallbackNouns.ENTITY.name_of(self._selected)
 
     # ── subject restriction (WHERE partition) ────────────────────────────────

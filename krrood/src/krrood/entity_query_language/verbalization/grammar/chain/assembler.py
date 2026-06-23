@@ -57,6 +57,9 @@ class ChainAssembler(Assembler[MappedVariable, ChainPlan]):
         :param node: The chain to render.
         :param plan: The chain plan computed for *node*.
         :return: The possessive rendering — the unguarded default form.
+
+        >>> verbalize_expression(variable(Robot, []).battery)
+        'the battery of a Robot'
         """
         return self.possessive(plan)
 
@@ -68,6 +71,9 @@ class ChainAssembler(Assembler[MappedVariable, ChainPlan]):
         :return: The possessive path *"the attribute of the Root"*; for a variable root, deferred to
             the coreference pass as a :class:`PossessiveChain` (it knows whether the root is the
             current discourse subject, for *"its …"*).
+
+        >>> verbalize_expression(variable(Task, []).name)
+        'the name of a Task'
         """
         root_fragment = self._chain_root(plan.root)
         if isinstance(plan.root, Variable):
@@ -84,6 +90,9 @@ class ChainAssembler(Assembler[MappedVariable, ChainPlan]):
         :param plan: The analysed chain (a single attribute on a variable — see
             :attr:`ChainPlan.is_single_variable_attribute`).
         :return: The bare plural *"attributes of Roots"*.
+
+        >>> verbalize_expression(sum(variable(Robot, []).battery))
+        'the sum of batteries of Robots'
         """
         attribute = plan.chain[0]
         # The root's plural noun phrase ("Robots" / "Robot 2") is the variable rule's job; recurse
@@ -104,6 +113,9 @@ class ChainAssembler(Assembler[MappedVariable, ChainPlan]):
         :return: The noun phrase for the chain root. Recursed in ``inline`` position, so an entity
             root is dispatched to the inline-noun form and anything else renders normally — the
             chain assembler doesn't decide which, nor call the query assembler.
+
+        >>> verbalize_expression(variable(Mission, []).assigned_to)
+        'the Robot to which a Mission is assigned'
         """
         return self.context.child(root, inline=True)
 
@@ -113,6 +125,9 @@ class ChainAssembler(Assembler[MappedVariable, ChainPlan]):
             :attr:`ChainPlan.is_boolean_terminal`).
         :param negated: Whether to negate the predicative.
         :return: The predicative *"<navigation> is [not] <attribute>"*.
+
+        >>> verbalize_expression(variable(Robot, []).operational)
+        'a Robot is operational'
         """
         navigation_fragment, attribute_fragment = self._boolean_parts(plan)
         copula = Copulas.IS_NOT.as_fragment() if negated else Copulas.IS.as_fragment()
@@ -124,6 +139,9 @@ class ChainAssembler(Assembler[MappedVariable, ChainPlan]):
         :return: The unconstrained-boolean predicative *"<navigation> is either <attribute> or not"* —
             for a boolean attribute compared to a domain holding both ``True`` and ``False`` (the
             value is left open, so neither polarity is asserted).
+
+        >>> verbalize_expression(variable(Task, []).completed == variable(bool, [True, False]))
+        'a Task is either completed or not'
         """
         navigation_fragment, attribute_fragment = self._boolean_parts(plan)
         return PhraseFragment(
@@ -147,6 +165,9 @@ class ChainAssembler(Assembler[MappedVariable, ChainPlan]):
         the recursion supplies its surface form (root *"a Mission"*, ordinal *"the first of …"*,
         relational *"the Robot to which a Mission is assigned"*) and — crucially — pronominalises it
         to the discourse subject (*"the Robot to which it is assigned"*) when one is in scope.
+
+        >>> verbalize_expression(variable(Worker, []).tasks[0].completed)
+        'the first of the tasks of a Worker is completed'
         """
         terminal = plan.chain[-1]
         navigation_fragment = self.context.child(terminal._child_, inline=True)

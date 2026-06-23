@@ -27,8 +27,10 @@ from krrood.entity_query_language.verbalization.grammar.conditions.recognition i
     is_concrete_object_literal,
     is_none_literal,
     references,
-    relational_verb_phrase,
     single_hop_attribute,
+)
+from krrood.entity_query_language.verbalization.relational_attributes import (
+    relational_verb_phrase,
 )
 from krrood.entity_query_language.verbalization.morphology import is_past_participle
 from krrood.entity_query_language.verbalization.pipeline import verbalize_expression
