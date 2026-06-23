@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing_extensions import List
+from typing_extensions import List, Optional
 
 from krrood.entity_query_language.verbalization.navigation_path import PathStep
 from krrood.entity_query_language.verbalization.fragments.base import (
@@ -16,6 +16,9 @@ from krrood.entity_query_language.verbalization.fragments.features import (
     Number,
 )
 from krrood.entity_query_language.verbalization.fragments.roles import SemanticRole
+from krrood.entity_query_language.verbalization.vocabulary.countability import (
+    NounCountability,
+)
 from krrood.entity_query_language.verbalization.vocabulary.english import (
     Articles,
     Conjunctions,
@@ -44,8 +47,21 @@ def attribute_fragment(
     )
 
 
+def _genitive_article(step: PathStep) -> Optional[Fragment]:
+    """:return: the article introducing a genitive hop — none for a mass noun (*"the amount of
+    money"*, never *"the amount of the money"*), else the definite *"the"*.
+
+    A genitive hop is a fresh, non-anaphoric description of an attribute, so a mass-noun hop reads
+    in its bare generic form; only countable hops take *"the"*.
+    """
+    if NounCountability().is_uncountable(step.name):
+        return None
+    return Articles.THE.as_fragment()
+
+
 def _genitive_step(step: PathStep, owner_fragment: Fragment) -> Fragment:
-    """:return: *"the <attribute> of <owner>"* — one plain (noun) hop wrapping its owner.
+    """:return: *"the <attribute> of <owner>"* — one plain (noun) hop wrapping its owner; a mass-noun
+    hop drops the article (*"… of money of …"*).
 
     This is the genitive case specifically: it lays down *the … of …* around the owner, so the
     *battery* hop on *Robot* reads *the battery of Robot* (a relational hop would instead route
@@ -55,9 +71,10 @@ def _genitive_step(step: PathStep, owner_fragment: Fragment) -> Fragment:
     >>> flatten_fragment_to_plain_text(_genitive_step(PathStep("battery"), WordFragment(text="Robot")))
     'the battery of Robot'
     """
+    article = _genitive_article(step)
     return PhraseFragment(
         parts=[
-            Articles.THE.as_fragment(),
+            *([article] if article is not None else []),
             attribute_fragment(step),
             Prepositions.OF.as_fragment(),
             owner_fragment,
