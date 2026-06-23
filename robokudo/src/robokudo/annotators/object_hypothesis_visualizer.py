@@ -116,7 +116,7 @@ class ObjectHypothesisVisualizer(BaseAnnotator):
         font: int = cv2.FONT_HERSHEY_SIMPLEX,
         font_scale: float = 1.0,
         thickness: int = 2,
-    ):
+    ) -> None:
         """Draw text in the middle of an image.
 
         :param image: Image to draw on

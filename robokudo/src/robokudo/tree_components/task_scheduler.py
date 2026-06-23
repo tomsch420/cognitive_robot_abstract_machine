@@ -19,6 +19,7 @@ from py_trees.common import Status
 from py_trees.composites import Sequence
 from typing_extensions import List, Optional
 
+from robokudo.defs import PACKAGE_NAME
 from robokudo.utils.error_handling import catch_and_raise_to_blackboard
 from robokudo.utils.tree import (
     add_child_to_parent,
@@ -52,10 +53,10 @@ class TaskSchedulerBase(Behaviour):
         """
         super().__init__(name)
 
-        self.logger: logging.Logger = logging.getLogger(__name__)
+        self.rk_logger: logging.Logger = logging.getLogger(PACKAGE_NAME)
         """Logger for this class."""
 
-        self.logger.debug("%s.__init__()" % self.__class__.__name__)
+        self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
 
         self.fix_parent_relationships_after_plan: bool = True
         """Whether to fix parent relationships after planning"""
@@ -68,7 +69,7 @@ class TaskSchedulerBase(Behaviour):
 
         :raises AssertionError: If parent is not a Sequence or if the first child is not the scheduler
         """
-        self.logger.debug("%s.initialise()" % self.__class__.__name__)
+        self.rk_logger.debug("%s.initialise()" % self.__class__.__name__)
 
         # Make sanity checks that we are in a correctly configured environment
         parent = self.parent
@@ -105,7 +106,9 @@ class TaskSchedulerBase(Behaviour):
         new_job = self.plan_new_job()
 
         if new_job is None:
-            self.logger.debug("Couldn't find solution for Job Scheduling. Aborting...")
+            self.rk_logger.debug(
+                "Couldn't find solution for Job Scheduling. Aborting..."
+            )
             self.feedback_message = (
                 "Couldn't find solution for Job Scheduling. Aborting..."
             )
