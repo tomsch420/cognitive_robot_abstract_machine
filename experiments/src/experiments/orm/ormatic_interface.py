@@ -31,7 +31,7 @@ import coraplex.language_giskard_templates
 import coraplex.locations.backends
 import coraplex.locations.base
 import coraplex.locations.pose_validator
-import coraplex.motion_executor
+import coraplex.execution_environment
 import coraplex.orm.model
 import coraplex.perception
 import coraplex.plans.attachment_nodes

@@ -34,7 +34,7 @@ from coraplex.datastructures.enums import (
 )
 from coraplex.exceptions import MotionDidNotFinish
 from coraplex.language import CodeNode
-from coraplex.motion_executor import simulated_robot
+from coraplex.execution_environment import simulated_robot
 from coraplex.orm.ormatic_interface import *  # type: ignore
 from coraplex.plans.factories import code, sequential, parallel, execute_single
 

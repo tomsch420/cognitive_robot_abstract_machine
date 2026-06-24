@@ -26,12 +26,12 @@ import coraplex.datastructures.grasp
 import coraplex.datastructures.grasp_scoring
 import coraplex.datastructures.trajectory
 import coraplex.exceptions
+import coraplex.execution_environment
 import coraplex.language
 import coraplex.language_giskard_templates
 import coraplex.locations.backends
 import coraplex.locations.base
 import coraplex.locations.pose_validator
-import coraplex.motion_executor
 import coraplex.orm.model
 import coraplex.perception
 import coraplex.plans.attachment_nodes
@@ -308,25 +308,6 @@ class AreReachableByDAO_pose_sequence_association(Base, AssociationDataAccessObj
 
     target: Mapped[PoseMappingDAO] = relationship(
         "PoseMappingDAO", foreign_keys=[target_posemappingdao_id], lazy="selectin"
-    )
-
-
-class MotionExecutorDAO_motions_association(Base, AssociationDataAccessObject):
-    __tablename__ = "_49684117974867564339412077050868075484548464831612793739254217"
-
-    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
-
-    source_motionexecutordao_id: Mapped[int] = mapped_column(
-        ForeignKey("MotionExecutorDAO.database_id")
-    )
-    target_motionstatechartnodedao_id: Mapped[int] = mapped_column(
-        ForeignKey("MotionStatechartNodeDAO.database_id")
-    )
-
-    target: Mapped[MotionStatechartNodeDAO] = relationship(
-        "MotionStatechartNodeDAO",
-        foreign_keys=[target_motionstatechartnodedao_id],
-        lazy="selectin",
     )
 
 
@@ -2778,6 +2759,22 @@ class UnknownExecutionTypeDAO(
     )
 
 
+class ExecutionEnvironmentDAO(
+    Base, DataAccessObject[coraplex.execution_environment.ExecutionEnvironment]
+):
+    __tablename__ = "ExecutionEnvironmentDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    execution_type: Mapped[coraplex.datastructures.enums.ExecutionType] = mapped_column(
+        krrood.ormatic.custom_types.PolymorphicEnumType,
+        nullable=False,
+        use_existing_column=True,
+    )
+
+
 class LocationDAO(Base, DataAccessObject[coraplex.locations.base.Location]):
     __tablename__ = "LocationDAO"
 
@@ -3177,59 +3174,6 @@ class IsVisibleByDAO(
         "inherit_condition": database_id == PoseValidatorDAO.database_id,
         "polymorphic_load": "selectin",
     }
-
-
-class ExecutionEnvironmentDAO(
-    Base, DataAccessObject[coraplex.motion_executor.ExecutionEnvironment]
-):
-    __tablename__ = "ExecutionEnvironmentDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        Integer, primary_key=True, use_existing_column=True
-    )
-
-    execution_type: Mapped[coraplex.datastructures.enums.ExecutionType] = mapped_column(
-        krrood.ormatic.custom_types.PolymorphicEnumType,
-        nullable=False,
-        use_existing_column=True,
-    )
-
-
-class MotionExecutorDAO(
-    Base, DataAccessObject[coraplex.motion_executor.MotionExecutor]
-):
-    __tablename__ = "MotionExecutorDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        Integer, primary_key=True, use_existing_column=True
-    )
-
-    world_id: Mapped[int] = mapped_column(
-        ForeignKey("WorldMappingDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
-    plan_node_id: Mapped[int] = mapped_column(
-        ForeignKey("PlanNodeDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
-
-    motions: Mapped[builtins.list[MotionExecutorDAO_motions_association]] = (
-        relationship(
-            "MotionExecutorDAO_motions_association",
-            collection_class=builtins.list,
-            cascade="all, delete-orphan",
-            foreign_keys="[MotionExecutorDAO_motions_association.source_motionexecutordao_id]",
-            lazy="selectin",
-        )
-    )
-    world: Mapped[WorldMappingDAO] = relationship(
-        "WorldMappingDAO", uselist=False, foreign_keys=[world_id], post_update=True
-    )
-    plan_node: Mapped[PlanNodeDAO] = relationship(
-        "PlanNodeDAO", uselist=False, foreign_keys=[plan_node_id], post_update=True
-    )
 
 
 class PlanEdgeDAO(Base, DataAccessObject[coraplex.orm.model.PlanEdge]):
@@ -4261,22 +4205,11 @@ class ActionNodeDAO(
         nullable=True,
         use_existing_column=True,
     )
-    motion_executor_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
-        ForeignKey("MotionExecutorDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
 
     execution_data: Mapped[ExecutionDataDAO] = relationship(
         "ExecutionDataDAO",
         uselist=False,
         foreign_keys=[execution_data_id],
-        post_update=True,
-    )
-    motion_executor: Mapped[MotionExecutorDAO] = relationship(
-        "MotionExecutorDAO",
-        uselist=False,
-        foreign_keys=[motion_executor_id],
         post_update=True,
     )
 

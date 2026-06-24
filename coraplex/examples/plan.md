@@ -22,10 +22,10 @@ are associated with a designator and can be performed by the robot.
 We will now go through a simple example of how to create a plan using the CoraPlex language. To create a plan you always 
 need a language expression.
 
-# Setup a World 
+# Setup a World
 
 ```python
-from coraplex.motion_executor import simulated_robot
+from coraplex.execution_environment import simulated_robot
 from coraplex.testing import setup_world
 from coraplex.datastructures.dataclasses import Context
 from semantic_digital_twin.robots.pr2 import PR2

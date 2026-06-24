@@ -16,7 +16,7 @@ from coraplex.locations.factories import (
     accessing_location,
     giskard_reachability_location,
 )
-from coraplex.motion_executor import simulated_robot
+from coraplex.execution_environment import simulated_robot
 from coraplex.plans.factories import sequential
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction, MoveTorsoAction
 from coraplex.view_manager import ViewManager

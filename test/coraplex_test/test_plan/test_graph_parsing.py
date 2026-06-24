@@ -1,6 +1,6 @@
 from coraplex.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
 from coraplex.datastructures.grasp import GraspDescription
-from coraplex.motion_executor import simulated_robot
+from coraplex.execution_environment import simulated_robot
 from coraplex.plans.attachment_nodes import ModelChangeNode
 from coraplex.plans.executables import GiskardExecutable, ModelChangeExecutable
 from coraplex.plans.factories import execute_single, sequential
@@ -293,9 +293,7 @@ def test_split_by_type_groups_consecutive_elements(immutable_model_world):
 
     assert [len(group) for group in splitted_list] == [2, 1, 1]
     assert splitted_list[1] == [model_change]
-    assert all(
-        not isinstance(element, ModelChangeNode) for element in splitted_list[0]
-    )
+    assert all(not isinstance(element, ModelChangeNode) for element in splitted_list[0])
 
 
 def test_split_by_type_leading_and_trailing_match(immutable_model_world):

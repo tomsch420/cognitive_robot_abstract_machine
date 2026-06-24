@@ -13,7 +13,6 @@ from coraplex.plans.designator import Designator
 from krrood.entity_query_language.query.match import Match
 from coraplex.datastructures.enums import TaskStatus
 from coraplex.datastructures.execution_data import ExecutionData
-from coraplex.motion_executor import MotionExecutor
 from coraplex.plans.executables import (
     Executable,
     GiskardExecutable,
@@ -511,11 +510,6 @@ class ActionNode(DesignatorNode):
     execution_data: Optional[ExecutionData] = None
     """
     Additional data that is collected before and after the execution of the action.
-    """
-
-    motion_executor: Optional[MotionExecutor] = None
-    """
-    Instance of the MotionExecutor used to execute the motion chart of the sub-motions of this action.
     """
 
     _last_world_modification_block_pre_perform_index: Optional[int] = None

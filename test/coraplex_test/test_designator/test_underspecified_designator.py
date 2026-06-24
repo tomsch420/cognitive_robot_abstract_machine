@@ -12,7 +12,7 @@ from coraplex.datastructures.enums import (
 from coraplex.datastructures.grasp import GraspDescription
 
 from coraplex.language import SequentialNode
-from coraplex.motion_executor import simulated_robot
+from coraplex.execution_environment import simulated_robot
 from coraplex.plans.factories import sequential, execute_single
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.pick_up import PickUpAction

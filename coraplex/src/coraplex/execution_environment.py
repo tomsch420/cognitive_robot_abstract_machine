@@ -2,59 +2,11 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import List, Any
 
-from typing_extensions import TYPE_CHECKING
-
-from giskardpy.motion_statechart.graph_node import MotionStatechartNode
-from giskardpy.motion_statechart.motion_statechart import (
-    MotionStatechart,
-)
 from coraplex.datastructures.enums import ExecutionType
 from coraplex.plans.executables import GiskardExecutable
 
-from semantic_digital_twin.world import World
-
-if TYPE_CHECKING:
-    from coraplex.plans.plan_node import PlanNode
-
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class MotionExecutor:
-    """
-    Deprecated: The construction and execution of the motion state chart moved to
-    :py:class:`pycram.plans.executables.GiskardExecutable`.
-    This class only remains for the generated ORM interface.
-    """
-
-    motions: List[MotionStatechartNode]
-    """
-    The motions to execute.
-    """
-
-    world: World
-    """
-    The world in which the motions should be executed.
-    """
-
-    motion_state_chart: MotionStatechart = field(init=False)
-    """
-    Giskard's motion state chart that is created from the motions.
-    """
-
-    ros_node: Any = field(kw_only=True, default=None)
-    """
-    ROS node that should be used for communication.
-
-    Only relevant for real execution.
-    """
-
-    plan_node: PlanNode = field(kw_only=True)
-    """
-    The plan node that created this executor.
-    """
 
 
 @dataclass
