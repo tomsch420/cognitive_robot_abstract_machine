@@ -17,7 +17,10 @@ from krrood.entity_query_language.verbalization.fragments.source_reference impor
 )
 from krrood.entity_query_language.verbalization.navigation_path import PathStep
 from krrood.entity_query_language.verbalization.exceptions import UnloweredFragmentError
-from krrood.entity_query_language.verbalization.value_lexicon import value_phrase
+from krrood.entity_query_language.verbalization.value_lexicon import (
+    type_noun,
+    value_phrase,
+)
 
 _T = TypeVar("_T")
 
@@ -187,7 +190,7 @@ class RoleFragment(HasText, HasNumber, HasPolarity, Fragment):
             text=(
                 text
                 if text is not None
-                else (type_.__name__ if is_class else str(type_))
+                else (type_noun(type_) if is_class else str(type_))
             ),
             role=SemanticRole.VARIABLE,
             source_reference=SourceReference.for_type(type_) if is_class else None,

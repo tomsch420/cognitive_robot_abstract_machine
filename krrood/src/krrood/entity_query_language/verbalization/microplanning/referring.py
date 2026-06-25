@@ -10,6 +10,7 @@ from krrood.entity_query_language.core.mapped_variable import Attribute
 from krrood.entity_query_language.core.variable import Variable, Literal
 from krrood.entity_query_language.query.query import Entity, Query
 from krrood.entity_query_language.verbalization.fragments.features import Definiteness
+from krrood.entity_query_language.verbalization.value_lexicon import type_noun
 from krrood.entity_query_language.verbalization.relational_attributes import (
     relational_verb,
 )
@@ -173,18 +174,24 @@ class ReferringExpressions:
         'Robot'
         """
         if isinstance(node, Variable) and not isinstance(node, Literal):
-            return (
-                node._type_.__name__
-                if getattr(node, "_type_", None)
-                else node.__class__.__name__
-            )
+            return ReferringExpressions._variable_type_label(node)
         if (
             isinstance(node, Attribute)
             and relational_verb(node._attribute_name_) is not None
         ):
             value_type = getattr(node, "_type_", None)
-            return value_type.__name__ if isinstance(value_type, type) else None
+            return type_noun(value_type) if isinstance(value_type, type) else None
         return None
+
+    @staticmethod
+    def _variable_type_label(variable: Variable) -> str:
+        """:return: The display noun for *variable*'s type — the friendly type noun when it carries a
+        ``_type_`` (*"Integer"* for ``int``), else its own class name."""
+        return (
+            type_noun(variable._type_)
+            if getattr(variable, "_type_", None)
+            else variable.__class__.__name__
+        )
 
     def numbered_label(self, variable: Variable) -> NumberedLabel:
         """Records *variable* as introduced.
@@ -200,11 +207,7 @@ class ReferringExpressions:
         >>> referring.numbered_label(second).text
         'Robot 2'
         """
-        type_name = (
-            variable._type_.__name__
-            if getattr(variable, "_type_", None)
-            else variable.__class__.__name__
-        )
+        type_name = self._variable_type_label(variable)
         label = self.disambiguation_map.get(variable._id_, type_name)
         self.seen.add(variable._id_)
         return NumberedLabel(label, label != type_name)

@@ -166,7 +166,7 @@ def test_verbalization_produces_natural_language_not_repr():
 
 def test_verbalize_variable_first_mention():
     x = variable(int, [1, 2])
-    assert verbalize_expression(x) == "an int"
+    assert verbalize_expression(x) == "an Integer"
 
 
 def test_verbalize_variable_article_consonant():
@@ -826,19 +826,19 @@ def test_verbalize_not_complex_fallback():
 def test_verbalize_count():
     x = variable(int, [1, 2])
     text = verbalize_expression(eql.count(x))
-    assert "number of" in text and "ints" in text
+    assert "number of" in text and "Integers" in text
 
 
 def test_verbalize_average():
     x = variable(int, [1, 2])
     text = verbalize_expression(eql.average(x))
-    assert "average" in text and "ints" in text
+    assert "average" in text and "Integers" in text
 
 
 def test_verbalize_sum():
     x = variable(int, [1, 2])
     text = verbalize_expression(eql.sum(x))
-    assert "sum" in text and "ints" in text
+    assert "sum" in text and "Integers" in text
 
 
 def test_verbalize_max_min():
@@ -848,8 +848,8 @@ def test_verbalize_max_min():
     min_text = verbalize_expression(eql.min(x))
     assert "the maximum" in max_text
     assert "the minimum" in min_text
-    assert "int" in max_text
-    assert "int" in min_text
+    assert "Integer" in max_text
+    assert "Integer" in min_text
 
 
 def test_aggregation_article_count_first_mention():
