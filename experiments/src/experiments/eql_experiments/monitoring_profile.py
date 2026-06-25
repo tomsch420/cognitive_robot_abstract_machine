@@ -338,7 +338,22 @@ def run_ab_comparison(
                 overhead_vs_baseline_percent=overhead_percent,
             )
         )
-    return ExperimentsTable(rows)
+    return ExperimentsTable(
+        rows,
+        description=(
+            "Wall-clock overhead of EQL's two monitoring layers, measured over "
+            f"{iterations} iterations (after {warmups} warm-up passes) across four "
+            "query workloads (filter, multi-source join, aggregation, generative inference). "
+            "Three monitoring configurations are compared: "
+            "#emph[both_off] disables all monitoring and serves as the baseline; "
+            "#emph[monitoring_off] disables only the call-stack capture layer; "
+            "#emph[full] runs both the call-stack capture and evaluation-observer layers "
+            "as in normal operation. "
+            "Duration columns report mean ± standard deviation in milliseconds "
+            "per pass over all workloads; overhead columns are relative to the "
+            "#emph[both_off] baseline."
+        ),
+    )
 
 
 # %% Per-line profiling

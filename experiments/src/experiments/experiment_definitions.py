@@ -17,10 +17,11 @@ from krrood.class_diagrams.attribute_introspector import (
 @dataclass
 class MeanAndStandardDeviation:
     """
-    Class that represents a mean and standard deviation for tables that will be directly rendered as
-    mean +- standard deviation.
+    Class that represents a mean and standard deviation for tables that will be
+    directly rendered as mean +- standard deviation.
 
-    Use this in experiment results when you want to render a mean +- standard deviation.
+    Use this in experiment results when you want to render a mean +-
+    standard deviation.
     """
 
     mean: float
@@ -48,13 +49,13 @@ class MeanAndStandardDeviation:
 @dataclass
 class ExperimentResult:
     """
-    Class for results from experiments.
-    Use this when you want to create a table of results (measurements) from experiments for scientific articles.
+    Class for results from experiments. Use this when you want to create a
+    table of results (measurements) from experiments for scientific articles.
 
     This class is like a single row in a table of experiments.
 
-    Assumptions made here are that there are only built in like fields or one-to-one relationships with other
-    ExperimentResult classes.
+    Assumptions made here are that there are only built in like fields
+    or one-to-one relationships with other ExperimentResult classes.
     """
 
     @classmethod
@@ -67,7 +68,7 @@ class ExperimentResult:
         type_hints = get_type_hints_of_object(cls)
         for field_ in cls.introspector().discover(cls):
             resolved_type = type_hints[field_.field.name]
-            if issubclass(resolved_type, ExperimentResult):
+            if isinstance(resolved_type, type) and issubclass(resolved_type, ExperimentResult):
                 result.extend(resolved_type.recursive_fields())
             else:
                 result.append(field_)
@@ -84,14 +85,23 @@ class ExperimentResult:
 @dataclass
 class ExperimentsTable:
     """
-    A collection of experiments ready to be presented as a table in a scientific article.
+    A collection of experiments ready to be presented as a table in a
+    scientific article.
 
-    This class assumes that all rows in the table have the same type and are a subclass of ExperimentResult.
+    This class assumes that all rows in the table have the same type and
+    are a subclass of ExperimentResult.
     """
 
     experiments: list[ExperimentResult]
     """
     The list of experiments to be presented in the table.
+    """
+
+    description: str = ""
+    """
+    Optional prose caption explaining what the table represents.
+
+    Typically rendered at the bottom of a table as caption.
     """
 
     def __post_init__(self):
@@ -121,41 +131,53 @@ class TypstRenderer:
     """
 
     def render_row(self, row: ExperimentResult) -> str:
-        """Renders the cells of a single row in Typst format."""
+        """
+        Renders the cells of a single row in Typst format.
+        """
         return ", ".join([f"[{v}]" for v in row.get_column_values()])
 
     def render_table(self) -> str:
-        """Renders the entire ExperimentsTable into a valid Typst #table markup string."""
+        """
+        Render the table as Typst markup.
+
+        When :attr:`ExperimentsTable.description` is set, the table is
+        wrapped in a ``#figure`` with that text as the caption.
+        Otherwise a bare ``#table`` is returned.
+        """
         row_class = self.experiments_table.row_class
 
-        # Handle empty table edge-case gracefully
         if not row_class:
             return "#table()"
 
-        # 1. Extract headers and setup column configuration
         headers = row_class.get_column_names()
         columns_count = len(headers)
 
-        # 2. Build the Typst header block
         header_cells = ", ".join(
             [f"[*{name.replace('_', ' ').title()}*]" for name in headers]
         )
 
-        # 3. Build the rows content
         rows_content = []
         for row in self.experiments_table.experiments:
             rows_content.append(self.render_row(row))
 
         all_cells = header_cells
         if rows_content:
-            all_cells += ",\n  " + ",\n  ".join(rows_content)
+            all_cells += ",\n    " + ",\n    ".join(rows_content)
 
-        # 4. Construct complete Typst syntax block
-        typst_markup = (
-            f"#table(\n"
-            f"  columns: {columns_count},\n"
-            f"  align: center + horizon,\n"
-            f"  {all_cells}\n"
+        table_markup = (
+            f"table(\n"
+            f"    columns: {columns_count},\n"
+            f"    align: center + horizon,\n"
+            f"    {all_cells}\n"
+            f"  )"
+        )
+
+        if not self.experiments_table.description:
+            return f"#{table_markup}"
+
+        return (
+            f"#figure(\n"
+            f"  {table_markup},\n"
+            f"  caption: [{self.experiments_table.description}]\n"
             f")"
         )
-        return typst_markup

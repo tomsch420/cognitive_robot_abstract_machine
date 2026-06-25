@@ -413,7 +413,22 @@ def main():
         pbar.set_description(f"Running benchmark for partnet model {model_id}")
         results.append(_perform_benchmark_for_partnet_model(loader, model_id))
 
-    table = ExperimentsTable(results)
+    table = ExperimentsTable(
+        results,
+        description=(
+            "Graph of Convex Sets free-space pipeline performance across URDF indoor "
+            "environments and PartNet-Mobility articulated objects. "
+            "Each row corresponds to one environment; repeated pipeline phases "
+            "(free-space computation, materialisation, connectivity graph construction) "
+            "report mean ± standard deviation in milliseconds over three runs, "
+            "while world loading and the end-to-end call are measured once. "
+            "#emph[Obstacle count] is the number of axis-aligned bounding boxes "
+            "subtracted from the search space; #emph[free-space simple set count] is the "
+            "number of disjoint axis-aligned boxes in the resulting free region; "
+            "#emph[graph node count] and #emph[graph edge count] describe the "
+            "R-tree adjacency graph used for path planning."
+        ),
+    )
     print(TypstRenderer(table).render_table())
 
 

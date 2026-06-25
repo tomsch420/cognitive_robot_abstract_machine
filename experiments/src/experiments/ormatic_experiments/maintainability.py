@@ -180,7 +180,23 @@ def measure_maintainability(
 
 def main():
     result = measure_maintainability()
-    print(TypstRenderer(ExperimentsTable([result])).render_table())
+    table = ExperimentsTable(
+        [result],
+        description=(
+            "Maintainability metrics comparing the developer-authored ORMatic model files "
+            "against the auto-generated ORM interface for the CRAM codebase. "
+            "#emph[Maintained lines of code] counts non-blank lines across the "
+            "#emph[coraplex] and #emph[semantic\\_digital\\_twin] model.py files "
+            "— the source a developer authors and maintains when using ORMatic. "
+            "#emph[Generated lines of code] counts the corresponding SQLAlchemy mapping "
+            "code produced automatically by ORMatic, which would otherwise require "
+            "manual authoring and maintenance. "
+            "The ratio reports generated~/ maintained LOC. "
+            "The Radon Maintainability Index (0--100, higher is better) and its rank "
+            "(A > 19, B 9--19, C ≤ 9) are computed on the combined model source."
+        ),
+    )
+    print(TypstRenderer(table).render_table())
     print()
     ratio = round(result.generated_lines_of_code / result.maintained_lines_of_code, 1)
     print(

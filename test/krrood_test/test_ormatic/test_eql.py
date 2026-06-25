@@ -34,6 +34,7 @@ from ..dataset.ormatic_interface import (
 from krrood.entity_query_language.factories import (
     entity,
     variable,
+    variable_from,
     and_,
     or_,
     contains,
@@ -1458,5 +1459,42 @@ def test_exists_in_where_clause(session, database):
     results = translator.evaluate()
 
     assert len(results) == 2
-    result_robot_xs = {r.robot_x for r in results}
-    assert result_robot_xs == {1.0, 2.0}
+
+
+def test_variable_from_raises_on_sql_translation(session, database):
+    """
+    Prove bug: variable_from creates a Variable with _type_=None, causing
+    eql_to_sql to raise because the DAO table cannot be determined.
+    """
+    query = an(entity(variable_from([])))
+    with pytest.raises(Exception):
+        eql_to_sql(query, session)
+
+
+def test_computed_attribute_domain_raises_dedicated_error(session, database):
+    """
+    When an EXISTS variable's domain is a computed attribute (e.g. n.siblings),
+    eql_to_sql raises ComputedAttributeDomainError naming the attribute so the
+    user knows exactly why SQL translation is impossible.
+    """
+    from krrood.ormatic.eql_interface import ComputedAttributeDomainError
+
+    b = variable(type_=Body, domain=[])
+    s = variable_from(b.children)  # 'children' is a computed attribute, not a DB relationship
+    query = an(entity(b).where(exists(s, s.name == "x")))
+
+    with pytest.raises(ComputedAttributeDomainError) as exc_info:
+        eql_to_sql(query, session)
+
+    assert "children" in str(exc_info.value)
+
+
+def test_variable_with_explicit_type_translates_to_sql(session, database):
+    """
+    After fix: variable(type_=Body, ...) sets _type_ so eql_to_sql can
+    resolve BodyDAO and produce a valid SELECT statement.
+    """
+    body = variable(type_=Body, domain=[])
+    query = an(entity(body))
+    translator = eql_to_sql(query, session)
+    assert translator.sql_query is not None

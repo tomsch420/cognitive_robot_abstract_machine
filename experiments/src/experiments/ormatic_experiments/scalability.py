@@ -361,7 +361,20 @@ def main():
             )
         )
 
-    table = ExperimentsTable(results)
+    table = ExperimentsTable(
+        results,
+        description=(
+            "ORMatic code-generation performance as a function of input class-set size, "
+            "measured at ten class-drop probabilities from 0.9 (smallest subset) to 0.0 "
+            "(full class set). "
+            "Each row aggregates 10 independent generation runs; all numeric columns report "
+            "mean ± standard deviation. "
+            "Structural counts (classes, associations, inheritances) vary between runs "
+            "because the class subset is resampled each time. "
+            "Duration columns report seconds for class-diagram construction, "
+            "ORMatic table reasoning, and SQLAlchemy file serialisation."
+        ),
+    )
     print(TypstRenderer(table).render_table())
     plot_scalability(table).show()
 

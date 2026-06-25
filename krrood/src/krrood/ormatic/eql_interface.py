@@ -220,6 +220,43 @@ class EmptyAttributeChainError(AttributeResolutionError):
 
 
 @dataclass
+class ComputedAttributeDomainError(EQLTranslationError, TypeError):
+    """
+    Raised when an EXISTS variable's domain is a computed Python attribute that has
+    no corresponding SQLAlchemy relationship, making SQL correlation impossible.
+
+    This error occurs when :func:`~krrood.entity_query_language.factories.variable_from`
+    is called with an :class:`~krrood.entity_query_language.core.mapped_variable.Attribute`
+    expression such as ``variable_from(n.left_siblings)``.  The attribute may be a
+    ``@property`` computed entirely in Python (e.g. by traversing an in-memory graph),
+    so the SQL translator cannot determine which table to select from or how to
+    correlate the subquery.
+    """
+
+    attribute: Attribute
+    """The attribute expression that was used as the variable's domain."""
+
+    def error_message(self) -> str:
+        owner = self.attribute._owner_class_
+        owner_name = owner.__name__ if owner is not None else "unknown"
+        return (
+            f"'{owner_name}.{self.attribute._attribute_name_}' is used as the domain "
+            f"of an EXISTS variable, but it is a Python-computed attribute with no "
+            f"SQLAlchemy relationship. SQL translation cannot correlate the subquery."
+        )
+
+    def suggest_correction(self) -> str:
+        owner = self.attribute._owner_class_
+        owner_name = owner.__name__ if owner is not None else "unknown"
+        dao_hint = f"the DAO that maps '{owner_name}'"
+        return (
+            f"Add a SQLAlchemy relationship for '{self.attribute._attribute_name_}' on "
+            f"{dao_hint}, or restructure the query to avoid using a computed attribute "
+            f"as an EXISTS domain."
+        )
+
+
+@dataclass
 class VariableTypeExtractor:
     """Extracts underlying Variable and its python type from a leaf-like node."""
 
@@ -1322,10 +1359,15 @@ class EQLTranslator:
 
         :param exists_node: The EQL Exists node (variable + condition).
         :return: A SQLAlchemy EXISTS expression.
+        :raises ComputedAttributeDomainError: When the existential variable's domain is
+            a computed Python attribute with no SQLAlchemy relationship.
         :raises NoDAOFoundForTypeError: When the existential variable type has no DAO.
         """
         existential_variable = exists_node.variable
         condition = exists_node.condition
+        domain = getattr(existential_variable, "_domain_", None)
+        if isinstance(domain, Attribute):
+            raise ComputedAttributeDomainError(domain)
         dao_class = self._require_dao_class(existential_variable._type_)
         sub_where = self._translate_exists_condition(condition)
         sub_query = select(literal(1)).select_from(dao_class)

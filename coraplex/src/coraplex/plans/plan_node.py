@@ -12,6 +12,7 @@ import rustworkx as rx
 import tqdm
 from typing_extensions import Union
 
+from coraplex.robot_plans.actions.base import ActionDescription
 from giskardpy.motion_statechart.graph_node import Task
 from krrood.entity_query_language.query.match import Match
 
@@ -24,7 +25,7 @@ from coraplex.datastructures.execution_data import ExecutionData
 from coraplex.plans.designator import Designator
 
 if TYPE_CHECKING:
-    from coraplex.robot_plans import ActionDescription, BaseMotion
+    from coraplex.robot_plans import BaseMotion
 
 
 logger = logging.getLogger(__name__)
@@ -51,12 +52,12 @@ class PlanNode(PlanEntity):
 
     start_time: Optional[datetime] = field(default_factory=datetime.now)
     """
-    The starting time of the function, optional
+    The starting time of the function, optional.
     """
 
     end_time: Optional[datetime] = None
     """
-    The ending time of the function, optional
+    The ending time of the function, optional.
     """
 
     reason: Optional[PlanFailure] = None
@@ -66,7 +67,7 @@ class PlanNode(PlanEntity):
 
     result: Optional[Any] = None
     """
-    Result from the execution of this node
+    Result from the execution of this node.
     """
 
     index: Optional[int] = field(default=None, init=False, repr=False)
@@ -77,14 +78,16 @@ class PlanNode(PlanEntity):
     layer_index: Optional[int] = field(default=None, init=False, repr=False)
     """
     The position of this node in its children.
-    The children of a node are interpreted as a list of nodes that have order.
-    rustworkx doesn't have order in the children, hence this attribute makes it possible.
+
+    The children of a node are interpreted as a list of nodes that have
+    order. rustworkx doesn't have order in the children, hence this
+    attribute makes it possible.
     """
 
     @property
     def parent(self) -> Optional[PlanNode]:
         """
-        The parent node of this node, None if this is the root node
+        The parent node of this node, None if this is the root node.
 
         :return: The parent node
         """
@@ -97,9 +100,9 @@ class PlanNode(PlanEntity):
     @property
     def children(self) -> List[PlanNode]:
         """
-        All children nodes of this node
+        All children nodes of this node.
 
-        :return:  A list of child nodes
+        :return: A list of child nodes
         """
         children = self.plan.plan_graph.successors(self.index)
         return list(sort_by_layer_index(children))
@@ -124,7 +127,6 @@ class PlanNode(PlanEntity):
         """
         :return: The path from the root node to this node
         """
-
         paths = rx.all_shortest_paths(
             self.plan.plan_graph, self.index, self.plan.root.index, as_undirected=True
         )
@@ -137,7 +139,7 @@ class PlanNode(PlanEntity):
     @property
     def is_leaf(self) -> bool:
         """
-        Returns True if this node is a leaf node
+        Returns True if this node is a leaf node.
 
         :return: True if this node is a leaf node
         """
@@ -191,7 +193,9 @@ class PlanNode(PlanEntity):
     @property
     def previous_nodes(self) -> List[PlanNode]:
         """
-        Gets the previous nodes to the given node. Previous meaning the nodes that are before the given one in
+        Gets the previous nodes to the given node.
+
+        Previous meaning the nodes that are before the given one in
         depth first order of nodes.
 
         :return: The previous nodes as a list of nodes
@@ -225,7 +229,7 @@ class PlanNode(PlanEntity):
 
     def interrupt(self):
         """
-        Interrupts the execution of this node and all nodes below
+        Interrupts the execution of this node and all nodes below.
         """
         self.status = TaskStatus.INTERRUPTED
         logger.info(f"Interrupted node: {str(self)}")
@@ -233,7 +237,7 @@ class PlanNode(PlanEntity):
 
     def resume(self):
         """
-        Resumes the execution of this node and all nodes below
+        Resumes the execution of this node and all nodes below.
         """
         self.status = TaskStatus.RUNNING
 
@@ -260,7 +264,6 @@ class PlanNode(PlanEntity):
         """
         Perform the node and update the fields of this node.
         """
-
         for parent in self.path:
             if parent.status == TaskStatus.INTERRUPTED:
                 self.status = TaskStatus.INTERRUPTED
@@ -280,6 +283,7 @@ class PlanNode(PlanEntity):
     def mount_subplan(self, root: PlanNode):
         """
         Mount an entire plan as a child of to this node.
+
         :param root: The root node of the plan to be mounted
         """
         self.plan._migrate_nodes_from_plan(root.plan)
@@ -288,8 +292,9 @@ class PlanNode(PlanEntity):
     def simplify(self):
         """
         Simplifies the plan by merging nodes that are semantically equivalent.
-        This modifies the plan in-place.
-        Only implement this if it makes sense for your class to have this ability.
+
+        This modifies the plan in-place. Only implement this if it makes
+        sense for your class to have this ability.
         """
         pass
 
@@ -303,7 +308,9 @@ class PlanNode(PlanEntity):
 @dataclass(eq=False, repr=False)
 class UnderspecifiedNode(PlanNode):
     """
-    An action or language expression that is described by an `underspecified(...)` statement.
+    An action or language expression that is described by an
+    `underspecified(...)` statement.
+
     This node is used to generate fully specified actions  or language expressions.
     The semantics are: try until it succeeds or fails if the underspecified action is exhausted.
     If you want to limit the number of attempts, add a limit clause to the underspecified action.
@@ -319,6 +326,7 @@ class UnderspecifiedNode(PlanNode):
     )
     """
     The iterator that is used to generate the actions.
+
     Only available after the first call to _perform.
     """
 
@@ -371,17 +379,20 @@ class ActionNode(DesignatorNode):
 
     execution_data: ExecutionData = None
     """
-    Additional data that  is collected before and after the execution of the action.
+    Additional data that  is collected before and after the execution of the
+    action.
     """
 
     motion_executor: MotionExecutor = None
     """
-    Instance of the MotionExecutor used to execute the motion chart of the sub-motions of this action.
+    Instance of the MotionExecutor used to execute the motion chart of the sub-
+    motions of this action.
     """
 
     _world_modification_block_length_pre_perform: Optional[int] = None
     """
-    The last model modification block before the execution of this node. 
+    The last model modification block before the execution of this node.
+
     Used to check if the model has changed during execution.
     """
 
@@ -391,8 +402,11 @@ class ActionNode(DesignatorNode):
 
     def collect_motions(self) -> List[Task]:
         """
-        Collects all child motions of this action. A motion is considered if it is a direct child of this action node,
-        i.e. there is no other action node between this action node and the motion.
+        Collects all child motions of this action.
+
+        A motion is considered if it is a direct child of this action
+        node, i.e. there is no other action node between this action
+        node and the motion.
         """
         return [
             motion_node.motion.motion_chart
@@ -403,7 +417,8 @@ class ActionNode(DesignatorNode):
 
     def construct_motion_state_chart(self):
         """
-        Builds a giskard Motion State Chart from the collected motions of this action node.
+        Builds a giskard Motion State Chart from the collected motions of this
+        action node.
         """
         self.motion_executor = MotionExecutor(
             self.collect_motions(),
@@ -422,7 +437,8 @@ class ActionNode(DesignatorNode):
 
     def create_execution_data_pre_perform(self):
         """
-        Create the ExecutionData and logs additional information about the execution of this node.
+        Create the ExecutionData and logs additional information about the
+        execution of this node.
         """
         robot_pose = self.plan.robot.root.global_pose
         exec_data = ExecutionData(robot_pose, self.plan.world.state._data)
@@ -433,7 +449,8 @@ class ActionNode(DesignatorNode):
 
     def update_execution_data_post_perform(self):
         """
-        Update the ExecutionData with additional information to the ExecutionData object after performing this node.
+        Update the ExecutionData with additional information to the
+        ExecutionData object after performing this node.
         """
         self.execution_data.execution_end_pose = self.plan.robot.root.global_pose
 
@@ -460,8 +477,9 @@ class ActionNode(DesignatorNode):
 class MotionNode(DesignatorNode):
     """
     A node in the plan representing a fully specified motion.
-    Motions are not directly performed. Motions get merged with their siblings into one motion state chart which then is
-    executed.
+
+    Motions are not directly performed. Motions get merged with their
+    siblings into one motion state chart which then is executed.
     """
 
     @property
@@ -470,8 +488,10 @@ class MotionNode(DesignatorNode):
 
     def _perform(self):
         """
-        Performs this node by performing the respective MotionDesignator. Additionally, checks if one of the parents has
-        the status INTERRUPTED and aborts the perform if that is the case.
+        Performs this node by performing the respective MotionDesignator.
+
+        Additionally, checks if one of the parents has the status
+        INTERRUPTED and aborts the perform if that is the case.
 
         :return: The return value of the Motion Designator
         """
@@ -480,7 +500,8 @@ class MotionNode(DesignatorNode):
     @property
     def parent_action_node(self) -> Optional[ActionNode]:
         """
-        Returns the next resolved action node in the plan above this motion node.
+        Returns the next resolved action node in the plan above this motion
+        node.
         """
         for node in self.path:
             if isinstance(node, ActionNode):

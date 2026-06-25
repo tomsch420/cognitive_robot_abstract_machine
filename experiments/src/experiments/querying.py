@@ -24,7 +24,9 @@ Run with (the ``experiments`` package must be importable)::
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, List
+from typing import Any, List, Optional
+
+import tqdm
 
 import coraplex as _coraplex_pkg
 import coraplex.orm.ormatic_interface  # type: ignore  # noqa: F401
@@ -73,11 +75,15 @@ from sqlalchemy.orm import Session, sessionmaker
 from experiments.experiment_definitions import (
     ExperimentResult,
     ExperimentsTable,
+    MeanAndStandardDeviation,
     TypstRenderer,
 )
 
 _CORAPLEX_RESOURCES = Path(_coraplex_pkg.__file__).parent.parent.parent / "resources"
 _DATABASE_PATH = Path(__file__).parent / "querying.db"
+_NUMBER_OF_PLAN_COPIES = 100
+_NUMBER_OF_QUERY_REPETITIONS = 10
+_NOT_APPLICABLE = "n. a."
 
 
 @dataclass
@@ -113,9 +119,11 @@ class BehaviourQueryResult(ExperimentResult):
     """
     One row of the behaviour-query experiment table.
 
-    Each row evaluates one query both via in-memory EQL and via SQL so
-    the two approaches can be compared side-by-side.  Untranslatable SQL
-    queries report ``-1`` / ``-1.0`` sentinel values.
+    Each row evaluates one query both via in-memory EQL and via SQL,
+    timing each approach over :data:`_NUMBER_OF_QUERY_REPETITIONS` runs
+    against a database populated with :data:`_NUMBER_OF_PLAN_COPIES`
+    plan copies. Untranslatable SQL queries report
+    :data:`_FAILED_MEASUREMENT` sentinels.
     """
 
     question: str
@@ -123,32 +131,44 @@ class BehaviourQueryResult(ExperimentResult):
     The natural-language question posed to the robot.
     """
 
-    eql_number_of_results: int
+    eql_number_of_results: Optional[int]
     """
-    Number of results from in-memory EQL evaluation, or -1 on error.
-    """
-
-    eql_duration_ms: float
-    """
-    Wall-clock time in milliseconds for in-memory EQL evaluation.
+    Number of results from in-memory EQL evaluation, or ``None`` on error.
     """
 
-    sql_translation_duration_ms: float
+    eql_duration_ms: MeanAndStandardDeviation
     """
-    Wall-clock time in milliseconds for EQL-to-SQL translation, or -1.0 on
-    failure.
-    """
-
-    sql_number_of_results: int
-    """
-    Number of results returned by the SQL query, or -1 on error.
+    Mean ± std wall-clock time in milliseconds for in-memory EQL evaluation
+    across :data:`_NUMBER_OF_QUERY_REPETITIONS` runs.
     """
 
-    sql_execution_duration_ms: float
+    sql_translation_duration_ms: Optional[MeanAndStandardDeviation]
     """
-    Wall-clock time in milliseconds for SQL execution against the database, or
-    -1.0 on failure.
+    Mean ± std wall-clock time in milliseconds for EQL-to-SQL translation, or
+    ``None`` when the query cannot be translated to SQL.
     """
+
+    sql_number_of_results: Optional[int]
+    """
+    Number of results returned by the SQL query against all plan copies, or
+    ``None`` when the query cannot be translated to SQL.
+    """
+
+    sql_execution_duration_ms: Optional[MeanAndStandardDeviation]
+    """
+    Mean ± std wall-clock time in milliseconds for SQL execution against the
+    database, or ``None`` when the query cannot be translated to SQL.
+    """
+
+    def get_column_values(self) -> list:
+        """
+        Return column values with ``None`` replaced by :data:`_NOT_APPLICABLE`
+        so the rendered table shows a meaningful boundary marker rather than a
+        raw sentinel.
+        """
+        return [
+            _NOT_APPLICABLE if v is None else v for v in super().get_column_values()
+        ]
 
 
 def build_plan() -> Plan:
@@ -264,8 +284,16 @@ def build_plan() -> Plan:
     return plan
 
 
-def _q_what_did_you_do(plan: Plan) -> BehaviourQuery:
-    n = eql.variable(ActionNode, domain=plan.plan_graph.nodes())
+def _q_what_did_you_do(plans: List[Plan]) -> BehaviourQuery:
+    n = eql.variable(
+        type_=ActionNode,
+        domain=[
+            node
+            for p in plans
+            for node in p.plan_graph.nodes()
+            if isinstance(node, ActionNode)
+        ],
+    )
     return BehaviourQuery(
         question="What did you just do?",
         query=eql.an(eql.entity(n).where(n.status == TaskStatus.SUCCEEDED)).ordered_by(
@@ -275,8 +303,10 @@ def _q_what_did_you_do(plan: Plan) -> BehaviourQuery:
     )
 
 
-def _q_walk_through_in_order(plan: Plan) -> BehaviourQuery:
-    n = eql.variable(PlanNode, domain=plan.plan_graph.nodes())
+def _q_walk_through_in_order(plans: List[Plan]) -> BehaviourQuery:
+    n = eql.variable(
+        type_=PlanNode, domain=[node for p in plans for node in p.plan_graph.nodes()]
+    )
     return BehaviourQuery(
         question="Walk me through what you did in order.",
         query=eql.an(eql.entity(n).where(n.status == TaskStatus.SUCCEEDED)).ordered_by(
@@ -285,8 +315,16 @@ def _q_walk_through_in_order(plan: Plan) -> BehaviourQuery:
     )
 
 
-def _q_total_duration(plan: Plan) -> BehaviourQuery:
-    n = eql.variable(ActionNode, domain=plan.plan_graph.nodes())
+def _q_total_duration(plans: List[Plan]) -> BehaviourQuery:
+    n = eql.variable(
+        type_=ActionNode,
+        domain=[
+            node
+            for p in plans
+            for node in p.plan_graph.nodes()
+            if isinstance(node, ActionNode)
+        ],
+    )
     return BehaviourQuery(
         question="How long did the whole task take?",
         query=eql.set_of(
@@ -298,8 +336,10 @@ def _q_total_duration(plan: Plan) -> BehaviourQuery:
     )
 
 
-def _q_duration_per_step(plan: Plan) -> BehaviourQuery:
-    n = eql.variable(PlanNode, domain=plan.plan_graph.nodes())
+def _q_duration_per_step(plans: List[Plan]) -> BehaviourQuery:
+    n = eql.variable(
+        type_=PlanNode, domain=[node for p in plans for node in p.plan_graph.nodes()]
+    )
     return BehaviourQuery(
         question="How long did each step take?",
         query=eql.an(eql.entity(n).where(n.end_time != None)).ordered_by(  # noqa: E711
@@ -308,33 +348,43 @@ def _q_duration_per_step(plan: Plan) -> BehaviourQuery:
     )
 
 
-def _q_did_anything_go_wrong(plan: Plan) -> BehaviourQuery:
-    n = eql.variable(PlanNode, domain=plan.plan_graph.nodes())
+def _q_did_anything_go_wrong(plans: List[Plan]) -> BehaviourQuery:
+    n = eql.variable(
+        type_=PlanNode, domain=[node for p in plans for node in p.plan_graph.nodes()]
+    )
     return BehaviourQuery(
         question="Did anything go wrong?",
         query=eql.an(eql.entity(n).where(n.status == TaskStatus.FAILED)),
     )
 
 
-def _q_why_did_you_fail(plan: Plan) -> BehaviourQuery:
-    n = eql.variable(PlanNode, domain=plan.plan_graph.nodes())
+def _q_why_did_you_fail(plans: List[Plan]) -> BehaviourQuery:
+    n = eql.variable(
+        type_=PlanNode, domain=[node for p in plans for node in p.plan_graph.nodes()]
+    )
     return BehaviourQuery(
         question="Why did you fail at that step?",
         query=eql.an(eql.entity(n.reason).where(n.status == TaskStatus.FAILED)),
     )
 
 
-def _q_how_many_retries(plan: Plan) -> BehaviourQuery:
-    n = eql.variable(PlanNode, domain=plan.plan_graph.nodes())
+def _q_how_many_retries(plans: List[Plan]) -> BehaviourQuery:
+    n = eql.variable(
+        type_=PlanNode, domain=[node for p in plans for node in p.plan_graph.nodes()]
+    )
     return BehaviourQuery(
         question="How many times did you retry before giving up?",
         query=(eql.set_of(c := eql.count_all()).where(n.status == TaskStatus.FAILED)),
     )
 
 
-def _q_which_fallback(plan: Plan) -> BehaviourQuery:
-    n = eql.variable(PlanNode, domain=plan.plan_graph.nodes())
-    s = eql.variable(PlanNode, domain=n.left_siblings)
+def _q_which_fallback(plans: List[Plan]) -> BehaviourQuery:
+    n = eql.variable(
+        type_=PlanNode, domain=[node for p in plans for node in p.plan_graph.nodes()]
+    )
+    # left_siblings is a Python-computed property using layer_index, which is absent from the DB
+    # schema. SQL translation for this query is expected to fail; in-memory EQL works correctly.
+    s = eql.variable_from(n.left_siblings)
     return BehaviourQuery(
         question="Which fallback did you end up using?",
         query=eql.an(
@@ -346,8 +396,16 @@ def _q_which_fallback(plan: Plan) -> BehaviourQuery:
     )
 
 
-def _q_longest_step(plan: Plan) -> BehaviourQuery:
-    n = eql.variable(ActionNode, domain=plan.plan_graph.nodes())
+def _q_longest_step(plans: List[Plan]) -> BehaviourQuery:
+    n = eql.variable(
+        type_=ActionNode,
+        domain=[
+            node
+            for p in plans
+            for node in p.plan_graph.nodes()
+            if isinstance(node, ActionNode)
+        ],
+    )
 
     return BehaviourQuery(
         question="Which step took the longest?",
@@ -357,8 +415,10 @@ def _q_longest_step(plan: Plan) -> BehaviourQuery:
     )
 
 
-def _q_status_breakdown(plan: Plan) -> BehaviourQuery:
-    n = eql.variable(PlanNode, domain=plan.plan_graph.nodes())
+def _q_status_breakdown(plans: List[Plan]) -> BehaviourQuery:
+    n = eql.variable(
+        type_=PlanNode, domain=[node for p in plans for node in p.plan_graph.nodes()]
+    )
     return BehaviourQuery(
         question="Were all subtasks successful, or did some fail?",
         query=(
@@ -369,44 +429,48 @@ def _q_status_breakdown(plan: Plan) -> BehaviourQuery:
     )
 
 
-def _q_world_state_at_start(plan: Plan) -> BehaviourQuery:
-    n = eql.variable(Plan, domain=[plan])
+def _q_world_state_at_start(plans: List[Plan]) -> BehaviourQuery:
+    n = eql.variable(type_=Plan, domain=plans)
     return BehaviourQuery(
         question="What was the state of the world when you started the task?",
         query=eql.an(eql.entity(n.initial_world.state)),
     )
 
 
-def _q_world_state_at_end(plan: Plan) -> BehaviourQuery:
-    n = eql.variable(Plan, domain=[plan])
+def _q_world_state_at_end(plans: List[Plan]) -> BehaviourQuery:
+    n = eql.variable(type_=Plan, domain=plans)
     return BehaviourQuery(
         question="What was the state of the world when you finished?",
         query=eql.an(eql.entity(n.context.world.state)),
     )
 
 
-def build_queries(plan: Plan) -> List[BehaviourQuery]:
+def build_queries(plans: List[Plan]) -> List[BehaviourQuery]:
     """
-    Construct all behaviour queries for a completed plan execution.
+    Construct all behaviour queries over a collection of completed plan
+    executions.
 
-    :param plan: The plan whose execution history the queries will
-        inspect.
+    Each query's domain is collected from all plans via
+    :func:`~krrood.entity_query_language.factories.variable_from`, so that
+    in-memory EQL evaluation covers the same breadth as the SQL queries that
+    run against the :data:`_NUMBER_OF_PLAN_COPIES`-copy database.
+
+    :param plans: The plans whose execution history the queries will inspect.
     :return: All behaviour queries, in presentation order.
     """
     return [
-        _q_what_did_you_do(plan),
-        _q_walk_through_in_order(plan),
-        _q_total_duration(plan),
-        _q_duration_per_step(plan),
-        _q_did_anything_go_wrong(plan),
-        _q_why_did_you_fail(plan),
-        _q_how_many_retries(plan),
-        _q_which_fallback(plan),
-        _q_longest_step(plan),
-        _q_status_breakdown(plan),
-        _q_world_modifications(plan),
-        _q_world_state_at_start(plan),
-        _q_world_state_at_end(plan),
+        _q_what_did_you_do(plans),
+        _q_walk_through_in_order(plans),
+        _q_total_duration(plans),
+        _q_duration_per_step(plans),
+        _q_did_anything_go_wrong(plans),
+        _q_why_did_you_fail(plans),
+        _q_how_many_retries(plans),
+        _q_which_fallback(plans),
+        _q_longest_step(plans),
+        _q_status_breakdown(plans),
+        _q_world_state_at_start(plans),
+        _q_world_state_at_end(plans),
     ]
 
 
@@ -432,12 +496,13 @@ def _count_results(raw: Any) -> int:
 
 def run_experiment(plan: Plan, session: Session) -> ExperimentsTable:
     """
-    Evaluate all behaviour queries both via in-memory EQL and via SQL,
-    collecting timings and result counts for each approach in a single row per
-    query.
+    Evaluate all behaviour queries both via in-memory EQL and via SQL, timing
+    each approach over :data:`_NUMBER_OF_QUERY_REPETITIONS` runs.  The database
+    holds :data:`_NUMBER_OF_PLAN_COPIES` plan copies so SQL timings reflect a
+    realistic dataset size.
 
-    EQL or SQL failures are recorded as ``-1`` / ``-1.0`` sentinels so a
-    single failing query does not abort the experiment.
+    EQL or SQL failures are recorded as :data:`_FAILED_MEASUREMENT`
+    sentinels so a single failing query does not abort the experiment.
 
     :param plan: The fully executed plan to query.
     :param session: An open SQLAlchemy session connected to the
@@ -445,49 +510,72 @@ def run_experiment(plan: Plan, session: Session) -> ExperimentsTable:
     :return: A table with one :class:`BehaviourQueryResult` row per
         query.
     """
+    plans = [plan] * _NUMBER_OF_PLAN_COPIES
     rows: List[BehaviourQueryResult] = []
-    for query in build_queries(plan):
-        # EQL evaluation
-        t0 = time.perf_counter()
-        try:
-            eql_count = _count_results(query.evaluate())
-        except Exception:
-            eql_count = -1
-        eql_ms = round((time.perf_counter() - t0) * 1000.0, 3)
+    for query in build_queries(plans):
+        eql_timings: List[float] = []
+        eql_count: Optional[int] = None
+        for _ in range(_NUMBER_OF_QUERY_REPETITIONS):
+            t0 = time.perf_counter()
+            try:
+                raw = query.evaluate()
+                result = raw.tolist() if hasattr(raw, "tolist") else raw
+                if eql_count is None:
+                    eql_count = _count_results(result)
+            except Exception:
+                eql_count = None
+            eql_timings.append((time.perf_counter() - t0) * 1000.0)
 
-        # SQL translation
-        t0 = time.perf_counter()
-        try:
-            translator = eql_to_sql(query.query, session)
-            sql_translation_ms = round((time.perf_counter() - t0) * 1000.0, 3)
-        except Exception:
+        sql_translation_timings: List[float] = []
+        translator: Any = None
+        translation_failed = False
+        for _ in range(_NUMBER_OF_QUERY_REPETITIONS):
+            t0 = time.perf_counter()
+            try:
+                translator = eql_to_sql(query.query, session)
+                sql_translation_timings.append((time.perf_counter() - t0) * 1000.0)
+            except Exception:
+                translation_failed = True
+                break
+
+        if translation_failed:
             rows.append(
                 BehaviourQueryResult(
                     question=query.question,
                     eql_number_of_results=eql_count,
-                    eql_duration_ms=eql_ms,
-                    sql_translation_duration_ms=-1.0,
-                    sql_execution_duration_ms=-1.0,
-                    sql_number_of_results=-1,
+                    eql_duration_ms=MeanAndStandardDeviation.from_measurements(
+                        eql_timings
+                    ),
+                    sql_translation_duration_ms=None,
+                    sql_execution_duration_ms=None,
+                    sql_number_of_results=None,
                 )
             )
             continue
 
-        # SQL execution
-        t0 = time.perf_counter()
-        try:
-            sql_count = _count_results(translator.evaluate())
-        except Exception:
-            sql_count = -1
-        sql_execution_ms = round((time.perf_counter() - t0) * 1000.0, 3)
+        sql_execution_timings: List[float] = []
+        sql_count: Optional[int] = None
+        for _ in range(_NUMBER_OF_QUERY_REPETITIONS):
+            t0 = time.perf_counter()
+            try:
+                raw = translator.evaluate()
+                if sql_count is None:
+                    sql_count = _count_results(raw)
+            except Exception:
+                sql_count = None
+            sql_execution_timings.append((time.perf_counter() - t0) * 1000.0)
 
         rows.append(
             BehaviourQueryResult(
                 question=query.question,
                 eql_number_of_results=eql_count,
-                eql_duration_ms=eql_ms,
-                sql_translation_duration_ms=sql_translation_ms,
-                sql_execution_duration_ms=sql_execution_ms,
+                eql_duration_ms=MeanAndStandardDeviation.from_measurements(eql_timings),
+                sql_translation_duration_ms=MeanAndStandardDeviation.from_measurements(
+                    sql_translation_timings
+                ),
+                sql_execution_duration_ms=MeanAndStandardDeviation.from_measurements(
+                    sql_execution_timings
+                ),
                 sql_number_of_results=sql_count,
             )
         )
@@ -501,8 +589,8 @@ def run_experiment(plan: Plan, session: Session) -> ExperimentsTable:
 
 def persist_plan(plan: Plan) -> tuple[Session, Engine]:
     """
-    Serialise *plan* to a SQLite database at :data:`_DATABASE_PATH` via
-    ORMatic.
+    Serialise :data:`_NUMBER_OF_PLAN_COPIES` copies of *plan* to a SQLite
+    database at :data:`_DATABASE_PATH` via ORMatic.
 
     Any pre-existing database is dropped first so each run starts from a
     clean slate.  Returns the open session and engine so the caller can
@@ -516,12 +604,11 @@ def persist_plan(plan: Plan) -> tuple[Session, Engine]:
     drop_database(engine)
     Base.metadata.create_all(bind=engine)
 
-    dao = to_dao(plan)
-
     session = sessionmaker(engine)()
-    session.add(dao)
+    for _ in tqdm.trange(_NUMBER_OF_PLAN_COPIES):
+        session.add(to_dao(plan))
     session.commit()
-    print(f"Plan persisted to {_DATABASE_PATH} with database_id={dao.database_id}")
+    print(f"{_NUMBER_OF_PLAN_COPIES} plan copies persisted to {_DATABASE_PATH}")
     return session, engine
 
 
@@ -543,6 +630,15 @@ def main() -> None:
         session.close()
         engine.dispose()
 
+    table.description = (
+        f"Performance comparison of in-memory EQL and SQL evaluation for "
+        f"{len(table.experiments)} natural-language behaviour queries posed to a PR2 robot "
+        f"after a pick-and-place task. "
+        f"The database contains {_NUMBER_OF_PLAN_COPIES} copies of the same execution trace, "
+        f"and each query is timed over {_NUMBER_OF_QUERY_REPETITIONS} repetitions; "
+        f"duration columns report mean ± standard deviation in milliseconds. "
+        f"Cells marked {_NOT_APPLICABLE} indicate queries that could not be translated to SQL."
+    )
     print(TypstRenderer(table).render_table())
 
 

@@ -370,7 +370,18 @@ def main():
         aggregate_results.append(aggregate)
         all_raw.extend(raw)
 
-    table = ExperimentsTable(aggregate_results)
+    table = ExperimentsTable(
+        aggregate_results,
+        description=(
+            "Mean ± standard deviation of wall-clock time (seconds) for each phase "
+            "of the ORMatic serialisation pipeline, measured over 10 independent iterations "
+            "per plan size. "
+            "Phases cover world construction, simulated plan execution, DAO serialisation "
+            "(#emph[to_dao]), database write, database read, and plan reconstruction "
+            "(#emph[from_dao]). "
+            "Plan size denotes the number of random navigation actions in the plan."
+        ),
+    )
     print(TypstRenderer(table).render_table())
     plot_reliability(all_raw).show()
 
