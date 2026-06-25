@@ -235,7 +235,15 @@ def test_verbalize_has_types_is_membership():
 def test_verbalize_has_types_too_many_is_not_spelled():
     """Past the membership cap the admissible types are summarised by count, not spelled out."""
     subject = variable(Body, [])
-    many = (Apple, Cabinet, Container, Drawer, FixedConnection, Handle, PrismaticConnection)
+    many = (
+        Apple,
+        Cabinet,
+        Container,
+        Drawer,
+        FixedConnection,
+        Handle,
+        PrismaticConnection,
+    )
     text = verbalize_expression(HasTypes(subject, many))
     assert "Apple" not in text
     assert text == "a Body is one of seven types"
@@ -280,6 +288,19 @@ def test_verbalize_index_access_rendered_as_ordinal():
     # An integer index reads as an ordinal ("the first of the tasks"), not a raw subscript leak.
     assert "first" in text
     assert "[0]" not in text
+
+
+def test_verbalize_negative_index_reads_from_the_end():
+    @dataclass
+    class Robot:
+        tasks: list
+
+    r = variable(Robot, [])
+    assert verbalize_expression(r.tasks[-1]) == "the last of the tasks of a Robot"
+    assert (
+        verbalize_expression(r.tasks[-2])
+        == "the second to last of the tasks of a Robot"
+    )
 
 
 def test_verbalize_index_then_attribute_is_ordinal_chain():
@@ -1334,7 +1355,9 @@ def test_grouped_selection_equal_to_key_reports_distinct():
     """A grouped query whose selection IS the group key reports the distinct keys, fronted —
     never a trailing 'grouped by'."""
     employee = variable(Employee, domain=None)
-    text = verbalize_expression(a(set_of(employee.department).grouped_by(employee.department)))
+    text = verbalize_expression(
+        a(set_of(employee.department).grouped_by(employee.department))
+    )
     assert text == "Report the distinct departments"
     assert "grouped by" not in text
 
@@ -2457,7 +2480,9 @@ def test_second_domain_calc_equality_in_whose():
 
 
 def test_is_calculation_value_predicate():
-    from krrood.entity_query_language.query.aggregation_structure import is_calculation_value
+    from krrood.entity_query_language.query.aggregation_structure import (
+        is_calculation_value,
+    )
 
     bank_transaction = variable(BankTransaction, domain=None)
     assert is_calculation_value(eql.max(bank_transaction.amount_details.amount)) is True
