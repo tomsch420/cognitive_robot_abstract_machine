@@ -15,30 +15,48 @@ from semantic_digital_twin.world import World
 
 
 class RerunMode(Enum):
-    """Where the Rerun recording stream sends its data."""
+    """
+    Where the Rerun recording stream sends its data.
+    """
 
     SPAWN = "spawn"
-    """Spawn and stream to a local Rerun viewer."""
+    """
+    Spawn and stream to a local Rerun viewer.
+    """
+
     CONNECT = "connect"
-    """Stream to an already-running viewer over gRPC (uses ``target`` URL)."""
+    """
+    Stream to an already-running viewer over gRPC (uses ``target`` URL).
+    """
+
     SAVE = "save"
-    """Record to an ``.rrd`` file with no viewer (uses ``target`` path)."""
+    """
+    Record to an ``.rrd`` file with no viewer (uses ``target`` path).
+    """
     NONE = "none"
-    """Do not attach an output; the caller manages the recording's output."""
+    """
+    Do not attach an output; the caller manages the recording's output.
+    """
 
 
 @dataclass(eq=False)
 class RerunModelCallback(ModelChangeCallback):
-    """Logs the world's static geometry, re-logging it whenever the model changes.
+    """
+    Logs the world's static geometry, re-logging it whenever the model changes.
 
-    Separate from the state-change callback so geometry is re-sent only on model
-    changes, not on every state update.
+    Separate from the state-change callback so geometry is re-sent only
+    on model changes, not on every state update.
     """
 
     recording: rr.RecordingStream = field(kw_only=True)
-    """The recording stream geometry is logged to."""
+    """
+    The recording stream geometry is logged to.
+    """
+
     root_entity_path: str = field(default="world", kw_only=True)
-    """Entity path under which the kinematic tree is logged."""
+    """
+    Entity path under which the kinematic tree is logged.
+    """
 
     def on_model_change(self, **kwargs) -> None:
         self._log_model(self._world)
@@ -47,9 +65,10 @@ class RerunModelCallback(ModelChangeCallback):
         """
         Log every body's static visual geometry to Rerun.
 
-        Each shape's mesh is logged as a static :class:`rerun.Mesh3D` and its
-        ``origin`` as a static :class:`rerun.Transform3D` on the same entity, so only
-        the per-body transforms need re-logging on a state change.
+        Each shape's mesh is logged as a static :class:`rerun.Mesh3D`
+        and its ``origin`` as a static :class:`rerun.Transform3D` on the
+        same entity, so only the per-body transforms need re-logging on
+        a state change.
 
         :param world: The world whose geometry is logged.
         """
@@ -102,24 +121,52 @@ class RerunAdapter(StateChangeCallback):
     """
 
     root_entity_path: str = "world"
-    """Entity path under which the kinematic tree is logged."""
+    """
+    Entity path under which the kinematic tree is logged.
+    """
+
     application_id: str = "test"
-    """Rerun application id for the recording."""
+    """
+    Rerun application id for the recording.
+    """
+
     mode: RerunMode = field(default=RerunMode.SPAWN, kw_only=True)
-    """Where the recording sends its data."""
+    """
+    Where the recording sends its data.
+    """
+
     target: Optional[str] = field(default=None, kw_only=True)
-    """gRPC URL for ``CONNECT`` or file path for ``SAVE``."""
+    """
+    GRPC URL for ``CONNECT`` or file path for ``SAVE``.
+    """
+
     timeline: str = field(default="state_version", kw_only=True)
-    """Name of the Rerun timeline driven by the world state version."""
+    """
+    Name of the Rerun timeline driven by the world state version.
+    """
+
     state_history: bool = field(default=False, kw_only=True)
-    """Keep a scrubbable state history (bounded by ``memory_limit``); if ``False``, keep only the current state."""
+    """
+    Keep a scrubbable state history (bounded by ``memory_limit``); if
+    ``False``, keep only the current state.
+    """
+
     memory_limit: str = field(default="10%", kw_only=True)
-    """Spawned-viewer memory budget (e.g. ``"2GB"``); oldest data is dropped past it. Only used by the ``SPAWN`` mode."""
+    """
+    Spawned-viewer memory budget (e.g. ``"2GB"``); oldest data is dropped past
+    it.
+
+    Only used by the ``SPAWN`` mode.
+    """
 
     recording: rr.RecordingStream = field(init=False)
-    """The Rerun recording stream all data is logged to."""
+    """
+    The Rerun recording stream all data is logged to.
+    """
     model_cb: RerunModelCallback = field(init=False)
-    """The owned callback that logs and re-logs geometry on model changes."""
+    """
+    The owned callback that logs and re-logs geometry on model changes.
+    """
 
     def __post_init__(self) -> None:
         super().__post_init__()
@@ -149,12 +196,14 @@ class RerunAdapter(StateChangeCallback):
         """
         Log every body's current forward-kinematics transform to Rerun.
 
-        Logged at the same ``world/<body>`` path the geometry is parented under, so
-        the two compose. With ``static=True`` the transforms overwrite in place (no
-        timeline history), giving a constant-memory current-state view.
+        Logged at the same ``world/<body>`` path the geometry is
+        parented under, so the two compose. With ``static=True`` the
+        transforms overwrite in place (no timeline history), giving a
+        constant-memory current-state view.
 
         :param world: The world whose state is logged.
-        :param static: Whether to log without timeline history (overwrite in place).
+        :param static: Whether to log without timeline history
+            (overwrite in place).
         """
         for body in world.bodies:
             world_transform_body = world.compute_forward_kinematics_np(world.root, body)
@@ -180,21 +229,26 @@ class RerunAdapter(StateChangeCallback):
             self._log_state(self._world, static=True)
 
     def stop(self) -> None:
-        """Detach the callbacks from the world and flush pending data to the sink."""
+        """
+        Detach the callbacks from the world and flush pending data to the sink.
+        """
         super().stop()
         self.model_cb.stop()
         self.recording.flush()
 
     @staticmethod
     def read_recording_entities(path: str, dataset_name: str = "semdt") -> set[str]:
-        """Return the entity paths recorded in an ``.rrd`` file.
+        """
+        Return the entity paths recorded in an ``.rrd`` file.
 
-        Reads back through Rerun's in-process server / DataFusion reader. Only the
-        schema (the logged entity paths) is recovered -- cell values (geometry,
-        transforms) are not read back. Intended for verifying what was recorded.
+        Reads back through Rerun's in-process server / DataFusion
+        reader. Only the schema (the logged entity paths) is recovered
+        -- cell values (geometry, transforms) are not read back.
+        Intended for verifying what was recorded.
 
         :param path: Path to the ``.rrd`` file to inspect.
-        :param dataset_name: Handle the recording is registered under while reading.
+        :param dataset_name: Handle the recording is registered under
+            while reading.
         :return: The set of entity paths present in the recording.
         """
         with rr.server.Server(datasets={dataset_name: [path]}) as server:

@@ -29,11 +29,12 @@ def test_shape():
 
 
 def test_mesh_color_survives_serialization(tmp_path):
-    """Per-vertex mesh color survives the to_json/from_json round-trip.
+    """
+    Per-vertex mesh color survives the to_json/from_json round-trip.
 
-    Color travels inside the serialized geometry (re-exported as OBJ, which the
-    collision loader and visualizer can read), so a receiver renders it without
-    needing the original mesh file.
+    Color travels inside the serialized geometry (re-exported as OBJ,
+    which the collision loader and visualizer can read), so a receiver
+    renders it without needing the original mesh file.
     """
     source = trimesh.creation.box(extents=(1.0, 1.0, 1.0))
     source.visual.vertex_colors = np.tile([200, 50, 50, 255], (len(source.vertices), 1))
@@ -46,7 +47,8 @@ def test_mesh_color_survives_serialization(tmp_path):
 
 
 def test_mesh_color_is_lost_without_color_preserving_format(tmp_path):
-    """A format that cannot store per-vertex color (STL) drops it on export.
+    """
+    A format that cannot store per-vertex color (STL) drops it on export.
 
     The contrast to the PLY round-trip: without a color-preserving format the color
     is lost.
