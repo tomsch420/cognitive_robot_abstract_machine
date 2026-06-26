@@ -6,6 +6,7 @@ from dataclasses import dataclass, fields, Field
 from functools import cached_property
 
 from typing_extensions import (
+    TYPE_CHECKING,
     Any,
     Callable,
     TypeVar,
@@ -21,8 +22,12 @@ from coraplex.exceptions import ContextIsUnavailable, ConditionNotSatisfied
 from coraplex.plans.failures import PlanFailure
 from semantic_digital_twin.world import World
 
-from coraplex.plans.plan_node import PlanNode
 from coraplex.plans.designator import Designator
+
+
+if TYPE_CHECKING:
+    from coraplex.plans.plan_node import PlanNode
+    from coraplex.datastructures.dataclasses import Context
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.core.variable import Variable
 from krrood.entity_query_language.factories import (
@@ -31,7 +36,6 @@ from krrood.entity_query_language.factories import (
     set_of,
     evaluate_condition,
 )
-from ...datastructures.dataclasses import Context
 
 logger = logging.getLogger(__name__)
 

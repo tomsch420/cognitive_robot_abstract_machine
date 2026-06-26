@@ -75,7 +75,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from experiments.experiment_definitions import (
     ExperimentResult,
     ExperimentsTable,
-    MeanAndStandardDeviation,
+    MedianAndIQR,
     TypstRenderer,
 )
 
@@ -119,11 +119,16 @@ class BehaviourQueryResult(ExperimentResult):
     """
     One row of the behaviour-query experiment table.
 
-    Each row evaluates one query both via in-memory EQL and via SQL,
-    timing each approach over :data:`_NUMBER_OF_QUERY_REPETITIONS` runs
-    against a database populated with :data:`_NUMBER_OF_PLAN_COPIES`
-    plan copies. Untranslatable SQL queries report
-    :data:`_FAILED_MEASUREMENT` sentinels.
+    Each row evaluates one query both via in-memory EQL and via SQL, timing
+    each approach over :data:`_NUMBER_OF_QUERY_REPETITIONS` runs against a
+    database populated with :data:`_NUMBER_OF_PLAN_COPIES` plan copies.
+    Untranslatable SQL queries report :data:`_NOT_APPLICABLE` sentinels.
+
+    .. note::
+        The :data:`_NUMBER_OF_PLAN_COPIES` episodes are all copies of the same
+        execution trace. Result counts therefore scale linearly with the copy
+        count rather than reflecting the diversity of a real episodic dataset.
+        See :func:`run_experiment` for details.
     """
 
     question: str
@@ -136,15 +141,20 @@ class BehaviourQueryResult(ExperimentResult):
     Number of results from in-memory EQL evaluation, or ``None`` on error.
     """
 
-    eql_duration_ms: MeanAndStandardDeviation
+    eql_duration_ms: MedianAndIQR
     """
-    Mean ± std wall-clock time in milliseconds for in-memory EQL evaluation
-    across :data:`_NUMBER_OF_QUERY_REPETITIONS` runs.
+    Median and interquartile range of wall-clock time in milliseconds for
+    in-memory EQL evaluation across :data:`_NUMBER_OF_QUERY_REPETITIONS` runs.
+
+    Median and IQR are reported instead of mean ± std because EQL timing
+    distributions are heavily right-skewed due to the call-stack monitoring
+    infrastructure; occasional outlier runs inflate the mean and standard
+    deviation disproportionately.
     """
 
-    sql_translation_duration_ms: Optional[MeanAndStandardDeviation]
+    sql_translation_duration_ms: Optional[MedianAndIQR]
     """
-    Mean ± std wall-clock time in milliseconds for EQL-to-SQL translation, or
+    Median and IQR of EQL-to-SQL translation time in milliseconds, or
     ``None`` when the query cannot be translated to SQL.
     """
 
@@ -154,17 +164,15 @@ class BehaviourQueryResult(ExperimentResult):
     ``None`` when the query cannot be translated to SQL.
     """
 
-    sql_execution_duration_ms: Optional[MeanAndStandardDeviation]
+    sql_execution_duration_ms: Optional[MedianAndIQR]
     """
-    Mean ± std wall-clock time in milliseconds for SQL execution against the
-    database, or ``None`` when the query cannot be translated to SQL.
+    Median and IQR of SQL execution time in milliseconds, or ``None`` when
+    the query cannot be translated to SQL.
     """
 
     def get_column_values(self) -> list:
         """
-        Return column values with ``None`` replaced by :data:`_NOT_APPLICABLE`
-        so the rendered table shows a meaningful boundary marker rather than a
-        raw sentinel.
+        Return column values with ``None`` replaced by :data:`_NOT_APPLICABLE`.
         """
         return [
             _NOT_APPLICABLE if v is None else v for v in super().get_column_values()
@@ -494,6 +502,7 @@ def _count_results(raw: Any) -> int:
     return 1
 
 
+
 def run_experiment(plan: Plan, session: Session) -> ExperimentsTable:
     """
     Evaluate all behaviour queries both via in-memory EQL and via SQL, timing
@@ -513,19 +522,21 @@ def run_experiment(plan: Plan, session: Session) -> ExperimentsTable:
     plans = [plan] * _NUMBER_OF_PLAN_COPIES
     rows: List[BehaviourQueryResult] = []
     for query in build_queries(plans):
+        # --- EQL timing ---
         eql_timings: List[float] = []
         eql_count: Optional[int] = None
-        for _ in range(_NUMBER_OF_QUERY_REPETITIONS):
+        for index in range(_NUMBER_OF_QUERY_REPETITIONS):
             t0 = time.perf_counter()
             try:
                 raw = query.evaluate()
-                result = raw.tolist() if hasattr(raw, "tolist") else raw
-                if eql_count is None:
-                    eql_count = _count_results(result)
+                items = list(raw) if hasattr(raw, "__iter__") else ([] if raw is None else [raw])
             except Exception:
-                eql_count = None
+                items = []
             eql_timings.append((time.perf_counter() - t0) * 1000.0)
+            if index == 0:
+                eql_count = len(items)
 
+        # --- SQL translation timing ---
         sql_translation_timings: List[float] = []
         translator: Any = None
         translation_failed = False
@@ -543,40 +554,40 @@ def run_experiment(plan: Plan, session: Session) -> ExperimentsTable:
                 BehaviourQueryResult(
                     question=query.question,
                     eql_number_of_results=eql_count,
-                    eql_duration_ms=MeanAndStandardDeviation.from_measurements(
-                        eql_timings
-                    ),
+                    eql_duration_ms=MedianAndIQR.from_measurements(eql_timings),
                     sql_translation_duration_ms=None,
-                    sql_execution_duration_ms=None,
                     sql_number_of_results=None,
+                    sql_execution_duration_ms=None,
                 )
             )
             continue
 
+        # --- SQL execution timing ---
         sql_execution_timings: List[float] = []
         sql_count: Optional[int] = None
-        for _ in range(_NUMBER_OF_QUERY_REPETITIONS):
+        for index in range(_NUMBER_OF_QUERY_REPETITIONS):
             t0 = time.perf_counter()
             try:
                 raw = translator.evaluate()
-                if sql_count is None:
-                    sql_count = _count_results(raw)
+                items = list(raw) if hasattr(raw, "__iter__") else ([] if raw is None else [raw])
             except Exception:
-                sql_count = None
+                items = []
             sql_execution_timings.append((time.perf_counter() - t0) * 1000.0)
+            if index == 0:
+                sql_count = len(items)
 
         rows.append(
             BehaviourQueryResult(
                 question=query.question,
                 eql_number_of_results=eql_count,
-                eql_duration_ms=MeanAndStandardDeviation.from_measurements(eql_timings),
-                sql_translation_duration_ms=MeanAndStandardDeviation.from_measurements(
+                eql_duration_ms=MedianAndIQR.from_measurements(eql_timings),
+                sql_translation_duration_ms=MedianAndIQR.from_measurements(
                     sql_translation_timings
                 ),
-                sql_execution_duration_ms=MeanAndStandardDeviation.from_measurements(
+                sql_number_of_results=sql_count,
+                sql_execution_duration_ms=MedianAndIQR.from_measurements(
                     sql_execution_timings
                 ),
-                sql_number_of_results=sql_count,
             )
         )
     return ExperimentsTable(rows)
@@ -634,9 +645,12 @@ def main() -> None:
         f"Performance comparison of in-memory EQL and SQL evaluation for "
         f"{len(table.experiments)} natural-language behaviour queries posed to a PR2 robot "
         f"after a pick-and-place task. "
-        f"The database contains {_NUMBER_OF_PLAN_COPIES} copies of the same execution trace, "
-        f"and each query is timed over {_NUMBER_OF_QUERY_REPETITIONS} repetitions; "
-        f"duration columns report mean ± standard deviation in milliseconds. "
+        f"The database contains {_NUMBER_OF_PLAN_COPIES} copies of the same execution trace "
+        f"(see limitations note in :class:`BehaviourQueryResult`). "
+        f"Each query is timed over {_NUMBER_OF_QUERY_REPETITIONS} repetitions; "
+        f"duration columns report median [Q1, Q3] in milliseconds. "
+        f"EQL timing distributions are right-skewed due to monitoring overhead; "
+        f"median and IQR are more informative than mean and standard deviation for these measurements. "
         f"Cells marked {_NOT_APPLICABLE} indicate queries that could not be translated to SQL."
     )
     print(TypstRenderer(table).render_table())

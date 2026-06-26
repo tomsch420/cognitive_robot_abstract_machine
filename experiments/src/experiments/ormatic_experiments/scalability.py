@@ -1,9 +1,23 @@
 """
-This module provides functions and dataclass definitions for conducting
-scalability experiments with the ORMatic library. It includes tools for
-collecting mappable classes, alternative mappings, and type mappings, as well
-as computing timing and structural statistics across multiple ORMatic
-generation runs.
+Scalability experiments for the ORMatic framework and the episodic query system.
+
+Two orthogonal scalability dimensions are covered:
+
+1. **Schema generation scalability** (:func:`run_scalability_experiment`): measures
+   how fast ORMatic generates ORM code as the number of mapped classes grows.
+
+2. **Query execution scalability** (:func:`run_query_scalability_experiment`): measures
+   how fast SQL queries execute as the number of stored execution episodes grows.
+   This directly validates Requirement 5 (Scalable Data Storage), which states that
+   query performance must not degrade as the episodic database grows.
+
+Four representative SQL queries are selected from :mod:`experiments.querying`,
+covering the main SQL complexity classes:
+
+- **Filter**: return all succeeded action nodes.
+- **Ordered traversal**: return all plan nodes ordered by start time.
+- **Aggregation**: compute the earliest start and latest end time.
+- **Group-by**: count nodes by status.
 """
 
 import logging
@@ -12,27 +26,44 @@ import time
 import tempfile
 from contextlib import contextmanager
 from dataclasses import is_dataclass, dataclass
-from typing import Type, List, Set, Tuple
+from typing import Any, Type, List, Set, Tuple
 
 import plotly.graph_objects as go
 import tqdm
+from sqlalchemy.orm import Session, sessionmaker
 
 import coraplex.orm.ormatic_interface  # type: ignore
 import coraplex.plans.plan_node
 import semantic_digital_twin  # type: ignore
+from coraplex.orm.ormatic_interface import Base  # type: ignore
 from experiments.experiment_definitions import (
     ExperimentResult,
     ExperimentsTable,
     MeanAndStandardDeviation,
+    MedianAndIQR,
     TypstRenderer,
 )
+from experiments.querying import build_plan, build_queries
 from krrood.class_diagrams import ClassDiagram
 from krrood.ormatic.data_access_objects.alternative_mappings import AlternativeMapping
+from krrood.ormatic.data_access_objects.helper import to_dao
+from krrood.ormatic.eql_interface import eql_to_sql
 from krrood.ormatic.helper import get_classes_of_ormatic_interface
 from krrood.ormatic.ormatic import ORMatic
 from krrood.ormatic.type_dict import TypeDict
+from krrood.ormatic.utils import create_engine, drop_database
 from krrood.utils import recursive_subclasses
 from coraplex.robot_plans.actions.base import ActionDescription
+
+_EPISODE_COUNTS: List[int] = [1, 10, 50, 100, 500, 1000]
+_QUERY_REPETITIONS: int = 10
+
+# Indices into the list returned by build_queries() for the four representative
+# queries. These are stable as long as build_queries() preserves its order.
+_FILTER_INDEX: int = 0
+_TRAVERSAL_INDEX: int = 3
+_AGGREGATION_INDEX: int = 2
+_GROUPBY_INDEX: int = 9
 
 
 def build_cram_class_sets() -> Tuple[Set[Type], List[Type], dict]:
@@ -332,6 +363,140 @@ def plot_scalability(table: ExperimentsTable) -> go.Figure:
     return fig
 
 
+@dataclass
+class QueryScalabilityResult(ExperimentResult):
+    """
+    One row in the query scalability table.
+
+    Each row reports median and IQR of SQL execution time for four
+    representative query types at a specific episode count.
+    """
+
+    episode_count: int
+    """Number of stored execution episodes in the database for this row."""
+
+    filter_duration_ms: MedianAndIQR
+    """
+    SQL execution time for a simple status-equality filter query across all
+    stored episodes (``What did you just do?``).
+    """
+
+    traversal_duration_ms: MedianAndIQR
+    """
+    SQL execution time for an ordered traversal query that returns all plan
+    nodes sorted by start time (``How long did each step take?``).
+    """
+
+    aggregation_duration_ms: MedianAndIQR
+    """
+    SQL execution time for a min/max aggregation query that returns a single
+    row (``How long did the whole task take?``).
+    """
+
+    groupby_duration_ms: MedianAndIQR
+    """
+    SQL execution time for a grouped-count query
+    (``Were all subtasks successful, or did some fail?``).
+    """
+
+
+def _populate_database(session: Session, plan: Any, episode_count: int) -> None:
+    """
+    Write *episode_count* copies of *plan* to the database behind *session*.
+
+    :param session: An open SQLAlchemy session connected to an empty database.
+    :param plan: The fully executed plan to serialise.
+    :param episode_count: Number of copies to store.
+    """
+    for _ in range(episode_count):
+        session.add(to_dao(plan))
+    session.commit()
+
+
+def _time_sql_query(translator: Any, repetitions: int) -> MedianAndIQR:
+    """
+    Execute a pre-translated SQL query *repetitions* times and return timing statistics.
+
+    :param translator: A translator object whose ``.evaluate()`` executes the
+        SQL query against the connected database.
+    :param repetitions: Number of timed executions.
+    :return: Median and IQR of execution times in milliseconds.
+    """
+    timings: List[float] = []
+    for _ in range(repetitions):
+        t0 = time.perf_counter()
+        translator.evaluate()
+        timings.append((time.perf_counter() - t0) * 1000.0)
+    return MedianAndIQR.from_measurements(timings)
+
+
+def run_query_scalability_experiment(
+    episode_counts: List[int] = _EPISODE_COUNTS,
+    repetitions: int = _QUERY_REPETITIONS,
+) -> ExperimentsTable:
+    """
+    Measure SQL query execution time across a range of episode counts.
+
+    For each episode count a fresh in-memory SQLite database is populated and
+    four representative SQL queries are timed. The database is discarded after
+    each episode count to ensure isolation between measurements. This directly
+    validates Requirement 5 (Scalable Data Storage): as the episodic database
+    grows, query performance must remain acceptable.
+
+    :param episode_counts: Ordered list of episode counts to test.
+    :param repetitions: Number of timed query executions per (count, query) pair.
+    :return: A table with one :class:`QueryScalabilityResult` row per episode count.
+    """
+    plan = build_plan()
+    queries = build_queries([plan])
+
+    filter_query = queries[_FILTER_INDEX]
+    traversal_query = queries[_TRAVERSAL_INDEX]
+    aggregation_query = queries[_AGGREGATION_INDEX]
+    groupby_query = queries[_GROUPBY_INDEX]
+
+    rows: List[QueryScalabilityResult] = []
+
+    for episode_count in tqdm.tqdm(episode_counts):
+        engine = create_engine("sqlite:///:memory:")
+        session = sessionmaker(engine)()
+        Base.metadata.create_all(bind=session.bind)
+
+        _populate_database(session, plan, episode_count)
+
+        filter_translator = eql_to_sql(filter_query.query, session)
+        traversal_translator = eql_to_sql(traversal_query.query, session)
+        aggregation_translator = eql_to_sql(aggregation_query.query, session)
+        groupby_translator = eql_to_sql(groupby_query.query, session)
+
+        rows.append(
+            QueryScalabilityResult(
+                episode_count=episode_count,
+                filter_duration_ms=_time_sql_query(filter_translator, repetitions),
+                traversal_duration_ms=_time_sql_query(traversal_translator, repetitions),
+                aggregation_duration_ms=_time_sql_query(aggregation_translator, repetitions),
+                groupby_duration_ms=_time_sql_query(groupby_translator, repetitions),
+            )
+        )
+
+        drop_database(session.bind)
+        session.close()
+        engine.dispose()
+
+    return ExperimentsTable(
+        rows,
+        description=(
+            f"SQL query execution time as a function of the number of stored episodes, "
+            f"validating Requirement 5 (Scalable Data Storage). "
+            f"Each row populates a fresh in-memory SQLite database with the given episode "
+            f"count and times four representative SQL queries over {repetitions} repetitions; "
+            f"duration columns report median [Q1, Q3] in milliseconds. "
+            f"The four query types cover the main SQL complexity classes: "
+            f"status-equality filter, ordered traversal, min/max aggregation, and grouped count."
+        ),
+    )
+
+
 def main():
     classes, alternative_mappings, type_mappings = build_cram_class_sets()
     required_classes = [coraplex.plans.plan_node.UnderspecifiedNode, ActionDescription]
@@ -361,7 +526,7 @@ def main():
             )
         )
 
-    table = ExperimentsTable(
+    generation_table = ExperimentsTable(
         results,
         description=(
             "ORMatic code-generation performance as a function of input class-set size, "
@@ -375,8 +540,11 @@ def main():
             "ORMatic table reasoning, and SQLAlchemy file serialisation."
         ),
     )
-    print(TypstRenderer(table).render_table())
-    plot_scalability(table).show()
+    print(TypstRenderer(generation_table).render_table())
+    plot_scalability(generation_table).show()
+
+    query_table = run_query_scalability_experiment()
+    print(TypstRenderer(query_table).render_table())
 
 
 if __name__ == "__main__":

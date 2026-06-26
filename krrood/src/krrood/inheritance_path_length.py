@@ -31,21 +31,29 @@ def inheritance_path_length(child_class: Type, parent_class: Type) -> Optional[i
 
 def _inheritance_path_length(
     child_class: Type, parent_class: Type, current_length: int = 0
-) -> int:
+) -> Optional[int]:
     """
     Helper function for :func:`inheritance_path_length`.
+
+    Returns ``None`` when no path through ``__bases__`` exists, which can
+    occur for virtual subclasses registered via :meth:`ABCMeta.register` where
+    :func:`issubclass` returns ``True`` but no real inheritance edge is present.
 
     :param child_class: The child class.
     :param parent_class: The parent class.
     :param current_length: The current length of the inheritance path.
-    :return: The minimum path length between `child_class` and `parent_class`.
+    :return: The minimum path length between ``child_class`` and
+        ``parent_class``, or ``None`` when no real path exists.
     """
-
     if child_class == parent_class:
         return current_length
-    else:
-        return min(
-            _inheritance_path_length(base, parent_class, current_length + 1)
-            for base in child_class.__bases__
-            if issubclass(base, parent_class)
-        )
+
+    branch_lengths = [
+        _inheritance_path_length(base, parent_class, current_length + 1)
+        for base in child_class.__bases__
+        if issubclass(base, parent_class)
+    ]
+    valid = [length for length in branch_lengths if length is not None]
+    if not valid:
+        return None
+    return min(valid)

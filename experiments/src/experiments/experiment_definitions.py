@@ -47,6 +47,54 @@ class MeanAndStandardDeviation:
 
 
 @dataclass
+class MedianAndIQR:
+    """
+    Represents the median and interquartile range of a set of measurements.
+
+    Prefer this over :class:`MeanAndStandardDeviation` when the distribution is
+    expected to be skewed or heavy-tailed (e.g. query timings with occasional
+    outliers caused by GC pauses or cold-cache effects). The median and IQR are
+    not distorted by a small number of extreme values.
+    """
+
+    median: float
+    """
+    The 50th percentile of the measurements.
+    """
+
+    q1: float
+    """
+    The 25th percentile (first quartile) of the measurements.
+    """
+
+    q3: float
+    """
+    The 75th percentile (third quartile) of the measurements.
+    """
+
+    def __str__(self) -> str:
+        return f"{self.median} [{self.q1}, {self.q3}]"
+
+    @classmethod
+    def from_measurements(cls, measurements: List[float]) -> MedianAndIQR:
+        """
+        Compute median and IQR from a list of scalar measurements.
+
+        :param measurements: The raw sample values.
+        :return: A :class:`MedianAndIQR` summarising the distribution.
+        """
+        med = round(statistics.median(measurements), 2)
+        if len(measurements) < 4:
+            return cls(median=med, q1=med, q3=med)
+        quartiles = statistics.quantiles(measurements, n=4)
+        return cls(
+            median=med,
+            q1=round(quartiles[0], 2),
+            q3=round(quartiles[2], 2),
+        )
+
+
+@dataclass
 class ExperimentResult:
     """
     Class for results from experiments. Use this when you want to create a
