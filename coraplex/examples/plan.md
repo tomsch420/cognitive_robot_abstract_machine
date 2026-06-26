@@ -90,7 +90,30 @@ with simulated_robot:
     plan.perform()
 ```
 
-This will execute the plan in a simulated environment. Now we can take a look at the arguments of the plan after execution.
+This will execute the plan in a simulated environment.
+
+### Collision Avoidance
+The execution environments accept a `collision_avoidance` flag. When set to `True`, an
+`ExternalCollisionAvoidance` goal is added to every motion state chart created within the
+environment, keeping the robot from colliding with the rest of the world while the motions run.
+
+```python
+with simulated_robot(collision_avoidance=True):
+    plan.perform()
+```
+
+The flag also works when constructing an environment directly, and is restored correctly for
+nested environments:
+
+```python
+from coraplex.datastructures.enums import ExecutionType
+from coraplex.execution_environment import ExecutionEnvironment
+
+with ExecutionEnvironment(ExecutionType.SIMULATED, collision_avoidance=True):
+    plan.perform()
+```
+
+Now we can take a look at the arguments of the plan after execution.
 
 ```python
 print(plan.root.status)
