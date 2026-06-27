@@ -1,3 +1,12 @@
+"""
+Grammar rules for attribute / index / call chains — one guarded :class:`PhraseRule` per surface
+form, dispatched by ``select``. The guards are mutually exclusive, so at most one fires and no
+ordering between them is needed: the precedence *"the bare-plural noun phrase wins over the
+predicative"* lives in :meth:`~krrood.entity_query_language.verbalization.grammar.chain.planner.ChainPlan.renders_as_plural_attribute`,
+which both the plural and boolean rules consult. The guarded forms outrank the unguarded possessive
+fallback; adding a chain form is a new guarded rule here, with no change to existing rules.
+"""
+
 from __future__ import annotations
 
 from krrood.entity_query_language.core.mapped_variable import MappedVariable
@@ -15,12 +24,6 @@ from krrood.entity_query_language.verbalization.grammar.framework.phrase_rule im
     RuleContext,
 )
 
-# One guarded rule per surface form, dispatched by ``select``. The guards are mutually exclusive,
-# so at most one fires and no ordering between them is needed: the precedence "the bare-plural
-# noun phrase wins over the predicative" lives in ``ChainPlan.renders_as_plural_attribute``, which
-# both the plural and boolean rules consult. The guarded forms outrank the unguarded possessive
-# fallback. Adding a chain form is a new guarded rule here — no existing rule changes.
-
 
 class PluralChainAttributeRule(PhraseRule):
     """Plural single-attribute chain → bare plural *"attributes of Roots"*.
@@ -30,7 +33,6 @@ class PluralChainAttributeRule(PhraseRule):
     """
 
     construct = MappedVariable
-    name = "chain-plural-attribute"
 
     def when(self, node: MappedVariable, context: RuleContext) -> bool:
         """:return: ``True`` when the chain is a plural single attribute on a variable.
@@ -67,7 +69,6 @@ class BooleanAttributeChainRule(PhraseRule):
     """
 
     construct = MappedVariable
-    name = "chain-boolean-attribute"
 
     def when(self, node: MappedVariable, context: RuleContext) -> bool:
         """:return: ``True`` for a boolean-terminal chain that is not a bare-plural attribute.
@@ -106,7 +107,6 @@ class PossessiveChainRule(PhraseRule):
     """
 
     construct = MappedVariable
-    name = "chain-possessive"
 
     def build(
         self, node: MappedVariable, context: RuleContext

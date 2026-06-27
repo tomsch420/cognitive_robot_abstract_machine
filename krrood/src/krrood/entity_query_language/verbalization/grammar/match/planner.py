@@ -104,7 +104,7 @@ class MatchPlanner(Planner[Match, MatchPlan]):
     become *"given that"*) from the ``where`` conditions, and aggregate the single-hop equalities by
     their object so related attributes (a position's x/y/z) verbalise together.
 
-    Reference: Reiter & Dale (2000) — content determination + aggregation (microplanning).
+    Reference: :cite:t:`reiter2000building` — content determination + aggregation (microplanning).
 
     >>> MatchPlanner(underspecified(Robot)(name="R2", battery=80)).plan().underspecified
     True

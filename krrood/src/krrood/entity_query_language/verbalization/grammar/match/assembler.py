@@ -54,7 +54,7 @@ class MatchAssembler(Assembler[Match, MatchPlan]):
     chain / comparator / coreference machinery renders them; this assembler only decides the
     match-specific structure.
 
-    Reference: Gatt & Reiter (2009), SimpleNLG — surface realisation.
+    Reference: :cite:t:`gatt2009simplenlg` — surface realisation.
 
     >>> verbalize_expression(underspecified(Robot)(name="R2", battery=80))
     "Generate a Robot given that the name and battery of the Robot are 'R2' and 80 respectively"

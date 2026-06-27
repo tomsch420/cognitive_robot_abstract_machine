@@ -55,7 +55,7 @@ class InferenceAssembler(Assembler[Entity, RuleStructure]):
     >>> verbalize_expression(entity(drawer).where(connection.parent == variable(Container, [])))
     "If there's a FixedConnection whose parent is a Container, then there's a Drawer whose container is the parent of the FixedConnection, and handle is the child of the FixedConnection"
 
-    Reference: Gatt & Reiter (2009), SimpleNLG — surface realisation.
+    Reference: :cite:t:`gatt2009simplenlg` — surface realisation.
     """
 
     planner = InferencePlanner

@@ -46,7 +46,7 @@ class ConditionAssembler(Assembler[Comparator, None]):
     op <value>"* that a *"whose …"* envelope wraps), a range modifier (*"<attribute> is between low and
     high"*), or the inference whose-attribute body (*"<attribute> is <value>"* agreeing in number).
 
-    Reference: Gatt & Reiter (2009), SimpleNLG — surface realisation.
+    Reference: :cite:t:`gatt2009simplenlg` — surface realisation.
     """
 
     def realize(self, node: Comparator, plan: None = None) -> VerbalizationFragment:

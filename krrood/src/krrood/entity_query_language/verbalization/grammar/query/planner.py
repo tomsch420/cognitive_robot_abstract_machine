@@ -211,7 +211,7 @@ class QueryPlanner(Planner[Query, QueryPlan]):
     partition (grouped *"whose …"* predicates vs. residual *"such that …"*), and whether the
     entity is an aggregation value-subquery.
 
-    Reference: Reiter & Dale (2000) — content/structure determination (microplanning).
+    Reference: :cite:t:`reiter2000building` — content/structure determination (microplanning).
 
     >>> QueryPlanner(entity(variable(Robot, []))).plan().selected_type
     'Robot'

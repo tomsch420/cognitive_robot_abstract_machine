@@ -149,16 +149,13 @@ class PhraseRule(ABC):
 
     References:
 
-    * Montague, R. (1970), "Universal Grammar", *Theoria* 36 — syntax algebra → semantics
-      algebra as a homomorphism.
-    * Bach, E. (1976) — the rule-to-rule hypothesis (one syntactic rule ↔ one semantic rule).
-    * Stanford Encyclopedia of Philosophy, "Montague Semantics" / "Compositionality".
+    * :cite:t:`montague1970universal` — syntax algebra → semantics algebra as a homomorphism.
+    * :cite:t:`bach1976extension` — the rule-to-rule hypothesis (one syntactic rule ↔ one semantic rule).
+    * :cite:t:`janssen2021montague`, :cite:t:`szabo2022compositionality` — Montague semantics and compositionality.
     """
 
     construct: ClassVar[type]
     """The EQL node class this rule handles (the ``isinstance`` gate)."""
-    name: ClassVar[str] = ""
-    """Stable identifier for querying or tracing the grammar."""
     enters_query_scope: ClassVar[bool] = False
     """``True`` on a rule whose construct is itself a query body, so an entity found anywhere
     within it renders as a nested noun phrase."""

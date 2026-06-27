@@ -27,8 +27,7 @@ class Assembler(ABC, Generic[TSymbolicExpression, TPlan]):
     into a fragment. A realisation-only construct (e.g. an ORDER BY / HAVING clause, which has
     nothing to decide) sets ``planner = None`` and receives ``plan=None``.
 
-    Reference: Gatt, A. & Reiter, E. (2009), "SimpleNLG: A realisation engine for practical
-    applications", ENLG — surface realisation as a dedicated stage.
+    Reference: :cite:t:`gatt2009simplenlg` — surface realisation as a dedicated stage.
     """
 
     context: RuleContext

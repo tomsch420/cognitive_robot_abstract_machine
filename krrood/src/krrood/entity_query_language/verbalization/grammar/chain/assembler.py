@@ -50,7 +50,7 @@ class ChainAssembler(Assembler[MappedVariable, ChainPlan]):
     >>> verbalize_expression(variable(Robot, []).battery)
     'the battery of a Robot'
 
-    Reference: Gatt & Reiter (2009), SimpleNLG — surface realisation.
+    Reference: :cite:t:`gatt2009simplenlg` — surface realisation.
     """
 
     planner = ChainPlanner

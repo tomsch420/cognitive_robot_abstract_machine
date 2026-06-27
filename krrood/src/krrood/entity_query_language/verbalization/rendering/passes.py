@@ -7,7 +7,7 @@ order. A :class:`RewritePass` captures the common case — a stateless pass that
 a single *leaf* rewrite — so determiner lowering and morphology need not each re-walk the tree by
 hand: :func:`~…fragments.base.map_fragment` rebuilds it bottom-up around the rewritten leaves.
 
-Reference: Gatt & Reiter (2009), SimpleNLG — the ordered realisation stages.
+Reference: :cite:t:`gatt2009simplenlg` — the ordered realisation stages.
 """
 
 from __future__ import annotations

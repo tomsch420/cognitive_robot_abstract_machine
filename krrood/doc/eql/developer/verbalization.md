@@ -19,6 +19,8 @@ This guide explains the architecture of the EQL verbalization subsystem for deve
 
 The verbalization subsystem translates any EQL symbolic expression into a human-readable English string (or a structured fragment tree that can be rendered in plain text, ANSI colour, or HTML).
 
+The class and attribute names that appear in the generated text keep a reference to where they came from, so the ANSI and HTML renderers can turn them into hyperlinks back to the API documentation — clicking a name in a verbalization jumps to that class's or attribute's Sphinx AutoAPI page. This means the generated English is not just prose but a navigable index into the API docs (see {py:class}`~krrood.entity_query_language.verbalization.rendering.source_link_resolver.SourceLinkResolver`).
+
 The single entry point is {py:class}`~krrood.entity_query_language.verbalization.pipeline.VerbalizationPipeline`, with {py:func}`~krrood.entity_query_language.verbalization.pipeline.verbalize_expression` as the plain-text shortcut:
 
 ```python
@@ -42,6 +44,51 @@ html = pipeline.verbalize(query)
 ```
 
 Pass a shared {py:class}`~krrood.entity_query_language.verbalization.context.MicroplanningServices` to `verbalize` across calls to get cross-mention coreference (*"a Robot"* … *"the Robot"*).  A construct with no grammar rule raises {py:class}`~krrood.entity_query_language.verbalization.exceptions.UnverbalizableExpressionError` — coverage gaps fail loudly rather than degrading to a bare class name.
+
+## Glossary
+
+The subsystem borrows standard terms from functional programming and from the natural-language
+generation (NLG) literature. They are defined once here.
+
+```{glossary}
+catamorphism
+  A fold that collapses a recursive structure to a single value by replacing each node with a
+  handler. The verbalizer folds the EQL tree into a fragment tree, and the renderer folds the
+  fragment tree into a string.
+
+F-algebra
+  The bundle of per-node handlers a catamorphism applies — the grammar rules over EQL nodes, or
+  the four ``word`` / ``role`` / ``phrase`` / ``block`` handlers over the fragment tree.
+
+homomorphism (Montague)
+  The structure-preserving map from the syntax algebra (EQL constructs) to the semantics algebra
+  (English phrases): one rule per construct, which is what {py:class}`~krrood.entity_query_language.verbalization.grammar.framework.phrase_rule.PhraseRule` realises.
+
+microplanning
+  The NLG stage that decides *content and structure* — what to say and in what shape — before
+  surface realisation. Here, the planners.
+
+surface realisation
+  The NLG stage that turns a planned structure into grammatical text (agreement, determiners,
+  inflection, spacing). Here, the assemblers plus the ordered realisation passes.
+
+coreference
+  Referring to an already-introduced entity with a reduced form (*"a Robot"* … *"the Robot"* /
+  *"its …"*).
+
+referring expression
+  The noun phrase chosen to identify an entity — indefinite, definite, numbered, or pronoun.
+
+morphology
+  Word-form inflection: pluralisation and verb agreement.
+
+orthography
+  Surface spelling concerns: punctuation spacing and capitalisation cleanup.
+
+coordination (aggregation)
+  Combining several conditions into one coordinated phrase — Oxford-comma lists,
+  *"between … and …"* ranges, or *"… have the same …"* co-indexed comparisons.
+```
 
 ---
 
@@ -324,7 +371,7 @@ Rules emit the *first-mention* form — a `NounPhrase` tagged with a `referent_i
 
 The local centre (`_chain_topic`) is the **grammatical subject of the clause just said** — the antecedent a reader binds *"its"* to (centering theory: the backward-looking centre is the highest-ranked entity, subject before oblique). A relational referent is that subject only when nothing is predicated *of an attribute of it*: a boolean predicative (*"the Robot to which it is assigned is operational"*) or a bare relational mention — there the referent heads the subject phrase, so a following attribute reads *"its battery"*. But a genitive attribute (*"the **battery** of the Robot … is greater than 5"*) is itself the subject head; the Robot is an oblique inside it. So a following *"its power"* would bind to the battery (*"battery power"*!), not the Robot — wrong — and the owner is spelled out instead: *"the power of the Robot"*. This is one rule, not a special case: an aggregation's measured quantity (*"the average of the **battery** …"*) is likewise headed by the attribute, so it clears the centre the same way. One refinement keeps a *run* consistent: a clause that is itself an *"its …"* continuation of the current centre **keeps** it (a centering CONTINUE — the pronoun signals the topic persists), so a string of attributes on one referent reads uniformly *"its battery … its power"* rather than mixing *"its battery … the power of the Robot"*. The asymmetry that protects the rule above survives: *"its"* can only *start* after the referent was a clause subject, but once started it continues.
 
-The build is therefore free of in-fold coreference mutation.  {py:class}`~krrood.entity_query_language.verbalization.microplanning.referring.ReferringExpressions` holds only the pre-computed disambiguation map and a `seen` **set** of introduced referent ids — the latter solely to *seed* the pass across builds sharing one services bundle.  `numbered_label(var)` is the single source of the disambiguation lookup; `noun_for_parts(var)` builds on it for the first-mention `Definiteness`.
+The build is therefore free of in-fold coreference mutation.  {py:class}`~krrood.entity_query_language.verbalization.microplanning.referring.ReferringExpressions` holds only the pre-computed disambiguation map and a `seen` **set** of introduced referent ids — the latter solely to *seed* the pass across builds sharing one services bundle.  `numbered_label(variable)` is the single source of the disambiguation lookup; `noun_for_parts(variable)` builds on it for the first-mention `Definiteness`.
 
 ### Disambiguation map
 
@@ -500,3 +547,9 @@ text = VerbalizationPipeline(ParagraphRenderer(MarkdownFormatter())).verbalize(q
 
 - {py:class}`~krrood.entity_query_language.verbalization.vocabulary.english.Keywords` / `Logicals` / `Aggregations` / `Copulas` / `Operators` / `Articles` / `Prepositions` / `Conjunctions` / `Punctuation` / `Pronouns` / `RangePhrases` / `CoindexedOperators` / `CoindexedPhrases` / `Absence` / `NonExistence` / `SetMembership` / `Specificity` / `ExistentialPhrase` / `FallbackNouns`
 - {py:class}`~krrood.entity_query_language.verbalization.vocabulary.words.PlainWord` / `RoleWord` / `VocabEnum`
+
+## References
+
+The reference notes throughout the verbalization source (the `:cite:` annotations on the grammar
+rules, planners, assemblers, and realisation passes) resolve to the entries collected in the
+{doc}`/bibliography`.

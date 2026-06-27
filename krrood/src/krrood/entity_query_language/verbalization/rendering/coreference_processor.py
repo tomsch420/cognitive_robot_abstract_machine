@@ -67,8 +67,8 @@ class CoreferenceProcessor(RealizationPass):
 
     Stateful per pass: the walk threads ``_seen`` and ``_subject_stack``.
 
-    Reference: Reiter & Dale (2000) — referring-expression generation as a microplanning subtask;
-    Gatt & Reiter (2009), SimpleNLG — ordered realisation stages.
+    Reference: :cite:t:`reiter2000building` — referring-expression generation as a microplanning subtask;
+    :cite:t:`gatt2009simplenlg` — ordered realisation stages.
 
     Both chains rooted at the Employee subject are downgraded to the pronoun *its*:
 

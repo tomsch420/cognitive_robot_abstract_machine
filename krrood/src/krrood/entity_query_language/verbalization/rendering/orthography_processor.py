@@ -24,7 +24,7 @@ class OrthographyProcessor(RealizationPass):
     and regroups its parts so a glued token has no adjacent separator, yielding *"(x)"* from
     ``[OPEN_PAREN, x, CLOSE_PAREN]``.
 
-    Reference: Reiter & Dale (2000) — linguistic realisation (orthography); Gatt & Reiter (2009),
+    Reference: :cite:t:`reiter2000building` — linguistic realisation (orthography); :cite:t:`gatt2009simplenlg`,
     SimpleNLG — the realisation passes.
     """
 

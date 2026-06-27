@@ -42,7 +42,7 @@ class MorphologyProcessor(RewritePass):
     * a verb (a ``VERB`` leaf carrying a lemma) → present-tense agreement (*"works"* / *"work"*) or
       do-support negation (*"does not work"* / *"do not work"*).
 
-    Reference: Gatt & Reiter (2009), SimpleNLG — the MorphologyProcessor realisation stage.
+    Reference: :cite:t:`gatt2009simplenlg` — the MorphologyProcessor realisation stage.
     """
 
     def rewrite(self, leaf: VerbalizationFragment) -> VerbalizationFragment:

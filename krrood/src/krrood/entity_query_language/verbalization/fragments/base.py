@@ -273,7 +273,7 @@ class NounPhrase(HasNumber, VerbalizationFragment):
     The determiner is chosen later from its definiteness and number, so that decision lives in
     exactly one place.
 
-    Reference: Gatt & Reiter (2009), SimpleNLG — ``NPPhraseSpec``.
+    Reference: :cite:t:`gatt2009simplenlg` — ``NPPhraseSpec``.
     """
 
     head: VerbalizationFragment
@@ -392,13 +392,11 @@ def fold_fragment(
     raw ``BlockFragment`` because block layout is consumer-specific and controls its own
     recursion.
 
-    Concept references:
-
-    * Catamorphism / F-algebra — Meijer, Fokkinga & Paterson (1991), "Functional Programming
-      with Bananas, Lenses, Envelopes and Barbed Wire", FPCA; Bird & de Moor (1997), "Algebra
-      of Programming".
-    * Phrase specification traversed by realisation processors — Gatt & Reiter (2009),
-      "SimpleNLG: A realisation engine for practical applications", ENLG.
+    A *catamorphism* is the unique fold that collapses a recursive structure to a single value by
+    replacing each node with a handler; an *F-algebra* is that bundle of per-node handlers — here the
+    four ``word`` / ``role`` / ``phrase`` / ``block`` functions. References: :cite:t:`meijer1991bananas`;
+    :cite:t:`bird1997algebra`; and :cite:t:`gatt2009simplenlg` for the phrase specification traversed
+    by realisation processors.
 
     :param fragment: Root of the fragment tree.
     :param word: Handler for ``WordFragment`` text.
@@ -451,10 +449,8 @@ def map_structural_children(
     """
     match fragment:
         case PhraseFragment(parts=parts):
-            # replace() preserves the separator (and any future fields); only children change.
             return replace(fragment, parts=[recurse(p) for p in parts])
         case BlockFragment(header=header, items=items):
-            # replace() preserves conjunction / bulleted_header (and source); only children change.
             return replace(
                 fragment,
                 header=None if header is None else recurse(header),

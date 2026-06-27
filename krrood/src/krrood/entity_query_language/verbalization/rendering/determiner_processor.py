@@ -40,8 +40,8 @@ class DeterminerProcessor(RewritePass):
     The cell ``INDEFINITE × PLURAL → bare`` is the determiner-drop (*"a Robot"* → *"Robots"*):
     the indefinite article is inherently singular, so a bare plural is its plural counterpart.
 
-    Reference: Gatt & Reiter (2009), SimpleNLG — ``NPPhraseSpec`` realisation; Reiter & Dale
-    (2000) — microplanning.
+    Reference: :cite:t:`gatt2009simplenlg` — ``NPPhraseSpec`` realisation;
+    :cite:t:`reiter2000building` — microplanning.
     """
 
     def rewrite(self, leaf: VerbalizationFragment) -> VerbalizationFragment:

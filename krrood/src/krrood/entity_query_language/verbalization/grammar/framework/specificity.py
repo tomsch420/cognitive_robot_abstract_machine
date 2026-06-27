@@ -28,7 +28,7 @@ class SpecificityRule(ABC):
     (genuine subsumption) or from disjoint guards, never from a hand-assigned number.
 
     Reference: production-rule selection; the systemic-functional "most delicate system wins"
-    principle.
+    principle (:cite:t:`halliday2014functional`).
     """
 
     @classmethod

@@ -105,7 +105,7 @@ class ConditionForm(SpecificityRule):
     >>> verbalize_expression(an(entity(robot).where(robot.battery > 50)))
     'Find a Robot whose battery is greater than 50'
 
-    Reference: Dale & Reiter (1995) — referring expressions / post-nominal modification;
+    Reference: :cite:t:`dale1995gricean` — referring expressions / post-nominal modification;
     production-rule selection (the most-specific guarded alternative wins).
     """
 

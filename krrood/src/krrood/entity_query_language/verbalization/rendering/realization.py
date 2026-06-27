@@ -47,7 +47,7 @@ def realize_tree(
     orthography (punctuation spacing). Both the whole-expression build and the local realisation
     of an opaque template need this same ordered sequence.
 
-    Reference: Gatt & Reiter (2009), SimpleNLG — the ordered realisation stages.
+    Reference: :cite:t:`gatt2009simplenlg` — the ordered realisation stages.
 
     :param fragment: Root of the fragment tree.
     :param previously_introduced_referents: Referents introduced by prior builds on a shared context.

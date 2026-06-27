@@ -70,9 +70,9 @@ def fold(
     When no rule covers the node, an ``UnverbalizableExpressionError`` is raised rather than
     degrading silently to the class name.
 
-    The recursion is an F-algebra fold over the EQL algebra, with the grammar as the algebra
-    (Meijer, Fokkinga & Paterson 1991, "Functional Programming with Bananas, Lenses, Envelopes
-    and Barbed Wire"; Bird & de Moor 1997, "Algebra of Programming").
+    The recursion is an F-algebra fold (catamorphism) over the EQL algebra, with the grammar as
+    the algebra — see :func:`~krrood.entity_query_language.verbalization.fragments.base.fold_fragment`
+    for the catamorphism / F-algebra definition (:cite:t:`meijer1991bananas`; :cite:t:`bird1997algebra`).
 
     :param node: Any EQL expression, or a synthetic coordination artifact produced by conjunct
         reduction (:class:`RangeFold` / :class:`CoindexedFold`).

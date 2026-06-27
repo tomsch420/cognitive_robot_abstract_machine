@@ -57,10 +57,8 @@ class ReferringExpressions:
 
     References:
 
-    * Reiter, E. & Dale, R. (2000), "Building Natural Language Generation Systems", CUP —
-      referring-expression generation as a microplanning subtask.
-    * Dale, R. & Reiter, E. (1995), "Computational interpretations of the Gricean maxims in the
-      generation of referring expressions", *Cognitive Science* 19(2).
+    * :cite:t:`reiter2000building` — referring-expression generation as a microplanning subtask.
+    * :cite:t:`dale1995gricean` — interpreting the Gricean maxims in referring-expression generation.
     """
 
     seen: Set[uuid.UUID] = field(default_factory=set)

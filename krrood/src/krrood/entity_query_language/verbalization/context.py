@@ -23,7 +23,7 @@ class MicroplanningServices:
     The three microplanning services for one verbalization pass: the referring-expression
     service, the binding scope, and the render configuration.
 
-    The split mirrors the microplanning subtasks of Reiter & Dale (2000).
+    The split mirrors the microplanning subtasks of :cite:t:`reiter2000building`.
     """
 
     referring: ReferringExpressions = field(default_factory=ReferringExpressions)

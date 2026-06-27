@@ -41,7 +41,7 @@ class AggregationValueAssembler(Assembler[Query, QueryPlan]):
     >>> verbalize_expression(an(entity(max(variable(BankTransaction, []).amount_details.amount))))
     'Find the maximum of the amount of the amount_details of a BankTransaction'
 
-    Reference: Reiter & Dale (2000) — aggregation; Gatt & Reiter (2009), SimpleNLG — realisation.
+    Reference: :cite:t:`reiter2000building` — aggregation; :cite:t:`gatt2009simplenlg` — realisation.
     """
 
     planner = QueryPlanner

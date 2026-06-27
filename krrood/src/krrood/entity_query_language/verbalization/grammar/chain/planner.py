@@ -82,7 +82,7 @@ class ChainPlanner(Planner[MappedVariable, ChainPlan]):
     whether it ends in a boolean attribute (predicative form) — the chain decisions of *what to
     say*, before any surface form is chosen.
 
-    Reference: Reiter & Dale (2000) — content/structure determination (microplanning).
+    Reference: :cite:t:`reiter2000building` — content/structure determination (microplanning).
 
     >>> ChainPlanner(variable(Task, []).completed).plan().is_boolean_terminal
     True

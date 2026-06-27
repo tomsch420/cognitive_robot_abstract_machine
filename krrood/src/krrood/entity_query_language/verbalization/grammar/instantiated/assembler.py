@@ -46,7 +46,7 @@ class InstantiatedAssembler(Assembler[InstantiatedVariable, InstantiatedPlan]):
     rendered under a sibling binding's override, and the deferred constraints reference those
     overrides.
 
-    Reference: Gatt & Reiter (2009), SimpleNLG — surface realisation.
+    Reference: :cite:t:`gatt2009simplenlg` — surface realisation.
 
     >>> connection = variable(FixedConnection, [])
     >>> verbalize_expression(inference(Drawer)(container=connection.parent, handle=connection.child))

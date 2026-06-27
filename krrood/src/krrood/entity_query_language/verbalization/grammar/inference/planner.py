@@ -105,7 +105,7 @@ class InferencePlanner(Planner[Entity, RuleStructure]):
     Decompose an inference-rule query (an entity whose selected variable is an instantiated
     variable) into a ``RuleStructure`` (the IF/THEN decomposition).
 
-    Reference: Reiter & Dale (2000) — content/structure determination (microplanning).
+    Reference: :cite:t:`reiter2000building` — content/structure determination (microplanning).
     """
 
     @staticmethod

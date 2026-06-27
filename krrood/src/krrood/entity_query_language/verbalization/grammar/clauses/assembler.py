@@ -35,7 +35,7 @@ class GroupedByAssembler(Assembler[Union[Query, GroupedBy], GroupPlan]):
     """
     *"grouped by <keys>"* — or *"and the <aggregated> are grouped by <keys>"* in a query.
 
-    Reference: Reiter & Dale (2000) — aggregation / clause structuring; Gatt & Reiter (2009),
+    Reference: :cite:t:`reiter2000building` — aggregation / clause structuring; :cite:t:`gatt2009simplenlg`,
     SimpleNLG — surface realisation.
 
     A grouped set-of *report* fronts its grouping as *"For each <key>, report …"* in the query

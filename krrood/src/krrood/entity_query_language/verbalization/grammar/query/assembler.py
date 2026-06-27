@@ -70,9 +70,9 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
     It dispatches on the selection shape, builds the selection and its restrictions, and combines
     the trailing clauses. Coreference is resolved later: the assembler emits referring noun
     phrases and subject-scope markers, and a document-order pass decides first/subsequent/pronoun
-    afterwards (Reiter & Dale 2000).
+    afterwards :cite:p:`reiter2000building`.
 
-    Reference: Gatt & Reiter (2009), SimpleNLG — surface realisation.
+    Reference: :cite:t:`gatt2009simplenlg` — surface realisation.
 
     >>> robot = variable(Robot, [])
     >>> verbalize_expression(an(entity(robot).where(robot.battery > 50)))
