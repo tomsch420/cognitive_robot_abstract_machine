@@ -19,23 +19,6 @@ name: krrood Docs Preview
 #     edit needed; or
 #   * change the branch under `on.push.branches` below to your PR branch.
 #
-# Can the branch be auto-detected so nobody edits this file?
-#   Partly. You can trigger on `pull_request` (which runs on whatever branch the PR is from) or on
-#   `push` to `'**'`. BUT GitHub Pages serves a SINGLE site per repository, so any trigger that fires
-#   for several branches makes each run overwrite the same site — there is no per-branch live URL.
-#   The clobber-free automatic alternative is to replace the two Pages steps with
-#   `actions/upload-artifact` (reviewers download the built HTML zip) and trigger on `pull_request`.
-#   This file deliberately stays scoped to one branch so the live URL is stable; flip to the artifact
-#   variant if you want hands-off per-PR previews.
-#
-# Conflict with the upstream (cram2) CI
-# -------------------------------------
-# Do NOT merge this upstream as a Pages deployer: cram2's `build_all_docs.yml` already deploys the
-# aggregate docs to the same single GitHub Pages site via `actions/deploy-pages`, so two deployers
-# would race and overwrite each other. Scoped to a fork-only branch name it stays inert on cram2 (no
-# such branch exists there, so it never fires) — but the safe form to actually merge upstream is the
-# `upload-artifact` variant described above, which never touches Pages.
-#
 # One-time setup: enable Pages on the fork — Settings → Pages → Source: "GitHub Actions".
 # After a successful run the docs are at:
 #   https://<owner>.github.io/cognitive_robot_abstract_machine/
