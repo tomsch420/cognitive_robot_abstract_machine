@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum, StrEnum
-from typing_extensions import ClassVar
+from enum import Enum
+from typing_extensions import ClassVar, Optional
 
 from krrood.entity_query_language.verbalization.fragments.base import (
     RoleFragment,
@@ -91,19 +91,6 @@ class LogicalWord(RoleWord):
     _role_ = SemanticRole.LOGICAL
 
 
-class ChildForm(StrEnum):
-    """How an aggregation word verbalizes its child expression."""
-
-    PLURAL = "plural"
-    """The child is rendered in plural form, joined by *"of"*: *"sum of amounts of
-    BankTransactions"*. The bare aggregation noun (*"sum"*) is the phrase head, so a repeat mention
-    reduces cleanly to *"the sum"*."""
-    SINGULAR = "singular"
-    """The child is rendered singular, joined by *"of"*: *"maximum of the amount of …"*."""
-    NONE = "none"
-    """The aggregation word takes no child (e.g. ``"count of all"``); it renders bare."""
-
-
 @dataclass(frozen=True)
 class AggregationWord(RoleWord):
     """
@@ -111,8 +98,9 @@ class AggregationWord(RoleWord):
     """
 
     _role_ = SemanticRole.AGGREGATION
-    child_form: ChildForm = ChildForm.PLURAL
-    """Controls how the child expression is verbalized."""
+    child_form: Optional[GrammaticalNumber] = GrammaticalNumber.PLURAL
+    """The grammatical number the child expression is rendered in (*"sum of amounts"* → plural,
+    *"maximum of the amount"* → singular), or ``None`` for a childless aggregate (*"count of all"*)."""
 
 
 class OperatorWord(RoleWord):

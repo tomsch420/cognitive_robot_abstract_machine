@@ -22,7 +22,6 @@ from krrood.entity_query_language.verbalization.fragments.roles import SemanticR
 from krrood.entity_query_language.verbalization.fragments.features import Spacing
 from krrood.entity_query_language.verbalization.vocabulary.words import (
     AggregationWord,
-    ChildForm,
     KeyWord,
     LogicalWord,
     GrammaticalNumber,
@@ -215,11 +214,11 @@ class Aggregations(VocabEnum):
     """Aggregation function phrases (number of, sum of, average of, etc.)."""
 
     COUNT = AggregationWord("number")
-    COUNT_ALL = AggregationWord("count of all", child_form=ChildForm.NONE)
+    COUNT_ALL = AggregationWord("count of all", child_form=None)
     SUM = AggregationWord("sum")
     AVERAGE = AggregationWord("average")
-    MAX = AggregationWord("maximum", child_form=ChildForm.SINGULAR)
-    MIN = AggregationWord("minimum", child_form=ChildForm.SINGULAR)
+    MAX = AggregationWord("maximum", child_form=GrammaticalNumber.SINGULAR)
+    MIN = AggregationWord("minimum", child_form=GrammaticalNumber.SINGULAR)
     MODE = AggregationWord("mode")
     MULTI_MODE = AggregationWord("all modes")
 
@@ -233,7 +232,7 @@ class Aggregations(VocabEnum):
         >>> Aggregations.COUNT_ALL.has_child
         False
         """
-        return self.value.child_form is not ChildForm.NONE
+        return self.value.child_form is not None
 
     @property
     def child_number(self) -> GrammaticalNumber:
@@ -245,11 +244,7 @@ class Aggregations(VocabEnum):
         >>> Aggregations.MAX.child_number
         <GrammaticalNumber.SINGULAR: 'singular'>
         """
-        return (
-            GrammaticalNumber.PLURAL
-            if self.value.child_form is ChildForm.PLURAL
-            else GrammaticalNumber.SINGULAR
-        )
+        return self.value.child_form or GrammaticalNumber.SINGULAR
 
     def complement(self, child: Fragment) -> List[Fragment]:
         """
@@ -264,7 +259,7 @@ class Aggregations(VocabEnum):
         >>> Aggregations.COUNT_ALL.complement(WordFragment(text="amounts"))
         []
         """
-        if self.value.child_form is ChildForm.NONE:
+        if self.value.child_form is None:
             return []
         return [Prepositions.OF.as_fragment(), child]
 
@@ -282,7 +277,7 @@ class Aggregations(VocabEnum):
         ...  for part in Aggregations.MAX.compact_complement(WordFragment(text="amount"))]
         ['amount']
         """
-        if self.value.child_form is ChildForm.PLURAL:
+        if self.value.child_form is GrammaticalNumber.PLURAL:
             return [Prepositions.OF.as_fragment(), leaf]
         return [leaf]
 
