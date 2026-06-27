@@ -315,6 +315,25 @@ class PossessiveChain(Fragment):
 
 
 @dataclass
+class OwnedAttributes(Fragment):
+    """One or more attributes bound to an owner, whose possessive-vs-genitive surface coreference
+    decides — *"its x, y, and z"* when the owner is the current discourse subject, else the genitive
+    *"the x, y, and z of <owner>"*. Lets a caller name an owner's attributes without itself choosing
+    the pronoun (which is the coreference pass's concern)."""
+
+    attributes: Fragment
+    """The possessed attribute(s), pre-joined (*"x, y, and z"*)."""
+
+    owner_fragment: Fragment
+    """The referring phrase for the owner, rendered by the normal recursion; used in the genitive
+    (non-subject) branch (*"… of the position"* / *"… of its position"*)."""
+
+    owner_referent_id: Optional[uuid.UUID] = None
+    """The owner's referent id — the surface pronominalises only when this is the current subject
+    (and the owner is not a numbered label)."""
+
+
+@dataclass
 class BlockFragment(Fragment):
     """
     A named structural block with an optional header and a list of sub-items.

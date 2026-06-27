@@ -9,6 +9,7 @@ from krrood.entity_query_language.verbalization.fragments.base import (
     BlockFragment,
     Fragment,
     oxford_comma,
+    OwnedAttributes,
     PhraseFragment,
     RoleFragment,
     WordFragment,
@@ -36,7 +37,6 @@ from krrood.entity_query_language.verbalization.vocabulary.english import (
     Directive,
     Keywords,
     Prepositions,
-    Pronouns,
 )
 
 #: The most attribute values coordinated under one *"… are 1, 2, and 3 respectively"* point before
@@ -121,8 +121,7 @@ class MatchAssembler(Assembler[Match, MatchPlan]):
             parts=[
                 Conjunctions.AND.as_fragment(),
                 Keywords.PREDICT.as_fragment(),
-                Pronouns.ITS.as_fragment(),
-                self._attribute_list(attributes),
+                self._owned_attributes(attributes, group.object),
                 WordFragment(text=noun),
             ]
         )
@@ -145,23 +144,17 @@ class MatchAssembler(Assembler[Match, MatchPlan]):
         )
 
     def _predict_point(self, group: AttributeGroup, plan: MatchPlan) -> Fragment:
-        """:return: *"its <attrs>"* for the selection's own attributes, else
-        *"<attrs> of <object>"* (*"x, y, and z of its position"*).
-
-        Its contribution is a single predict point — here the *"battery of the Robot to which it is
-        assigned"* span. Because the predicted attribute belongs to a non-selection object, it takes
-        the *"<attrs> of <object>"* branch rather than the *"its <attrs>"* one; :meth:`_predict_block`
-        wraps these points under the shared *"and predict"* header.
+        """:return: a single predict point — the object's predicted attributes as an
+        :class:`OwnedAttributes`, which coreference renders as *"its <attrs>"* for the selection's own
+        attributes or *"<attrs> of <object>"* (*"the x, y, and z of its position"*) for a sub-object;
+        :meth:`_predict_block` wraps these under the shared *"and predict"* header.
 
         >>> verbalize_expression(underspecified(Mission)(assigned_to=underspecified(Robot)(battery=...)))
         'Generate a Mission and predict the battery of the Robot to which it is assigned'
         """
-        attributes = [assignment.attribute for assignment in group.predicted]
-        if group.object._id_ == plan.selection._id_:
-            return PhraseFragment(
-                parts=[Pronouns.ITS.as_fragment(), self._attribute_list(attributes)]
-            )
-        return self._genitive_attribute_phrase(attributes, group.object)
+        return self._owned_attributes(
+            [assignment.attribute for assignment in group.predicted], group.object
+        )
 
     # ── given that ───────────────────────────────────────────────────────────
 
@@ -273,9 +266,8 @@ class MatchAssembler(Assembler[Match, MatchPlan]):
     def _genitive_attribute_phrase(
         self, attributes: List[Attribute], owner: SymbolicExpression
     ) -> Fragment:
-        """:return: the definite genitive *"the <attrs> of <owner>"* an object's attributes take when
-        not pronominalised (*"the name and battery of the Robot"*) — the shared form of the grouped
-        *"respectively"* point and a non-selection predict point.
+        """:return: the definite genitive *"the <attrs> of <owner>"* the grouped *"respectively"*
+        point's attributes take (*"the name and battery of the Robot"*).
 
         >>> verbalize_expression(underspecified(Robot)(name="R2", battery=80))
         "Generate a Robot given that the name and battery of the Robot are 'R2' and 80 respectively"
@@ -287,6 +279,19 @@ class MatchAssembler(Assembler[Match, MatchPlan]):
                 Prepositions.OF.as_fragment(),
                 self.context.child(owner),
             ]
+        )
+
+    def _owned_attributes(
+        self, attributes: List[Attribute], owner: SymbolicExpression
+    ) -> Fragment:
+        """:return: an :class:`OwnedAttributes` naming *attributes* on *owner* — coreference renders
+        it as the possessive *"its <attrs>"* when *owner* is the discourse subject, else the genitive
+        *"the <attrs> of <owner>"*. The pronoun choice is the coreference pass's, not this assembler's.
+        """
+        return OwnedAttributes(
+            attributes=self._attribute_list(attributes),
+            owner_fragment=self.context.child(owner),
+            owner_referent_id=owner._id_,
         )
 
     # ── where ────────────────────────────────────────────────────────────────
