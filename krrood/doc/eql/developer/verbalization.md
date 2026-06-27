@@ -551,7 +551,5 @@ text = VerbalizationPipeline(ParagraphRenderer(MarkdownFormatter())).verbalize(q
 ## References
 
 The reference notes throughout the verbalization source (the `:cite:` annotations on the grammar
-rules, planners, assemblers, and realisation passes) resolve to the works below.
-
-```{bibliography}
-```
+rules, planners, assemblers, and realisation passes) resolve to the entries collected in the
+{doc}`/bibliography`.
