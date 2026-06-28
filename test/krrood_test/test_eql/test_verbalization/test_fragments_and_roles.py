@@ -231,7 +231,7 @@ def test_grouped_by_vars_are_role_fragments(departments_and_employees_fixture):
 
 
 def test_ordered_by_direction_fragment(handles_and_containers_world):
-    """The direction word in ordered-by must come from SortDirections (not a bare string)."""
+    """The direction word in ordered-by must come from the ordering-range vocabulary (not a bare string)."""
     world = handles_and_containers_world
     cabinet = variable(Cabinet, domain=world.views)
     drawer = flat_variable(cabinet.drawers)

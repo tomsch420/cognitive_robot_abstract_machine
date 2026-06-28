@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from typing_extensions import List, Optional, Union
+from typing_extensions import List, Optional
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.query.operations import GroupedBy
@@ -18,8 +18,8 @@ class GroupPlan:
     """The group-by key expressions (empty ⇒ a bare *"grouped"* / no clause)."""
 
     aggregated: List[SymbolicExpression]
-    """Selected expressions aggregated (not group keys) — rendered plural; empty for a bare
-    grouped-by node."""
+    """Selected expressions aggregated (not group keys) — rendered plural; empty when the query
+    selects no aggregations."""
 
     weaves_aggregated: bool = False
     """``True`` when the query weaves its aggregated selections into the clause
@@ -38,9 +38,9 @@ class GroupPlan:
 
 
 @dataclass
-class GroupedByPlanner(Planner[Union[Query, GroupedBy], GroupPlan]):
+class GroupedByPlanner(Planner[Query, GroupPlan]):
     """
-    Decompose the GROUP BY of *node* (a query or a bare grouped-by node) into a ``GroupPlan``.
+    Decompose a query's GROUP BY into a ``GroupPlan``.
 
     The query-algebra facts — which keys group the results and which selections are aggregated over
     them — are owned by the EQL expressions (``GroupedBy.group_key_root_ids`` and
@@ -64,24 +64,16 @@ class GroupedByPlanner(Planner[Union[Query, GroupedBy], GroupPlan]):
         grouped = self._grouped_by()
         if grouped is None or not grouped.variables_to_group_by:
             return GroupPlan(keys=[], aggregated=[])
-        aggregated = (
-            self.node.aggregated_selections(grouped.group_key_root_ids)
-            if isinstance(self.node, Query)
-            else []
-        )
         return GroupPlan(
             keys=list(grouped.variables_to_group_by),
-            aggregated=aggregated,
+            aggregated=self.node.aggregated_selections(grouped.group_key_root_ids),
             weaves_aggregated=not isinstance(self.node, SetOf),
         )
 
     def _grouped_by(self) -> Optional[GroupedBy]:
-        """:return: The GROUP BY of *node* — *node* itself when it is a bare ``GroupedBy``, else
-        the query's grouped-by expression (``None`` when the query is ungrouped).
+        """:return: The query's grouped-by expression (``None`` when the query is ungrouped).
 
         >>> GroupedByPlanner(an(entity(variable(Employee, []))))._grouped_by() is None
         True
         """
-        if isinstance(self.node, GroupedBy):
-            return self.node
         return self.node._grouped_by_expression_

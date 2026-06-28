@@ -210,7 +210,7 @@ def test_cardinal_words():
 def test_ranking_form_selection(n, direction, relation, expected):
     """The registry picks the right form per (direction, count, key-relation) — OCP seam."""
     from krrood.entity_query_language.verbalization.grammar.query.planner import (
-        RankingDirection,
+        SortDirection,
         RankingKeyRelation,
         RankingPlan,
     )
@@ -220,10 +220,10 @@ def test_ranking_form_selection(n, direction, relation, expected):
     )
 
     direction_value = {
-        "NONE": RankingDirection.NONE,
-        "ASCENDING": RankingDirection.ASCENDING,
-        "DESCENDING": RankingDirection.DESCENDING,
-        "OTHER_relation": RankingDirection.DESCENDING,
+        "NONE": SortDirection.NONE,
+        "ASCENDING": SortDirection.ASCENDING,
+        "DESCENDING": SortDirection.DESCENDING,
+        "OTHER_relation": SortDirection.DESCENDING,
     }[n]
     relation_value = {
         "SELF": RankingKeyRelation.SELF,

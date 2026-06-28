@@ -56,8 +56,8 @@ class SpecificityRule(ABC):
         >>> from krrood.entity_query_language.verbalization.grammar.query.ranking import (
         ...     RankingForm, RankingRequest)
         >>> from krrood.entity_query_language.verbalization.grammar.query.planner import (
-        ...     RankingPlan, RankingDirection, RankingKeyRelation)
-        >>> plan = RankingPlan(limit_number=3, direction=RankingDirection.DESCENDING,
+        ...     RankingPlan, SortDirection, RankingKeyRelation)
+        >>> plan = RankingPlan(limit_number=3, direction=SortDirection.DESCENDING,
         ...     relation=RankingKeyRelation.ATTRIBUTE, order_key=None)
         >>> RankingForm.most_applicable(RankingRequest(plan=plan)).__name__
         'AttributeRankedByForm'

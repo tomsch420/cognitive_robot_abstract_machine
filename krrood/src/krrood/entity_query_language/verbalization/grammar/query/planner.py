@@ -59,8 +59,8 @@ class ReportKind(Enum):
     ordering ranges over all the results)."""
 
 
-class RankingDirection(Enum):
-    """The ordering direction a ``limit`` selects over, if any."""
+class SortDirection(Enum):
+    """The direction a sort runs in — shared by a ``limit`` ranking and an ORDER BY clause."""
 
     NONE = auto()
     """A ``limit`` with no ``ordered_by`` — the first *n* in natural order."""
@@ -91,7 +91,7 @@ class RankingPlan:
     limit_number: int
     """The limit (always ``>= 1``)."""
 
-    direction: RankingDirection
+    direction: SortDirection
     """The ordering direction, or ``NONE`` for a bare ``limit``."""
 
     relation: RankingKeyRelation
@@ -397,14 +397,12 @@ class QueryPlanner(Planner[Query, QueryPlan]):
         if builder is None:
             return RankingPlan(
                 limit_number=limit,
-                direction=RankingDirection.NONE,
+                direction=SortDirection.NONE,
                 relation=RankingKeyRelation.SELF,
                 order_key=None,
             )
         direction = (
-            RankingDirection.DESCENDING
-            if builder.descending
-            else RankingDirection.ASCENDING
+            SortDirection.DESCENDING if builder.descending else SortDirection.ASCENDING
         )
         return RankingPlan(
             limit_number=limit,

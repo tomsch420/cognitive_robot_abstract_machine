@@ -21,7 +21,7 @@ from krrood.entity_query_language.verbalization.grammar.framework.specificity im
     SpecificityRule,
 )
 from krrood.entity_query_language.verbalization.grammar.query.planner import (
-    RankingDirection,
+    SortDirection,
     RankingKeyRelation,
     RankingPlan,
 )
@@ -59,18 +59,18 @@ class RankingSurface:
     """Post-nominal modifiers — *"with the highest salary"* / *"by salary"* — or empty."""
 
 
-def _quality(direction: RankingDirection, n: int) -> RankingWords:
+def _quality(direction: SortDirection, n: int) -> RankingWords:
     """:return: The leading quality word for a (direction, n): *first* (no order), *highest*/*top*
     (descending, n=1/n>1), *lowest*/*bottom* (ascending, n=1/n>1).
 
-    >>> _quality(RankingDirection.DESCENDING, 1).name
+    >>> _quality(SortDirection.DESCENDING, 1).name
     'HIGHEST'
-    >>> _quality(RankingDirection.DESCENDING, 3).name
+    >>> _quality(SortDirection.DESCENDING, 3).name
     'TOP'
     """
-    if direction is RankingDirection.DESCENDING:
+    if direction is SortDirection.DESCENDING:
         return RankingWords.HIGHEST if n == 1 else RankingWords.TOP
-    if direction is RankingDirection.ASCENDING:
+    if direction is SortDirection.ASCENDING:
         return RankingWords.LOWEST if n == 1 else RankingWords.BOTTOM
     return RankingWords.FIRST
 
@@ -197,7 +197,7 @@ class AttributeSuperlativeForm(LeadingRankForm):
         """
         superlative = (
             RankingWords.LOWEST
-            if request.plan.direction is RankingDirection.ASCENDING
+            if request.plan.direction is SortDirection.ASCENDING
             else RankingWords.HIGHEST
         )
         modifier = PhraseFragment(
@@ -244,7 +244,7 @@ class AttributeRankedByForm(LeadingRankForm):
         plan = request.plan
         quality = (
             RankingWords.BOTTOM
-            if plan.direction is RankingDirection.ASCENDING
+            if plan.direction is SortDirection.ASCENDING
             else RankingWords.TOP
         )
         pre_head = PhraseFragment(

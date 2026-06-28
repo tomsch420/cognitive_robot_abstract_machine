@@ -98,7 +98,6 @@ def test_every_construct_folder_contributes_rules():
         "query",
         "inference",
         "aggregation",
-        "clauses",
         "instantiated",
     ):
         assert (

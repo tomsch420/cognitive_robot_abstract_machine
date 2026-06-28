@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from typing_extensions import List, Optional, Union
+from typing_extensions import List, Optional
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.query.builders import OrderedByBuilder
-from krrood.entity_query_language.query.operations import GroupedBy, OrderedBy
 from krrood.entity_query_language.query.query import Query
 from krrood.entity_query_language.verbalization.fragments.base import (
     oxford_comma,
@@ -22,16 +21,25 @@ from krrood.entity_query_language.verbalization.grammar.clauses.planner import (
     GroupedByPlanner,
     GroupPlan,
 )
+from krrood.entity_query_language.verbalization.grammar.query.planner import (
+    SortDirection,
+)
 from krrood.entity_query_language.verbalization.vocabulary.english import (
     Articles,
     Conjunctions,
     Copulas,
     Keywords,
-    SortDirections,
+    OrderingRangeWords,
 )
 
+_ORDERING_RANGE_WORDS = {
+    SortDirection.ASCENDING: OrderingRangeWords.LOWEST_TO_HIGHEST,
+    SortDirection.DESCENDING: OrderingRangeWords.HIGHEST_TO_LOWEST,
+}
+"""Maps a :class:`SortDirection` to the ORDER BY range prose it surfaces as."""
 
-class GroupedByAssembler(Assembler[Union[Query, GroupedBy], GroupPlan]):
+
+class GroupedByAssembler(Assembler[Query, GroupPlan]):
     """
     *"grouped by <keys>"* — or *"and the <aggregated> are grouped by <keys>"* in a query.
 
@@ -40,7 +48,7 @@ class GroupedByAssembler(Assembler[Union[Query, GroupedBy], GroupPlan]):
 
     A grouped set-of *report* fronts its grouping as *"For each <key>, report …"* in the query
     assembler, so this clause is used for the in-query weave (*"and the <aggregated> are grouped by
-    …"*) and bare grouped-by nodes.
+    …"*).
 
     >>> employee = variable(Employee, [])
     >>> verbalize_expression(
@@ -51,21 +59,17 @@ class GroupedByAssembler(Assembler[Union[Query, GroupedBy], GroupPlan]):
 
     planner = GroupedByPlanner
 
-    def realize(
-        self, node: Union[Query, GroupedBy], plan: GroupPlan
-    ) -> VerbalizationFragment:
+    def realize(self, node: Query, plan: GroupPlan) -> VerbalizationFragment:
         """
-        :param node: The query (or bare grouped-by node) being rendered.
-        :param plan: The group plan.
+        :param node: The query being rendered.
+        :param plan: The group plan (always carries keys — :meth:`clause` gates on their presence).
         :return: *"grouped by <keys>"* — or *"and the <aggregated> are grouped by <keys>"* when
-            the query also selects aggregations (bare *"grouped"* when there are no keys).
+            the query also selects aggregations.
 
         It renders the grouping key (*"department"*) that the report is grouped on. For the grouped
         set-of report in the class example, the query assembler fronts that key as the leading *"For
         each department, report"* frame and drops this trailing clause as redundant.
         """
-        if not plan.has_keys:
-            return Keywords.GROUPED.as_fragment()
         groups_phrase = self._keys_phrase(plan.keys)
         if plan.aggregated and plan.weaves_aggregated:
             aggregated_phrase = oxford_comma(
@@ -87,7 +91,7 @@ class GroupedByAssembler(Assembler[Union[Query, GroupedBy], GroupPlan]):
             )
         return PhraseFragment(parts=[Keywords.GROUPED_BY.as_fragment(), groups_phrase])
 
-    def clause(self, node: Union[Query, GroupedBy]) -> Optional[VerbalizationFragment]:
+    def clause(self, node: Query) -> Optional[VerbalizationFragment]:
         """
         :param node: The query being rendered.
         :return: The in-query GROUP BY clause, or ``None`` when there are no group keys.
@@ -128,7 +132,7 @@ class GroupedByAssembler(Assembler[Union[Query, GroupedBy], GroupPlan]):
         )
 
 
-class OrderedByAssembler(Assembler[Union[OrderedBy, OrderedByBuilder], None]):
+class OrderedByAssembler(Assembler[OrderedByBuilder, None]):
     """*"ordered by <variable> from lowest to highest / from highest to lowest"*. Realisation-only
     (no plan).
 
@@ -138,13 +142,10 @@ class OrderedByAssembler(Assembler[Union[OrderedBy, OrderedByBuilder], None]):
     """
 
     def realize(
-        self, node: Union[OrderedBy, OrderedByBuilder], plan: None = None
+        self, node: OrderedByBuilder, plan: None = None
     ) -> VerbalizationFragment:
         """
-        *node* is "ordered-like": an ``OrderedBy`` expression or an ``OrderedByBuilder``, both
-        exposing ``.variable`` and ``.descending``.
-
-        :param node: The ordered-by expression or builder.
+        :param node: The ordered-by builder (exposing ``.variable`` and ``.descending``).
         :param plan: Unused (this assembler has no plan).
         :return: The clause *"ordered by <variable> from lowest to highest"* (ascending) or
             *"… from highest to lowest"* (descending).
@@ -154,13 +155,13 @@ class OrderedByAssembler(Assembler[Union[OrderedBy, OrderedByBuilder], None]):
         query.
         """
         direction = (
-            SortDirections.DESCENDING if node.descending else SortDirections.ASCENDING
+            SortDirection.DESCENDING if node.descending else SortDirection.ASCENDING
         )
         return PhraseFragment(
             parts=[
                 Keywords.ORDERED_BY.as_fragment(),
                 self.context.child(node.variable),
-                direction.as_fragment(),
+                _ORDERING_RANGE_WORDS[direction].as_fragment(),
             ]
         )
 

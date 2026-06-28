@@ -127,7 +127,6 @@ def test_doctest_discovery_includes_previously_uncovered_modules():
         "grammar.query.rules",
         "grammar.query.assembler",
         "grammar.query.planner",
-        "grammar.clauses.rules",
         "grammar.clauses.assembler",
         "grammar.clauses.planner",
         "grammar.aggregation.rules",

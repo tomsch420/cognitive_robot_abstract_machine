@@ -187,7 +187,6 @@ class Keywords(VocabEnum):
     WHICH = KeyWord("which")
     THAT = KeyWord("that")
     GROUPED_BY = KeyWord("grouped by")
-    GROUPED = KeyWord("grouped")
     HAVING = KeyWord("having")
     ORDERED_BY = KeyWord("ordered by")
     PREDICT = KeyWord("predict")
@@ -577,12 +576,12 @@ class CoindexedPhrases(VocabEnum):
     HAVE_THE_SAME = PlainWord("have the same")
 
 
-class SortDirections(VocabEnum):
-    """Sort direction prose for ORDERED BY clauses — the range the ordering runs over, read as
-    plain English rather than a parenthetical SQL keyword."""
+class OrderingRangeWords(VocabEnum):
+    """The range an ORDER BY clause runs over, read as plain English rather than a parenthetical SQL
+    keyword. Looked up from a :class:`SortDirection` by the ordered-by assembler."""
 
-    ASCENDING = PlainWord("from lowest to highest")
-    DESCENDING = PlainWord("from highest to lowest")
+    LOWEST_TO_HIGHEST = PlainWord("from lowest to highest")
+    HIGHEST_TO_LOWEST = PlainWord("from highest to lowest")
 
 
 class RankingWords(VocabEnum):

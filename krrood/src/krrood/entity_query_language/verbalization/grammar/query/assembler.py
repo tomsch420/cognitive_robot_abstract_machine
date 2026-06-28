@@ -36,7 +36,7 @@ from krrood.entity_query_language.verbalization.grammar.clauses.composer import 
 from krrood.entity_query_language.verbalization.grammar.query.planner import (
     QueryPlan,
     QueryPlanner,
-    RankingDirection,
+    SortDirection,
     RankingKeyRelation,
     ReportKind,
     ReportPlan,
@@ -247,7 +247,7 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
         return None
 
     def _highest_aggregate_modifier(
-        self, aggregate: SymbolicExpression, direction: RankingDirection
+        self, aggregate: SymbolicExpression, direction: SortDirection
     ) -> VerbalizationFragment:
         """:return: the post-nominal ranking modifier *"with the highest/lowest <aggregate>"* — the
         aggregate's first (full) mention, which the body's repeat reduces to *"the sum"*.
@@ -288,14 +288,14 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
         return (kind, root_id, path)
 
     def _with_superlative(
-        self, fragment: VerbalizationFragment, direction: RankingDirection
+        self, fragment: VerbalizationFragment, direction: SortDirection
     ) -> VerbalizationFragment:
         """:return: *fragment* qualified by the ranking superlative — *"the highest …"* (descending) /
         *"the lowest …"* (ascending) — attached as the noun's pre-head so it reads *"the highest sum
         of …"*."""
         quality = (
             RankingWords.LOWEST
-            if direction is RankingDirection.ASCENDING
+            if direction is SortDirection.ASCENDING
             else RankingWords.HIGHEST
         )
         if isinstance(fragment, NounPhrase):
