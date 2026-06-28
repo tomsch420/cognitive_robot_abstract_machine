@@ -666,17 +666,16 @@ It is directly useful for displaying *why* a robot perceives something as a Draw
 Pass `link_resolver=AutoAPIResolver(...)` when constructing the renderer and class/attribute
 names become clickable links — opening the corresponding Sphinx AutoAPI documentation page.
 
-`AutoAPIResolver` works in two modes:
-
-| Mode | How to construct | When it works |
-|---|---|---|
-| **Local** | `AutoAPIResolver.for_package("krrood")` | After `sphinx-build doc doc/_build/html` |
-| **GitHub Pages** | `AutoAPIResolver(base_url="https://cram2.github.io/…/krrood")` | Always, no local build needed |
+For links rendered *inside* this documentation site, use `AutoAPIResolver.for_in_site_docs()`: it
+emits links **relative** to the current page, so they resolve to the sibling `autoapi/` tree in any
+build or host — a local `_build/html`, a Pages preview, or the published site — with no hard-coded
+URL. (For a live preview from an IDE instead, `AutoAPIResolver.for_package("krrood")` targets the
+IDE's `localhost` server against a local `sphinx-build doc doc/_build/html`.)
 
 The demo below uses `Robot` and `Mission` from
 `krrood.entity_query_language.verbalization.example_domain` — real classes that Sphinx AutoAPI
 documents like any other module under `src`, so their hyperlinks resolve to the generated AutoAPI
-pages both on GitHub Pages and in a locally built docs tree (no hand-maintained mock API needed).
+pages in any built docs tree (no hand-maintained mock API needed).
 
 ```{code-cell} ipython3
 from krrood.entity_query_language.verbalization.example_domain import Robot, Mission
