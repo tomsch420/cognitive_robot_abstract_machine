@@ -7,6 +7,7 @@ from __future__ import annotations
 from timeit import default_timer
 
 from py_trees.common import Status
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.io.camera_interface import CameraInterface
@@ -19,22 +20,25 @@ class StaticCameraTransformAnnotator(BaseAnnotator):
         class Parameters:
             def __init__(self) -> None:
                 self.world_frame: str = "map"
+                """Reference frame used for the camera-to-world transform."""
+
                 self.camera_frame: str = "camera"
-                self.translation: tuple[float, float, float] = (0.0, 0.0, 0.0)
-                self.rotation_xyzw: tuple[float, float, float, float] = (
-                    0.0,
-                    0.0,
-                    0.0,
-                    1.0,
+                """Camera frame used as the transform child frame."""
+
+                self.world_T_camera: HomogeneousTransformationMatrix = (
+                    HomogeneousTransformationMatrix()
                 )
+                """Camera pose relative to the configured world frame."""
 
         parameters = Parameters()
 
     def __init__(
         self,
         name: str = "StaticCameraTransform",
-        descriptor: StaticCameraTransformAnnotator.Descriptor = Descriptor(),
+        descriptor: StaticCameraTransformAnnotator.Descriptor | None = None,
     ) -> None:
+        if descriptor is None:
+            descriptor = StaticCameraTransformAnnotator.Descriptor()
         super().__init__(name=name, descriptor=descriptor)
 
     def update(self) -> Status:
@@ -47,8 +51,7 @@ class StaticCameraTransformAnnotator(BaseAnnotator):
             cas=cas,
             world_frame=params.world_frame,
             camera_frame=params.camera_frame,
-            translation=params.translation,
-            rotation_xyzw=params.rotation_xyzw,
+            world_T_camera=params.world_T_camera,
         )
 
         end_timer = default_timer()
