@@ -133,12 +133,12 @@ class SharedSubjectComparisons:
 @dataclass
 class SharedSubjectConjunction:
     """The conjunctive analogue of :class:`SharedSubjectComparisons`: two or more value comparisons
-    on the *same bare variable*, said once as a restrictive relative clause — *"an Integer that is
+    on the *same bare variable*, said once as one shared-subject main clause — *"an Integer is
     between 1 and 10 and is not 5"* — rather than repeating the subject per conjunct.
 
-    Scoped to a *bare variable* subject (not an attribute chain), so the relative pronoun attaches
-    unambiguously to the subject noun; an attribute-chain conjunction (*"the battery of a Robot"*)
-    keeps its per-clause surface, where a *"that"* clause would dangle.
+    Scoped to a *bare variable* subject (not an attribute chain), so the shared subject and copula
+    lead a single clause; an attribute-chain conjunction (*"the battery of a Robot"*) names a
+    different subject per conjunct and so keeps its per-clause surface.
     """
 
     subject_expression: SymbolicExpression

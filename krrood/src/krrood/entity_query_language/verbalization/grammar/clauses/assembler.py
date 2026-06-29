@@ -182,29 +182,29 @@ class OrderedByAssembler(Assembler[OrderedByBuilder, None]):
 
 
 class HavingAssembler(Assembler[Query, None]):
-    """*"having <condition>"* (compact comparators). Realisation-only (no plan).
+    """*"where <condition>"* — the per-group HAVING filter as a full clause. Realisation-only (no plan).
 
     >>> employee = variable(Employee, [])
     >>> total = sum(employee.salary)
     >>> verbalize_expression(
     ...     a(set_of(employee.department, total).grouped_by(employee.department).having(total > 30000))
     ... )
-    'For each department, report the sum of salaries of Employees having the sum greater than 30000'
+    'For each department, report the sum of salaries of Employees where the sum is greater than 30000'
     """
 
     def realize(self, node: Query, plan: None = None) -> VerbalizationFragment:
         """
         :param node: The query whose HAVING condition to render.
         :param plan: Unused (this assembler has no plan).
-        :return: *"having <condition>"* — the condition rendered with compact (copula-less)
-            comparators.
+        :return: *"where <condition>"* — the group filter as a full *"where the sum is greater than
+            30000"* clause.
 
-        It emits only the trailing *"having the sum greater than 30000"* span, using compact
-        comparators so the condition reads tersely; the rest of the report comes from elsewhere.
+        The condition keeps its copula (*"the sum is greater than 30000"*) and is introduced by
+        *"where"* — a group-level filter reads as a clause, not the bare *"having …"* participle that
+        misparses as modifying the reported population; the rest of the report comes from elsewhere.
         """
-        with self.context.configuration.compact_predicates_scope():
-            having_fragment = self.context.child(node._having_expression_.condition)
-        return PhraseFragment(parts=[Keywords.HAVING.as_fragment(), having_fragment])
+        having_fragment = self.context.child(node._having_expression_.condition)
+        return PhraseFragment(parts=[Keywords.WHERE.as_fragment(), having_fragment])
 
     def clause(self, query: Query) -> Optional[VerbalizationFragment]:
         """
@@ -212,13 +212,13 @@ class HavingAssembler(Assembler[Query, None]):
         :return: The in-query HAVING clause, or ``None`` when there is no HAVING.
 
         It is the in-query having gate: present a HAVING expression and it renders the trailing
-        *"having the number greater than 5"* span, otherwise nothing:
+        *"where the number is greater than 5"* span, otherwise nothing:
 
         >>> employee = variable(Employee, [])
         >>> headcount = count(employee.name)
         >>> verbalize_expression(
         ...     a(set_of(employee.department, headcount).grouped_by(employee.department).having(headcount > 5))
         ... )
-        'For each department, report the number of names of Employees having the number greater than 5'
+        'For each department, report the number of names of Employees where the number is greater than 5'
         """
         return self.realize(query) if query._having_expression_ is not None else None

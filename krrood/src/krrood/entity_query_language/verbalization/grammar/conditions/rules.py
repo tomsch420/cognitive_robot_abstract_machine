@@ -104,7 +104,7 @@ class AndRule(PhraseRule):
     'the battery of a Robot is between 10 and 90'
     >>> x = variable(int, [])
     >>> verbalize_expression(and_(x > 1, x < 10, x != 5))
-    'an Integer that is between 1 and 10 and is not 5'
+    'an Integer is between 1 and 10 and is not 5'
     """
 
     construct = AND
@@ -114,8 +114,8 @@ class AndRule(PhraseRule):
 
         It owns the *, and* coordination between the two conjuncts of the example; the conjunct
         clauses themselves come from the shared statement assembler. When every conjunct is a value
-        comparison on one bare variable, it factors to the *"<subject> that is …"* relative clause via
-        the :class:`SharedSubjectConjunction` fold.
+        comparison on one bare variable, it factors to the *"<subject> is …"* shared-subject main
+        clause via the :class:`SharedSubjectConjunction` fold.
 
         >>> robot = variable(Robot, [])
         >>> verbalize_expression(and_(robot.battery > 50, robot.name == 'x'))
@@ -161,7 +161,7 @@ class RangeFoldRule(PhraseRule):
             context.child(node.chain_expression),
             context.child(node.lower_expression),
             context.child(node.upper_expression),
-            compact=context.configuration.compact_predicates,
+            compact=False,
         )
 
 
@@ -294,16 +294,17 @@ class SharedSubjectComparisonsRule(PhraseRule):
 
 
 class SharedSubjectConjunctionRule(PhraseRule):
-    """Factored conjunction *"<subject> that is <tail>, …, and <tail>"* — the
+    """Factored conjunction *"<subject> is <tail>, …, and <tail>"* — the
     :class:`SharedSubjectConjunction` artifact produced when every conjunct of an ``AND`` is a value
     comparison on one shared *bare variable*.
 
-    The subject and the leading copula are said once and the predicate tails coordinate under a
-    restrictive relative clause; the conjunctive analogue of :class:`SharedSubjectComparisonsRule`.
+    The subject and the leading copula are said once and the predicate tails coordinate as one main
+    clause; the conjunctive analogue of :class:`SharedSubjectComparisonsRule` (*"… is either … or …"*),
+    so a conjunction and a disjunction over the same subject read with the same *"<subject> is …"* lead.
 
     >>> x = variable(int, [])
     >>> verbalize_expression(and_(x > 1, x < 10, x != 5))
-    'an Integer that is between 1 and 10 and is not 5'
+    'an Integer is between 1 and 10 and is not 5'
     """
 
     construct = SharedSubjectConjunction
@@ -311,12 +312,12 @@ class SharedSubjectConjunctionRule(PhraseRule):
     def build(
         self, node: SharedSubjectConjunction, context: RuleContext
     ) -> VerbalizationFragment:
-        """Say the factored conjunction — subject once, the lead copula carried by the relative
-        clause, the tails coordinated Oxford-style.
+        """Say the factored conjunction — subject once, the lead copula carried by the first tail, the
+        tails coordinated Oxford-style.
 
         >>> x = variable(int, [])
         >>> verbalize_expression(and_(x > 5, x != 5))
-        'an Integer that is greater than 5 and is not 5'
+        'an Integer is greater than 5 and is not 5'
         """
         tails = [
             self._tail(tail, context, lead=index == 0)
@@ -325,7 +326,6 @@ class SharedSubjectConjunctionRule(PhraseRule):
         return PhraseFragment(
             parts=[
                 context.child(node.subject_expression),
-                Keywords.THAT.as_fragment(),
                 oxford_comma(tails, Conjunctions.AND.as_fragment()),
             ]
         )
@@ -334,9 +334,9 @@ class SharedSubjectConjunctionRule(PhraseRule):
     def _tail(cls, tail, context: RuleContext, *, lead: bool) -> VerbalizationFragment:
         """:return: one relative-clause tail. A folded :class:`RangeFold` reads *"between low and
         high"* (with the lead copula when it leads); a :class:`Comparator` reads its
-        operator-and-value tail. The lead tail carries the clause's copula (*"that is greater than
-        1"*); a negation re-introduces it (*"is not 5"*); a bare equality has an empty core, so it too
-        keeps the copula (*"is 5"*); every other positive tail shares the lead copula and drops it
+        operator-and-value tail. The lead tail carries the clause's copula (*"is greater than 1"*); a
+        negation re-introduces it (*"is not 5"*); a bare equality has an empty core, so it too keeps
+        the copula (*"is 5"*); every other positive tail shares the lead copula and drops it
         (*"less than 10"*)."""
         if isinstance(tail, RangeFold):
             return between_phrase(

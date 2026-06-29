@@ -347,7 +347,7 @@ total = eql.sum(employee.salary)
 print(verbalize_expression(
     a(set_of(employee.department, total).grouped_by(employee.department).having(total > 30000))
 ))
-# For each department, report the sum of salaries of Employees having the sum greater than 30000
+# For each department, report the sum of salaries of Employees where the sum is greater than 30000
 ```
 
 A plain (non-aggregating, unordered) `set_of` stays a search and also drops the parentheses.
@@ -515,9 +515,10 @@ query = a(
 print(verbalize_expression(query))
 ```
 
-The HAVING clause uses the *compact* (copula-less) operator form — *"greater than 30000"*
-instead of *"is greater than 30000"* — matching SQL-style conciseness.  The GROUP BY
-clause states only the grouping key without restating the full selection tuple.
+The HAVING clause reads as a full *"where <aggregate> is greater than 30000"* group filter — a
+clause rather than a bare *"having …"* participle, so it is unambiguous that the condition filters
+the groups, not the reported population.  The GROUP BY clause states only the grouping key without
+restating the full selection tuple.
 
 ## Colored Terminal Output
 

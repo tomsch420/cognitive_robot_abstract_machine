@@ -770,9 +770,9 @@ def test_verbalize_and_chain_flattening():
     x = variable(int, [])
     cond = and_(x > 1, x < 10, x != 5)
     text = verbalize_expression(cond)
-    # The flattened conjuncts on one bare variable factor into a relative clause; the complementary
-    # bound pair folds to "between".
-    assert text == "an Integer that is between 1 and 10 and is not 5"
+    # The flattened conjuncts on one bare variable factor into one shared-subject main clause; the
+    # complementary bound pair folds to "between".
+    assert text == "an Integer is between 1 and 10 and is not 5"
 
 
 def test_verbalize_and_stops_at_or():
@@ -934,7 +934,7 @@ def test_max_re_mention_in_having_reduces_to_the_head():
     query = a(set_of(max_amount).grouped_by(t.amount_details).having(max_amount > 100))
     text = verbalize_expression(query)
     assert text.count("the maximum of") == 1  # the column names it in full, once
-    assert "having the maximum greater than 100" in text  # the re-mention reduces
+    assert "where the maximum is greater than 100" in text  # the re-mention reduces
 
 
 # ── Nested sub-queries as values (the imperative "Find" is reserved for the top level) ──
@@ -1256,7 +1256,9 @@ def test_verbalize_complex_having(departments_and_employees_fixture):
     assert "salaries" in text
     assert "For each department, report" in text  # a report, fronted by its grouping
     assert "grouped by" not in text
-    assert "having" in text
+    assert (
+        "where the average is greater than" in text
+    )  # HAVING as a group-filter clause
     assert "30000" in text
 
 
@@ -1273,7 +1275,7 @@ def test_grouped_having_reduces_the_repeated_aggregate():
     text = verbalize_expression(query)
     assert (
         text
-        == "For each department, report the sum of salaries of Employees having the sum greater than 30000"
+        == "For each department, report the sum of salaries of Employees where the sum is greater than 30000"
     )
     assert text.count("the sum of salaries of Employees") == 1
 
@@ -1522,8 +1524,10 @@ def test_aggregator_coreference_second_mention_is_the(
     assert "the average of" in text
 
 
-def test_having_comparator_omits_is_copula(departments_and_employees_fixture):
-    """HAVING condition should use compact comparator form without the 'is' copula."""
+def test_having_renders_as_where_clause_with_copula(departments_and_employees_fixture):
+    """The per-group HAVING filter reads as a full *"where <aggregate> is <op> <value>"* clause, so
+    the group condition is unambiguous rather than the bare *"having the sum greater than …"* that
+    misparses as modifying the reported population."""
     _, _ = departments_and_employees_fixture
     employee = variable(Employee, domain=None)
     avg_salary = eql.average(employee.salary)
@@ -1534,9 +1538,8 @@ def test_having_comparator_omits_is_copula(departments_and_employees_fixture):
     )
     text = verbalize_expression(query)
 
-    having_part = text[text.index("having") :]
-    assert "is greater than" not in having_part
-    assert "greater than" in having_part
+    where_part = text[text.index("where") :]
+    assert "is greater than" in where_part
 
 
 def test_where_keeps_is_copula(departments_and_employees_fixture):
@@ -1550,8 +1553,10 @@ def test_where_keeps_is_copula(departments_and_employees_fixture):
     assert "is greater than" in where_part
 
 
-def test_having_compound_condition_all_compact(departments_and_employees_fixture):
-    """AND/OR inside HAVING: every comparator should use compact form."""
+def test_having_compound_condition_renders_full_clauses(
+    departments_and_employees_fixture,
+):
+    """AND/OR inside the HAVING *where* clause: every comparator reads as a full *"is <op> …"* clause."""
     _, _ = departments_and_employees_fixture
     employee = variable(Employee, domain=None)
     avg_salary = eql.average(employee.salary)
@@ -1563,15 +1568,15 @@ def test_having_compound_condition_all_compact(departments_and_employees_fixture
     )
     text = verbalize_expression(query)
 
-    having_part = text[text.index("having") :]
-    assert "is greater than" not in having_part
-    assert "is at least" not in having_part
-    assert "greater than" in having_part
-    assert "at least" in having_part
+    where_part = text[text.index("where") :]
+    assert "is greater than" in where_part
+    assert "is at least" in where_part
 
 
-def test_having_negated_comparator_compact(departments_and_employees_fixture):
-    """NOT over a comparator inside HAVING should also omit 'is'."""
+def test_having_negated_comparator_renders_full_clause(
+    departments_and_employees_fixture,
+):
+    """NOT over a comparator inside the HAVING *where* clause reads as *"is not <op> …"*."""
     _, _ = departments_and_employees_fixture
     employee = variable(Employee, domain=None)
     avg_salary = eql.average(employee.salary)
@@ -1582,9 +1587,8 @@ def test_having_negated_comparator_compact(departments_and_employees_fixture):
     )
     text = verbalize_expression(query)
 
-    having_part = text[text.index("having") :]
-    assert "is not greater than" not in having_part
-    assert "not greater than" in having_part
+    where_part = text[text.index("where") :]
+    assert "is not greater than" in where_part
 
 
 def test_set_of_grouped_by_reports_without_restating_the_key(
@@ -1609,7 +1613,7 @@ def test_set_of_grouped_by_reports_without_restating_the_key(
     assert (
         text.count("department") == 1
     )  # named once in "For each department", not restated
-    assert "having" in text and "30000" in text
+    assert "where" in text and "30000" in text
 
 
 # ── Comparator "is" form ──────────────────────────────────────────────────────
@@ -1634,8 +1638,10 @@ def test_verbalize_not_comparator_ne():
     assert "is" in text
 
 
-def test_verbalize_having_compact_eq_uses_equals():
-    """HAVING compact mode: == keeps 'equals' (not 'is') so the copula-less form is readable."""
+def test_verbalize_having_eq_uses_is_copula():
+    """The HAVING *where* clause renders ``==`` with the copula like any other clause — *"the number
+    is equal to 2"* — not the copula-less *"equals"* the old compact HAVING form used.
+    """
     employee = variable(Employee, domain=None)
     count_emp = eql.count(employee)
     query = a(
@@ -1644,9 +1650,8 @@ def test_verbalize_having_compact_eq_uses_equals():
         .having(count_emp == 2)
     )
     text = verbalize_expression(query)
-    having_part = text[text.index("having") :]
-    assert "equals" in having_part
-    assert "is 2" not in having_part
+    where_part = text[text.index("where") :]
+    assert "is equal to 2" in where_part
 
 
 # ── Non-predicate InstantiatedVariable natural-English form ───────────────────
