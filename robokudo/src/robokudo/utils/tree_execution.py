@@ -32,6 +32,7 @@ from robokudo.identifier import BBIdentifier
 if TYPE_CHECKING:
     from py_trees.behaviour import Behaviour
     from py_trees_ros.trees import BehaviourTree
+    from robokudo.cas import CAS
 
 _T = TypeVar("_T")
 
@@ -133,11 +134,14 @@ def run_tree_until_successful_cas_count(
     include_gui: bool = False,
     max_iterations: int = 500,
     tick_rate: int = 20,
+    on_successful_cas: Optional[Callable[[CAS], None]] = None,
 ) -> list:
     """Execute a tree until a requested number of distinct successful CASes exist.
 
     The tree is setup once without a ``OneShot`` wrapper so continuously running
     pipelines can process multiple percepts using the same ROS node.
+    ``on_successful_cas`` is called immediately after each new successful CAS is
+    observed.
     """
     if expected_cas_count < 0:
         raise ValueError("expected_cas_count must be non-negative")
@@ -148,25 +152,27 @@ def run_tree_until_successful_cas_count(
     setup_with_descendants_rk(ae_root)
 
     seen_cas_ids = set()
-    successful_cases = []
+    successful_cas_instances = []
 
     def stop_condition(tick_count: int) -> Optional[list]:
         if tree.status is Status.SUCCESS:
             cas = tree.cas
             if cas.cas_id not in seen_cas_ids:
                 seen_cas_ids.add(cas.cas_id)
-                successful_cases.append(cas)
+                successful_cas_instances.append(cas)
+                if on_successful_cas is not None:
+                    on_successful_cas(cas)
 
-        if len(successful_cases) >= expected_cas_count:
-            return successful_cases
+        if len(successful_cas_instances) >= expected_cas_count:
+            return successful_cas_instances
 
         if tick_count >= max_iterations:
             raise TimeoutError(
                 f"Expected {expected_cas_count} successful CASes, "
-                f"got {len(successful_cases)} after {tick_count} ticks"
+                f"got {len(successful_cas_instances)} after {tick_count} ticks"
             )
 
         return None
 
     result = _tick_tree_until(ae_root, node, stop_condition, tick_rate)
-    return result if result is not None else successful_cases
+    return result if result is not None else successful_cas_instances
