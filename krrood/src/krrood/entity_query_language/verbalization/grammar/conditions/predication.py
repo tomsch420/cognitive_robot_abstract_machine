@@ -394,8 +394,8 @@ def comparator_operator(
     :param comparator: The comparator expression.
     :param services: Shared verbalization state.
     :param negated: Outer negation (from a wrapping ``Not``).
-    :param compact: Copula-less variant (HAVING clauses).  Defaults to
-        ``services.configuration.compact_predicates`` when ``None``.
+    :param compact: Copula-less variant — the bare operator core without *"is"*. Defaults to the
+        full copular surface (``False``) when ``None``; coordinated tails pass it explicitly.
     :param number: The grammatical number the predicative copula agrees with.
     :param copula: Keep the leading copula on the predicative (non-compact) surface. Pass ``False``
         for the bare core (*"greater than"*) when a shared copula is factored out across coordinated
@@ -409,7 +409,7 @@ def comparator_operator(
     'the battery of a Robot is greater than 50'
     """
     if compact is None:
-        compact = services.configuration.compact_predicates
+        compact = False
     operation = comparator.operation
 
     is_calculation = operation in (operator.eq, operator.ne) and (

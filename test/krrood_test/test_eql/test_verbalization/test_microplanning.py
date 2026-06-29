@@ -124,17 +124,6 @@ def test_query_depth_scope_increments_and_restores():
     assert configuration.query_depth == 0
 
 
-def test_compact_predicates_scope_restores_previous_even_nested():
-    configuration = RenderConfiguration()
-    assert configuration.compact_predicates is False
-    with configuration.compact_predicates_scope():
-        assert configuration.compact_predicates is True
-        with configuration.compact_predicates_scope():
-            assert configuration.compact_predicates is True
-        assert configuration.compact_predicates is True
-    assert configuration.compact_predicates is False
-
-
 # ── Coordination ─────────────────────────────────────────────────────────────
 
 
