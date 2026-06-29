@@ -49,7 +49,7 @@ class ROIAdjusterAnnotator(BaseAnnotator):
     def __init__(
         self,
         name: str = "ROIAdjusterAnnotator",
-        descriptor: ROIAdjusterAnnotator.Descriptor = Descriptor(),
+        descriptor: ROIAdjusterAnnotator.Descriptor | None = None,
     ) -> None:
         """Initialize the ROI adjuster.
 

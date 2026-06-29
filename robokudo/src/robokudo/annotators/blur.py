@@ -60,7 +60,7 @@ class BlurAnnotator(BaseAnnotator):
     def __init__(
         self,
         name: str = "BlurAnnotator",
-        descriptor: BlurAnnotator.Descriptor = Descriptor(),
+        descriptor: BlurAnnotator.Descriptor | None = None,
     ) -> None:
         """Initialize the blur annotator. Minimal one-time init!
 

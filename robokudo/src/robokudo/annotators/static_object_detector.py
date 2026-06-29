@@ -140,7 +140,7 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
     def __init__(
         self,
         name: str = "StaticObjectDetector",
-        descriptor: StaticObjectDetectorAnnotator.Descriptor = Descriptor(),
+        descriptor: StaticObjectDetectorAnnotator.Descriptor | None = None,
     ) -> None:
         """Default construction. Minimal one-time init!
 

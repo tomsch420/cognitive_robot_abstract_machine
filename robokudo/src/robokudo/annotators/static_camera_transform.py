@@ -37,8 +37,6 @@ class StaticCameraTransformAnnotator(BaseAnnotator):
         name: str = "StaticCameraTransform",
         descriptor: StaticCameraTransformAnnotator.Descriptor | None = None,
     ) -> None:
-        if descriptor is None:
-            descriptor = StaticCameraTransformAnnotator.Descriptor()
         super().__init__(name=name, descriptor=descriptor)
 
     def update(self) -> Status:

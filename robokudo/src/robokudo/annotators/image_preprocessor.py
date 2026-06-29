@@ -69,7 +69,7 @@ class ImagePreprocessorAnnotator(BaseAnnotator):
     def __init__(
         self,
         name: str = "ImagePreprocessor",
-        descriptor: ImagePreprocessorAnnotator.Descriptor = Descriptor(),
+        descriptor: ImagePreprocessorAnnotator.Descriptor | None = None,
     ) -> None:
         """Initialize the image preprocessor.
 

@@ -55,7 +55,7 @@ class LambdaFunctionAnnotator(BaseAnnotator):
     def __init__(
         self,
         name: str = "LambdaFunctionAnnotator",
-        descriptor: LambdaFunctionAnnotator.Descriptor = Descriptor(),
+        descriptor: LambdaFunctionAnnotator.Descriptor | None = None,
     ):
         """Initialize the lambda function annotator. Minimal one-time init!
 

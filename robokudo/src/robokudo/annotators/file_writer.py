@@ -66,7 +66,7 @@ class FileWriter(BaseAnnotator):
     def __init__(
         self,
         name: str = "FileWriter",
-        descriptor: FileWriter.Descriptor = Descriptor(),
+        descriptor: FileWriter.Descriptor | None = None,
     ) -> None:
         """Initialize the file writer.
 

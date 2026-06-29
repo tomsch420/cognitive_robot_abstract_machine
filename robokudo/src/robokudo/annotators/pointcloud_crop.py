@@ -77,7 +77,7 @@ class PointcloudCropAnnotator(BaseAnnotator):
     def __init__(
         self,
         name: str = "PointcloudCropAnnotator",
-        descriptor: PointcloudCropAnnotator.Descriptor = Descriptor(),
+        descriptor: PointcloudCropAnnotator.Descriptor | None = None,
     ) -> None:
         """Initialize the point cloud cropper.
 

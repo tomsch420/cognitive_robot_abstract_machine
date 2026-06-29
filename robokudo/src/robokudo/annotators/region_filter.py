@@ -53,7 +53,7 @@ class RegionFilter(ThreadedAnnotator):
     def __init__(
         self,
         name: str = "RegionFilter",
-        descriptor: RegionFilter.Descriptor = Descriptor(),
+        descriptor: RegionFilter.Descriptor | None = None,
     ) -> None:
         """Initialize the region filter.
 

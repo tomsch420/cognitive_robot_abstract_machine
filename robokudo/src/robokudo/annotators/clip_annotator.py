@@ -71,7 +71,11 @@ class ClipAnnotator(ThreadedAnnotator):
                 self.use_softmax: bool = True
                 """Whether to apply softmax to the results of the analyzed image or hypothesis or not."""
 
-    def __init__(self, name: str = "ClipAnnotator", descriptor=Descriptor()) -> None:
+    def __init__(
+        self,
+        name: str = "ClipAnnotator",
+        descriptor: ClipAnnotator.Descriptor | None = None,
+    ) -> None:
         super().__init__(name=name, descriptor=descriptor)
 
         self.rk_logger.debug(f"Starting to init {self.__class__.__name__}")

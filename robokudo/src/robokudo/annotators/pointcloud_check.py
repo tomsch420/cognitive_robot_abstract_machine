@@ -64,7 +64,7 @@ class PointcloudCheckAnnotator(BaseAnnotator):
     def __init__(
         self,
         name: str = "PointcloudcloudCheckAnnotator",
-        descriptor: PointcloudCheckAnnotator.Descriptor = Descriptor(),
+        descriptor: PointcloudCheckAnnotator.Descriptor | None = None,
     ) -> None:
         """Initialize the point cloud checker.
 

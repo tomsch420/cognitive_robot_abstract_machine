@@ -78,7 +78,7 @@ class LocationAnnotator(ThreadedAnnotator):
     def __init__(
         self,
         name: str = "LocationAnnotator",
-        descriptor: LocationAnnotator.Descriptor = Descriptor(),
+        descriptor: LocationAnnotator.Descriptor | None = None,
     ) -> None:
         """Initialize the location annotator.
 

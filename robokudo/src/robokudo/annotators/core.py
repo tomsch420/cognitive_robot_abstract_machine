@@ -124,7 +124,7 @@ class BaseAnnotator(Behaviour):
     def __init__(
         self,
         name: str = "Annotator",
-        descriptor: BaseAnnotator.Descriptor = Descriptor(),
+        descriptor: Optional[BaseAnnotator.Descriptor] = None,
         ros_pkg_name: str = PACKAGE_NAME,
     ) -> None:
         """Initialize the BaseAnnotator.
@@ -136,6 +136,9 @@ class BaseAnnotator(Behaviour):
         :param ros_pkg_name: Name of the ROS package
         """
         super().__init__(name)
+        if descriptor is None:
+            descriptor = self.Descriptor()
+
         # self.rk_logger = get_logger(ros_pkg_name)
         self.rk_logger = logging.getLogger(ros_pkg_name)
 
@@ -478,7 +481,7 @@ class ThreadedAnnotator(BaseAnnotator):
     def __init__(
         self,
         name: str = "ThreadedAnnotator",
-        descriptor: BaseAnnotator.Descriptor = BaseAnnotator.Descriptor(),
+        descriptor: Optional[BaseAnnotator.Descriptor] = None,
     ) -> None:
         """Initialize the ThreadedAnnotator.
 

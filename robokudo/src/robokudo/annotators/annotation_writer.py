@@ -46,7 +46,7 @@ class AnnotationStorageWriter(BaseAnnotator):
     def __init__(
         self,
         name: str = "AnnotationStorageWriter",
-        descriptor: AnnotationStorageWriter.Descriptor = Descriptor(),
+        descriptor: AnnotationStorageWriter.Descriptor | None = None,
     ) -> None:
         """Initialize the annotation storage writer. Minimal one-time init!
 
@@ -116,7 +116,7 @@ class AnnotationPublisherWriter(BaseAnnotator):
     def __init__(
         self,
         name: str = "AnnotationPublisherWriter",
-        descriptor: AnnotationPublisherWriter.Descriptor = Descriptor(),
+        descriptor: AnnotationPublisherWriter.Descriptor | None = None,
     ) -> None:
         """Initialize the annotation publisher. Minimal one-time init!
 

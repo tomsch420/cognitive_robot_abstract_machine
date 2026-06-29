@@ -58,7 +58,7 @@ class StorageWriter(BaseAnnotator):
     def __init__(
         self,
         name: str = "StorageWriter",
-        descriptor: StorageWriter.Descriptor = Descriptor(),
+        descriptor: StorageWriter.Descriptor | None = None,
     ) -> None:
         """Initialize the storage writer. Minimal one-time init!
 

@@ -115,7 +115,7 @@ class ClusterColorAnnotator(BaseAnnotator):
     def __init__(
         self,
         name: str = "ClusterColorAnnotator",
-        descriptor: ClusterColorAnnotator.Descriptor = Descriptor(),
+        descriptor: ClusterColorAnnotator.Descriptor | None = None,
     ) -> None:
         """Default construction. Minimal one-time init!
 

@@ -62,7 +62,7 @@ class ClusterPositionAnnotator(BaseAnnotator):
     def __init__(
         self,
         name: str = "ClusterPositionAnnotator",
-        descriptor: ClusterPositionAnnotator.Descriptor = Descriptor(),
+        descriptor: ClusterPositionAnnotator.Descriptor | None = None,
     ) -> None:
         """Initialize the position estimator.
 

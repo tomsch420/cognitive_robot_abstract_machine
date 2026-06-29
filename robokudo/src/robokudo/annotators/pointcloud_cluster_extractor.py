@@ -179,7 +179,7 @@ class PointCloudClusterExtractor(ThreadedAnnotator):
     def __init__(
         self,
         name: str = "PointCloudClusterExtractor",
-        descriptor: PointCloudClusterExtractor.Descriptor = Descriptor(),
+        descriptor: PointCloudClusterExtractor.Descriptor | None = None,
     ) -> None:
         """Initialize the cluster extractor.
 
@@ -468,7 +468,7 @@ class NaivePointCloudClusterExtractor(ThreadedAnnotator):
     def __init__(
         self,
         name: str = "NaivePointCloudClusterExtractor",
-        descriptor: "NaivePointCloudClusterExtractor.Descriptor" = Descriptor(),
+        descriptor: NaivePointCloudClusterExtractor.Descriptor | None = None,
     ) -> None:
         """Initialize the naive cluster extractor.
 

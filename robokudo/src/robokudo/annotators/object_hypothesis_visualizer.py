@@ -72,7 +72,7 @@ class ObjectHypothesisVisualizer(BaseAnnotator):
     def __init__(
         self,
         name: str = "ObjectHypothesisVisualizer",
-        descriptor: ObjectHypothesisVisualizer.Descriptor = Descriptor(),
+        descriptor: ObjectHypothesisVisualizer.Descriptor | None = None,
     ) -> None:
         """Initialize the object hypothesis visualizer.
 

@@ -99,7 +99,7 @@ class OutlierRemovalOnObjectHypothesisAnnotator(BaseAnnotator):
     def __init__(
         self,
         name: str = "OutlierRemovalOnObjectHypothesis",
-        descriptor: OutlierRemovalOnObjectHypothesisAnnotator.Descriptor = Descriptor(),
+        descriptor: OutlierRemovalOnObjectHypothesisAnnotator.Descriptor | None = None,
     ):
         """Initialize the outlier removal annotator.
 

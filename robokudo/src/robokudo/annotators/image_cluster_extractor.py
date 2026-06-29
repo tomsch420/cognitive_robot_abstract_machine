@@ -123,7 +123,7 @@ class ImageClusterExtractor(BaseAnnotator):
     def __init__(
         self,
         name: str = "ImageClusterExtractor",
-        descriptor: ImageClusterExtractor.Descriptor = Descriptor(),
+        descriptor: ImageClusterExtractor.Descriptor | None = None,
     ) -> None:
         super().__init__(name, descriptor)
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)

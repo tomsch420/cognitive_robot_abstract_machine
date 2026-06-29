@@ -76,7 +76,7 @@ class ClusterColorHistogramAnnotator(BaseAnnotator):
     def __init__(
         self,
         name: str = "ClusterColorHistogramAnnotator",
-        descriptor: ClusterColorHistogramAnnotator.Descriptor = Descriptor(),
+        descriptor: ClusterColorHistogramAnnotator.Descriptor | None = None,
     ) -> None:
         """Initialize the color histogram analyzer. Minimal one-time init!
 

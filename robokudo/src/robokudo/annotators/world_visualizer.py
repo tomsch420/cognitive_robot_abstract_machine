@@ -36,7 +36,7 @@ class WorldVisualizer(robokudo.annotators.core.ThreadedAnnotator):
     def __init__(
         self,
         name: str = "WorldVisualizer",
-        descriptor: WorldVisualizer.Descriptor = Descriptor(),
+        descriptor: WorldVisualizer.Descriptor | None = None,
     ) -> None:
         super().__init__(name=name, descriptor=descriptor)
 

@@ -69,7 +69,7 @@ class TSDFAnnotator(ThreadedAnnotator):
     def __init__(
         self,
         name: str = "TSDFAnnotator",
-        descriptor: TSDFAnnotator.Descriptor = Descriptor(),
+        descriptor: TSDFAnnotator.Descriptor | None = None,
     ) -> None:
         super().__init__(name, descriptor)
 

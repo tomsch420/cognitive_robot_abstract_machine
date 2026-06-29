@@ -60,7 +60,7 @@ class FilterAnnotator(BaseAnnotator):
     def __init__(
         self,
         name: str = "FilterAnnotator",
-        descriptor: FilterAnnotator.Descriptor = Descriptor(),
+        descriptor: FilterAnnotator.Descriptor | None = None,
     ) -> None:
         """Initialize the filter annotator.
 

@@ -67,7 +67,7 @@ class PlaneAnnotator(ThreadedAnnotator):
     def __init__(
         self,
         name: str = "PlaneAnnotator",
-        descriptor: PlaneAnnotator.Descriptor = Descriptor(),
+        descriptor: PlaneAnnotator.Descriptor | None = None,
     ) -> None:
         """Initialize the plane detector.
 

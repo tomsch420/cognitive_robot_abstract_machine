@@ -219,7 +219,7 @@ class ShapeEstimatorAnnotator(ThreadedAnnotator):
     def __init__(
         self,
         name: str = "ShapeEstimatorAnnotator",
-        descriptor: ShapeEstimatorAnnotator.Descriptor = Descriptor(),
+        descriptor: ShapeEstimatorAnnotator.Descriptor | None = None,
     ) -> None:
         """Initialize the shape estimator annotator."""
         super().__init__(name=name, descriptor=descriptor)

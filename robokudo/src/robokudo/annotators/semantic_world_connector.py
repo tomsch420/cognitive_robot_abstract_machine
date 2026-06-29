@@ -41,7 +41,7 @@ class SemanticDigitalTwinConnector(ThreadedAnnotator):
     def __init__(
         self,
         name: str = "SemanticDigitalTwinSynchronization",
-        descriptor: SemanticDigitalTwinConnector.Descriptor = Descriptor(),
+        descriptor: SemanticDigitalTwinConnector.Descriptor | None = None,
     ) -> None:
         """Default construction. Minimal one-time init!"""
         super().__init__(name, descriptor)

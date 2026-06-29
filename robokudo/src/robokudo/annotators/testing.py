@@ -321,7 +321,7 @@ class ScopedAnnotator(BaseAnnotator):
     def __init__(
         self,
         name: str = "ScopedAnnotator",
-        descriptor: ScopedAnnotator.Descriptor = Descriptor(),
+        descriptor: ScopedAnnotator.Descriptor | None = None,
     ) -> None:
         """
         Initialize the scoped annotator.

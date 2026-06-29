@@ -82,7 +82,7 @@ class ICPPoseRefinementAnnotator(ThreadedAnnotator):
     def __init__(
         self,
         name: str = "ICPPoseRefinementAnnotator",
-        descriptor: ICPPoseRefinementAnnotator.Descriptor = Descriptor(),
+        descriptor: ICPPoseRefinementAnnotator.Descriptor | None = None,
     ) -> None:
         """Initialize the ICP pose refiner.
 

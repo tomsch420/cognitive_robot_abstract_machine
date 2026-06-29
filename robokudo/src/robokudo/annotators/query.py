@@ -268,7 +268,7 @@ class GenerateQueryResult(BaseAnnotator):
         parameters = Parameters()
 
     def __init__(
-        self, name: str = "GenerateQueryResult", descriptor: Descriptor = Descriptor()
+        self, name: str = "GenerateQueryResult", descriptor: Optional[Descriptor] = None
     ) -> None:
         """Initialize query result generator.
 
