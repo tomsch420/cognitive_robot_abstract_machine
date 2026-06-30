@@ -44,12 +44,12 @@ from krrood.entity_query_language.predicate import HasType, HasTypes, Predicate,
 from krrood.entity_query_language.verbalization.exceptions import (
     PredicateFragmentRequiredError,
 )
+from krrood.entity_query_language.verbalization.vocabulary.english import Prepositions
 from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
     Adjective,
     clause,
     Copula,
     Noun,
-    Preposition,
     Verb,
 )
 from krrood.entity_query_language.verbalization.pipeline import (
@@ -1465,7 +1465,7 @@ def test_verbalize_custom_predicate_employee_domain():
             return clause(
                 Noun(fields["employee"]),
                 Verb("work"),
-                Preposition.IN,
+                Prepositions.IN,
                 Noun(fields["department"]),
             )
 

@@ -141,7 +141,7 @@ class Verbalizable(ABC):
 
         Build the clause from the typed part-of-speech vocabulary
         (:func:`~…vocabulary.parts_of_speech.clause` with ``Noun`` / ``Verb`` / ``Copula`` /
-        ``Preposition`` / ``Adjective``), composing the already-rendered field fragments in *fields*
+        ``Prepositions`` / ``Adjective``), composing the already-rendered field fragments in *fields*
         (keyed by field name). State only the **affirmative, present-tense** form: a ``Verb`` is given
         as its lemma, and the realisation passes inflect it (*"work"* → *"works"*) and agree its
         number. Returning a typed clause rather than a string keeps the predicate composable — a

@@ -17,13 +17,13 @@ from typing_extensions import Optional
 
 from krrood.entity_query_language.verbalization import morphology
 from krrood.entity_query_language.verbalization.vocabulary.english import (
-    ENGLISH_PREPOSITIONS,
+    Prepositions,
 )
 
 #: The prepositions that, as the final token of a snake_case attribute name, mark a *relational*
-#: field (*assigned_to*, *owned_by*, *located_in*): the English preposition inventory from the
-#: lexicon minus ``of`` — ``<noun>_of`` is a genitive (``number_of``, ``type_of``), never a relation.
-_RELATIONAL_PREPOSITIONS = ENGLISH_PREPOSITIONS - {"of"}
+#: field (*assigned_to*, *owned_by*, *located_in*): the English preposition inventory minus ``of`` —
+#: ``<noun>_of`` is a genitive (``number_of``, ``type_of``), never a relation.
+_RELATIONAL_PREPOSITIONS = {preposition.text for preposition in Prepositions} - {"of"}
 
 
 @dataclass(frozen=True)

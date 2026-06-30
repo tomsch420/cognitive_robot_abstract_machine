@@ -2,7 +2,7 @@
 Tests for the typed predicate-clause vocabulary and its automatic negation.
 
 A predicate states only the affirmative, present-tense clause from typed part-of-speech elements
-(``Noun`` / ``Verb`` / ``Copula`` / ``Preposition`` / ``Adjective``); the morphology pass inflects
+(``Noun`` / ``Verb`` / ``Copula`` / ``Prepositions`` / ``Adjective``); the morphology pass inflects
 the verb (agreement) and a wrapping ``Not`` negates it automatically — a verb with do-support, a
 copula with suppletion.
 """
@@ -46,12 +46,12 @@ from krrood.entity_query_language.verbalization.pipeline import verbalize_expres
 from krrood.entity_query_language.verbalization.rendering.morphology_processor import (
     MorphologyProcessor,
 )
+from krrood.entity_query_language.verbalization.vocabulary.english import Prepositions
 from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
     Adjective,
     clause,
     Copula,
     Noun,
-    Preposition,
     Verb,
 )
 
@@ -120,7 +120,7 @@ def test_verb_element_is_a_verb_role_leaf_carrying_the_lemma():
 
 
 def test_clause_joins_constituents_in_order():
-    built = clause(Noun("Employee"), Verb("work"), Preposition.IN, Noun("Department"))
+    built = clause(Noun("Employee"), Verb("work"), Prepositions.IN, Noun("Department"))
     # Realization lowers the noun phrases (articles) and inflects the verb for agreement.
     assert (
         flatten_fragment_to_plain_text(realize_tree(built))
@@ -132,7 +132,7 @@ def test_clause_joins_constituents_in_order():
 
 
 def test_negate_clause_marks_the_verb_head():
-    built = clause(Noun("Employee"), Verb("work"), Preposition.IN, Noun("Department"))
+    built = clause(Noun("Employee"), Verb("work"), Prepositions.IN, Noun("Department"))
     negated = negate_clause(built)
     assert negated.parts[1].negated is True
 

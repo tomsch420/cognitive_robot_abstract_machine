@@ -43,10 +43,10 @@ from krrood.entity_query_language.predicate import (
 from krrood.entity_query_language.verbalization.fragments.features import (
     GrammaticalNumber,
 )
+from krrood.entity_query_language.verbalization.vocabulary.english import Prepositions
 from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
     clause,
     Noun,
-    Preposition,
     Verb,
 )
 from krrood.entity_query_language.query.quantifiers import (
@@ -621,7 +621,7 @@ def test_generate_with_using_inherited_predicate(handles_and_containers_world):
                 Noun(fields["body1"]),
                 Verb("share", number=GrammaticalNumber.PLURAL),
                 Noun("first character"),
-                Preposition.WITH,
+                Prepositions.WITH,
                 Noun(fields["body2"]),
                 Noun("and"),
                 Noun(fields["body3"]),

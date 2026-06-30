@@ -27,3 +27,24 @@ def test_lexicon_is_overridable_for_a_domain():
     assert custom.is_uncountable("plasma")
     # the default mass nouns are not implied when a domain supplies its own set
     assert not custom.is_uncountable("money")
+
+
+def test_expanded_lexicon_covers_common_mass_nouns():
+    """The curated lexicon spans the everyday mass nouns: materials, substances, abstractions, and
+    collective/activity nouns that take no plural and no indefinite article."""
+    countability = NounCountability()
+    for mass_noun in (
+        "wood", "metal", "plastic", "leather", "wool", "cotton", "concrete",
+        "coffee", "tea", "wine", "bread", "butter", "cheese", "meat", "flour",
+        "love", "anger", "courage", "honesty", "freedom", "happiness", "wisdom",
+        "education", "transport", "accommodation", "luggage", "garbage", "jewellery",
+    ):
+        assert countability.is_uncountable(mass_noun), mass_noun
+
+
+def test_dual_sense_nouns_stay_countable():
+    """A noun with a dominant countable sense is left countable so it is not wrongly stripped of its
+    article."""
+    countability = NounCountability()
+    for countable_noun in ("battery", "department", "robot", "table", "report"):
+        assert not countability.is_uncountable(countable_noun), countable_noun

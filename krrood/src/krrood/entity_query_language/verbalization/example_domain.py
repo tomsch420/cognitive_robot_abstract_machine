@@ -42,12 +42,12 @@ from krrood.entity_query_language.predicate import Predicate
 from krrood.entity_query_language.verbalization.fragments.base import (
     VerbalizationFragment,
 )
+from krrood.entity_query_language.verbalization.vocabulary.english import Prepositions
 from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
     Adjective,
     clause,
     Copula,
     Noun,
-    Preposition,
     Verb,
 )
 
@@ -213,7 +213,7 @@ class WorksIn(Predicate):
         return clause(
             Noun(fields["employee"]),
             Verb("work"),
-            Preposition.IN,
+            Prepositions.IN,
             Noun(fields["department"]),
         )
 

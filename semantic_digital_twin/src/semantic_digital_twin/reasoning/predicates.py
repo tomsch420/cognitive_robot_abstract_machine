@@ -14,10 +14,10 @@ from krrood.entity_query_language.predicate import (
     Symbol,
     symbolic_function,
 )
+from krrood.entity_query_language.verbalization.vocabulary.english import Prepositions
 from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
     clause,
     Noun,
-    Preposition,
     Verb,
 )
 from random_events.interval import Interval
@@ -564,7 +564,7 @@ class ContainsType(Predicate):
             Noun(fields["iterable"]),
             Verb("contain"),
             Noun("instance"),
-            Preposition.OF,
+            Prepositions.OF,
             Noun(fields["obj_type"]),
         )
 

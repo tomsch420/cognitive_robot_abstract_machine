@@ -162,7 +162,8 @@ class CommonGroupKeyWord(PlainWord):
             parts=[
                 self.as_fragment(),
                 WordFragment(text=field_name),
-                Prepositions.OF_THE.as_fragment(),
+                Prepositions.OF.as_fragment(),
+                Articles.THE.as_fragment(),
                 WordFragment(text=root, number=GrammaticalNumber.PLURAL),
             ],
         )
@@ -344,67 +345,104 @@ class Copulas(VocabEnum):
 
 
 class Prepositions(VocabEnum):
-    """Prepositions used in possessive path phrases (OF, OF THE) and aggregate scopes (AMONG)."""
+    """The closed-class inventory of English prepositions — the single preposition vocabulary.
 
-    OF = PlainWord("of")
-    OF_THE = PlainWord("of the")
+    One enum serves every use of a preposition: the words the verbalizer *emits* (the genitive
+    *"of"*, the aggregate scope *"among"*, the comitative *"with"*), the prepositions a clause links
+    its constituents with (*"works **in** a department"*), and the lexicon a recognizer consults to
+    read a relation off a field name's final token (*assigned_**to***, *owned_**by***). Prepositions
+    are a fixed, finite class, so the inventory is enumerated in full rather than inferred — no
+    inflection library or part-of-speech tagger is needed (or appropriate).
+
+    ..note:: Only simple (one-word) prepositions are members. Complex prepositions (*"in front of"*,
+        *"according to"*) are multi-token, so they could not be matched against a single snake_case
+        field token, and the verbalizer emits none of them.
+    """
+
+    ABOARD = PlainWord("aboard")
+    ABOUT = PlainWord("about")
+    ABOVE = PlainWord("above")
+    ACROSS = PlainWord("across")
+    AFTER = PlainWord("after")
+    AGAINST = PlainWord("against")
+    ALONG = PlainWord("along")
+    ALONGSIDE = PlainWord("alongside")
+    AMID = PlainWord("amid")
+    AMIDST = PlainWord("amidst")
     AMONG = PlainWord("among")
+    AMONGST = PlainWord("amongst")
+    AROUND = PlainWord("around")
+    AS = PlainWord("as")
+    ASTRIDE = PlainWord("astride")
+    AT = PlainWord("at")
+    ATOP = PlainWord("atop")
+    BARRING = PlainWord("barring")
+    BEFORE = PlainWord("before")
+    BEHIND = PlainWord("behind")
+    BELOW = PlainWord("below")
+    BENEATH = PlainWord("beneath")
+    BESIDE = PlainWord("beside")
+    BESIDES = PlainWord("besides")
+    BETWEEN = PlainWord("between")
+    BEYOND = PlainWord("beyond")
+    BUT = PlainWord("but")
+    BY = PlainWord("by")
+    CONCERNING = PlainWord("concerning")
+    CONSIDERING = PlainWord("considering")
+    DESPITE = PlainWord("despite")
+    DOWN = PlainWord("down")
+    DURING = PlainWord("during")
+    EXCEPT = PlainWord("except")
+    EXCLUDING = PlainWord("excluding")
+    FOLLOWING = PlainWord("following")
+    FOR = PlainWord("for")
+    FROM = PlainWord("from")
+    GIVEN = PlainWord("given")
+    IN = PlainWord("in")
+    INCLUDING = PlainWord("including")
+    INSIDE = PlainWord("inside")
+    INTO = PlainWord("into")
+    LIKE = PlainWord("like")
+    MINUS = PlainWord("minus")
+    NEAR = PlainWord("near")
+    NOTWITHSTANDING = PlainWord("notwithstanding")
+    OF = PlainWord("of")
+    OFF = PlainWord("off")
+    ON = PlainWord("on")
+    ONTO = PlainWord("onto")
+    OPPOSITE = PlainWord("opposite")
+    OUT = PlainWord("out")
+    OUTSIDE = PlainWord("outside")
+    OVER = PlainWord("over")
+    PAST = PlainWord("past")
+    PENDING = PlainWord("pending")
+    PER = PlainWord("per")
+    PLUS = PlainWord("plus")
+    REGARDING = PlainWord("regarding")
+    RESPECTING = PlainWord("respecting")
+    ROUND = PlainWord("round")
+    SAVE = PlainWord("save")
+    SINCE = PlainWord("since")
+    THAN = PlainWord("than")
+    THROUGH = PlainWord("through")
+    THROUGHOUT = PlainWord("throughout")
+    TILL = PlainWord("till")
+    TO = PlainWord("to")
+    TOWARD = PlainWord("toward")
+    TOWARDS = PlainWord("towards")
+    UNDER = PlainWord("under")
+    UNDERNEATH = PlainWord("underneath")
+    UNLIKE = PlainWord("unlike")
+    UNTIL = PlainWord("until")
+    UNTO = PlainWord("unto")
+    UP = PlainWord("up")
+    UPON = PlainWord("upon")
+    VERSUS = PlainWord("versus")
+    VIA = PlainWord("via")
     WITH = PlainWord("with")
-
-
-#: The closed-class inventory of common English prepositions, as a lexical datum (distinct from the
-#: :class:`Prepositions` enum, which holds the few prepositions the verbalizer *emits*). Prepositions
-#: are a fixed, finite class — no inflection library or POS tagger is needed (or appropriate) to
-#: enumerate them. Recognizers consult this to read a relation off a field name's final token.
-ENGLISH_PREPOSITIONS = frozenset(
-    {
-        "about",
-        "above",
-        "across",
-        "after",
-        "against",
-        "along",
-        "among",
-        "around",
-        "at",
-        "before",
-        "behind",
-        "below",
-        "beneath",
-        "beside",
-        "between",
-        "beyond",
-        "by",
-        "for",
-        "from",
-        "in",
-        "inside",
-        "into",
-        "near",
-        "of",
-        "off",
-        "on",
-        "onto",
-        "out",
-        "outside",
-        "over",
-        "past",
-        "per",
-        "through",
-        "to",
-        "toward",
-        "towards",
-        "under",
-        "underneath",
-        "until",
-        "up",
-        "upon",
-        "via",
-        "with",
-        "within",
-        "without",
-    }
-)
+    WITHIN = PlainWord("within")
+    WITHOUT = PlainWord("without")
+    WORTH = PlainWord("worth")
 
 
 class Conjunctions(VocabEnum):

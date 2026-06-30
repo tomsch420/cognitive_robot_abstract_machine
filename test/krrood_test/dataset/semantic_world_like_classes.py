@@ -8,10 +8,10 @@ from krrood.entity_query_language.predicate import Symbol, Predicate
 from krrood.entity_query_language.verbalization.fragments.base import (
     VerbalizationFragment,
 )
+from krrood.entity_query_language.verbalization.vocabulary.english import Prepositions
 from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
     clause,
     Noun,
-    Preposition,
     Verb,
 )
 
@@ -160,7 +160,7 @@ class ContainsType(Predicate):
             Noun(fields["iterable"]),
             Verb("contain"),
             Noun("instance"),
-            Preposition.OF,
+            Prepositions.OF,
             Noun(fields["obj_type"]),
         )
 

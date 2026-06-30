@@ -26,11 +26,8 @@ from krrood.entity_query_language.verbalization.microplanning.coordination impor
 )
 from krrood.entity_query_language.verbalization.vocabulary.english import (
     Copulas,
+    Prepositions,
     SetMembership,
-)
-from krrood.entity_query_language.verbalization.vocabulary.words import (
-    PlainWord,
-    VocabEnum,
 )
 
 
@@ -182,31 +179,19 @@ class OneOf(ClauseElement):
         )
 
 
-class Preposition(VocabEnum):
-    """The prepositions a clause links its constituents with (*"works **in** a department"*)."""
-
-    IN = PlainWord("in")
-    ON = PlainWord("on")
-    OF = PlainWord("of")
-    TO = PlainWord("to")
-    BY = PlainWord("by")
-    AT = PlainWord("at")
-    WITH = PlainWord("with")
-    FROM = PlainWord("from")
-
-
 @runtime_checkable
 class ClauseConstituent(Protocol):
     """The one contract every clause constituent satisfies: it renders itself to a :class:`VerbalizationFragment`.
 
     A typed part-of-speech element (:class:`ClauseElement` — :class:`Noun` / :class:`Verb` / …), a
-    :class:`Preposition`, a predicate :class:`~krrood.entity_query_language.predicate.VerbalizationField`, and a
+    :class:`~krrood.entity_query_language.verbalization.vocabulary.english.Prepositions` member, a
+    predicate :class:`~krrood.entity_query_language.predicate.VerbalizationField`, and a
     raw :class:`VerbalizationFragment` all satisfy it structurally (each defines ``as_fragment``), so
     :func:`clause` depends on this single abstraction rather than enumerating concrete types — a new
     kind of constituent only has to implement the method (open/closed).
 
     This is a :class:`~typing.Protocol`, not a base class, because the constituents are
-    deliberately heterogeneous: ``Preposition`` is an ``Enum`` (it cannot also inherit an ABC) and
+    deliberately heterogeneous: ``Prepositions`` is an ``Enum`` (it cannot also inherit an ABC) and
     ``VerbalizationField`` is a core type (it must not depend on this verbalization layer). Structural typing
     unifies them without forcing inheritance.
     """
@@ -220,7 +205,7 @@ def clause(*constituents: ClauseConstituent) -> Clause:
     Build a predicate clause from typed part-of-speech constituents.
 
     A predicate states its affirmative form once — *"<subject> works in <object>"* —
-    ``clause(Noun(subject), Verb("work"), Preposition.IN, Noun(object))`` — and the realisation
+    ``clause(Noun(subject), Verb("work"), Prepositions.IN, Noun(object))`` — and the realisation
     passes handle agreement and negation. A raw :class:`VerbalizationFragment` is accepted too, so a rendered
     field fragment can be dropped in directly. The result is a :class:`Clause`, so coreference
     treats the first constituent as the clause's subject (pronominalisation, verb agreement).
@@ -232,7 +217,7 @@ def clause(*constituents: ClauseConstituent) -> Clause:
     ...     flatten_fragment_to_plain_text, WordFragment,
     ... )
     >>> flatten_fragment_to_plain_text(
-    ...     clause(Noun(WordFragment(text="an Employee")), Verb("work"), Preposition.IN,
+    ...     clause(Noun(WordFragment(text="an Employee")), Verb("work"), Prepositions.IN,
     ...            Noun(WordFragment(text="a Department")))
     ... )
     'an Employee work in a Department'
