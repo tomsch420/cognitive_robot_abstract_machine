@@ -580,7 +580,7 @@ class WrappedTable:
             specific ORM container properties.
         """
 
-        type_endpoint = wrapped_field.resolved_type_endpoint
+        type_endpoint = wrapped_field.type_endpoint
 
         # check underspecified generic fields
         if (
@@ -696,7 +696,7 @@ class WrappedTable:
         :param wrapped_field: The wrapped field to get the table for.
         :return: The wrapped table for the given wrapped field.
         """
-        type_endpoint = wrapped_field.resolved_type_endpoint
+        type_endpoint = wrapped_field.type_endpoint
         try:
             result = self.ormatic.wrapped_tables[
                 self.ormatic.class_dependency_graph.get_wrapped_class(type_endpoint)
@@ -806,7 +806,7 @@ class WrappedTable:
 
         :param wrapped_field: The field to extract the information from.
         """
-        type_endpoint = wrapped_field.resolved_type_endpoint
+        type_endpoint = wrapped_field.type_endpoint
         self.ormatic.imported_modules.add("typing_extensions")
         self.ormatic.imported_modules.add(type_endpoint.__module__)
         column_name = wrapped_field.field.name
@@ -823,7 +823,7 @@ class WrappedTable:
         )
 
     def create_custom_type(self, wrapped_field: WrappedField):
-        type_endpoint = wrapped_field.resolved_type_endpoint
+        type_endpoint = wrapped_field.type_endpoint
         custom_type = self.ormatic.type_mappings[type_endpoint]
         self.ormatic.type_mappings[type_endpoint] = custom_type
         column_name = wrapped_field.field.name

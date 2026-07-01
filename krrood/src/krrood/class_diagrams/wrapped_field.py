@@ -246,12 +246,23 @@ class WrappedField:
     @cached_property
     def type_endpoint(self) -> Type:
         """
-        The type this field ultimately points to: the contained type for containers and optionals,
-        the lowest common ancestor for unions, otherwise the resolved type.
+        The concrete type this field ultimately points to, ready to be used directly.
 
-        A surviving ``TypeVar`` is returned as-is so generic-classification predicates such as
-        :attr:`is_underspecified_generic` keep seeing the type variable. Use
-        :attr:`resolved_type_endpoint` when a concrete class is required.
+        A bounded ``TypeVar`` is reduced to its bound, since the field is specified to that bound; an
+        unbounded ``TypeVar`` is returned unchanged. Predicates that must reason about the type
+        variable itself use :attr:`_unresolved_type_endpoint`.
+        """
+        endpoint = self._unresolved_type_endpoint
+        if isinstance(endpoint, TypeVar) and endpoint.__bound__ is not None:
+            return endpoint.__bound__
+        return endpoint
+
+    @cached_property
+    def _unresolved_type_endpoint(self) -> Type:
+        """
+        The type this field points to before a bounded ``TypeVar`` is reduced to its bound: the
+        contained type for containers and optionals, the lowest common ancestor for unions, otherwise
+        the resolved type. May be a ``TypeVar``.
         """
         if self.is_container or self.is_optional:
             return self.contained_type
@@ -262,20 +273,6 @@ class WrappedField:
             if lowest_common_ancestor is not None:
                 return lowest_common_ancestor
         return resolved
-
-    @cached_property
-    def resolved_type_endpoint(self) -> Type:
-        """
-        The :attr:`type_endpoint` with a bounded ``TypeVar`` reduced to its bound.
-
-        This is the concrete class a type variable stands for, needed wherever a real type is
-        required rather than the variable itself (e.g. ORM column and relationship generation). An
-        unbounded ``TypeVar`` is returned unchanged.
-        """
-        endpoint = self.type_endpoint
-        if isinstance(endpoint, TypeVar) and endpoint.__bound__ is not None:
-            return endpoint.__bound__
-        return endpoint
 
     @cached_property
     def is_role_taker(self) -> bool:
@@ -345,6 +342,12 @@ class WrappedField:
 
         :return: True if the type hint is an underspecified generic class.
         """
+        # A type-variable endpoint is specified to its bound (or is simply an unresolved variable),
+        # never a bare underspecified generic, so it must not be skipped even though its bound may be
+        # a generic class with free parameters.
+        if isinstance(self._unresolved_type_endpoint, TypeVar):
+            return False
+
         # A class is underspecified only if it still has free TypeVar parameters.
         # Concrete subclasses of generic parents (e.g. HSRBMobileBase(MobileBase, HasTorso[HSRBTorso]))
         # are subclasses of Generic but have __parameters__ == (), so they must not be skipped.
