@@ -154,7 +154,6 @@ import semantic_digital_twin.adapters.ros.tf_publisher
 import semantic_digital_twin.adapters.ros.tfwrapper
 import semantic_digital_twin.adapters.ros.visualization.collision_viz_marker
 import semantic_digital_twin.adapters.ros.visualization.exceptions
-import semantic_digital_twin.adapters.ros.visualization.pose_publisher
 import semantic_digital_twin.adapters.ros.visualization.spatial_type_marker_renderer
 import semantic_digital_twin.adapters.ros.visualization.spatial_type_publisher
 import semantic_digital_twin.adapters.ros.visualization.viz_marker
@@ -21970,32 +21969,6 @@ class TfPublisherModelCallbackDAO(
 
     __mapper_args__ = {
         "polymorphic_identity": "TfPublisherModelCallbackDAO",
-        "inherit_condition": database_id == ModelChangeCallbackDAO.database_id,
-        "polymorphic_load": "selectin",
-    }
-
-
-class PosePublisherDAO(
-    ModelChangeCallbackDAO,
-    DataAccessObject[
-        semantic_digital_twin.adapters.ros.visualization.pose_publisher.PosePublisher
-    ],
-):
-    __tablename__ = "PosePublisherDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(ModelChangeCallbackDAO.database_id),
-        primary_key=True,
-        use_existing_column=True,
-    )
-
-    lifetime: Mapped[builtins.int] = mapped_column(use_existing_column=True)
-    topic_name: Mapped[builtins.str] = mapped_column(
-        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "PosePublisherDAO",
         "inherit_condition": database_id == ModelChangeCallbackDAO.database_id,
         "polymorphic_load": "selectin",
     }

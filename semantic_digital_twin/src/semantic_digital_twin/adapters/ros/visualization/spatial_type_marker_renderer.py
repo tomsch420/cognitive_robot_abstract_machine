@@ -57,7 +57,7 @@ class SpatialTypeVisualization:
     """
 
     marker_id_offset: int = 0
-    """The base marker id. Renderers that emit several markers add small offsets to it."""
+    """The offset added to each marker's local id. The first marker of a request uses it directly, further markers add small increments."""
 
     label: str | None = None
     """An optional text label rendered alongside the markers."""
@@ -88,12 +88,21 @@ class SpatialTypeMarkerRenderer(SubClassSafeGeneric[SpatialTypeInput], ABC):
 
     @classmethod
     def can_render(cls, spatial_type: SpatialType) -> bool:
-        """Whether this renderer can render the given spatial type."""
+        """
+        Whether this renderer can render the given spatial type.
+
+        :param spatial_type: The spatial type to check.
+        """
         return isinstance(spatial_type, cls.input_type())
 
     @classmethod
     def renderer_for(cls, spatial_type: SpatialType) -> type[SpatialTypeMarkerRenderer]:
-        """Find the renderer responsible for the given spatial type."""
+        """
+        Find the renderer responsible for the given spatial type.
+
+        :param spatial_type: The spatial type to find a renderer for.
+        :return: The renderer responsible for rendering the spatial type.
+        """
         for subclass in recursive_subclasses(cls):
             if subclass.can_render(spatial_type):
                 return subclass
@@ -108,6 +117,7 @@ class SpatialTypeMarkerRenderer(SubClassSafeGeneric[SpatialTypeInput], ABC):
 
         :param request: The spatial type and its display metadata.
         :param root_frame_name: The frame used when the spatial type has no reference frame.
+        :return: The markers representing the spatial type.
         """
         renderer = cls.renderer_for(request.spatial_type)
         return renderer.render_markers(request, root_frame_name)
@@ -117,12 +127,24 @@ class SpatialTypeMarkerRenderer(SubClassSafeGeneric[SpatialTypeInput], ABC):
     def render_markers(
         cls, request: SpatialTypeVisualization, root_frame_name: str
     ) -> list[Marker]:
-        """Build the markers for the spatial type of the given request."""
+        """
+        Build the markers for the spatial type of the given request.
+
+        :param request: The spatial type and its display metadata.
+        :param root_frame_name: The frame used when the spatial type has no reference frame.
+        :return: The markers representing the spatial type.
+        """
         raise NotImplementedError
 
     @staticmethod
     def _reference_frame_name(spatial_type: SpatialType, root_frame_name: str) -> str:
-        """The name of the spatial type's reference frame, falling back to the root frame."""
+        """
+        The name of the spatial type's reference frame, falling back to the root frame.
+
+        :param spatial_type: The spatial type to resolve the reference frame of.
+        :param root_frame_name: The frame used when the spatial type has no reference frame.
+        :return: The name of the spatial type's reference frame, or the root frame.
+        """
         reference_frame = spatial_type.reference_frame
         if reference_frame is None:
             return root_frame_name
@@ -132,7 +154,14 @@ class SpatialTypeMarkerRenderer(SubClassSafeGeneric[SpatialTypeInput], ABC):
     def _base_marker(
         cls, request: SpatialTypeVisualization, marker_id: int, frame_id: str
     ) -> Marker:
-        """Create a marker with the shared fields filled in."""
+        """
+        Create a marker with the shared fields filled in.
+
+        :param request: The spatial type and its display metadata.
+        :param marker_id: The marker's local id.
+        :param root_frame_name: The frame used when the spatial type has no reference frame.
+        :return: The marker with the shared fields filled in.
+        """
         marker = Marker()
         marker.action = Marker.ADD
         marker.ns = request.namespace
@@ -151,7 +180,14 @@ class SpatialTypeMarkerRenderer(SubClassSafeGeneric[SpatialTypeInput], ABC):
         frame_id: str,
         pose: RosPose,
     ) -> Marker:
-        """Create the optional label marker shared by the renderers."""
+        """
+        Create the optional label marker shared by the renderers.
+
+        :param request: The spatial type and its display metadata.
+        :param marker_id: The marker's local id.
+        :param pose: The pose of the label.
+        :return: The marker representing the label.
+        """
         marker = cls._base_marker(request, marker_id, frame_id)
         marker.type = Marker.TEXT_VIEW_FACING
         marker.text = request.label
@@ -169,6 +205,9 @@ class Point3MarkerRenderer(SpatialTypeMarkerRenderer[Point3]):
     def render_markers(
         cls, request: SpatialTypeVisualization, root_frame_name: str
     ) -> list[Marker]:
+        """
+        Build a sphere marker at the point's position, plus an optional label.
+        """
         frame_id = cls._reference_frame_name(request.spatial_type, root_frame_name)
         position = request.spatial_type.evaluate()
         marker = cls._base_marker(request, 0, frame_id)
@@ -191,6 +230,9 @@ class Vector3MarkerRenderer(SpatialTypeMarkerRenderer[Vector3]):
     def render_markers(
         cls, request: SpatialTypeVisualization, root_frame_name: str
     ) -> list[Marker]:
+        """
+        Build an arrow marker from the origin along the vector, plus an optional label.
+        """
         vector = request.spatial_type
         if vector.visualisation_frame is not None:
             frame_id = str(vector.visualisation_frame.name)
@@ -231,6 +273,9 @@ class PoseLikeMarkerRenderer(SpatialTypeMarkerRenderer[Pose]):
     def render_markers(
         cls, request: SpatialTypeVisualization, root_frame_name: str
     ) -> list[Marker]:
+        """
+        Build an RGB axis triad at the pose, plus an optional label.
+        """
         frame_id = cls._reference_frame_name(request.spatial_type, root_frame_name)
         position, orientation = cls._position_and_orientation(request.spatial_type)
         pose = RosPose(
@@ -258,7 +303,14 @@ class PoseLikeMarkerRenderer(SpatialTypeMarkerRenderer[Pose]):
         frame_id: str,
         pose: RosPose,
     ) -> Marker:
-        """Create one colored arrow for the given axis of the triad."""
+        """
+        Create one colored arrow for the given axis of the triad.
+
+        :param request: The spatial type and its display metadata.
+        :param axis_index: The index of the axis to render.
+        :param frame_id: The frame used when the spatial type has no reference frame.
+        :param pose: The pose of the triad.
+        """
         end_point = [0.0, 0.0, 0.0]
         end_point[axis_index] = request.arrow_length
         axis_color = [0.0, 0.0, 0.0, 1.0]
@@ -280,7 +332,11 @@ class PoseLikeMarkerRenderer(SpatialTypeMarkerRenderer[Pose]):
     def _position_and_orientation(
         spatial_type: SpatialType,
     ) -> tuple[np.ndarray, np.ndarray]:
-        """Resolve the current position and orientation quaternion of the spatial type."""
+        """
+        Resolve the current position and orientation quaternion of the spatial type.
+
+        :param spatial_type: The spatial type to resolve.
+        """
         if isinstance(spatial_type, Quaternion):
             return np.zeros(3), spatial_type.evaluate()
         if isinstance(spatial_type, RotationMatrix):
