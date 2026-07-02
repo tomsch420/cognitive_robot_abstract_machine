@@ -41,26 +41,52 @@ from giskardpy.qp.constraint_collection import ConstraintCollection
 
 @dataclass(repr=False, eq=False)
 class State(MutableMapping[MotionStatechartNode, float], SubclassJSONSerializer):
+    """
+    Maps every node of a motion statechart to a scalar value, backed by a single
+    contiguous array indexed by :attr:`~MotionStatechartNode.index`.
+    """
+
     motion_statechart: MotionStatechart
     default_value: ClassVar[float] = field(init=False)
     data: np.ndarray = field(default_factory=lambda: np.array([], dtype=np.float64))
 
     def grow(self) -> None:
+        """
+        Appends the default value to :attr:`data`, keeping it in sync with a newly added node.
+        """
         self.data = np.append(self.data, self.default_value)
 
     def life_cycle_symbols(self) -> List[LifeCycleVariable]:
+        """
+        :return: The life cycle variable of every node, in node order.
+        """
         return [node.life_cycle_variable for node in self.motion_statechart.nodes]
 
     def observation_symbols(self) -> List[ObservationVariable]:
+        """
+        :return: The observation variable of every node, in node order.
+        """
         return [node.observation_variable for node in self.motion_statechart.nodes]
 
     def __getitem__(self, node: MotionStatechartNode) -> float:
+        """
+        :return: The value stored for `node`, read from :attr:`data` at :attr:`~MotionStatechartNode.index`.
+        """
         return float(self.data[node.index])
 
     def __setitem__(self, node: MotionStatechartNode, value: float) -> None:
+        """
+        Writes `value` into :attr:`data` at `node`'s :attr:`~MotionStatechartNode.index`.
+        """
         self.data[node.index] = value
 
     def __delitem__(self, node: MotionStatechartNode) -> None:
+        """
+        Removes the entry for `node` from :attr:`data`.
+
+        .. warning:: This shifts the indices of all nodes after `node`, but does not update
+            their :attr:`~MotionStatechartNode.index`, so the state and the nodes fall out of sync.
+        """
         self.data = np.delete(self.data, node.index)
 
     def __iter__(self):
@@ -70,12 +96,21 @@ class State(MutableMapping[MotionStatechartNode, float], SubclassJSONSerializer)
         return self.data.shape[0]
 
     def keys(self) -> List[MotionStatechartNode]:
+        """
+        :return: All nodes of the motion statechart, i.e. the keys of this mapping.
+        """
         return self.motion_statechart.nodes
 
     def items(self) -> List[tuple[MotionStatechartNode, float]]:
+        """
+        :return: (node, value) pairs for every node of the motion statechart.
+        """
         return [(node, self[node]) for node in self.motion_statechart.nodes]
 
     def values(self) -> List[float]:
+        """
+        :return: The value of every node, in node order.
+        """
         return [self[node] for node in self.keys()]
 
     def __contains__(self, node: MotionStatechartNode) -> bool:
@@ -83,7 +118,7 @@ class State(MutableMapping[MotionStatechartNode, float], SubclassJSONSerializer)
 
     def __deepcopy__(self, memo) -> Self:
         """
-        Create a deep copy of the WorldState.
+        Create a deep copy of the state.
         """
         return self.__class__(
             motion_statechart=self.motion_statechart,
@@ -91,10 +126,20 @@ class State(MutableMapping[MotionStatechartNode, float], SubclassJSONSerializer)
         )
 
     def to_json(self) -> Dict[str, Any]:
+        """
+        :return: The JSON representation of the base class, extended with the raw :attr:`data` array.
+        """
         return {**super().to_json(), "data": self.data.tolist()}
 
     @classmethod
     def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+        """
+        Reconstruct a state from its JSON representation.
+
+        :param data: The JSON dict, as produced by :meth:`to_json`.
+        :param kwargs: Must contain the owning `motion_statechart`.
+        :return: The deserialized state.
+        """
         motion_statechart = kwargs["motion_statechart"]
         return cls(
             motion_statechart=motion_statechart,
@@ -108,6 +153,10 @@ class State(MutableMapping[MotionStatechartNode, float], SubclassJSONSerializer)
         return str(self)
 
     def __eq__(self, other: Self) -> bool:
+        """
+        :return: True if `other` is a :class:`State` with the same :attr:`data`.
+        .. note:: The owning :attr:`motion_statechart` is not compared.
+        """
         if not isinstance(other, State):
             return NotImplemented
         return np.array_equal(self.data, other.data)
@@ -115,6 +164,9 @@ class State(MutableMapping[MotionStatechartNode, float], SubclassJSONSerializer)
 
 @dataclass(repr=False, eq=False)
 class LifeCycleState(State):
+    """
+    The life cycle state of every node in a motion statechart, see :class:`MotionStatechart`.
+    """
 
     default_value: ClassVar[float] = LifeCycleValues.NOT_STARTED
     _compiled_updater: sm.CompiledFunction = field(init=False)
@@ -164,9 +216,15 @@ class LifeCycleState(State):
         )
 
     def __getitem__(self, node: MotionStatechartNode) -> LifeCycleValues:
+        """
+        :return: The life cycle state of `node`, as a :class:`LifeCycleValues` member.
+        """
         return LifeCycleValues(super().__getitem__(node))
 
     def update_state(self):
+        """
+        Evaluates the compiled updater created by :meth:`compile` and writes the result into :attr:`data`.
+        """
         np.copyto(self.data, self._compiled_updater.evaluate())
 
     def __str__(self) -> str:
@@ -180,11 +238,26 @@ class LifeCycleState(State):
 
 @dataclass(repr=False, eq=False)
 class ObservationState(State):
+    """
+    The observation state of every node in a motion statechart, see :class:`MotionStatechart`.
+    """
+
     default_value: ClassVar[ObservationStateValues] = ObservationStateValues.UNKNOWN
 
     _compiled_updater: sm.CompiledFunction = field(init=False)
 
     def compile(self, context: MotionStatechartContext):
+        """
+        Compiles the updater for observation states.
+        1. For each node, build an expression that evaluates the node's observation expression while
+           RUNNING, resets to TrinaryUnknown while NOT_STARTED, and otherwise keeps the previous value.
+        2. Combine all node expressions into a single expression and compile it.
+        3. Bind compiled function arguments to memory views of the observation, life cycle, world, and
+           float-variable state data.
+        4. Store the compiled updater for later use in updating the observation state.
+
+        :param context: The build context whose world and float-variable data the compiled updater reads from.
+        """
         observation_state_updater = []
         for node in self.motion_statechart.nodes:
             state_f = sm.if_eq_cases(
@@ -225,20 +298,34 @@ class ObservationState(State):
         )
 
     def update_state(self):
+        """
+        Evaluates the compiled updater created by :meth:`compile` and writes the result into :attr:`data`.
+        """
         np.copyto(self.data, self._compiled_updater.evaluate())
 
 
 @dataclass(repr=False, eq=False)
 class StateHistoryItem:
+    """
+    A snapshot of a :class:`MotionStatechart`'s life cycle and observation state at one control cycle.
+    """
+
     control_cycle: int
     life_cycle_state: LifeCycleState
     observation_state: ObservationState
 
     def __post_init__(self):
+        """
+        Deep-copies the given states, so later mutation of the live states does not affect this snapshot.
+        """
         self.life_cycle_state = deepcopy(self.life_cycle_state)
         self.observation_state = deepcopy(self.observation_state)
 
     def __eq__(self, other: StateHistoryItem) -> bool:
+        """
+        :return: True if `other` has the same life cycle and observation state.
+        .. note:: :attr:`control_cycle` is not compared.
+        """
         has_life_cycle_changed = np.any(
             other.life_cycle_state.data != self.life_cycle_state.data
         )
@@ -248,6 +335,9 @@ class StateHistoryItem:
         return not has_life_cycle_changed and not has_observation_changed
 
     def __repr__(self) -> str:
+        """
+        :return: Every node's name mapped to its observation state and life cycle state name.
+        """
         merged = {
             node.name: f"{self.observation_state[node]} | {life_cycle.name}"
             for node, life_cycle in self.life_cycle_state.items()
@@ -257,9 +347,17 @@ class StateHistoryItem:
 
 @dataclass
 class StateHistory:
+    """
+    The recorded sequence of :class:`StateHistoryItem` snapshots of a :class:`MotionStatechart`.
+    """
+
     history: List[StateHistoryItem] = field(default_factory=list)
 
     def append(self, next_item: StateHistoryItem):
+        """
+        Appends `next_item`, unless it is equal to the last recorded item, in which case it is dropped
+        to avoid storing consecutive duplicates.
+        """
         if len(self.history) != 0:
             if next_item == self.history[-1]:
                 return
@@ -268,11 +366,17 @@ class StateHistory:
     def get_life_cycle_history_of_node(
         self, node: MotionStatechartNode
     ) -> list[LifeCycleValues]:
+        """
+        :return: The recorded life cycle state of `node` at every control cycle, in order.
+        """
         return [history_item.life_cycle_state[node] for history_item in self.history]
 
     def get_observation_history_of_node(
         self, node: MotionStatechartNode
     ) -> list[ObservationStateValues]:
+        """
+        :return: The recorded observation state of `node` at every control cycle, in order.
+        """
         return [history_item.observation_state[node] for history_item in self.history]
 
     def __len__(self) -> int:
@@ -340,6 +444,9 @@ class MotionStatechart(SubclassJSONSerializer):
     """
 
     def __post_init__(self):
+        """
+        Creates the (initially empty) life cycle and observation states for this motion statechart.
+        """
         self.life_cycle_state = LifeCycleState(self)
         self.observation_state = ObservationState(self)
 
@@ -383,6 +490,9 @@ class MotionStatechart(SubclassJSONSerializer):
 
     @property
     def nodes(self) -> List[MotionStatechartNode]:
+        """
+        :return: All nodes of the motion statechart.
+        """
         return list(self.rx_graph.nodes())
 
     def collect_debug_expressions(self) -> List[DebugExpression]:
@@ -427,13 +537,23 @@ class MotionStatechart(SubclassJSONSerializer):
         self.observation_state.grow()
 
     def add_nodes(self, nodes: List[MotionStatechartNode]):
+        """
+        Adds every node in `nodes` to the motion statechart, see :meth:`add_node`.
+        """
         for node in nodes:
             self.add_node(node)
 
     def get_node_by_index(self, index: int) -> MotionStatechartNode:
+        """
+        :param index: The :attr:`~MotionStatechartNode.index` of the node to look up.
+        :return: The node with the given index.
+        """
         return self.rx_graph.get_node_data(index)
 
     def _add_transitions(self):
+        """
+        Rebuilds the graph's edges from the current start, pause, end, and reset conditions of every node.
+        """
         self._validate_condition_scopes()
         self.rx_graph.clear_edges()
         for node in self.nodes:
@@ -462,6 +582,11 @@ class MotionStatechart(SubclassJSONSerializer):
     def _validate_condition_scope(
         self, owner: MotionStatechartNode, condition: TrinaryCondition
     ):
+        """
+        Checks that `condition` only depends on `owner` itself or siblings of `owner`.
+
+        :raises ConditionScopeError: If `condition` depends on a node from a different scope level.
+        """
         for dependency in condition.node_dependencies:
             if dependency is owner:
                 continue
@@ -476,10 +601,16 @@ class MotionStatechart(SubclassJSONSerializer):
     def _create_edge_for_condition(
         self, owner: MotionStatechartNode, condition: TrinaryCondition
     ):
+        """
+        Adds an edge from `owner` to every node `condition` depends on.
+        """
         for parent_node in condition.node_dependencies:
             self.rx_graph.add_edge(owner.index, parent_node.index, condition)
 
     def _build_nodes(self, context: MotionStatechartContext):
+        """
+        Builds every node of the motion statechart and applies its resulting artifacts.
+        """
         built_node_indices: set[int] = set()
         for node in self.nodes:
             self._build_and_apply_artifacts(node, context, built_node_indices)
@@ -490,6 +621,11 @@ class MotionStatechart(SubclassJSONSerializer):
         context: MotionStatechartContext,
         built_node_indices: set[int],
     ):
+        """
+        Builds `node`, recursively building its children first if it is a :class:`Goal`, and stores
+        the resulting :class:`~giskardpy.motion_statechart.graph_node.NodeArtifacts` on the node.
+        Already-built nodes (tracked via `built_node_indices`) are skipped.
+        """
         if node.index in built_node_indices:
             return
         if isinstance(node, Goal):
@@ -536,12 +672,19 @@ class MotionStatechart(SubclassJSONSerializer):
             self._expand_goal(goal, context=context)
 
     def _expand_goal(self, goal: Goal, context: MotionStatechartContext):
+        """
+        Expands `goal` and recursively expands every child of `goal` that is itself a :class:`Goal`.
+        """
         goal.expand(context)
         for child_node in goal.nodes:
             if isinstance(child_node, Goal):
                 self._expand_goal(child_node, context=context)
 
     def combine_constraint_collections_of_nodes(self) -> ConstraintCollection:
+        """
+        :return: The constraint collections of all nodes, merged into one, with each node's
+            constraints prefixed by its :attr:`~MotionStatechartNode.unique_name`.
+        """
         combined_constraint_collection = ConstraintCollection()
         for node in self.nodes:
             combined_constraint_collection.merge(
@@ -550,6 +693,10 @@ class MotionStatechart(SubclassJSONSerializer):
         return combined_constraint_collection
 
     def _update_observation_state(self, context: MotionStatechartContext):
+        """
+        Updates the compiled observation state, then lets every RUNNING node overwrite its own
+        observation via :meth:`~MotionStatechartNode.on_tick`.
+        """
         self.observation_state.update_state()
         for node in self.nodes:
             if self.life_cycle_state[node] == LifeCycleValues.RUNNING:
@@ -558,6 +705,10 @@ class MotionStatechart(SubclassJSONSerializer):
                     self.observation_state[node] = observation_overwrite
 
     def _update_life_cycle_state(self, context: MotionStatechartContext):
+        """
+        Updates the compiled life cycle state and triggers the life cycle callbacks for every node
+        whose life cycle state changed as a result.
+        """
         previous = self.life_cycle_state.data.copy()
         self.life_cycle_state.update_state()
         self._trigger_life_cycle_callbacks(
@@ -570,6 +721,11 @@ class MotionStatechart(SubclassJSONSerializer):
         current_state: np.ndarray,
         context: MotionStatechartContext,
     ) -> None:
+        """
+        For every node whose life cycle state changed between `previous_state` and `current_state`,
+        calls the matching callback (e.g. :meth:`~MotionStatechartNode.on_start`,
+        :meth:`~MotionStatechartNode.on_end`). Transitions with no dedicated callback are ignored.
+        """
         for node in self.nodes:
             prev = LifeCycleValues(int(previous_state[node.index]))
             curr = LifeCycleValues(int(current_state[node.index]))
@@ -614,6 +770,10 @@ class MotionStatechart(SubclassJSONSerializer):
     def get_nodes_by_type(
         self, node_type: Type[GenericMotionStatechartNode]
     ) -> List[GenericMotionStatechartNode]:
+        """
+        :param node_type: The node type to filter for.
+        :return: All nodes that are an instance of `node_type`.
+        """
         return [node for node in self.nodes if isinstance(node, node_type)]
 
     def is_end_motion(self) -> bool:
@@ -626,11 +786,17 @@ class MotionStatechart(SubclassJSONSerializer):
         )
 
     def _raise_if_cancel_motion(self):
+        """
+        Raises the exception of the first :class:`CancelMotion` node whose observation state is True.
+        """
         for node in self.get_nodes_by_type(CancelMotion):
             if self.observation_state[node] == ObservationStateValues.TRUE:
                 raise node.exception
 
     def cleanup_nodes(self, context: MotionStatechartContext):
+        """
+        Calls :meth:`~MotionStatechartNode.cleanup` on every node.
+        """
         for node in self.nodes:
             node.cleanup(context)
 
@@ -646,11 +812,22 @@ class MotionStatechart(SubclassJSONSerializer):
         context: MotionStatechartContext = None,
         second_length_in_cm: float = 2.0,
     ):
+        """
+        Renders a Gantt chart of :attr:`history` and saves it at `path`.
+
+        :param path: Where to save the resulting PDF.
+        :param context: If given (and it provides `dt`), the x-axis is scaled to seconds instead of control cycles.
+        :param second_length_in_cm: Width in cm of one second on the x-axis.
+        """
         HistoryGanttChartPlotter(
             self, second_width_in_cm=second_length_in_cm, context=context
         ).plot_gantt_chart(path)
 
     def to_json(self) -> Dict[str, Any]:
+        """
+        :return: The JSON representation of this motion statechart, including all nodes and their unique edges.
+        .. warning:: This rebuilds the graph's edges from the nodes' current conditions as a side effect, see :meth:`_add_transitions`.
+        """
         self._add_transitions()
         result = super().to_json()
         result["nodes"] = [
@@ -661,6 +838,13 @@ class MotionStatechart(SubclassJSONSerializer):
 
     @classmethod
     def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+        """
+        Reconstructs a motion statechart from its JSON representation, as produced by :meth:`to_json`:
+        first all nodes, then their transition conditions, then goal/child parent links.
+
+        :param data: The JSON dict.
+        :return: The deserialized motion statechart.
+        """
         motion_statechart = cls()
         for json_data in data["nodes"]:
             node = MotionStatechartNode.from_json(json_data, **kwargs)
