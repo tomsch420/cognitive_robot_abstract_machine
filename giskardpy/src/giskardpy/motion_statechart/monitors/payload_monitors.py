@@ -174,7 +174,6 @@ class ThreadedPredicateMonitor(MotionStatechartNode):
                 self._error,
             )
             raise self._error
-            # return ObservationStateValues.FALSE
         return (
             ObservationStateValues.TRUE
             if self._result

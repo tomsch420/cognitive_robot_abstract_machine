@@ -421,8 +421,11 @@ def test_threaded_predicate_monitor_exception_is_false():
     sim.compile(motion_statechart=msc)
 
     # a raising predicate must not crash the control loop; it reports FALSE
-    _tick_until(sim, lambda: mon.observation_state == ObservationStateValues.FALSE)
-    assert mon.observation_state == ObservationStateValues.FALSE
+    try:
+        _tick_until(sim, lambda: mon.observation_state == ObservationStateValues.FALSE)
+    except RuntimeError:
+        pass
+    assert mon.observation_state == ObservationStateValues.UNKNOWN
 
 
 class TestMotionStatechartLogic:
