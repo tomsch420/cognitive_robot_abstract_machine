@@ -10,7 +10,7 @@ from semantic_digital_twin.world_description.world_entity import Body
 
 
 @dataclass(eq=False, repr=False)
-class FeatureMonitor(MotionStatechartNode):
+class FeatureFunctionMonitor(MotionStatechartNode):
     """
     Base for monitors that compare a controlled feature (attached to ``tip_link``) with a
     reference feature (attached to ``root_link``) expressed in the root link frame.
@@ -54,7 +54,7 @@ class FeatureMonitor(MotionStatechartNode):
 
 
 @dataclass(eq=False, repr=False)
-class HeightMonitor(FeatureMonitor):
+class HeightMonitor(FeatureFunctionMonitor):
     """
     Observes ``True`` while the height difference between the controlled and reference point along
     the root z-axis is within ``[lower_limit, upper_limit]``.
@@ -85,7 +85,7 @@ class HeightMonitor(FeatureMonitor):
 
 
 @dataclass(eq=False, repr=False)
-class PerpendicularMonitor(FeatureMonitor):
+class PerpendicularMonitor(FeatureFunctionMonitor):
     """
     Observes ``True`` while the controlled normal is perpendicular to the reference normal within
     ``threshold``.
@@ -109,7 +109,7 @@ class PerpendicularMonitor(FeatureMonitor):
 
 
 @dataclass(eq=False, repr=False)
-class DistanceMonitor(FeatureMonitor):
+class DistanceMonitor(FeatureFunctionMonitor):
     """
     Observes ``True`` while the planar distance (ignoring the z-axis) between the controlled and
     reference point is within ``[lower_limit, upper_limit]``.
@@ -140,7 +140,7 @@ class DistanceMonitor(FeatureMonitor):
 
 
 @dataclass(eq=False, repr=False)
-class AngleMonitor(FeatureMonitor):
+class AngleMonitor(FeatureFunctionMonitor):
     """
     Observes ``True`` while the angle between the controlled and reference vector is within
     ``[lower_angle, upper_angle]``.

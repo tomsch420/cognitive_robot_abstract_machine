@@ -8990,13 +8990,13 @@ class VectorsAlignedDAO(
     }
 
 
-class FeatureMonitorDAO(
+class FeatureFunctionMonitorDAO(
     MotionStatechartNodeDAO,
     DataAccessObject[
-        giskardpy.motion_statechart.monitors.feature_monitors.FeatureMonitor
+        giskardpy.motion_statechart.monitors.feature_monitors.FeatureFunctionMonitor
     ],
 ):
-    __tablename__ = "FeatureMonitorDAO"
+    __tablename__ = "FeatureFunctionMonitorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
         ForeignKey(MotionStatechartNodeDAO.database_id),
@@ -9023,14 +9023,14 @@ class FeatureMonitorDAO(
     )
 
     __mapper_args__ = {
-        "polymorphic_identity": "FeatureMonitorDAO",
+        "polymorphic_identity": "FeatureFunctionMonitorDAO",
         "inherit_condition": database_id == MotionStatechartNodeDAO.database_id,
         "polymorphic_load": "selectin",
     }
 
 
 class AngleMonitorDAO(
-    FeatureMonitorDAO,
+    FeatureFunctionMonitorDAO,
     DataAccessObject[
         giskardpy.motion_statechart.monitors.feature_monitors.AngleMonitor
     ],
@@ -9038,7 +9038,7 @@ class AngleMonitorDAO(
     __tablename__ = "AngleMonitorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(FeatureMonitorDAO.database_id),
+        ForeignKey(FeatureFunctionMonitorDAO.database_id),
         primary_key=True,
         use_existing_column=True,
     )
@@ -9072,13 +9072,13 @@ class AngleMonitorDAO(
 
     __mapper_args__ = {
         "polymorphic_identity": "AngleMonitorDAO",
-        "inherit_condition": database_id == FeatureMonitorDAO.database_id,
+        "inherit_condition": database_id == FeatureFunctionMonitorDAO.database_id,
         "polymorphic_load": "selectin",
     }
 
 
 class DistanceMonitorDAO(
-    FeatureMonitorDAO,
+    FeatureFunctionMonitorDAO,
     DataAccessObject[
         giskardpy.motion_statechart.monitors.feature_monitors.DistanceMonitor
     ],
@@ -9086,7 +9086,7 @@ class DistanceMonitorDAO(
     __tablename__ = "DistanceMonitorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(FeatureMonitorDAO.database_id),
+        ForeignKey(FeatureFunctionMonitorDAO.database_id),
         primary_key=True,
         use_existing_column=True,
     )
@@ -9117,13 +9117,13 @@ class DistanceMonitorDAO(
 
     __mapper_args__ = {
         "polymorphic_identity": "DistanceMonitorDAO",
-        "inherit_condition": database_id == FeatureMonitorDAO.database_id,
+        "inherit_condition": database_id == FeatureFunctionMonitorDAO.database_id,
         "polymorphic_load": "selectin",
     }
 
 
 class HeightMonitorDAO(
-    FeatureMonitorDAO,
+    FeatureFunctionMonitorDAO,
     DataAccessObject[
         giskardpy.motion_statechart.monitors.feature_monitors.HeightMonitor
     ],
@@ -9131,7 +9131,7 @@ class HeightMonitorDAO(
     __tablename__ = "HeightMonitorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(FeatureMonitorDAO.database_id),
+        ForeignKey(FeatureFunctionMonitorDAO.database_id),
         primary_key=True,
         use_existing_column=True,
     )
@@ -9162,13 +9162,13 @@ class HeightMonitorDAO(
 
     __mapper_args__ = {
         "polymorphic_identity": "HeightMonitorDAO",
-        "inherit_condition": database_id == FeatureMonitorDAO.database_id,
+        "inherit_condition": database_id == FeatureFunctionMonitorDAO.database_id,
         "polymorphic_load": "selectin",
     }
 
 
 class PerpendicularMonitorDAO(
-    FeatureMonitorDAO,
+    FeatureFunctionMonitorDAO,
     DataAccessObject[
         giskardpy.motion_statechart.monitors.feature_monitors.PerpendicularMonitor
     ],
@@ -9176,7 +9176,7 @@ class PerpendicularMonitorDAO(
     __tablename__ = "PerpendicularMonitorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(FeatureMonitorDAO.database_id),
+        ForeignKey(FeatureFunctionMonitorDAO.database_id),
         primary_key=True,
         use_existing_column=True,
     )
@@ -9209,7 +9209,7 @@ class PerpendicularMonitorDAO(
 
     __mapper_args__ = {
         "polymorphic_identity": "PerpendicularMonitorDAO",
-        "inherit_condition": database_id == FeatureMonitorDAO.database_id,
+        "inherit_condition": database_id == FeatureFunctionMonitorDAO.database_id,
         "polymorphic_load": "selectin",
     }
 
