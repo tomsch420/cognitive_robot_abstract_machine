@@ -1,4 +1,4 @@
-"""Tests for naming and type-hint utilities in ``krrood.code_generation.utils``."""
+"""Tests for naming and type-hint utilities in ``krrood.code_generation``."""
 
 from __future__ import annotations
 
@@ -7,13 +7,12 @@ from typing import List, Optional, Union
 
 import pytest
 
-from krrood.code_generation.utils import (
+from krrood.code_generation.naming import (
+    class_name_to_instance_name,
     str_to_snake_case,
-    stringify_type_hint,
     to_camel_case,
-    to_variable_name,
-    value_to_source,
 )
+from krrood.code_generation.type_hints import stringify_type_hint, value_to_source
 
 
 class TestNaming:
@@ -53,8 +52,8 @@ class TestNaming:
             ("", ""),
         ],
     )
-    def test_to_variable_name(self, input_str, expected):
-        assert to_variable_name(input_str) == expected
+    def test_class_name_to_instance_name(self, input_str, expected):
+        assert class_name_to_instance_name(input_str) == expected
 
 
 class TestStringifyTypeHint:

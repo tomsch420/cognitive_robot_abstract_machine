@@ -6,7 +6,7 @@ from typing import List, Set, Type, Optional, Tuple
 
 import jinja2
 
-from krrood.code_generation import run_black_on_file
+from krrood.code_generation.formatting import run_black_on_file
 from krrood.utils import module_and_class_name, is_dynamic_class
 
 

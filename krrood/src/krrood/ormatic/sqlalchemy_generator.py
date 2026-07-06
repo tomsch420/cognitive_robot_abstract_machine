@@ -5,7 +5,7 @@ import os
 from dataclasses import dataclass, field
 from typing_extensions import TextIO, TYPE_CHECKING
 
-from krrood.code_generation import run_black_on_file
+from krrood.code_generation.formatting import run_black_on_file
 from krrood.code_generation.generator import CodeGenerator
 
 if TYPE_CHECKING:

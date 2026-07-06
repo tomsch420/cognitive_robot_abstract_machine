@@ -56,12 +56,13 @@ import pytest
 # implementation does not yet exist — rather than producing confusing per-test
 # AttributeErrors at call time.
 # ---------------------------------------------------------------------------
-from krrood.code_generation import (
+from krrood.code_generation.function_case import FunctionCaseGenerator
+from krrood.code_generation.imports import (
+    CallableImport,
     FunctionMissingAnnotationsError,
-    function_to_dataclass_source,
     generate_callable_import,
-    to_camel_case,
 )
+from krrood.code_generation.naming import to_camel_case
 
 # ===========================================================================
 # Shared helpers / fixtures
@@ -168,44 +169,45 @@ def test_to_camel_case_result_is_nonempty_for_nonempty_input() -> None:
 class TestGenerateCallableImportModuleLevel:
     """Guarantees for ``generate_callable_import`` when passed a plain function."""
 
-    def test_returns_two_tuple(self, module_level_distance: Callable) -> None:
-        """Result is a two-element tuple."""
+    def test_returns_callable_import(self, module_level_distance: Callable) -> None:
+        """Result is a :class:`CallableImport` bundling the import line and access."""
         result = generate_callable_import(module_level_distance)
-        assert isinstance(result, tuple)
-        assert len(result) == 2
+        assert isinstance(result, CallableImport)
+        assert isinstance(result.import_line, str)
+        assert isinstance(result.access_expression, str)
 
     def test_import_line_is_from_import(self, module_level_distance: Callable) -> None:
         """The import line starts with ``from``."""
-        import_line, _ = generate_callable_import(module_level_distance)
+        import_line = generate_callable_import(module_level_distance).import_line
         assert import_line.startswith("from ")
 
     def test_import_line_contains_module(self, module_level_distance: Callable) -> None:
         """The import line references the function's module."""
-        import_line, _ = generate_callable_import(module_level_distance)
+        import_line = generate_callable_import(module_level_distance).import_line
         assert "my.module" in import_line
 
     def test_import_line_contains_function_name(
         self, module_level_distance: Callable
     ) -> None:
         """The import line names the function directly (not a class wrapping it)."""
-        import_line, _ = generate_callable_import(module_level_distance)
+        import_line = generate_callable_import(module_level_distance).import_line
         assert "distance" in import_line
 
     def test_access_expression_is_bare_name(
         self, module_level_distance: Callable
     ) -> None:
         """For a module-level function the access expression is the bare function name."""
-        _, access_expr = generate_callable_import(module_level_distance)
+        access_expr = generate_callable_import(module_level_distance).access_expression
         assert access_expr == "distance"
 
     def test_import_line_is_str(self, module_level_distance: Callable) -> None:
         """The import line is a ``str``."""
-        import_line, _ = generate_callable_import(module_level_distance)
+        import_line = generate_callable_import(module_level_distance).import_line
         assert isinstance(import_line, str)
 
     def test_access_expression_is_str(self, module_level_distance: Callable) -> None:
         """The access expression is a ``str``."""
-        _, access_expr = generate_callable_import(module_level_distance)
+        access_expr = generate_callable_import(module_level_distance).access_expression
         assert isinstance(access_expr, str)
 
 
@@ -225,7 +227,7 @@ class TestGenerateCallableImportMethod:
         available to form the access expression.
         """
         method = method_host_class.distance
-        import_line, _ = generate_callable_import(method)
+        import_line = generate_callable_import(method).import_line
         assert "MyClass" in import_line
         # The bare function name must NOT be the imported symbol.
         # (The import is "from my.module import MyClass", not "import distance")
@@ -237,25 +239,25 @@ class TestGenerateCallableImportMethod:
     def test_access_expression_is_dotted(self, method_host_class) -> None:
         """The access expression for a method is ``ClassName.method_name``."""
         method = method_host_class.distance
-        _, access_expr = generate_callable_import(method)
+        access_expr = generate_callable_import(method).access_expression
         assert "." in access_expr
 
     def test_access_expression_starts_with_class_name(self, method_host_class) -> None:
         """The access expression starts with the class name."""
         method = method_host_class.distance
-        _, access_expr = generate_callable_import(method)
+        access_expr = generate_callable_import(method).access_expression
         assert access_expr.startswith("MyClass")
 
     def test_access_expression_ends_with_method_name(self, method_host_class) -> None:
         """The access expression ends with the method name."""
         method = method_host_class.distance
-        _, access_expr = generate_callable_import(method)
+        access_expr = generate_callable_import(method).access_expression
         assert access_expr.endswith("distance")
 
     def test_import_line_references_module(self, method_host_class) -> None:
         """The import line still references the correct module."""
         method = method_host_class.distance
-        import_line, _ = generate_callable_import(method)
+        import_line = generate_callable_import(method).import_line
         assert "my.module" in import_line
 
 
@@ -293,7 +295,7 @@ class TestValidateAnnotationsMissingParam:
             return x + y
 
         with pytest.raises(FunctionMissingAnnotationsError):
-            function_to_dataclass_source(bad)
+            FunctionCaseGenerator().generate(bad)
 
     def test_raises_when_all_params_lack_annotations(self) -> None:
         """A function with no annotations at all raises ``FunctionMissingAnnotationsError``."""
@@ -302,7 +304,7 @@ class TestValidateAnnotationsMissingParam:
             pass
 
         with pytest.raises(FunctionMissingAnnotationsError):
-            function_to_dataclass_source(bare)
+            FunctionCaseGenerator().generate(bare)
 
 
 class TestValidateAnnotationsMissingReturn:
@@ -313,7 +315,7 @@ class TestValidateAnnotationsMissingReturn:
             return x + y
 
         with pytest.raises(FunctionMissingAnnotationsError):
-            function_to_dataclass_source(no_return)
+            FunctionCaseGenerator().generate(no_return)
 
 
 class TestValidateAnnotationsSelfExcluded:
@@ -325,7 +327,7 @@ class TestValidateAnnotationsSelfExcluded:
                 return x
 
         # Should succeed (no error), not raise FunctionMissingAnnotationsError.
-        source = function_to_dataclass_source(MyClass.method)
+        source = FunctionCaseGenerator().generate(MyClass.method)
         assert isinstance(source, str)
 
     def test_self_does_not_appear_as_dataclass_field(self) -> None:
@@ -335,7 +337,7 @@ class TestValidateAnnotationsSelfExcluded:
             def method(self, x: float) -> float:
                 return x
 
-        source = function_to_dataclass_source(MyClass.method)
+        source = FunctionCaseGenerator().generate(MyClass.method)
         # ``self: …`` as a field line must not appear in the dataclass body.
         # We check that "self" is not introduced as a typed field annotation.
         lines = source.splitlines()
@@ -357,7 +359,7 @@ class TestValidateAnnotationsClsExcluded:
                 return value
 
         # Access the underlying function (not the bound classmethod descriptor).
-        source = function_to_dataclass_source(MyClass.create.__func__)
+        source = FunctionCaseGenerator().generate(MyClass.create.__func__)
         assert isinstance(source, str)
 
     def test_cls_does_not_appear_as_dataclass_field(self) -> None:
@@ -368,7 +370,7 @@ class TestValidateAnnotationsClsExcluded:
             def create(cls, value: float) -> float:
                 return value
 
-        source = function_to_dataclass_source(MyClass.create.__func__)
+        source = FunctionCaseGenerator().generate(MyClass.create.__func__)
         lines = source.splitlines()
         field_lines = [
             ln.strip() for ln in lines if ":" in ln and not ln.strip().startswith("#")
@@ -385,7 +387,7 @@ class TestValidateAnnotationsClsExcluded:
 @pytest.fixture(scope="module")
 def distance_source(module_level_distance: Callable) -> str:
     """The generated source for the ``distance`` function (module-scoped)."""
-    return function_to_dataclass_source(module_level_distance)
+    return FunctionCaseGenerator().generate(module_level_distance)
 
 
 class TestFunctionToDataclassSourceKeywords:
@@ -487,4 +489,3 @@ class TestFunctionToDataclassSourceOutputField:
     def test_output_field_has_return_type(self, distance_source: str) -> None:
         """The ``_output`` field is annotated with the function's return type (``float``)."""
         assert "_output: float" in distance_source
-

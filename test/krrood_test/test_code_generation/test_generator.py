@@ -7,7 +7,7 @@ import tempfile
 
 import pytest
 
-from krrood.code_generation import CodeGenerator
+from krrood.code_generation.generator import CodeGenerator
 
 
 class TestCodeGenerator:
