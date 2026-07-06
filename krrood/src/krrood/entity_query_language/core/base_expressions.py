@@ -421,15 +421,25 @@ class SymbolicExpression(ABC):
     def _conditions_root_(self) -> Optional[SymbolicExpression]:
         """
         :return: The root of the symbolic expression graph that contains conditions, or None if no conditions found.
+
+        ..note:: When a node is reused both as a ``Filter`` condition and inside a sibling condition
+            its ``_parent_`` is clobbered, hiding the ``Filter`` from the graph walk; the owning
+            ``Filter`` is then recovered from the authoritative ``_parents_`` history.
         """
-        return next(
+        root_via_graph = next(
             (
                 expr.condition
                 for expr in self._all_expressions_
                 if isinstance(expr, Filter)
             ),
-            self._root_,
+            None,
         )
+        if root_via_graph is not None:
+            return root_via_graph
+        filter_parent = self._last_parent_of_type_(Filter)
+        if filter_parent is not None:
+            return filter_parent.condition
+        return self._root_
 
     @property
     def _root_(self) -> SymbolicExpression:
@@ -487,8 +497,8 @@ class SymbolicExpression(ABC):
         evaluation_context = get_evaluation_context()
         if evaluation_context is None:
             return None
-        cache_key = ("expression_index", self._root_._id_)
-        cache = evaluation_context.structural_cache
+        cache_key = self._root_._id_
+        cache = evaluation_context.expression_index_cache
         if cache_key not in cache:
             cache[cache_key] = weakref.WeakValueDictionary(
                 {expression._id_: expression for expression in self._all_expressions_}
@@ -538,7 +548,7 @@ class SymbolicExpression(ABC):
         if evaluation_context is None:
             return self._compute_subtree_contains_(expression_type)
         cache_key = (self._id_, expression_type)
-        cache = evaluation_context.structural_cache
+        cache = evaluation_context.subtree_containment_cache
         if cache_key not in cache:
             cache[cache_key] = self._compute_subtree_contains_(expression_type)
         return cache[cache_key]
