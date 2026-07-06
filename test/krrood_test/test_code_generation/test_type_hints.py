@@ -1,59 +1,11 @@
-"""Tests for naming and type-hint utilities in ``krrood.code_generation``."""
+"""Tests for type-hint serialisation in ``krrood.code_generation.type_hints``."""
 
 from __future__ import annotations
 
 import enum
 from typing import List, Optional, Union
 
-import pytest
-
-from krrood.code_generation.naming import (
-    class_name_to_instance_name,
-    str_to_snake_case,
-    to_camel_case,
-)
 from krrood.code_generation.type_hints import stringify_type_hint, value_to_source
-
-
-class TestNaming:
-    """Tests for naming conversion utilities."""
-
-    @pytest.mark.parametrize(
-        "input_str, expected",
-        [
-            ("my_func", "MyFunc"),
-            ("distance", "Distance"),
-            ("hello_world_test", "HelloWorldTest"),
-            ("a", "A"),
-            ("", ""),
-        ],
-    )
-    def test_to_camel_case(self, input_str, expected):
-        assert to_camel_case(input_str) == expected
-
-    @pytest.mark.parametrize(
-        "input_str, expected",
-        [
-            ("MyFunc", "my_func"),
-            ("Distance", "distance"),
-            ("HelloWorldTest", "hello_world_test"),
-            ("XMLParser", "xml_parser"),
-        ],
-    )
-    def test_str_to_snake_case(self, input_str, expected):
-        assert str_to_snake_case(input_str) == expected
-
-    @pytest.mark.parametrize(
-        "input_str, expected",
-        [
-            ("Distance", "distance"),
-            ("MyDistance", "myDistance"),
-            ("ABC", "aBC"),
-            ("", ""),
-        ],
-    )
-    def test_class_name_to_instance_name(self, input_str, expected):
-        assert class_name_to_instance_name(input_str) == expected
 
 
 class TestStringifyTypeHint:

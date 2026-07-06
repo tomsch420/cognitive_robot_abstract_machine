@@ -32,7 +32,7 @@ class SQLAlchemyGenerator:
 
     def __post_init__(self):
         self._generator = CodeGenerator(
-            template_dir=os.path.join(
+            template_directory=os.path.join(
                 os.path.dirname(__file__), "..", "jinja_templates"
             ),
         )
@@ -54,5 +54,3 @@ class SQLAlchemyGenerator:
 
         # format the output with black
         run_black_on_file(str(file.name))
-
-

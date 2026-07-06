@@ -25,7 +25,9 @@ from krrood.code_generation.type_hints import stringify_type_hint
 class FunctionCaseGenerator:
     """Emits @dataclass FunctionCase subclass source for a callable."""
 
-    base_class_fqn: str = "krrood.entity_query_language.rdr.function_case.FunctionCase"
+    base_class_fully_qualified_name: str = (
+        "krrood.entity_query_language.rdr.function_case.FunctionCase"
+    )
     """Fully-qualified name of the base class the emitted dataclass inherits from."""
 
     code_generator: CodeGenerator = field(init=False)
@@ -33,7 +35,7 @@ class FunctionCaseGenerator:
 
     def __post_init__(self):
         templates = importlib.resources.files("krrood.code_generation") / "templates"
-        self.code_generator = CodeGenerator(template_dir=str(templates))
+        self.code_generator = CodeGenerator(template_directory=str(templates))
 
     def generate(self, func: Callable, class_name: Optional[str] = None) -> str:
         """Emit Python source for a ``@dataclass`` subclass of ``FunctionCase``.
@@ -58,7 +60,9 @@ class FunctionCaseGenerator:
             class_name = to_camel_case(func.__name__)
         callable_import = generate_callable_import(func)
 
-        base_module, base_class_name = self.base_class_fqn.rsplit(".", 1)
+        base_module, base_class_name = self.base_class_fully_qualified_name.rsplit(
+            ".", 1
+        )
 
         # Resolve string annotations (produced by
         # ``from __future__ import annotations`` in the caller's module) to
@@ -69,37 +73,41 @@ class FunctionCaseGenerator:
             type_hints = {}
 
         # Collect custom types referenced by annotations.
-        sig = inspect.signature(func)
+        signature = inspect.signature(func)
         referenced_types: Dict[str, type] = {}
-        for param_name, param in sig.parameters.items():
-            if param_name in ("self", "cls"):
+        for parameter_name, parameter in signature.parameters.items():
+            if parameter_name in ("self", "cls"):
                 continue
-            t = type_hints.get(param_name, param.annotation)
-            if isinstance(t, type) and t.__module__ not in ("builtins",):
-                referenced_types[t.__name__] = t
-        t_ret = type_hints.get("return", sig.return_annotation)
-        if isinstance(t_ret, type) and t_ret.__module__ not in ("builtins",):
-            referenced_types[t_ret.__name__] = t_ret
+            annotation_type = type_hints.get(parameter_name, parameter.annotation)
+            if isinstance(annotation_type, type) and annotation_type.__module__ not in (
+                "builtins",
+            ):
+                referenced_types[annotation_type.__name__] = annotation_type
+        return_type = type_hints.get("return", signature.return_annotation)
+        if isinstance(return_type, type) and return_type.__module__ not in (
+            "builtins",
+        ):
+            referenced_types[return_type.__name__] = return_type
 
         # Generate type-import lines using the centralized import generator.
         type_import_lines = "\n".join(
             get_imports_from_types(list(referenced_types.values()))
         )
-        type_imports_str = type_import_lines + "\n" if type_import_lines else ""
+        type_imports = type_import_lines + "\n" if type_import_lines else ""
 
         # Build field data for the Jinja2 template.
         fields = [
             {
-                "name": param_name,
-                "type_str": stringify_type_hint(
-                    type_hints.get(param_name, param.annotation)
+                "name": parameter_name,
+                "type_string": stringify_type_hint(
+                    type_hints.get(parameter_name, parameter.annotation)
                 ),
             }
-            for param_name, param in sig.parameters.items()
-            if param_name not in ("self", "cls")
+            for parameter_name, parameter in signature.parameters.items()
+            if parameter_name not in ("self", "cls")
         ]
-        return_ann_str = stringify_type_hint(
-            type_hints.get("return", sig.return_annotation)
+        return_annotation_string = stringify_type_hint(
+            type_hints.get("return", signature.return_annotation)
         )
 
         return self.code_generator.render(
@@ -107,10 +115,10 @@ class FunctionCaseGenerator:
             base_module=base_module,
             base_class_name=base_class_name,
             class_name=class_name,
-            func_name=func.__name__,
+            function_name=func.__name__,
             import_line=callable_import.import_line,
-            access_expr=callable_import.access_expression,
-            type_imports_str=type_imports_str,
+            access_expression=callable_import.access_expression,
+            type_imports=type_imports,
             fields=fields,
-            return_type_str=return_ann_str,
+            return_type=return_annotation_string,
         )

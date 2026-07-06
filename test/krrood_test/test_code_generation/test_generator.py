@@ -16,9 +16,9 @@ class TestCodeGenerator:
     def test_construction(self):
         """CodeGenerator can be constructed with a valid template directory."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            gen = CodeGenerator(template_dir=tmpdir)
-            assert gen.template_dir == tmpdir
-            assert gen.env is not None
+            gen = CodeGenerator(template_directory=tmpdir)
+            assert gen.template_directory == tmpdir
+            assert gen.environment is not None
 
     def test_render_template(self):
         """A simple template renders with the given context variables."""
@@ -27,7 +27,7 @@ class TestCodeGenerator:
             with open(template_path, "w") as f:
                 f.write('"""{{ docstring }}"""\n{{ var_name }} = {{ value }}')
 
-            gen = CodeGenerator(template_dir=tmpdir)
+            gen = CodeGenerator(template_directory=tmpdir)
             output = gen.render(
                 "test.py.jinja", docstring="Test module", var_name="x", value=42
             )
@@ -41,7 +41,7 @@ class TestCodeGenerator:
             with open(template_path, "w") as f:
                 f.write("")
 
-            gen = CodeGenerator(template_dir=tmpdir)
+            gen = CodeGenerator(template_directory=tmpdir)
             output = gen.render("empty.py.jinja")
             assert output.strip() == ""
 
@@ -50,6 +50,6 @@ class TestCodeGenerator:
         import jinja2
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            gen = CodeGenerator(template_dir=tmpdir)
+            gen = CodeGenerator(template_directory=tmpdir)
             with pytest.raises(jinja2.TemplateNotFound):
                 gen.render("nonexistent.py.jinja")

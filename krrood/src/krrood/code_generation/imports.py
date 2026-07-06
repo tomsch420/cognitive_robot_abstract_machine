@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from importlib.util import resolve_name
 from typing import Callable, Dict, Iterable, List, Optional, Set, Type
 
+from krrood.code_generation.exceptions import FunctionMissingAnnotationsError
 from krrood.utils import (
     get_function_import_data,
     get_relative_import,
@@ -16,48 +17,42 @@ from krrood.utils import (
 )
 
 # %%
-# Exceptions
-
-
-class FunctionMissingAnnotationsError(TypeError):
-    """Raised at decoration time when a function lacks required type annotations."""
-
-
-# %%
 # Callable inspection
 
 
 @dataclass
-class CallableImport:
-    """Import data required to reference a callable from generated source."""
+class ImportData:
+    """Import data required to reference a symbol from generated source."""
 
     import_line: str
-    """The ``from … import …`` statement that makes the callable available."""
+    """The ``from … import …`` statement that makes the symbol available."""
 
     access_expression: str
-    """The name expression used to reference the callable after the import."""
+    """The name expression used to reference the symbol after the import."""
 
 
-def generate_callable_import(func: Callable) -> CallableImport:
-    """Return the :class:`CallableImport` for *func*.
+def generate_callable_import(func: Callable) -> ImportData:
+    """Return the :class:`ImportData` for *func*.
 
     :param func: The callable to generate an import for.
-    :returns: A :class:`CallableImport` bundling the ``from … import …`` line and
+    :returns: An :class:`ImportData` bundling the ``from … import …`` line and
         the name expression used to reference the callable after that import.
 
     Module-level function ``distance`` in ``my.module``::
 
-        CallableImport("from my.module import distance", "distance")
+        ImportData("from my.module import distance", "distance")
 
     Method ``MyClass.distance`` in ``my.module``::
 
-        CallableImport("from my.module import MyClass", "MyClass.distance")
+        ImportData("from my.module import MyClass", "MyClass.distance")
     """
     module_name = func.__module__
-    qualname = func.__qualname__
-    qualname_parts = qualname.split(".")
+    qualified_name = func.__qualname__
+    qualified_name_parts = qualified_name.split(".")
 
-    parent_segment = qualname_parts[-2] if len(qualname_parts) >= 2 else None
+    parent_segment = (
+        qualified_name_parts[-2] if len(qualified_name_parts) >= 2 else None
+    )
     is_method = (
         parent_segment is not None
         and parent_segment.isidentifier()
@@ -72,7 +67,7 @@ def generate_callable_import(func: Callable) -> CallableImport:
         import_line = f"from {module_name} import {func.__name__}"
         access_expression = func.__name__
 
-    return CallableImport(import_line=import_line, access_expression=access_expression)
+    return ImportData(import_line=import_line, access_expression=access_expression)
 
 
 def validate_annotations(func: Callable) -> None:
@@ -80,18 +75,19 @@ def validate_annotations(func: Callable) -> None:
 
     Unannotated ``self`` and ``cls`` parameters are silently excluded.
     """
-    sig = inspect.signature(func)
-    for param_name, param in sig.parameters.items():
-        if param_name in ("self", "cls"):
+    signature = inspect.signature(func)
+    for parameter_name, parameter in signature.parameters.items():
+        if parameter_name in ("self", "cls"):
             continue
-        if param.annotation is inspect.Parameter.empty:
+        if parameter.annotation is inspect.Parameter.empty:
             raise FunctionMissingAnnotationsError(
-                f"Parameter '{param_name}' of '{func.__qualname__}' "
-                f"lacks a type annotation."
+                function_qualified_name=func.__qualname__,
+                missing_parameter_name=parameter_name,
             )
-    if sig.return_annotation is inspect.Parameter.empty:
+    if signature.return_annotation is inspect.Parameter.empty:
         raise FunctionMissingAnnotationsError(
-            f"Function '{func.__qualname__}' lacks a return type annotation."
+            function_qualified_name=func.__qualname__,
+            missing_parameter_name=None,
         )
 
 
@@ -111,20 +107,21 @@ def generate_relative_import(
     """
     absolute = resolve_name(target_module, from_module)
 
-    from_pkg = from_module.rsplit(".", 1)[0]
-    from_parts = from_pkg.split(".")
+    from_package = from_module.rsplit(".", 1)[0]
+    from_parts = from_package.split(".")
     target_parts = absolute.split(".")
 
-    i = 0
+    common_prefix_length = 0
     while (
-        i < min(len(from_parts), len(target_parts)) and from_parts[i] == target_parts[i]
+        common_prefix_length < min(len(from_parts), len(target_parts))
+        and from_parts[common_prefix_length] == target_parts[common_prefix_length]
     ):
-        i += 1
+        common_prefix_length += 1
 
-    up = len(from_parts) - i
-    prefix = "." * (up + 1)
+    levels_up = len(from_parts) - common_prefix_length
+    prefix = "." * (levels_up + 1)
 
-    remainder = ".".join(target_parts[i:])
+    remainder = ".".join(target_parts[common_prefix_length:])
 
     if symbol:
         if remainder:
@@ -152,31 +149,31 @@ def get_type_names_per_module_from_types(
     for type_object in type_objects:
         try:
             if isinstance(type_object, type) or is_typing_type(type_object):
-                mod = type_object.__module__
+                module_name = type_object.__module__
                 name = type_object.__qualname__
             elif callable(type_object):
-                mod, name = get_function_import_data(type_object)
+                module_name, name = get_function_import_data(type_object)
             elif hasattr(type(type_object), "__module__"):
-                mod = type(type_object).__module__
+                module_name = type(type_object).__module__
                 name = type(type_object).__qualname__
             else:
                 continue
             if name == "NoneType":
-                mod = "types"
+                module_name = "types"
             if (
-                mod is None
-                or mod == "builtins"
-                or mod.startswith("_")
-                or mod in sys.builtin_module_names
-                or mod in excluded_modules
-                or "<" in mod
+                module_name is None
+                or module_name == "builtins"
+                or module_name.startswith("_")
+                or module_name in sys.builtin_module_names
+                or module_name in excluded_modules
+                or "<" in module_name
                 or name in excluded_names
-                or "site-packages" in mod.split(".")
+                or "site-packages" in module_name.split(".")
             ):
                 continue
-            if mod == "typing":
-                mod = "typing_extensions"
-            module_to_types[mod].append(name)
+            if module_name == "typing":
+                module_name = "typing_extensions"
+            module_to_types[module_name].append(name)
         except AttributeError:
             continue
     return module_to_types
