@@ -175,11 +175,6 @@ class GiskardExecutable(Executable):
         self._current_motion_state_chart.add_node(end_motion)
         return self._current_motion_state_chart
 
-    def _wire_up_motion_state_chart(self, tasks: List[Task]):
-        for index, task in enumerate(tasks[1:], start=1):
-            previous_done = tasks[index - 1].observation_variable
-            task.start_condition = previous_done
-
     def _add_condition_monitors(
         self, first_task: Task, end_trigger: ObservationStateValues
     ):
