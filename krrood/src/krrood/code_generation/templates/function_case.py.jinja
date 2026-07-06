@@ -2,7 +2,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing_extensions import ClassVar, Callable
 from {{ base_module }} import {{ base_class_name }}
-{{ type_imports_str }}try:
+{{ type_imports }}try:
     {{ import_line }}
 except ImportError:
     pass
@@ -10,14 +10,14 @@ except ImportError:
 
 @dataclass
 class {{ class_name }}({{ base_class_name }}):
-    """FunctionCase for the `{{ func_name }}` function."""
+    """FunctionCase for the `{{ function_name }}` function."""
 {% for field in fields %}
-    {{ field.name }}: {{ field.type_str }}
+    {{ field.name }}: {{ field.type_string }}
 {% endfor %}
-    _output: {{ return_type_str }}
+    _output: {{ return_type }}
 
 
 try:
-    {{ class_name }}.function = {{ access_expr }}
+    {{ class_name }}.function = {{ access_expression }}
 except NameError:
     pass
