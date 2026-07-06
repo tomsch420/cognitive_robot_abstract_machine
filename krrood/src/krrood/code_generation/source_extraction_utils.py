@@ -4,7 +4,7 @@ Utilities for extracting source code from Python modules, files, and ASTs.
 These are infrastructure functions used by multiple krrood subsystems
 (RDR, EQL-RDR, class_diagrams) to extract function/class source code and
 parse import statements.  They are distinct from the code-generation
-utilities in :mod:`krrood.code_generation.utils`.
+utilities in :mod:`krrood.code_generation`.
 """
 
 from __future__ import annotations
@@ -16,6 +16,7 @@ import os
 import textwrap
 import types
 from collections import defaultdict
+from dataclasses import dataclass
 from importlib.util import resolve_name
 from typing import Dict, List, Optional, Set, Tuple, Union
 
@@ -26,10 +27,29 @@ from krrood.exceptions import (
 
 logger = logging.getLogger(__name__)
 
+Sources = Union[
+    Dict[str, Union[str, List[str]]],
+    List[Union[str, List[str]]],
+]
+"""Extracted source code, keyed by name or ordered as a list in ``as_list`` mode."""
 
-# ---------------------------------------------------------------------------
+LineNumbers = Union[Dict[str, Tuple[int, int]], List[Tuple[int, int]]]
+"""Start/end line numbers, keyed by name or ordered as a list in ``as_list`` mode."""
+
+
+@dataclass
+class ExtractedSource:
+    """Result of extracting function/class source code from Python source."""
+
+    sources: Sources
+    """The extracted source code, either mapped by name or as an ordered list."""
+
+    line_numbers: Optional[LineNumbers] = None
+    """The start/end line numbers, populated only when they were requested."""
+
+
+# %%
 # Import extraction
-# ---------------------------------------------------------------------------
 
 
 def extract_imports_from(
@@ -116,9 +136,8 @@ def extract_imports_from(
     return sorted(result)
 
 
-# ---------------------------------------------------------------------------
+# %%
 # Function / class source extraction
-# ---------------------------------------------------------------------------
 
 
 def extract_function_or_class_file(
@@ -129,10 +148,7 @@ def extract_function_or_class_file(
     include_signature: bool = True,
     as_list: bool = False,
     is_class: bool = False,
-) -> Union[
-    Dict[str, Union[str, List[str]]],
-    Tuple[Dict[str, Union[str, List[str]]], Dict[str, Tuple[int, int]]],
-]:
+) -> ExtractedSource:
     """Extract the source code of a function/class from a file.
 
     :param file_path: The path to the file.
@@ -142,8 +158,8 @@ def extract_function_or_class_file(
     :param include_signature: Whether to include the function/class signature.
     :param as_list: Whether to return a list of sources instead of a dict.
     :param is_class: Whether to also look for class definitions.
-    :return: A dictionary mapping names to source code, or a tuple with
-        line numbers.
+    :return: An :class:`ExtractedSource` bundling the extracted sources and,
+        when requested, their line numbers.
     """
     with open(file_path, "r") as f:
         source = f.read()
@@ -167,10 +183,7 @@ def extract_function_or_class_from_source(
     include_signature: bool = True,
     as_list: bool = False,
     is_class: bool = False,
-) -> Union[
-    Dict[str, Union[str, List[str]]],
-    Tuple[Dict[str, Union[str, List[str]]], Dict[str, Tuple[int, int]]],
-]:
+) -> ExtractedSource:
     """Extract the source code of a function/class from source text.
 
     :param source: The string containing the source code.
@@ -180,8 +193,8 @@ def extract_function_or_class_from_source(
     :param include_signature: Whether to include the function/class signature.
     :param as_list: Whether to return a list of sources instead of a dict.
     :param is_class: Whether to also look for class definitions.
-    :return: A dictionary mapping names to source code, or a tuple with
-        line numbers.
+    :return: An :class:`ExtractedSource` bundling the extracted sources and,
+        when requested, their line numbers.
     """
     # Ensure function_names is a list (avoid circular import from rdr.utils).
     # Keep the same semantics as the original ``make_list``: strings are
@@ -236,8 +249,10 @@ def extract_function_or_class_from_source(
             f"functions not found: "
             f"{set(function_names) - set(functions_source.keys())}"
         )
+    sources = functions_source_list if as_list else functions_source
     if return_line_numbers:
-        return functions_source if not as_list else functions_source_list, (
-            line_numbers if not as_list else line_numbers_list
+        return ExtractedSource(
+            sources=sources,
+            line_numbers=line_numbers_list if as_list else line_numbers,
         )
-    return functions_source if not as_list else functions_source_list
+    return ExtractedSource(sources=sources)

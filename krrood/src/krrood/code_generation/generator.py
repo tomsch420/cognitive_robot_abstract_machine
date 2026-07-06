@@ -19,7 +19,9 @@ class CodeGenerator:
 
     Each domain package that needs Jinja2 templates instantiates this class
     with its own *template_dir* so templates live alongside the code that
-    uses them::
+    uses them.
+
+    .. code-block:: python
 
         generator = CodeGenerator(
             template_dir=os.path.join(os.path.dirname(__file__), "templates")

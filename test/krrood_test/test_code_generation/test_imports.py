@@ -1,4 +1,4 @@
-"""Tests for import-generation utilities in ``krrood.code_generation.utils``."""
+"""Tests for import-generation utilities in ``krrood.code_generation.imports``."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from typing import List, Optional
 
 import pytest
 
-from krrood.code_generation.utils import get_imports_from_types
+from krrood.code_generation.imports import get_imports_from_types
 
 
 class TestGetImportsFromTypes:
