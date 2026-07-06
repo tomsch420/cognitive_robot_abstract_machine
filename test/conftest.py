@@ -200,39 +200,45 @@ def _report_world_leak(world_in_mem: int) -> None:
         name = type(candidate).__name__
         return not any(token in name for token in skip)
 
-    # Walk one representative retention path from a leaked world up to a global root, bounded to six
-    # heap scans. This reveals what keeps the (Variable -> domain generator -> world) graph reachable.
-    seen_ids = set()
+    def is_root(candidate) -> bool:
+        """A node whose retention we treat as explained: a global, or a persistent owner."""
+        if isinstance(candidate, (_types_module.ModuleType, type)):
+            return True
+        return type(candidate).__name__ in (
+            "FixtureDef",
+            "Plan",
+            "PlanNode",
+            "ActionNode",
+            "DesignatorNode",
+            "Context",
+        )
+
+    # Walk one representative retention path from a leaked world up to a persistent owner. gc.get_referrers
+    # is fast here (~0.3s); only objgraph graph walks are forbidden. Following containers too lets the walk
+    # climb through __dict__/list holders to the owning object.
+    seen_ids = {id(worlds)}
     current = worlds[-1] if worlds else None
     emit(f"[world-leak] retention chain from newest world #{len(worlds) - 1}:")
-    for _ in range(6):
+    for _ in range(25):
         if current is None:
             break
         seen_ids.add(id(current))
-        holders = [
+        interesting = [
             holder
             for holder in gc.get_referrers(current)
-            if holder is not worlds
-            and holder is not seen_ids
-            and id(holder) not in seen_ids
+            if id(holder) not in seen_ids and on_retention_path(holder)
         ]
-        interesting = [holder for holder in holders if on_retention_path(holder)]
-        emit(f"    -> {[describe(holder) for holder in interesting][:12]}")
+        emit(f"    -> {[describe(holder) for holder in interesting][:10]}")
 
-        roots = [
-            holder
-            for holder in interesting
-            if isinstance(holder, (_types_module.ModuleType, type))
-            or type(holder).__name__ == "FixtureDef"
-        ]
+        roots = [holder for holder in interesting if is_root(holder)]
         if roots:
-            emit(f"    reached root: {describe(roots[0])}")
+            emit(f"    reached owner: {describe(roots[0])}")
             break
-        # Prefer a named owning object over a bare container so the walk makes progress.
+        # Prefer a named owning object; fall back to a container to climb toward its owner.
         named = [
             holder
             for holder in interesting
-            if not isinstance(holder, (list, dict, tuple, set))
+            if not isinstance(holder, (list, dict, tuple, set, frozenset))
         ]
         current = (named or interesting or [None])[0]
 
