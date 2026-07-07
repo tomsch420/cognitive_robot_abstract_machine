@@ -37,7 +37,7 @@ class FunctionCaseGenerator:
         templates = importlib.resources.files("krrood.code_generation") / "templates"
         self.code_generator = CodeGenerator(template_directory=str(templates))
 
-    def generate(self, func: Callable, class_name: Optional[str] = None) -> str:
+    def generate(self, function: Callable, class_name: Optional[str] = None) -> str:
         """Emit Python source for a ``@dataclass`` subclass of ``FunctionCase``.
 
         The emitted class has:
@@ -48,17 +48,17 @@ class FunctionCaseGenerator:
         - One field per annotated parameter (``self`` / ``cls`` excluded).
         - ``_output: <return_annotation>`` — the attribute the RDR will predict.
 
-        :param func: The callable to generate a case type for.
+        :param function: The callable to generate a case type for.
         :param class_name: Override for the generated class name.  When ``None``
-            the name is derived from ``func.__name__`` via :func:`to_camel_case`.
+            the name is derived from ``function.__name__`` via :func:`to_camel_case`.
         :raises FunctionMissingAnnotationsError: If any required annotation is absent.
         :returns: A Python source string that can be written to a ``.py`` file.
         """
-        validate_annotations(func)
+        validate_annotations(function)
 
         if class_name is None:
-            class_name = to_camel_case(func.__name__)
-        callable_import = generate_callable_import(func)
+            class_name = to_camel_case(function.__name__)
+        callable_import = generate_callable_import(function)
 
         base_module, base_class_name = self.base_class_fully_qualified_name.rsplit(
             ".", 1
@@ -68,12 +68,12 @@ class FunctionCaseGenerator:
         # ``from __future__ import annotations`` in the caller's module) to
         # actual type objects before formatting.
         try:
-            type_hints: Dict[str, object] = get_type_hints_of_object(func)
+            type_hints: Dict[str, object] = get_type_hints_of_object(function)
         except NameError:
             type_hints = {}
 
         # Collect custom types referenced by annotations.
-        signature = inspect.signature(func)
+        signature = inspect.signature(function)
         referenced_types: Dict[str, type] = {}
         for parameter_name, parameter in signature.parameters.items():
             if parameter_name in ("self", "cls"):
@@ -115,7 +115,7 @@ class FunctionCaseGenerator:
             base_module=base_module,
             base_class_name=base_class_name,
             class_name=class_name,
-            function_name=func.__name__,
+            function_name=function.__name__,
             import_line=callable_import.import_line,
             access_expression=callable_import.access_expression,
             type_imports=type_imports,

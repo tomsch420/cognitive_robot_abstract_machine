@@ -31,10 +31,10 @@ class ImportData:
     """The name expression used to reference the symbol after the import."""
 
 
-def generate_callable_import(func: Callable) -> ImportData:
-    """Return the :class:`ImportData` for *func*.
+def generate_callable_import(function: Callable) -> ImportData:
+    """Return the :class:`ImportData` for *function*.
 
-    :param func: The callable to generate an import for.
+    :param function: The callable to generate an import for.
     :returns: An :class:`ImportData` bundling the ``from … import …`` line and
         the name expression used to reference the callable after that import.
 
@@ -46,8 +46,8 @@ def generate_callable_import(func: Callable) -> ImportData:
 
         ImportData("from my.module import MyClass", "MyClass.distance")
     """
-    module_name = func.__module__
-    qualified_name = func.__qualname__
+    module_name = function.__module__
+    qualified_name = function.__qualname__
     qualified_name_parts = qualified_name.split(".")
 
     parent_segment = (
@@ -62,31 +62,31 @@ def generate_callable_import(func: Callable) -> ImportData:
     if is_method:
         class_name = parent_segment
         import_line = f"from {module_name} import {class_name}"
-        access_expression = f"{class_name}.{func.__name__}"
+        access_expression = f"{class_name}.{function.__name__}"
     else:
-        import_line = f"from {module_name} import {func.__name__}"
-        access_expression = func.__name__
+        import_line = f"from {module_name} import {function.__name__}"
+        access_expression = function.__name__
 
     return ImportData(import_line=import_line, access_expression=access_expression)
 
 
-def validate_annotations(func: Callable) -> None:
+def validate_annotations(function: Callable) -> None:
     """Raise :exc:`FunctionMissingAnnotationsError` if any required annotation is absent.
 
     Unannotated ``self`` and ``cls`` parameters are silently excluded.
     """
-    signature = inspect.signature(func)
+    signature = inspect.signature(function)
     for parameter_name, parameter in signature.parameters.items():
         if parameter_name in ("self", "cls"):
             continue
         if parameter.annotation is inspect.Parameter.empty:
             raise FunctionMissingAnnotationsError(
-                function_qualified_name=func.__qualname__,
+                function_qualified_name=function.__qualname__,
                 missing_parameter_name=parameter_name,
             )
     if signature.return_annotation is inspect.Parameter.empty:
         raise FunctionMissingAnnotationsError(
-            function_qualified_name=func.__qualname__,
+            function_qualified_name=function.__qualname__,
             missing_parameter_name=None,
         )
 
