@@ -19,6 +19,20 @@ set -euo pipefail
 # Safe to re-run: it only ever overwrites CLAUDE.local.md, and does nothing if
 # the configured branch or path isn't reachable (e.g. a fresh clone, or a fork
 # that never created it).
+#
+# How this script gets invoked (see ../settings.json): Claude Code registers it
+# as a SessionStart hook via `$CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh`.
+# CLAUDE_PROJECT_DIR is an env var Claude Code itself injects into every hook
+# command's environment, resolving to this project's root - so that path is
+# correct regardless of Claude Code's own cwd when it runs the hook.
+#
+# Coexistence with your own settings: Claude Code merges the `hooks` arrays
+# across all settings layers (managed > CLI args > .claude/settings.local.json
+# > .claude/settings.json (this repo's, committed) > ~/.claude/settings.json)
+# by concatenation, not override. So this SessionStart hook runs alongside -
+# never instead of - any SessionStart hook you already have configured for
+# yourself. settings.json is strict JSON with no comment support, which is why
+# this explanation lives here instead of there.
 
 NOTES_BRANCH="$(git config --get claude.personalNotesBranch || true)"
 [ -n "${NOTES_BRANCH}" ] || exit 0
