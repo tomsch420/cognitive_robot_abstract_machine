@@ -135,15 +135,15 @@ def get_types_to_import_from_type_hints(hints: List[Type]) -> Set[Type]:
     return to_import
 
 
-def get_types_to_import_from_func_type_hints(func: Callable) -> Set[Type]:
+def get_types_to_import_from_function_type_hints(function: Callable) -> Set[Type]:
     """Extract importable types from a function's annotations.
 
-    :param func: The function to extract type hints from.
+    :param function: The function to extract type hints from.
     :returns: A set of types that need to be imported.
     """
-    hints = get_type_hints_of_object(func)
+    hints = get_type_hints_of_object(function)
 
-    sig = inspect.signature(func)
+    sig = inspect.signature(function)
     all_hints = list(hints.values())
     if sig.return_annotation != inspect.Signature.empty:
         all_hints.append(sig.return_annotation)
