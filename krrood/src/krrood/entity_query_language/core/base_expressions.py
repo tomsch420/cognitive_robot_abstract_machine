@@ -891,6 +891,13 @@ class OperationResult:
     Only set when the overall condition result is True.
     """
 
+    evaluated_expression_ids: Optional[OrderedSet[UUID]] = None
+    """
+    A snapshot of the cumulative set of expression IDs evaluated so far during this evaluation pass,
+    populated by the :class:`~krrood.entity_query_language.evaluation.EvaluationTracker` observer. Unlike
+    ``satisfied_condition_ids``, this is populated on every yielded result, not only at the conditions root.
+    """
+
     @property
     def all_bindings(self) -> Bindings:
         """
