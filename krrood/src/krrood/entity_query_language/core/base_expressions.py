@@ -257,16 +257,15 @@ class SymbolicExpression(ABC):
         self, *types: Type[SymbolicExpression]
     ) -> Optional[SymbolicExpression]:
         """
-        :return: The most recently attached parent that is an instance of any of *types*, or ``None``.
+        :return: The most recently attached direct parent that is an instance of any of *types*,
+            or ``None``.
 
-        A node reused across the DAG has several parents at once, so there is no single "current"
-        parent. ``_parent_`` holds only the last parent set, and building an unrelated expression
-        over the node (for example ``node == False``) overwrites it with that operand parent,
-        hiding the structural rule-tree parent. This scans the full ``_parents_`` history and
-        returns the most recent parent restricted to the wanted structural *types* (``Filter`` /
-        ``ConclusionSelector``), skipping such incidental operand parents. The type filter is what
-        excludes the clobbering parent; "most recent" only breaks ties between several structural
-        parents, mirroring ``_parent_``'s own last-wins rule.
+        A node reused in more than one query/subquery keeps a direct parent per position, but only
+        one of them is ``_parent_`` (the first one attached — see the ``_parent_`` setter). Walking
+        the ``_parent_`` chain from such a node therefore reaches whichever context it was first
+        embedded in, not necessarily the one currently asking. This checks *this node's own*
+        `_parents_` directly (no multi-hop walk) for one matching *types*, so callers that need "the
+        Filter/ConclusionSelector directly owning me" find it regardless of which parent is primary.
         """
         return next(
             (parent for parent in reversed(self._parents_) if isinstance(parent, types)),
@@ -469,9 +468,12 @@ class SymbolicExpression(ABC):
         """
         :return: The root of the symbolic expression graph that contains conditions, or None if no conditions found.
 
-        ..note:: When a node is reused both as a ``Filter`` condition and inside a sibling condition
-            its ``_parent_`` is clobbered, hiding the ``Filter`` from the graph walk; the owning
-            ``Filter`` is then recovered from the authoritative ``_parents_`` history.
+        ..note:: A node reused across separate queries or subqueries (for example a shared
+            sub-expression wrapped in a second ``Filter`` by a derived/introspection query) has a
+            direct ``Filter`` parent that may not be reachable by walking up from ``self._root_``,
+            since that walk follows only the primary ``_parent_`` — whichever context first attached
+            it. :meth:`_last_parent_of_type_` recovers the owning ``Filter`` directly from this
+            node's own parents when the graph walk misses it.
         """
         root_via_graph = next(
             (
