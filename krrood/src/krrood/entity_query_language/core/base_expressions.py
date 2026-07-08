@@ -306,14 +306,15 @@ class SymbolicExpression(ABC):
 
     def _ensure_children_ids_are_cached_(self, *children: SymbolicExpression) -> None:
         """
-        Ensure that the IDs of the provided children expressions are cached within the current expression.
+        Ensure that the IDs of the provided children expressions, and all of their own descendants,
+        are cached within the current expression.
 
         :param children: The children expressions to cache IDs for.
         """
         for child in children:
             if child._id_ not in self._expression_id_cache_:
                 self._expression_id_cache_[child._id_] = child
-                child._ensure_children_ids_are_cached_(*child._children_)
+                self._ensure_children_ids_are_cached_(*child._children_)
 
     def _process_result_(self, result: OperationResult) -> Any:
         """
