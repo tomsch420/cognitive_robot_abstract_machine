@@ -439,7 +439,29 @@ class HasType(Triple):
             Noun(fields["variable"]),
             Copula(),
             Adjective("of type"),
-            Noun(fields["types_"]),
+            cls._types_listing(fields["types_"]),
+        )
+
+    @staticmethod
+    def _types_listing(types_field: VerbalizationField) -> Any:
+        """:return: the admissible types said DISJUNCTIVELY (*"Apple or Body"*) when the field holds
+        a tuple — ``isinstance`` over a tuple holds for any one of them, so *"and"* would claim an
+        impossible conjunction — else the field's own rendered fragment (a single type, or a
+        variable standing for one)."""
+        # Imported locally to avoid the core → verbalization import cycle (see :class:`Triple`).
+        from krrood.entity_query_language.verbalization.fragments.base import (
+            oxford_comma,
+            RoleFragment,
+        )
+        from krrood.entity_query_language.verbalization.vocabulary.english import (
+            Conjunctions,
+        )
+
+        if not isinstance(types_field.value, tuple):
+            return types_field
+        return oxford_comma(
+            [RoleFragment.for_type(type_) for type_ in types_field.value],
+            Conjunctions.OR.as_fragment(),
         )
 
 
