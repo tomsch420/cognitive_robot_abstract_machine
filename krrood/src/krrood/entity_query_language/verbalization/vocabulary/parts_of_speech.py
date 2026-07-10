@@ -174,13 +174,16 @@ class OneOf(ClauseElement):
             if isinstance(self.members, VerbalizationField)
             else self.members
         )
+        listed = one_of(
+            [RoleFragment.for_member(member) for member in members[: MAX_SET_MEMBERS + 1]]
+        )
+        if listed is not None:
+            return listed
+        # Past the cap the members are summarised by count; the category noun still distinguishes a
+        # set of types from a set of plain values.
         are_types = bool(members) and all(
             isinstance(member, type) for member in members
         )
-        render = RoleFragment.for_type if are_types else RoleFragment.for_literal
-        listed = one_of([render(member) for member in members[: MAX_SET_MEMBERS + 1]])
-        if listed is not None:
-            return listed
         return PhraseFragment(
             parts=[
                 SetMembership.ONE_OF.as_fragment(),
@@ -194,16 +197,16 @@ class OneOf(ClauseElement):
 class Or(ClauseElement):
     """A disjunctive listing of admissible values — *"A, B, or C"* — over a collection.
 
-    The vocabulary-level oxford-comma disjunction: each member renders as a linked type reference when
-    it is a class, else as a literal value, joined with *"or"*. An author writes ``Or(field)`` rather
-    than reaching for the low-level :func:`~…fragments.base.oxford_comma` / :class:`Conjunctions`
-    builders. A field bound to a single (non-tuple) value keeps that value's own rendered fragment.
+    The vocabulary-level oxford-comma disjunction over any iterable of members, each rendered by
+    :meth:`~…fragments.base.RoleFragment.for_member` (a class as a linked type reference, any other
+    value as a literal) and joined with *"or"*. An author writes ``Or(field)`` rather than reaching
+    for the low-level :func:`~…fragments.base.oxford_comma` / :class:`Conjunctions` builders. A field
+    bound to a single (non-iterable) value keeps that value's own rendered fragment.
     """
 
     members: Union[Iterable, VerbalizationField]
     """The admissible values — a predicate :class:`~krrood.entity_query_language.predicate.VerbalizationField`
-    bound to a collection (or a single value), or a collection directly. Classes render as linked type
-    references, other values as literals."""
+    bound to an iterable (or a single value), or an iterable directly."""
 
     def as_fragment(self) -> VerbalizationFragment:
         """:return: the disjunction phrase *"A, B, or C"*, or a single member's own fragment.
@@ -219,12 +222,11 @@ class Or(ClauseElement):
             if isinstance(self.members, VerbalizationField)
             else self.members
         )
-        if not isinstance(value, tuple):
+        if not isinstance(value, Iterable) or isinstance(value, (str, bytes)):
             return Noun(self.members).as_fragment()
-        are_types = bool(value) and all(isinstance(member, type) for member in value)
-        render = RoleFragment.for_type if are_types else RoleFragment.for_literal
         return oxford_comma(
-            [render(member) for member in value], Conjunctions.OR.as_fragment()
+            [RoleFragment.for_member(member) for member in value],
+            Conjunctions.OR.as_fragment(),
         )
 
 
