@@ -14,6 +14,7 @@ from krrood.entity_query_language.verbalization.fragments.base import (
     PhraseFragment,
     RoleFragment,
     WordFragment,
+    oxford_comma,
 )
 from krrood.entity_query_language.verbalization.fragments.features import (
     Definiteness,
@@ -25,6 +26,7 @@ from krrood.entity_query_language.verbalization.microplanning.coordination impor
     one_of,
 )
 from krrood.entity_query_language.verbalization.vocabulary.english import (
+    Conjunctions,
     Copulas,
     Prepositions,
     SetMembership,
@@ -176,6 +178,44 @@ class OneOf(ClauseElement):
                 WordFragment(text=morphology.cardinal(len(members))),
                 WordFragment(text="types" if are_types else "values"),
             ]
+        )
+
+
+@dataclass(frozen=True)
+class Or(ClauseElement):
+    """A disjunctive listing of admissible values — *"A, B, or C"* — over a collection.
+
+    The vocabulary-level oxford-comma disjunction: each member renders as a linked type reference when
+    it is a class, else as a literal value, joined with *"or"*. An author writes ``Or(field)`` rather
+    than reaching for the low-level :func:`~…fragments.base.oxford_comma` / :class:`Conjunctions`
+    builders. A field bound to a single (non-tuple) value keeps that value's own rendered fragment.
+    """
+
+    members: Union[Iterable, VerbalizationField]
+    """The admissible values — a predicate :class:`~krrood.entity_query_language.predicate.VerbalizationField`
+    bound to a collection (or a single value), or a collection directly. Classes render as linked type
+    references, other values as literals."""
+
+    def as_fragment(self) -> VerbalizationFragment:
+        """:return: the disjunction phrase *"A, B, or C"*, or a single member's own fragment.
+
+        >>> from krrood.entity_query_language.verbalization.fragments.base import (
+        ...     flatten_fragment_to_plain_text,
+        ... )
+        >>> flatten_fragment_to_plain_text(Or((int, str)).as_fragment())
+        'Integer or Text'
+        """
+        value = (
+            self.members.value
+            if isinstance(self.members, VerbalizationField)
+            else self.members
+        )
+        if not isinstance(value, tuple):
+            return Noun(self.members).as_fragment()
+        are_types = bool(value) and all(isinstance(member, type) for member in value)
+        render = RoleFragment.for_type if are_types else RoleFragment.for_literal
+        return oxford_comma(
+            [render(member) for member in value], Conjunctions.OR.as_fragment()
         )
 
 
