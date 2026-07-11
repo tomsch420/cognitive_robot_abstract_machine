@@ -225,7 +225,7 @@ class Query(
     _is_compiled_product_: bool = field(default=False, init=False)
     """
     Whether this instance is a compiled product (wired as the cartesian-product node) rather than a
-    spec. A spec delegates evaluation to the product it compiles, so that the spec behaves like its
+    specification. A specification delegates evaluation to the product it compiles, so that the specification behaves like its
     product while never being the mutated, embedded node itself.
     """
 
@@ -394,10 +394,10 @@ class Query(
         """
         Build (or rebuild) the query, caching a freshly compiled product expression.
 
-        This query is a stable spec: it holds the modifiers and a stable identity that derived
+        This query is a stable specification: it holds the modifiers and a stable identity that derived
         references and rules point at, but it is never itself the evaluated node. Each build compiles
-        a fresh product tree from the current spec via :meth:`_compile_` and stores it in
-        :attr:`_expression_`; the spec is never frozen, so any modifier marks it dirty and the next
+        a fresh product tree from the current specification via :meth:`_compile_` and stores it in
+        :attr:`_expression_`; the specification is never frozen, so any modifier marks it dirty and the next
         build produces a new product. Because every build yields a new tree (rather than mutating the
         previous one in place), a product already embedded elsewhere stays frozen against later edits.
 
@@ -411,11 +411,11 @@ class Query(
 
     def _compile_(self) -> SymbolicExpression:
         """
-        Compile a fresh, independent product expression from this spec — the single compile path.
+        Compile a fresh, independent product expression from this specification — the single compile path.
 
         The product is a separate node graph that shares this query's identifier and selected
         variables, so it evaluates identically and co-references the same variables, while later
-        edits that rebuild the spec cannot reach it. It is produced by replaying the spec's modifiers
+        edits that rebuild the specification cannot reach it. It is produced by replaying the specification's modifiers
         onto a fresh instance and wiring that instance as the cartesian-product node, rather than by
         cloning a live graph, so grouping, distinct, and self-referential ordering all compile
         correctly.
@@ -503,7 +503,7 @@ class Query(
         Evaluate the query by constraining values, updating conclusions,
         and selecting variables.
 
-        A spec delegates to its compiled product so that evaluating the spec as an expression behaves
+        A specification delegates to its compiled product so that evaluating the specification as an expression behaves
         exactly like evaluating the product; only the compiled product runs the real evaluation.
 
         This query is the scope that isolates a nested subquery: evaluated as a subquery (nested
@@ -783,7 +783,7 @@ class Query(
         as "this query has no where/having condition" (both fall back to the same node when no
         ``Filter`` exists). Since :attr:`_conditions_root_` already resolves within the compiled
         product, :attr:`_root_` must too, or that comparison always sees two different objects (the
-        spec and its product) even when the product itself has no condition.
+        specification and its product) even when the product itself has no condition.
 
         :return: The root of the compiled product's tree.
         """
@@ -810,9 +810,9 @@ class Query(
         """
         Traverse the whole node tree through the compiled product.
 
-        A spec holds only its selected variables and modifiers; the ``where`` / ``having``
+        A specification holds only its selected variables and modifiers; the ``where`` / ``having``
         conditions (and the variables they introduce) live in the compiled product. Delegating the
-        traversal keeps the spec behaving like its product, so consumers that scan every node — for
+        traversal keeps the specification behaving like its product, so consumers that scan every node — for
         example verbalization's referent disambiguation — also see condition-only referents.
         """
         self.build()
@@ -827,7 +827,7 @@ class Query(
 
         A selected variable's own ``_all_expressions_``/``_conditions_root_`` reach this query
         only indirectly, via ``self._root_._descendants_`` on the base class. Without this override
-        that walk sees only the spec's structural children (its selected variables), never the
+        that walk sees only the specification's structural children (its selected variables), never the
         ``where`` / ``having`` conditions, which live in the compiled product — so callers reaching
         this query as a root through a plain child, rather than through the query object itself,
         must get the same delegation as :attr:`_all_expressions_` and :attr:`_conditions_root_`.
@@ -840,7 +840,7 @@ class Query(
     @UnaryExpression._parent_.setter
     def _parent_(self, parent: SymbolicExpression):
         """
-        Route parenting to the compiled product rather than to the spec node, building it first. The
+        Route parenting to the compiled product rather than to the specification node, building it first. The
         ``_building_`` re-entrancy guard prevents recursion while a product instance wires itself
         during :meth:`_wire_in_place_`.
         """
