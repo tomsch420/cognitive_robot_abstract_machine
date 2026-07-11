@@ -35,6 +35,8 @@ def _discovered_grammar_rule_types():
     return {
         subclass
         for subclass in concrete_subclasses(PhraseRule)
+        # grammar_package.__name__ is the package's full dotted import path (e.g.
+        # "krrood.entity_query_language.verbalization.grammar"), matching subclass.__module__.
         if subclass.__module__.startswith(f"{grammar_package.__name__}.")
     }
 
