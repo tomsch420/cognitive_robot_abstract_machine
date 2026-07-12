@@ -17,16 +17,22 @@ from typing_extensions import Any, Dict, List, Optional, Tuple
 from robokudo.annotators.core import BaseAnnotator, ThreadedAnnotator
 from robokudo.types.annotation import Shape
 from robokudo.types.scene import ObjectHypothesis
-from robokudo.utils.shape_estimator_adapters import adapter_for_fit
+from robokudo.utils.shape_estimator_adapters import (
+    CUBOID_FIT_ADAPTER,
+    CYLINDER_FIT_ADAPTER,
+    SPHERE_FIT_ADAPTER,
+    CuboidFitParameters,
+    CylinderFitParameters,
+    ShapeFitAdapter,
+    ShapeFitParameters,
+    SphereFitParameters,
+    adapter_for_fit,
+)
 from robokudo.utils.shape_fitting import (
     CuboidFit,
     CylinderFit,
     CylinderFitConstraints,
     FittedShape,
-    SphereFit,
-    fit_cuboid,
-    fit_cylinder,
-    fit_sphere,
     refit_cuboid_with_fixed_orientation,
     refit_cylinder_with_fixed_axis,
     select_best_shape,
@@ -277,11 +283,6 @@ class ShapeEstimatorAnnotator(ThreadedAnnotator):
         if best_fit is None:
             return None
         best_fit_adapter = adapter_for_fit(best_fit)
-        minimum_inlier_ratio = best_fit_adapter.minimum_inlier_ratio(
-            self.descriptor.parameters
-        )
-        if best_fit.inlier_ratio < minimum_inlier_ratio:
-            return None
         self._log_selected_candidate(object_hypothesis, best_fit)
 
         inlier_indices_in_filtered_cloud = retained_point_indices[
@@ -320,31 +321,89 @@ class ShapeEstimatorAnnotator(ThreadedAnnotator):
         """Fit all enabled primitives and return accepted candidates."""
         candidates: List[FittedShape] = []
 
-        if self.descriptor.parameters.fit_sphere:
+        for adapter, fit_parameters in self._enabled_shape_fit_requests():
             self._record_shape_candidate(
                 candidates=candidates,
                 object_hypothesis=object_hypothesis,
-                shape_name="Sphere",
-                fit_result=self._fit_sphere_candidate(points),
-            )
-
-        if self.descriptor.parameters.fit_cylinder:
-            self._record_shape_candidate(
-                candidates=candidates,
-                object_hypothesis=object_hypothesis,
-                shape_name="Cylinder",
-                fit_result=self._fit_cylinder_candidate(points),
-            )
-
-        if self.descriptor.parameters.fit_cuboid:
-            self._record_shape_candidate(
-                candidates=candidates,
-                object_hypothesis=object_hypothesis,
-                shape_name="Cuboid",
-                fit_result=self._fit_cuboid_candidate(points),
+                shape_name=adapter.shape_name,
+                fit_result=self._postprocess_shape_candidate(
+                    fit_result=adapter.fit(points, fit_parameters),
+                    points=points,
+                ),
             )
 
         return candidates
+
+    def _enabled_shape_fit_requests(
+        self,
+    ) -> List[Tuple[ShapeFitAdapter, ShapeFitParameters]]:
+        """Return enabled shape fitters with explicit fit parameters."""
+        parameters = self.descriptor.parameters
+        fit_requests: List[Tuple[ShapeFitAdapter, ShapeFitParameters]] = []
+
+        if parameters.fit_sphere:
+            fit_requests.append(
+                (
+                    SPHERE_FIT_ADAPTER,
+                    SphereFitParameters(
+                        distance_threshold=parameters.distance_threshold,
+                        robust_loss=parameters.robust_loss,
+                        max_radius=parameters.max_sphere_radius_meters,
+                        max_radius_to_bbox_diagonal_ratio=(
+                            parameters.max_sphere_radius_to_bbox_diagonal_ratio
+                        ),
+                        max_radius_to_observed_extent_ratio=(
+                            parameters.max_sphere_radius_to_observed_extent_ratio
+                        ),
+                        max_center_distance_to_bbox_diagonal_ratio=(
+                            parameters.max_sphere_center_distance_to_bbox_diagonal_ratio
+                        ),
+                        min_inlier_ratio=parameters.minimum_inlier_ratio,
+                    ),
+                )
+            )
+
+        if parameters.fit_cylinder:
+            fit_requests.append(
+                (
+                    CYLINDER_FIT_ADAPTER,
+                    CylinderFitParameters(
+                        distance_threshold=parameters.distance_threshold,
+                        robust_loss=parameters.robust_loss,
+                        max_radius=parameters.max_cylinder_radius_meters,
+                        max_height=parameters.max_cylinder_height_meters,
+                        max_radius_to_bbox_diagonal_ratio=(
+                            parameters.max_cylinder_radius_to_bbox_diagonal_ratio
+                        ),
+                        max_radius_to_cross_section_extent_ratio=(
+                            parameters.max_cylinder_radius_to_cross_section_extent_ratio
+                        ),
+                        max_axis_center_distance_to_bbox_diagonal_ratio=(
+                            parameters.max_cylinder_center_distance_to_bbox_diagonal_ratio
+                        ),
+                        min_inlier_ratio=parameters.cylinder_minimum_inlier_ratio,
+                        max_initializations=parameters.cylinder_max_initializations,
+                        consensus_trials=parameters.cylinder_consensus_trials,
+                        inlier_polishing_iterations=(
+                            parameters.cylinder_inlier_polishing_iterations
+                        ),
+                    ),
+                )
+            )
+
+        if parameters.fit_cuboid:
+            fit_requests.append(
+                (
+                    CUBOID_FIT_ADAPTER,
+                    CuboidFitParameters(
+                        distance_threshold=parameters.cuboid_distance_threshold,
+                        max_extent=parameters.max_cuboid_extent_meters,
+                        min_inlier_ratio=parameters.cuboid_minimum_inlier_ratio,
+                    ),
+                )
+            )
+
+        return fit_requests
 
     def _record_shape_candidate(
         self,
@@ -364,53 +423,21 @@ class ShapeEstimatorAnnotator(ThreadedAnnotator):
         candidates.append(fit_result)
         self._log_candidate_metrics(object_hypothesis, fit_result)
 
-    def _fit_sphere_candidate(self, points: np.ndarray) -> Optional[SphereFit]:
-        """Fit one sphere candidate using descriptor parameters."""
-        return fit_sphere(
-            points=points,
-            distance_threshold=self.descriptor.parameters.distance_threshold,
-            robust_loss=self.descriptor.parameters.robust_loss,
-            max_radius=self.descriptor.parameters.max_sphere_radius_meters,
-            max_radius_to_bbox_diagonal_ratio=(
-                self.descriptor.parameters.max_sphere_radius_to_bbox_diagonal_ratio
-            ),
-            max_radius_to_observed_extent_ratio=(
-                self.descriptor.parameters.max_sphere_radius_to_observed_extent_ratio
-            ),
-            max_center_distance_to_bbox_diagonal_ratio=(
-                self.descriptor.parameters.max_sphere_center_distance_to_bbox_diagonal_ratio
-            ),
-            min_inlier_ratio=self.descriptor.parameters.minimum_inlier_ratio,
-        )
-
-    def _fit_cylinder_candidate(self, points: np.ndarray) -> Optional[CylinderFit]:
-        """Fit one cylinder candidate and apply configured axis stabilization."""
-        cylinder_fit = fit_cylinder(
-            points=points,
-            distance_threshold=self.descriptor.parameters.distance_threshold,
-            robust_loss=self.descriptor.parameters.robust_loss,
-            max_radius=self.descriptor.parameters.max_cylinder_radius_meters,
-            max_height=self.descriptor.parameters.max_cylinder_height_meters,
-            max_radius_to_bbox_diagonal_ratio=(
-                self.descriptor.parameters.max_cylinder_radius_to_bbox_diagonal_ratio
-            ),
-            max_radius_to_cross_section_extent_ratio=(
-                self.descriptor.parameters.max_cylinder_radius_to_cross_section_extent_ratio
-            ),
-            max_axis_center_distance_to_bbox_diagonal_ratio=(
-                self.descriptor.parameters.max_cylinder_center_distance_to_bbox_diagonal_ratio
-            ),
-            min_inlier_ratio=self.descriptor.parameters.cylinder_minimum_inlier_ratio,
-            max_initializations=self.descriptor.parameters.cylinder_max_initializations,
-            consensus_trials=self.descriptor.parameters.cylinder_consensus_trials,
-            inlier_polishing_iterations=self.descriptor.parameters.cylinder_inlier_polishing_iterations,
-        )
-        if cylinder_fit is None:
-            return None
-        return self._stabilize_cylinder_axis_if_tilted(
-            cylinder_fit=cylinder_fit,
-            points=points,
-        )
+    def _postprocess_shape_candidate(
+        self, fit_result: Optional[FittedShape], points: np.ndarray
+    ) -> Optional[FittedShape]:
+        """Apply annotator-level stabilization policies to fitted shape candidates."""
+        if isinstance(fit_result, CylinderFit):
+            return self._stabilize_cylinder_axis_if_tilted(
+                cylinder_fit=fit_result,
+                points=points,
+            )
+        if isinstance(fit_result, CuboidFit):
+            return self._stabilize_cuboid_orientation_if_ambiguous(
+                cuboid_fit=fit_result,
+                points=points,
+            )
+        return fit_result
 
     def _cylinder_fit_constraints(self) -> CylinderFitConstraints:
         """Return cylinder constraints from descriptor parameters."""
@@ -428,21 +455,6 @@ class ShapeEstimatorAnnotator(ThreadedAnnotator):
             max_axis_center_distance_to_bbox_diagonal_ratio=(
                 self.descriptor.parameters.max_cylinder_center_distance_to_bbox_diagonal_ratio
             ),
-        )
-
-    def _fit_cuboid_candidate(self, points: np.ndarray) -> Optional[CuboidFit]:
-        """Fit one cuboid candidate and apply configured orientation stabilization."""
-        cuboid_fit = fit_cuboid(
-            points=points,
-            distance_threshold=self.descriptor.parameters.cuboid_distance_threshold,
-            max_extent=self.descriptor.parameters.max_cuboid_extent_meters,
-            min_inlier_ratio=self.descriptor.parameters.cuboid_minimum_inlier_ratio,
-        )
-        if cuboid_fit is None:
-            return None
-        return self._stabilize_cuboid_orientation_if_ambiguous(
-            cuboid_fit=cuboid_fit,
-            points=points,
         )
 
     def _select_best_shape_candidate(

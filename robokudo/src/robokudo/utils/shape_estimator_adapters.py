@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 
 import numpy as np
 import open3d as o3d
@@ -19,11 +20,65 @@ from semantic_digital_twin.world_description.geometry import (
 from semantic_digital_twin.world_description.geometry import (
     Sphere as SemDTSphere,
 )
-from typing_extensions import Any
+from typing_extensions import Optional, Union
 
 from robokudo.types.annotation import Cuboid, Cylinder, Shape, Sphere
-from robokudo.utils.shape_fitting import CuboidFit, CylinderFit, FittedShape, SphereFit
+from robokudo.utils.shape_fitting import (
+    CuboidFit,
+    CylinderFit,
+    FittedShape,
+    SphereFit,
+    fit_cuboid,
+    fit_cylinder,
+    fit_sphere,
+)
 from robokudo.utils.transform import get_quaternion_from_rotation_matrix
+
+
+@dataclass(frozen=True)
+class SphereFitParameters:
+    """Parameters for fitting one sphere candidate."""
+
+    distance_threshold: float
+    robust_loss: str
+    max_radius: float
+    max_radius_to_bbox_diagonal_ratio: float
+    max_radius_to_observed_extent_ratio: float
+    max_center_distance_to_bbox_diagonal_ratio: float
+    min_inlier_ratio: float
+
+
+@dataclass(frozen=True)
+class CylinderFitParameters:
+    """Parameters for fitting one cylinder candidate."""
+
+    distance_threshold: float
+    robust_loss: str
+    max_radius: float
+    max_height: float
+    max_radius_to_bbox_diagonal_ratio: float
+    max_radius_to_cross_section_extent_ratio: float
+    max_axis_center_distance_to_bbox_diagonal_ratio: float
+    min_inlier_ratio: float
+    max_initializations: int
+    consensus_trials: int
+    inlier_polishing_iterations: int
+
+
+@dataclass(frozen=True)
+class CuboidFitParameters:
+    """Parameters for fitting one cuboid candidate."""
+
+    distance_threshold: float
+    max_extent: float
+    min_inlier_ratio: float
+
+
+ShapeFitParameters = Union[
+    SphereFitParameters,
+    CylinderFitParameters,
+    CuboidFitParameters,
+]
 
 
 class ShapeFitAdapter(ABC):
@@ -36,8 +91,10 @@ class ShapeFitAdapter(ABC):
         """Return whether this adapter handles the fit result."""
 
     @abstractmethod
-    def minimum_inlier_ratio(self, parameters: Any) -> float:
-        """Return configured minimum inlier ratio for this shape."""
+    def fit(
+        self, points: np.ndarray, parameters: ShapeFitParameters
+    ) -> Optional[FittedShape]:
+        """Fit this primitive using shape-specific fit parameters."""
 
     @abstractmethod
     def to_annotation(self, fit_result: FittedShape) -> Shape:
@@ -65,9 +122,27 @@ class SphereFitAdapter(ShapeFitAdapter):
         """Return whether this adapter handles the fit result."""
         return isinstance(fit_result, SphereFit)
 
-    def minimum_inlier_ratio(self, parameters: Any) -> float:
-        """Return configured minimum inlier ratio for spheres."""
-        return parameters.minimum_inlier_ratio
+    def fit(
+        self, points: np.ndarray, parameters: ShapeFitParameters
+    ) -> Optional[SphereFit]:
+        """Fit one sphere candidate."""
+        fit_parameters = _as_sphere_fit_parameters(parameters)
+        return fit_sphere(
+            points=points,
+            distance_threshold=fit_parameters.distance_threshold,
+            robust_loss=fit_parameters.robust_loss,
+            max_radius=fit_parameters.max_radius,
+            max_radius_to_bbox_diagonal_ratio=(
+                fit_parameters.max_radius_to_bbox_diagonal_ratio
+            ),
+            max_radius_to_observed_extent_ratio=(
+                fit_parameters.max_radius_to_observed_extent_ratio
+            ),
+            max_center_distance_to_bbox_diagonal_ratio=(
+                fit_parameters.max_center_distance_to_bbox_diagonal_ratio
+            ),
+            min_inlier_ratio=fit_parameters.min_inlier_ratio,
+        )
 
     def to_annotation(self, fit_result: FittedShape) -> Sphere:
         """Create a sphere annotation from a sphere fit."""
@@ -126,9 +201,31 @@ class CylinderFitAdapter(ShapeFitAdapter):
         """Return whether this adapter handles the fit result."""
         return isinstance(fit_result, CylinderFit)
 
-    def minimum_inlier_ratio(self, parameters: Any) -> float:
-        """Return configured minimum inlier ratio for cylinders."""
-        return parameters.cylinder_minimum_inlier_ratio
+    def fit(
+        self, points: np.ndarray, parameters: ShapeFitParameters
+    ) -> Optional[CylinderFit]:
+        """Fit one cylinder candidate."""
+        fit_parameters = _as_cylinder_fit_parameters(parameters)
+        return fit_cylinder(
+            points=points,
+            distance_threshold=fit_parameters.distance_threshold,
+            robust_loss=fit_parameters.robust_loss,
+            max_radius=fit_parameters.max_radius,
+            max_height=fit_parameters.max_height,
+            max_radius_to_bbox_diagonal_ratio=(
+                fit_parameters.max_radius_to_bbox_diagonal_ratio
+            ),
+            max_radius_to_cross_section_extent_ratio=(
+                fit_parameters.max_radius_to_cross_section_extent_ratio
+            ),
+            max_axis_center_distance_to_bbox_diagonal_ratio=(
+                fit_parameters.max_axis_center_distance_to_bbox_diagonal_ratio
+            ),
+            min_inlier_ratio=fit_parameters.min_inlier_ratio,
+            max_initializations=fit_parameters.max_initializations,
+            consensus_trials=fit_parameters.consensus_trials,
+            inlier_polishing_iterations=(fit_parameters.inlier_polishing_iterations),
+        )
 
     def to_annotation(self, fit_result: FittedShape) -> Cylinder:
         """Create a cylinder annotation from a cylinder fit."""
@@ -196,9 +293,17 @@ class CuboidFitAdapter(ShapeFitAdapter):
         """Return whether this adapter handles the fit result."""
         return isinstance(fit_result, CuboidFit)
 
-    def minimum_inlier_ratio(self, parameters: Any) -> float:
-        """Return configured minimum inlier ratio for cuboids."""
-        return parameters.cuboid_minimum_inlier_ratio
+    def fit(
+        self, points: np.ndarray, parameters: ShapeFitParameters
+    ) -> Optional[CuboidFit]:
+        """Fit one cuboid candidate."""
+        fit_parameters = _as_cuboid_fit_parameters(parameters)
+        return fit_cuboid(
+            points=points,
+            distance_threshold=fit_parameters.distance_threshold,
+            max_extent=fit_parameters.max_extent,
+            min_inlier_ratio=fit_parameters.min_inlier_ratio,
+        )
 
     def to_annotation(self, fit_result: FittedShape) -> Cuboid:
         """Create a cuboid annotation from a cuboid fit."""
@@ -257,10 +362,14 @@ class CuboidFitAdapter(ShapeFitAdapter):
         )
 
 
+SPHERE_FIT_ADAPTER = SphereFitAdapter()
+CYLINDER_FIT_ADAPTER = CylinderFitAdapter()
+CUBOID_FIT_ADAPTER = CuboidFitAdapter()
+
 SHAPE_FIT_ADAPTERS = (
-    SphereFitAdapter(),
-    CylinderFitAdapter(),
-    CuboidFitAdapter(),
+    SPHERE_FIT_ADAPTER,
+    CYLINDER_FIT_ADAPTER,
+    CUBOID_FIT_ADAPTER,
 )
 
 
@@ -327,3 +436,27 @@ def _as_cuboid_fit(fit_result: FittedShape) -> CuboidFit:
     if not isinstance(fit_result, CuboidFit):
         raise TypeError(f"Expected CuboidFit, got {type(fit_result)!r}")
     return fit_result
+
+
+def _as_sphere_fit_parameters(
+    parameters: ShapeFitParameters,
+) -> SphereFitParameters:
+    if not isinstance(parameters, SphereFitParameters):
+        raise TypeError(f"Expected SphereFitParameters, got {type(parameters)!r}")
+    return parameters
+
+
+def _as_cylinder_fit_parameters(
+    parameters: ShapeFitParameters,
+) -> CylinderFitParameters:
+    if not isinstance(parameters, CylinderFitParameters):
+        raise TypeError(f"Expected CylinderFitParameters, got {type(parameters)!r}")
+    return parameters
+
+
+def _as_cuboid_fit_parameters(
+    parameters: ShapeFitParameters,
+) -> CuboidFitParameters:
+    if not isinstance(parameters, CuboidFitParameters):
+        raise TypeError(f"Expected CuboidFitParameters, got {type(parameters)!r}")
+    return parameters
