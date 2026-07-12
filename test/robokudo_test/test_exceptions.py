@@ -10,6 +10,7 @@ from robokudo.exceptions import (
     ImageContourMissing,
     PlaneModelMissing,
     PointCloudThresholdError,
+    PointCloudThresholdRelation,
     PointCloudTooSmallForClustering,
     UnknownMode,
     WorldDescriptorBootstrapError,
@@ -57,7 +58,7 @@ class TestRoboKudoExceptions:
         exception = PointCloudThresholdError(
             point_count=12,
             threshold=100,
-            relation="below",
+            relation=PointCloudThresholdRelation.BELOW,
         )
 
         assert "Scene point cloud size (12) is below" in str(exception)

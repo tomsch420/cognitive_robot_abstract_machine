@@ -27,7 +27,7 @@ from py_trees.common import Status
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
-from robokudo.exceptions import PointCloudThresholdError
+from robokudo.exceptions import PointCloudThresholdError, PointCloudThresholdRelation
 from robokudo.utils.error_handling import catch_and_raise_to_blackboard
 
 
@@ -103,7 +103,7 @@ class PointcloudCheckAnnotator(BaseAnnotator):
                 raise PointCloudThresholdError(
                     point_count=point_count,
                     threshold=self.descriptor.parameters.point_threshold,
-                    relation="below",
+                    relation=PointCloudThresholdRelation.BELOW,
                 )
 
             self.rk_logger.info(
@@ -121,7 +121,7 @@ class PointcloudCheckAnnotator(BaseAnnotator):
                 raise PointCloudThresholdError(
                     point_count=point_count,
                     threshold=self.descriptor.parameters.point_threshold,
-                    relation="above",
+                    relation=PointCloudThresholdRelation.ABOVE,
                 )
 
             self.rk_logger.info(

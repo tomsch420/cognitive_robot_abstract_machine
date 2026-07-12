@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from abc import ABC
 from dataclasses import dataclass
+from enum import StrEnum
 from typing_extensions import Any
 
 from krrood.exceptions import DataclassException
@@ -78,17 +79,24 @@ class CASCheckFailed(AnalysisPreconditionError):
         return "inspect the CAS contents and the condition configured for this check."
 
 
+class PointCloudThresholdRelation(StrEnum):
+    """Relative position of a point cloud size to a configured threshold."""
+
+    BELOW = "below"
+    ABOVE = "above"
+
+
 @dataclass
 class PointCloudThresholdError(AnalysisPreconditionError):
     """Raised when point cloud size violates a configured threshold."""
 
     point_count: int
     threshold: int
-    relation: str
+    relation: PointCloudThresholdRelation
 
     def error_message(self) -> str:
         return (
-            f"Scene point cloud size ({self.point_count}) is {self.relation} "
+            f"Scene point cloud size ({self.point_count}) is {self.relation.value} "
             f"the configured threshold ({self.threshold})."
         )
 
