@@ -13,8 +13,19 @@ set -euo pipefail
 #   git config claude.personalNotesBranch <your-branch-name>
 #   git config claude.personalNotesPath   <path-on-that-branch>   # optional
 #
-# With claude.personalNotesBranch unset, this exits immediately: no fetch, no
-# write, no effect for anyone who hasn't configured it.
+# git config is per-clone, so it's the wrong mechanism anywhere sessions start
+# from a fresh clone every time (e.g. cloud/web sessions) - there's no
+# persistent .git/config for it to live in. For that case, opt in via
+# persistent environment variables instead (configured once at the environment
+# level, outside the repo, so they survive every fresh clone):
+#   CLAUDE_PERSONAL_NOTES_BRANCH=<your-branch-name>
+#   CLAUDE_PERSONAL_NOTES_PATH=<path-on-that-branch>   # optional
+# See ./README.md for exactly how to wire these into a cloud environment.
+# git config wins when both are set, so a local override always takes
+# precedence over an environment-level default.
+#
+# With neither set, this exits immediately: no fetch, no write, no effect for
+# anyone who hasn't configured it.
 #
 # Safe to re-run: it only ever overwrites CLAUDE.local.md, and does nothing if
 # the configured branch or path isn't reachable (e.g. a fresh clone, or a fork
@@ -35,10 +46,11 @@ set -euo pipefail
 # this explanation lives here instead of there.
 
 NOTES_BRANCH="$(git config --get claude.personalNotesBranch || true)"
+NOTES_BRANCH="${NOTES_BRANCH:-${CLAUDE_PERSONAL_NOTES_BRANCH:-}}"
 [ -n "${NOTES_BRANCH}" ] || exit 0
 
 NOTES_PATH="$(git config --get claude.personalNotesPath || true)"
-NOTES_PATH="${NOTES_PATH:-.claude/personal/cram-notes.md}"
+NOTES_PATH="${NOTES_PATH:-${CLAUDE_PERSONAL_NOTES_PATH:-.claude/personal/cram-notes.md}}"
 
 git fetch origin "${NOTES_BRANCH}" --quiet 2>/dev/null || exit 0
 
