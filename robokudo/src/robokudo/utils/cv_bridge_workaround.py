@@ -26,6 +26,7 @@ from typing_extensions import TYPE_CHECKING, Tuple
 from robokudo.exceptions import (
     CVBridgeImageConversionError,
     CVBridgeImageShapeError,
+    CVBridgeROSImagePayloadError,
     CVBridgeROSImageShapeError,
     CVBridgeROSImageStepError,
     CVBridgeUnsupportedEncoding,
@@ -198,8 +199,9 @@ class CVBridgeWorkaround:
 
         required_bytes = int(msg.height) * row_bytes
         if len(msg.data) < required_bytes:
-            raise ValueError(
-                f"ROS image payload too small: got {len(msg.data)} bytes, expected at least {required_bytes}"
+            raise CVBridgeROSImagePayloadError(
+                actual_bytes=len(msg.data),
+                required_bytes=required_bytes,
             )
 
         raw = np.frombuffer(msg.data, dtype=np.uint8, count=required_bytes)

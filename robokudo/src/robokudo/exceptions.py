@@ -140,6 +140,26 @@ class CVBridgeROSImageStepError(RoboKudoError, ValueError):
 
 
 @dataclass
+class CVBridgeROSImagePayloadError(RoboKudoError, ValueError):
+    """Raised when a ROS image payload is too small for its metadata."""
+
+    actual_bytes: int
+    """Number of bytes available in the ROS image payload."""
+
+    required_bytes: int
+    """Minimum number of bytes required by height and row step."""
+
+    def error_message(self) -> str:
+        return (
+            f"ROS image payload too small: got {self.actual_bytes} bytes, "
+            f"expected at least {self.required_bytes}."
+        )
+
+    def suggest_correction(self) -> str:
+        return "provide image data that matches the ROS image height and step."
+
+
+@dataclass
 class CVBridgeUnsupportedEncoding(RoboKudoError, ValueError):
     """Raised when the cv_bridge workaround receives an unknown encoding."""
 
