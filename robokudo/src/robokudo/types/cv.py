@@ -159,7 +159,7 @@ class KeyPoint(Point2D):
     """Object class ID."""
 
     @classmethod
-    def from_cv(cls, keypoint: cv2.KeyPoint) -> "KeyPoint":
+    def from_cv(cls, keypoint: cv2.KeyPoint) -> KeyPoint:
         """Create a keypoint from an OpenCV keypoint.
 
         :return: The created keypoint.
