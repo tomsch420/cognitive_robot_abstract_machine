@@ -15,6 +15,7 @@ class VisualizationLayout(Enum):
     Spring layout, root is in the center and nodes are ordered in circles around it 
     """
 
+
 class AdjacentBodyMethod(Enum):
     ClosestPoints = auto()
     """
@@ -300,4 +301,57 @@ class MonitorBehavior(Enum):
     RESUME = auto()
     """
     Resume the task when the condition is met.
+    """
+
+
+class CuttingTechnique(Enum):
+    """
+    Enum for the techniques of cutting an object.
+    """
+
+    SLICE = auto()
+    """
+    Cut the object into slices of equal thickness.
+    """
+    SAW = auto()
+    """
+    Cut with a repeated back-and-forth sawing motion.
+    """
+    HALVING = auto()
+    """
+    Cut the object into two halves.
+    """
+
+
+class WipingTechnique(Enum):
+    """
+    Enum for the techniques of wiping a surface.
+    """
+
+    WIPE = auto()
+    """
+    Wipe along a spiral covering the surface.
+    """
+    SHEAR = auto()
+    """
+    Wipe with an oscillatory shear motion.
+    """
+    SPREAD = auto()
+    """
+    Spread along straight lanes covering the surface.
+    """
+
+
+class MixingPattern(Enum):
+    """
+    Enum for the motion patterns of mixing the contents of a container.
+    """
+
+    SPIRAL = auto()
+    """
+    Mix along an outward spiral.
+    """
+    STIR = auto()
+    """
+    Mix along circular stirring laps.
     """
