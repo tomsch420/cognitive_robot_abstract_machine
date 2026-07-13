@@ -12,6 +12,7 @@ from robokudo.exceptions import (
     CVBridgeUnsupportedEncoding,
     CVBridgeUnsupportedTargetEncoding,
     CVBridgeROSImageShapeError,
+    CVBridgeROSImageStepError,
     EmptyPointCloud,
     ImageContourMissing,
     PlaneModelMissing,
@@ -93,6 +94,13 @@ class TestRoboKudoExceptions:
         exception = CVBridgeROSImageShapeError(height=0, width=640)
 
         assert "Invalid ROS image shape height=0, width=640" in str(exception)
+
+    def test_cv_bridge_ros_image_step_error_message(self):
+        exception = CVBridgeROSImageStepError(row_bytes=2, pixel_row_bytes=3)
+
+        assert "ROS image step (2) is smaller than pixel row bytes (3)" in str(
+            exception
+        )
 
     def test_stored_camera_transform_frame_metadata_missing_message(self):
         exception = StoredCameraTransformFrameMetadataMissing()

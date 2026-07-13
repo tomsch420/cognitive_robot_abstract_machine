@@ -27,6 +27,7 @@ from robokudo.exceptions import (
     CVBridgeImageConversionError,
     CVBridgeImageShapeError,
     CVBridgeROSImageShapeError,
+    CVBridgeROSImageStepError,
     CVBridgeUnsupportedEncoding,
     CVBridgeUnsupportedTargetEncoding,
 )
@@ -190,8 +191,9 @@ class CVBridgeWorkaround:
         row_bytes = int(msg.step)
         pixel_row_bytes = int(msg.width) * channels * base_dtype.itemsize
         if row_bytes < pixel_row_bytes:
-            raise ValueError(
-                f"ROS image step ({row_bytes}) is smaller than pixel row bytes ({pixel_row_bytes})"
+            raise CVBridgeROSImageStepError(
+                row_bytes=row_bytes,
+                pixel_row_bytes=pixel_row_bytes,
             )
 
         required_bytes = int(msg.height) * row_bytes

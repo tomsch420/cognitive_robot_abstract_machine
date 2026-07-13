@@ -120,6 +120,26 @@ class CVBridgeROSImageShapeError(RoboKudoError, ValueError):
 
 
 @dataclass
+class CVBridgeROSImageStepError(RoboKudoError, ValueError):
+    """Raised when a ROS image row step cannot contain one pixel row."""
+
+    row_bytes: int
+    """Configured ROS image row size in bytes."""
+
+    pixel_row_bytes: int
+    """Minimum row size required by width, channels, and dtype."""
+
+    def error_message(self) -> str:
+        return (
+            f"ROS image step ({self.row_bytes}) is smaller than pixel row bytes "
+            f"({self.pixel_row_bytes})."
+        )
+
+    def suggest_correction(self) -> str:
+        return "provide a ROS image step that can contain one full pixel row."
+
+
+@dataclass
 class CVBridgeUnsupportedEncoding(RoboKudoError, ValueError):
     """Raised when the cv_bridge workaround receives an unknown encoding."""
 

@@ -6,6 +6,7 @@ from robokudo.exceptions import (
     CVBridgeImageConversionError,
     CVBridgeImageShapeError,
     CVBridgeROSImageShapeError,
+    CVBridgeROSImageStepError,
     CVBridgeUnsupportedEncoding,
     CVBridgeUnsupportedTargetEncoding,
 )
@@ -99,6 +100,19 @@ class TestCVBridgeWorkaround(object):
         )
 
         with pytest.raises(CVBridgeROSImageShapeError):
+            bridge.imgmsg_to_cv2(msg, desired_encoding="passthrough")
+
+    def test_imgmsg_to_cv2_rejects_small_ros_image_step(self) -> None:
+        bridge = CVBridgeWorkaround()
+        msg = _make_image_msg(
+            height=1,
+            width=2,
+            encoding="rgb8",
+            step=5,
+            data=bytes([0, 0, 0, 0, 0]),
+        )
+
+        with pytest.raises(CVBridgeROSImageStepError):
             bridge.imgmsg_to_cv2(msg, desired_encoding="passthrough")
 
     def test_imgmsg_to_cv2_casts_to_32fc1(self) -> None:
