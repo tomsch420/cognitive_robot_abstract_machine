@@ -6,19 +6,13 @@ from datetime import datetime
 from functools import cached_property
 
 from geometry_msgs.msg import PoseStamped
-from krrood.ormatic.data_access_objects.dao import DataAccessObject
-from krrood.ormatic.data_access_objects.helper import to_dao
-from typing_extensions import Optional, List, TYPE_CHECKING
+from typing_extensions import Optional, List
 
 from segmind.datastructures.object_tracker import ObjectEventTracker, ObjectTrackerFactory
-from semantic_digital_twin.orm.ormatic_interface import BodyDAO
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Aperture
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.geometry import BoundingBox
 from semantic_digital_twin.world_description.world_entity import Body
-
-if TYPE_CHECKING:
-    from test.krrood_test.dataset.ormatic_interface import WorldDAO
 
 
 @dataclass
@@ -58,19 +52,6 @@ class EventWithTrackedObjects(DetectionEvent, ABC):
 
     with_object: Optional[Body] = None
     """The secondary object involved in this event, if any."""
-
-    tracked_object_frozen_copy: Optional[BodyDAO] = field(init=False, default=None, repr=False, hash=False)
-    """Frozen DAO copy of :attr:`tracked_object`, used by ORMatic and the NEEMInterface."""
-
-    world_frozen_copy: Optional[WorldDAO] = field(init=False, default=None, repr=False, hash=False)
-    """Frozen DAO copy of the world, used by ORMatic and the NEEMInterface."""
-
-    with_object_frozen_copy: Optional[DataAccessObject[Body]] = field(init=False, default=None, repr=False, hash=False)
-    """Frozen DAO copy of :attr:`with_object`, used by ORMatic and the NEEMInterface."""
-
-    def __post_init__(self):
-        if self.with_object is not None:
-            self.with_object_frozen_copy = to_dao(self.with_object)
 
     @property
     def tracked_objects(self) -> List[Body]:
@@ -217,8 +198,6 @@ class AbstractContactEvent(EventWithTrackedObjects, ABC):
     """
 
     def __post_init__(self):
-        super().__post_init__()
-
         self.bounding_box = BoundingBox.from_mesh(
             self.tracked_object.collision.combined_mesh,
             origin=self.tracked_object.global_pose.to_homogeneous_matrix()
@@ -278,19 +257,6 @@ class InsertionEvent(EventWithTrackedObjects):
     """
     List of objects into which the object was inserted.
     """
-
-    inserted_into_objects_frozen_copy: List[BodyDAO] = field(default_factory=list)
-    """
-    Will be set to a copy of inserted_into_objects, to be used by ORMatic and the NEEMInterface.
-    """
-
-
-    def __post_init__(self):
-        super().__post_init__()
-
-        if self.inserted_into_objects:
-            self.inserted_into_objects_frozen_copy = list(self.inserted_into_objects)
-
 
     @property
     def through_hole(self) -> Aperture:
