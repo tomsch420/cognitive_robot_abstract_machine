@@ -23,7 +23,6 @@ from coraplex.plans.plan_node import (
     ActionNode,
     DesignatorNode,
 )
-from coraplex.visualization import plot_rustworkx_interactive, create_ordered_graph
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.world import World
 
@@ -259,9 +258,7 @@ class Plan:
         :return: A list of lists where each list represents a layer
         """
         layers = rx.layers(self.plan_graph, [self.root.index], index_output=False)
-        return [
-            sorted(layer, key=lambda node: node.layer_index) for layer in layers
-        ]
+        return [sorted(layer, key=lambda node: node.layer_index) for layer in layers]
 
     def _migrate_nodes_from_plan(self, other: Plan) -> PlanNode:
         """
@@ -298,20 +295,6 @@ class Plan:
                 node.simplify()
 
         self.root.simplify()
-
-    def plot(self, layout: str = "bfs"):
-        """
-        Plots the plan in an interactive browser window
-
-        :param layout: The layout of the plot
-        """
-        graph, mapping = create_ordered_graph(self)
-        plot_rustworkx_interactive(
-            graph,
-            graph_source=lambda: create_ordered_graph(self)[0],
-            layout=layout,
-            start=mapping[self.root.index],
-        )
 
     def __repr__(self):
         return f"Plan with {len(self.all_nodes)} nodes"
