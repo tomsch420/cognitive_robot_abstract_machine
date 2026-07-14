@@ -14,8 +14,9 @@ kernelspec:
 # Underspecified Queries and Generative Backends
 
 A match built with {py:func}`~krrood.entity_query_language.factories.an` is **selective by
-default**: `an(Type, domain=...)` selects from the given domain, and a domain-less `an(Type)`
-selects from the SymbolGraph (for `Symbol` types). To instead **construct new instances** from an
+default**: `an(Type)(...).from_(domain)` selects from the given domain, and a domain-less
+`an(Type)` selects from the SymbolGraph (for `Symbol` types). To instead **construct new
+instances** from an
 underspecified match, evaluate it with an explicit *generative backend* — either
 {py:class}`~krrood.entity_query_language.backends.ProbabilisticBackend` (samples a probabilistic
 model) or {py:class}`~krrood.entity_query_language.backends.EntityQueryLanguageGenerativeBackend`
