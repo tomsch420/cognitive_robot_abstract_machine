@@ -18,7 +18,7 @@ from .datasets import (
     load_zoo_dataset,
 )
 from krrood.ripple_down_rules.datastructures.dataclasses import CaseQuery
-from krrood.ripple_down_rules.experts import Human
+from krrood.ripple_down_rules.experts import Human, Oracle
 from krrood.ripple_down_rules.rdr import SingleClassRDR, MultiClassRDR, GeneralRDR
 from krrood.ripple_down_rules.utils import make_set
 from .test_helpers.helpers import get_fit_scrdr
@@ -118,6 +118,24 @@ class TestAlchemyRDR(TestCase):
         assert os.path.exists(filename)
         with open(filename, "r") as f:
             assert f.read() == expert_answers_before
+
+    def test_fit_scrdr_with_oracle_expert_needs_no_pre_recorded_answers(self):
+        """
+        Regression test for the pre-recorded expert-answer fixtures running out of
+        answers on the full zoo dataset (raising NonInteractiveTerminalError): fitting
+        against the same full dataset with the programmatic Oracle expert instead of a
+        Human replaying a fixed, finite answer file must classify every case correctly,
+        without ever needing a human or an interactive shell.
+        """
+        scrdr = SingleClassRDR()
+        case_queries = [
+            CaseQuery(c, "species", (Species,), True, _target=t)
+            for c, t in zip(self.all_cases, self.targets)
+        ]
+        scrdr.fit(case_queries, expert=Oracle(), animate_tree=False)
+
+        for case, target in zip(self.all_cases, self.targets):
+            assert scrdr.classify(case) == target
 
     def test_fit_mcrdr_stop_only(self):
         use_loaded_answers = True
