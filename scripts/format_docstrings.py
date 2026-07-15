@@ -12,6 +12,7 @@ survive a subsequent black pass unchanged.
 
 from __future__ import annotations
 
+import logging
 import subprocess
 import sys
 import tempfile
@@ -22,6 +23,8 @@ from typing_extensions import Sequence
 
 REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
 DOCFORMATTER_CONFIG_PATH = REPOSITORY_ROOT / "pyproject.toml"
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -152,13 +155,15 @@ def main(file_arguments: Sequence[str]) -> int:
         any_file_changed = True
 
         if not outcome.docstrings_reformatted:
-            print(
-                f"{outcome.path}: formatted with black; docformatter's changes "
-                "conflicted with black and were left as-is"
+            logger.info(
+                "%s: formatted with black; docformatter's changes conflicted with "
+                "black and were left as-is",
+                outcome.path,
             )
 
     return 1 if any_file_changed else 0
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
     sys.exit(main(sys.argv[1:]))
