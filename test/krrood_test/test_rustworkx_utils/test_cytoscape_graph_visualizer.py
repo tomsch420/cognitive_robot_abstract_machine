@@ -68,6 +68,23 @@ class TestGraphElements:
         colors = [node["data"]["color"] for node in node_elements(visualizer.graph_elements())]
         assert colors == ["red", "green"]
 
+    def test_node_border_colors_come_from_the_border_color_getter(self):
+        visualizer = named_visualizer(
+            chain_graph(["a", "b"]),
+            border_color_getter=lambda payload: "black" if payload.name == "a" else "white",
+        )
+
+        border_colors = [
+            node["data"]["borderColor"] for node in node_elements(visualizer.graph_elements())
+        ]
+        assert border_colors == ["black", "white"]
+
+    def test_node_border_color_is_omitted_without_a_border_color_getter(self):
+        visualizer = named_visualizer(chain_graph(["a"]))
+
+        node = node_elements(visualizer.graph_elements())[0]
+        assert "borderColor" not in node["data"]
+
     def test_edges_connect_node_ids(self):
         visualizer = named_visualizer(chain_graph(["a", "b"]))
 

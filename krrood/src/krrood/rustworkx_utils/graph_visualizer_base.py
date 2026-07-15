@@ -73,6 +73,9 @@ class GraphVisualizerBase(ABC):
     color_getter: Optional[Callable[[Any], str]] = None
     """Maps a node payload to its color; a constant color is used when not provided."""
 
+    border_color_getter: Optional[Callable[[Any], str]] = None
+    """Maps a node payload to its border color; derived automatically from its fill color when not provided."""
+
     layout: GraphLayout = GraphLayout.SPRING
     """The algorithm used to place the nodes."""
 
@@ -103,6 +106,15 @@ class GraphVisualizerBase(ABC):
         if self.color_getter is None:
             return DEFAULT_NODE_COLOR
         return self.color_getter(self.graph[node_index])
+
+    def node_border_color(self, node_index: int) -> Optional[str]:
+        """
+        :param node_index: The rustworkx index of the node.
+        :return: The border color of the node, or ``None`` to derive one automatically from its fill color.
+        """
+        if self.border_color_getter is None:
+            return None
+        return self.border_color_getter(self.graph[node_index])
 
     def node_details(self, node_index: int) -> List[str]:
         """

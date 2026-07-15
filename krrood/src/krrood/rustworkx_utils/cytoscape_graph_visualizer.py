@@ -43,11 +43,14 @@ _PAGE_TEMPLATE = """<!doctype html>
 <script src="https://unpkg.com/webcola@3.4.0/WebCola/cola.min.js"></script>
 <script src="https://unpkg.com/cytoscape-cola@2.5.1/cytoscape-cola.js"></script>
 <style>
-  html, body { margin: 0; height: 100%; font-family: sans-serif; }
+  html, body { margin: 0; height: 100%; font-family: "Segoe UI", sans-serif; background: #0b0b0f; }
   #container { display: flex; height: 100vh; }
   #cy { flex: 3; background: #000000; }
-  #details { flex: 1; padding: 1rem; overflow: auto; border-left: 1px solid #ccc; }
-  #details h3 { margin-top: 0; }
+  #details { flex: 1; padding: 1.25rem; overflow: auto; background: #121218;
+    color: #d6d6e0; border-left: 1px solid #2a2a35; }
+  #details h3 { margin-top: 0; color: #ffffff; border-bottom: 1px solid #2a2a35; padding-bottom: 0.5rem; }
+  #details p { color: #b5b5c4; line-height: 1.5; }
+  #details i { color: #7a7a8c; }
 </style>
 </head>
 <body>
@@ -61,13 +64,27 @@ const cy = cytoscape({
   container: document.getElementById("cy"),
   style: [
     { selector: "node", style: {
-        "label": "data(label)", "background-color": "data(color)",
+        "label": "data(label)",
+        "background-fill": "radial-gradient",
+        "background-gradient-stop-colors": "data(gradientColors)",
+        "background-gradient-stop-positions": "0% 100%",
+        "border-width": 1, "border-opacity": 0.6, "border-color": "data(borderColor)",
         "text-valign": "top", "text-halign": "center", "color": "#ffffff",
-        "font-size": 12, "width": 30, "height": 30 } },
+        "font-size": 12, "width": 30, "height": 30,
+        "transition-property": "width, height, border-width, border-opacity",
+        "transition-duration": "0.15s", "transition-timing-function": "ease-out" } },
     { selector: "edge", style: {
-        "width": 2, "line-color": "#888", "target-arrow-color": "#888",
+        "width": 2, "line-color": "#888",
+        "line-fill": "linear-gradient",
+        "line-gradient-stop-colors": "data(lineGradientColors)",
+        "line-gradient-stop-positions": "0% 100%",
+        "target-arrow-color": "data(targetColor)",
         "target-arrow-shape": "triangle", "curve-style": "bezier" } },
-    { selector: "node:selected", style: { "border-width": 4, "border-color": "#ffffff" } }
+    { selector: "node.hovered", style: {
+        "width": 38, "height": 38, "border-width": 3, "border-opacity": 0.9, "z-index": 999 } },
+    { selector: "node:selected", style: {
+        "border-width": 3, "border-color": "#ffffff",
+        "overlay-color": "data(baseColor)", "overlay-padding": 8, "overlay-opacity": 0.25 } }
   ]
 });
 
@@ -87,22 +104,59 @@ function escapeHtml(text) {
   return holder.innerHTML;
 }
 
+const normalizeCanvas = document.createElement("canvas").getContext("2d");
+
+function normalizeColor(colorString) {
+  normalizeCanvas.fillStyle = colorString;
+  return normalizeCanvas.fillStyle;
+}
+
+function shadeHex(hex, percent) {
+  const channel = (offset) => {
+    const value = parseInt(hex.slice(offset, offset + 2), 16);
+    const target = percent > 0 ? 255 : 0;
+    const shaded = Math.round(value + (target - value) * Math.abs(percent));
+    return Math.max(0, Math.min(255, shaded)).toString(16).padStart(2, "0");
+  };
+  return "#" + channel(1) + channel(3) + channel(5);
+}
+
+function withGradient(data) {
+  const base = normalizeColor(data.color);
+  data.baseColor = base;
+  data.gradientColors = shadeHex(base, 0.45) + " " + shadeHex(base, -0.35);
+  if (data.borderColor === undefined) {
+    data.borderColor = shadeHex(base, -0.5);
+  }
+  return data;
+}
+
 async function refresh() {
   const response = await fetch("graph");
   const payload = await response.json();
   const currentNodes = new Set();
   const currentEdges = new Set();
+  const nodeColorById = new Map();
   let changed = false;
   for (const element of payload.elements) {
     const data = element.data;
-    if (data.source !== undefined) {
-      currentEdges.add(data.id);
-      if (!knownEdges.has(data.id)) { cy.add(element); knownEdges.add(data.id); changed = true; }
-    } else {
-      currentNodes.add(data.id);
-      if (!knownNodes.has(data.id)) { cy.add(element); knownNodes.add(data.id); changed = true; }
-      else { cy.getElementById(data.id).data(data); }
-    }
+    if (data.source !== undefined) { continue; }
+    currentNodes.add(data.id);
+    withGradient(data);
+    nodeColorById.set(data.id, data.baseColor);
+    if (!knownNodes.has(data.id)) { cy.add(element); knownNodes.add(data.id); changed = true; }
+    else { cy.getElementById(data.id).data(data); }
+  }
+  for (const element of payload.elements) {
+    const data = element.data;
+    if (data.source === undefined) { continue; }
+    currentEdges.add(data.id);
+    const sourceColor = nodeColorById.get(data.source) || "#888888";
+    const targetColor = nodeColorById.get(data.target) || "#888888";
+    data.lineGradientColors = sourceColor + " " + targetColor;
+    data.targetColor = targetColor;
+    if (!knownEdges.has(data.id)) { cy.add(element); knownEdges.add(data.id); changed = true; }
+    else { cy.getElementById(data.id).data(data); }
   }
   for (const id of Array.from(knownNodes)) {
     if (!currentNodes.has(id)) { cy.remove(cy.getElementById(id)); knownNodes.delete(id); changed = true; }
@@ -121,6 +175,17 @@ cy.on("tap", "node", async (event) => {
   document.getElementById("details").innerHTML =
     "<h3>" + escapeHtml(node.data("label")) + "</h3>" + lines;
 });
+
+cy.on("mouseover", "node", (event) => { event.target.addClass("hovered"); });
+cy.on("mouseout", "node", (event) => { event.target.removeClass("hovered"); });
+
+function pulseSelectionGlow(timestamp) {
+  const phase = (timestamp % 1500) / 1500;
+  const opacity = 0.15 + 0.25 * (1 + Math.sin(phase * Math.PI * 2)) / 2;
+  cy.nodes(":selected").style("overlay-opacity", opacity);
+  requestAnimationFrame(pulseSelectionGlow);
+}
+requestAnimationFrame(pulseSelectionGlow);
 
 refresh();
 setInterval(refresh, {{ interval_ms }});
@@ -150,20 +215,28 @@ class CytoscapeGraphVisualizer(GraphVisualizerBase):
     required_modules: ClassVar[Tuple[str, ...]] = ("flask",)
     """The libraries needed to serve the application."""
 
+    def _node_element(self, node_index: int) -> CytoscapeElement:
+        """
+        :param node_index: The rustworkx index of the node.
+        :return: The Cytoscape.js element for the node, with its border color included only if
+            :attr:`~krrood.rustworkx_utils.graph_visualizer_base.GraphVisualizerBase.border_color_getter`
+            supplies one.
+        """
+        data: Dict[str, Any] = {
+            "id": str(node_index),
+            "label": self.node_label(node_index),
+            "color": self.node_color(node_index),
+        }
+        border_color = self.node_border_color(node_index)
+        if border_color is not None:
+            data["borderColor"] = border_color
+        return {"data": data}
+
     def graph_elements(self) -> List[CytoscapeElement]:
         """
         :return: The Cytoscape.js node and edge elements for the current graph.
         """
-        elements: List[CytoscapeElement] = [
-            {
-                "data": {
-                    "id": str(index),
-                    "label": self.node_label(index),
-                    "color": self.node_color(index),
-                }
-            }
-            for index in self.graph.node_indices()
-        ]
+        elements = [self._node_element(index) for index in self.graph.node_indices()]
         elements += [
             {"data": {"id": f"{source}-{target}", "source": str(source), "target": str(target)}}
             for source, target in self.graph.edge_list()
