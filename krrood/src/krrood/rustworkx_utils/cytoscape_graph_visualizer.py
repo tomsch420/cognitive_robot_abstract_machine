@@ -84,7 +84,8 @@ const cy = cytoscape({
         "width": 38, "height": 38, "border-width": 3, "border-opacity": 0.9, "z-index": 999 } },
     { selector: "node:selected", style: {
         "border-width": 3, "border-color": "#ffffff",
-        "overlay-color": "data(baseColor)", "overlay-padding": 8, "overlay-opacity": 0.25 } }
+        "overlay-color": "data(baseColor)", "overlay-padding": 8, "overlay-opacity": 0.25 } },
+    ...{{ extra_node_styles_json | safe }}
   ]
 });
 
@@ -132,7 +133,21 @@ function withGradient(data) {
 }
 
 async function refresh() {
-  const response = await fetch("graph");
+  let response;
+  try {
+    response = await fetch("graph");
+  } catch (error) {
+    console.error("Failed to reach the graph endpoint:", error);
+    return;
+  }
+  if (!response.ok) {
+    console.error("Graph endpoint returned status", response.status);
+    if (knownNodes.size === 0 && knownEdges.size === 0) {
+      document.getElementById("details").innerHTML =
+        "<i>Failed to load the graph (server returned " + response.status + "). Retrying...</i>";
+    }
+    return;
+  }
   const payload = await response.json();
   const currentNodes = new Set();
   const currentEdges = new Set();
@@ -255,6 +270,24 @@ class CytoscapeGraphVisualizer(GraphVisualizerBase):
         """
         return self.cytoscape_layout_options()["name"]
 
+    def extra_node_styles(self) -> List[Dict[str, Any]]:
+        """
+        :return: Additional Cytoscape.js style selectors spread in after the built-in node styles,
+            letting subclasses layer extra styling (for example an image fill) onto specific nodes
+            without overriding the whole page template.
+        """
+        return []
+
+    def register_additional_routes(self, application: Flask) -> None:
+        """
+        Register extra Flask routes on ``application``, called once from :meth:`build_application`.
+
+        The default implementation does nothing; subclasses override this to serve extra per-node
+        resources (for example images referenced by :meth:`extra_node_styles`).
+
+        :param application: The Flask application to add routes to.
+        """
+
     def build_application(self) -> Flask:
         """
         :return: The Flask application serving the page and the graph and node endpoints.
@@ -269,6 +302,7 @@ class CytoscapeGraphVisualizer(GraphVisualizerBase):
                 _PAGE_TEMPLATE,
                 title=self.title,
                 layout_options_json=json.dumps(self.cytoscape_layout_options()),
+                extra_node_styles_json=json.dumps(self.extra_node_styles()),
                 interval_ms=int(self.refresh_interval_seconds * 1000),
             )
 
@@ -280,6 +314,7 @@ class CytoscapeGraphVisualizer(GraphVisualizerBase):
         def node(node_index: int):
             return jsonify(details=self.node_details(node_index))
 
+        self.register_additional_routes(application)
         return application
 
     def run(self) -> None:

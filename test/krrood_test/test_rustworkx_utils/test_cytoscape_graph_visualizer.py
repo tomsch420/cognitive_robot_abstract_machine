@@ -152,6 +152,46 @@ class TestAppearance:
         assert b"#000000" in page
         assert b'"color": "#ffffff"' in page
 
+    def test_refresh_reports_failed_graph_requests_instead_of_failing_silently(self):
+        client = named_visualizer(chain_graph(["a"])).build_application().test_client()
+
+        page = client.get("/").data
+        assert b"response.ok" in page
+        assert b"console.error" in page
+
+
+class TestExtensionHooks:
+    def test_extra_node_styles_default_to_empty(self):
+        visualizer = named_visualizer(chain_graph(["a"]))
+
+        assert visualizer.extra_node_styles() == []
+
+    def test_extra_node_styles_are_spread_into_the_rendered_page(self):
+        class StyledVisualizer(CytoscapeGraphVisualizer):
+            def extra_node_styles(self):
+                return [{"selector": "node[image]", "style": {"background-fit": "cover"}}]
+
+        client = StyledVisualizer(graph=chain_graph(["a"])).build_application().test_client()
+
+        page = client.get("/").data
+        assert b'"selector": "node[image]"' in page
+
+    def test_register_additional_routes_is_called_with_the_application(self):
+        calls = []
+
+        class RoutedVisualizer(CytoscapeGraphVisualizer):
+            def register_additional_routes(self, application):
+                calls.append(application)
+
+                @application.route("/extra")
+                def extra():
+                    return "extra"
+
+        client = RoutedVisualizer(graph=chain_graph(["a"])).build_application().test_client()
+
+        assert client.get("/extra").data == b"extra"
+        assert len(calls) == 1
+
 
 class TestCheckDependencies:
     def test_raises_when_flask_is_missing(self, monkeypatch):
