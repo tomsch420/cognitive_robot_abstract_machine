@@ -70,6 +70,11 @@ class Expert(ABC):
     A flag to indicate if the expert should use loaded answers or not.
     """
 
+    answer_delimiter: str = "'===New Answer==='"
+    """
+    The marker written between consecutive answers in a saved Python answers file.
+    """
+
     def __init__(
         self,
         use_loaded_answers: bool = False,
@@ -195,7 +200,9 @@ class Expert(ABC):
                     imports = ""
                 if func_source is None:
                     func_source = "pass  # No user input provided for this case.\n"
-                f.write(imports + func_source + "\n" + "\n\n\n'===New Answer==='\n\n\n")
+                f.write(
+                    imports + func_source + "\n\n\n\n" + self.answer_delimiter + "\n\n\n"
+                )
 
     def load_answers(self, path: Optional[str] = None):
         """
@@ -226,16 +233,25 @@ class Expert(ABC):
         """
         Load the expert answers from a Python file.
 
+        Splits on the bare delimiter marker rather than an exact run of surrounding
+        blank lines, since a formatter (e.g. black/docformatter) trimming trailing blank
+        lines at end of file would otherwise leave the delimiter after the last answer
+        without its usual trailing blank lines, silently dropping that last answer.
+
         :param path: The path to load the answers from.
         """
         file_path = path + ".py"
         with open(file_path, "r") as f:
-            all_answers = f.read().split("\n\n\n'===New Answer==='\n\n\n")[:-1]
+            content = f.read()
+        all_answers = [
+            answer.strip()
+            for answer in content.split(self.answer_delimiter)
+            if answer.strip()
+        ]
         all_function_sources = extract_function_or_class_file(
             file_path, [], as_list=True
         )
         for i, answer in enumerate(all_answers):
-            answer = answer.strip("\n").strip()
             if "def " not in answer and "pass" in answer:
                 self.all_expert_answers.append(({}, None))
                 continue
