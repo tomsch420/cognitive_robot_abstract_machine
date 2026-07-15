@@ -4,6 +4,7 @@ import threading
 import time
 from abc import abstractmethod
 from dataclasses import dataclass, field
+from datetime import timedelta
 from functools import cached_property
 from typing import ClassVar, Optional, Set, Type, List, Dict
 from uuid import UUID
@@ -157,17 +158,21 @@ class Synchronizer(WorldEntityWithClassBasedID):
     / ``_received_acknowledgments``).
     """
 
-    _subscriber_discovery_grace_period: float = field(default=0.2, init=False)
+    _subscriber_discovery_grace_period: timedelta = field(
+        default=timedelta(seconds=0.2), init=False
+    )
     """
-    Maximum time, in seconds, that :meth:`_snapshot_subscribers_after_discovery_settles`
-    waits for a just-created remote subscriber to be reflected in this node's ROS graph
-    cache before treating the observed subscriber count as final.
+    Maximum time that :meth:`_snapshot_subscribers_after_discovery_settles` waits for a
+    just-created remote subscriber to be reflected in this node's ROS graph cache before
+    treating the observed subscriber count as final.
     """
 
-    _subscriber_discovery_poll_interval: float = field(default=0.02, init=False)
+    _subscriber_discovery_poll_interval: timedelta = field(
+        default=timedelta(seconds=0.02), init=False
+    )
     """
-    Interval, in seconds, between subscriber-count samples taken while waiting for ROS
-    graph discovery to settle in :meth:`_snapshot_subscribers_after_discovery_settles`.
+    Interval between subscriber-count samples taken while waiting for ROS graph
+    discovery to settle in :meth:`_snapshot_subscribers_after_discovery_settles`.
     """
 
     def __post_init__(self):
@@ -295,18 +300,28 @@ class Synchronizer(WorldEntityWithClassBasedID):
         samples agree, or the grace period elapses, narrows that window without adding
         latency once discovery has already settled.
 
+        If the count never stabilizes within the grace period, the highest count seen is
+        used rather than the most recent one: an under-count silently breaks the
+        synchronous contract (the bug this method fixes), whereas an over-count only
+        costs the existing, already-logged ``wait_for_synchronization_timeout`` wait -
+        a strictly safer failure mode than the one being fixed.
+
         :return: The subscriber count once observed stable across two consecutive
-            samples, or the last sample once the grace period elapses.
+            samples, or the highest sample seen once the grace period elapses.
         """
-        deadline = time.monotonic() + self._subscriber_discovery_grace_period
+        deadline = (
+            time.monotonic() + self._subscriber_discovery_grace_period.total_seconds()
+        )
         previous_count = self._snapshot_subscribers()
+        highest_count_seen = previous_count
         while time.monotonic() < deadline:
-            time.sleep(self._subscriber_discovery_poll_interval)
+            time.sleep(self._subscriber_discovery_poll_interval.total_seconds())
             current_count = self._snapshot_subscribers()
+            highest_count_seen = max(highest_count_seen, current_count)
             if current_count == previous_count:
                 return current_count
             previous_count = current_count
-        return previous_count
+        return highest_count_seen
 
     @abstractmethod
     def _subscription_callback(self, msg: message_type):

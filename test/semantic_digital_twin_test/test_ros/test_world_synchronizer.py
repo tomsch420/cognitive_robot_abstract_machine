@@ -3,6 +3,7 @@ import json
 import os
 import threading
 import time
+from datetime import timedelta
 import unittest
 import uuid
 from dataclasses import dataclass, field
@@ -850,6 +851,7 @@ def test_synchronous_publish_blocks_until_receiver_acknowledges(rclpy_node):
         receiver_node.destroy_node()
 
 
+@dataclass
 class _SynchronizerWithNoOpSubscriptionHandling(Synchronizer):
     """
     Concrete :class:`Synchronizer` that ignores incoming messages, so tests can exercise
@@ -860,16 +862,20 @@ class _SynchronizerWithNoOpSubscriptionHandling(Synchronizer):
         pass
 
 
+@dataclass
 class _FakeSubscriptionInfo:
     """
     Stand-in for the objects ``Node.get_subscriptions_info_by_topic`` returns, exposing
     only the ``node_name`` attribute :meth:`Synchronizer._snapshot_subscribers` reads.
     """
 
-    def __init__(self, node_name: str):
-        self.node_name = node_name
+    node_name: str
+    """
+    The name of the node the fake subscription belongs to.
+    """
 
 
+@dataclass
 class _DiscoveryLaggingNode:
     """
     Fake ``rclpy`` node whose ``get_subscriptions_info_by_topic`` walks through a
@@ -877,10 +883,31 @@ class _DiscoveryLaggingNode:
     gradually catching up with a remote subscriber created moments earlier.
     """
 
-    def __init__(self, own_name: str, subscriber_counts: List[int]):
-        self._own_name = own_name
-        self._remaining_subscriber_counts = list(subscriber_counts)
-        self._last_subscriber_count = 0
+    own_name: str
+    """
+    The name reported by :meth:`get_name`, used to identify this node's own
+    subscriptions.
+    """
+
+    subscriber_counts: List[int]
+    """
+    The sequence of subscriber counts successive calls to
+    :meth:`get_subscriptions_info_by_topic` walk through.
+    """
+
+    _remaining_subscriber_counts: List[int] = field(init=False, repr=False)
+    """
+    Unconsumed prefix of :attr:`subscriber_counts`.
+    """
+
+    _last_subscriber_count: int = field(init=False, default=0, repr=False)
+    """
+    The most recently consumed subscriber count, repeated once :attr:`subscriber_counts`
+    is exhausted.
+    """
+
+    def __post_init__(self):
+        self._remaining_subscriber_counts = list(self.subscriber_counts)
 
     def create_subscription(self, *args, **kwargs):
         return None
@@ -889,7 +916,7 @@ class _DiscoveryLaggingNode:
         return None
 
     def get_name(self) -> str:
-        return self._own_name
+        return self.own_name
 
     def get_subscriptions_info_by_topic(self, topic_name: str):
         if self._remaining_subscriber_counts:
@@ -911,19 +938,40 @@ def test_snapshot_subscribers_waits_for_discovery_to_stabilize():
     synchronizer = _SynchronizerWithNoOpSubscriptionHandling(
         node=node, topic_name="/test_topic"
     )
-    synchronizer._subscriber_discovery_grace_period = 1.0
-    synchronizer._subscriber_discovery_poll_interval = 0.01
+    synchronizer._subscriber_discovery_grace_period = timedelta(seconds=1.0)
+    synchronizer._subscriber_discovery_poll_interval = timedelta(seconds=0.01)
 
     count = synchronizer._snapshot_subscribers_after_discovery_settles()
 
     assert count == 1
 
 
+def test_snapshot_subscribers_falls_back_to_highest_sample_not_last_sample():
+    """
+    If the subscriber count fluctuates without ever settling, the highest sample seen
+    must be used, not merely the most recently read one: under-counting silently breaks
+    the synchronous-publish contract (the bug this method fixes), so a transient dip in
+    the final sample taken before the grace period elapses must not discard a higher
+    count that was already observed.
+    """
+    node = _DiscoveryLaggingNode(
+        own_name="sender_node", subscriber_counts=[0, 3, 1, 3, 1, 3, 1, 3, 1]
+    )
+    synchronizer = _SynchronizerWithNoOpSubscriptionHandling(
+        node=node, topic_name="/test_topic"
+    )
+    synchronizer._subscriber_discovery_grace_period = timedelta(seconds=0.05)
+    synchronizer._subscriber_discovery_poll_interval = timedelta(seconds=0.01)
+
+    count = synchronizer._snapshot_subscribers_after_discovery_settles()
+
+    assert count == 3
+
+
 def test_snapshot_subscribers_gives_up_after_grace_period_elapses():
     """
     If the subscriber count never stabilizes within the grace period, the settled
-    snapshot must fall back to the last observed sample instead of blocking
-    indefinitely.
+    snapshot must return promptly instead of blocking indefinitely.
     """
     node = _DiscoveryLaggingNode(
         own_name="sender_node", subscriber_counts=list(range(1000))
@@ -931,8 +979,8 @@ def test_snapshot_subscribers_gives_up_after_grace_period_elapses():
     synchronizer = _SynchronizerWithNoOpSubscriptionHandling(
         node=node, topic_name="/test_topic"
     )
-    synchronizer._subscriber_discovery_grace_period = 0.05
-    synchronizer._subscriber_discovery_poll_interval = 0.01
+    synchronizer._subscriber_discovery_grace_period = timedelta(seconds=0.05)
+    synchronizer._subscriber_discovery_poll_interval = timedelta(seconds=0.01)
 
     start = time.monotonic()
     count = synchronizer._snapshot_subscribers_after_discovery_settles()
