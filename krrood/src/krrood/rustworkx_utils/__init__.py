@@ -14,3 +14,6 @@ from krrood.rustworkx_utils.interactive_graph_visualizer import (
 from krrood.rustworkx_utils.cytoscape_graph_visualizer import (
     CytoscapeGraphVisualizer,
 )
+from krrood.rustworkx_utils.visnetwork_graph_visualizer import (
+    VisNetworkGraphVisualizer,
+)

@@ -37,6 +37,9 @@ class GraphVisualizerBackend(Enum):
     CYTOSCAPE = auto()
     """A Flask application drawing the graph with Cytoscape.js."""
 
+    VIS_NETWORK = auto()
+    """A Flask application drawing the graph with vis-network."""
+
 
 def label_by_string(payload: Any) -> str:
     """Label a node by the string representation of its payload."""
