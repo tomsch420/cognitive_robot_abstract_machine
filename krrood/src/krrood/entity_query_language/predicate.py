@@ -516,3 +516,25 @@ class Is(Predicate):
 
     def __call__(self) -> bool:
         return self.first_entity is self.second_entity
+
+    @classmethod
+    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+        """:return: the clause *"<first_entity> is the same object as <second_entity>"* — the two
+        operands hold when they are the same object in memory."""
+        # Imported locally to avoid the core -> verbalization import cycle (as Triple does).
+        from krrood.entity_query_language.verbalization.vocabulary.english import (
+            Prepositions,
+        )
+        from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
+            clause,
+            Copula,
+            Noun,
+        )
+
+        return clause(
+            Noun(fields["first_entity"]),
+            Copula(),
+            Noun.the("same object"),
+            Prepositions.AS,
+            Noun(fields["second_entity"]),
+        )

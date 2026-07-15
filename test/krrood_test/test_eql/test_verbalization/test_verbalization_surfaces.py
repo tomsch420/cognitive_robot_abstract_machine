@@ -4,10 +4,10 @@ Golden-surface snapshot over every symbolic callable's verbalization.
 Every concrete :class:`~krrood.entity_query_language.predicate.Predicate` /
 :class:`~krrood.entity_query_language.predicate.SymbolicFunction` defined in krrood's source is
 rendered with placeholder operands and compared against the committed snapshot
-(``verbalization_surfaces.yaml``, one ``qualified class name: sentence`` entry per class). A class
-that decides no surface (implements no fragment) must be declared explicitly in
-``UNDECIDED_SURFACES``; a forgotten surface fails the suite rather than slipping into the snapshot as
-a silent marker.
+(``verbalization_surfaces.yaml``, one ``qualified class name: sentence`` entry per class). Every
+covered class must implement a fragment: a fragment-less class fails
+:func:`test_every_covered_symbolic_callable_has_a_verbalization_fragment` rather than being rendered
+or silently skipped.
 
 The point is review visibility: adding or renaming a symbolic callable, or changing the shared
 surface builders, makes the affected sentences appear as diff lines in the snapshot file, so the
@@ -72,21 +72,6 @@ Flip to ``True`` in this file to regenerate the snapshot instead of asserting ag
 it.
 """
 
-UNDECIDED_SURFACES = frozenset(
-    {
-        "krrood.entity_query_language.predicate.Is",
-    }
-)
-"""
-Covered symbolic callables that deliberately have no verbalization surface yet — a
-tracked, reviewed gap, each of which must be justified.
-
-A fragment-less class *not* listed here fails
-:func:`test_every_covered_surface_is_decided_or_explicitly_undecided`, so a forgotten surface is a
-red test; a listed class that has since gained a fragment fails the same test, so the list cannot go
-stale.
-"""
-
 OPERAND_OVERRIDES: Dict[str, Dict[str, Any]] = {
     "HasType": {"types_": int},
     "HasTypes": {"types_": (int, str)},
@@ -102,9 +87,9 @@ form belongs to ``HasTypes``.
 
 def _source_symbolic_callables() -> List[Type[SymbolicCallable]]:
     """:return: the symbolic callables defined in the covered source modules, sorted by qualified
-    name — the deterministic population the snapshot covers. A class whose only missing piece is
-    the verbalization fragment is included (recorded as fragment-less): it is still symbolically
-    constructible, so its undecided surface is exactly what the snapshot should make visible.
+    name — the deterministic population the snapshot covers. A class whose only missing piece is the
+    verbalization fragment is still included, so the fragment guard can flag it instead of it
+    silently escaping coverage.
     """
     return sorted(
         (
@@ -158,9 +143,9 @@ def _surface_of(cls: Type[SymbolicCallable]) -> str:
 
 
 def _render_surfaces() -> Dict[str, str]:
-    """:return: the snapshot mapping — ``qualified class name -> rendered surface`` — over the covered
-    callables that decided a surface (a fragment-less class belongs in :data:`UNDECIDED_SURFACES`,
-    not the snapshot)."""
+    """:return: the snapshot mapping — ``qualified class name -> rendered surface``. Fragment-less
+    classes are excluded here (the fragment guard fails on them), so rendering never trips over a
+    missing surface."""
     return {
         _qualified_name(cls): _surface_of(cls)
         for cls in _source_symbolic_callables()
@@ -168,26 +153,22 @@ def _render_surfaces() -> Dict[str, str]:
     }
 
 
-def test_every_covered_surface_is_decided_or_explicitly_undecided():
+def test_every_covered_symbolic_callable_has_a_verbalization_fragment():
     """
-    Every covered symbolic callable either renders a surface (and so appears in the
-    snapshot) or is a deliberate, justified entry in :data:`UNDECIDED_SURFACES`.
+    Every covered symbolic callable must implement its own verbalization fragment —
+    there is no undecided surface.
 
-    A new fragment-less class is a red test until it gets a fragment or is listed; a
-    listed class that has since gained a fragment is also red, so the list cannot go
-    stale.
+    A new predicate or function that ships without a fragment is a red test until it
+    gets one.
     """
-    fragment_less = {
+    fragment_less = sorted(
         _qualified_name(cls)
         for cls in _source_symbolic_callables()
         if not _has_fragment(cls)
-    }
-    missing = fragment_less - UNDECIDED_SURFACES
-    stale = UNDECIDED_SURFACES - fragment_less
-    assert fragment_less == UNDECIDED_SURFACES, (
-        f"Undecided verbalization surfaces are out of sync. Classes with no fragment that must "
-        f"either implement one or be added to UNDECIDED_SURFACES (with justification): {sorted(missing)}. "
-        f"Entries in UNDECIDED_SURFACES that now have a fragment and must be removed: {sorted(stale)}."
+    )
+    assert not fragment_less, (
+        "These symbolic callables have no verbalization fragment and must implement "
+        f"_verbalization_fragment_: {fragment_less}."
     )
 
 

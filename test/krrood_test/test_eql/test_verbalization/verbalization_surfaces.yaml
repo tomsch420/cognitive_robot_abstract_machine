@@ -9,6 +9,7 @@ krrood.entity_query_language.factories.NodeType: the node type of a Selectable
 krrood.entity_query_language.factories.RuntimeType: the runtime type of an object
 krrood.entity_query_language.predicate.HasType: an object is of type Integer
 krrood.entity_query_language.predicate.HasTypes: an object is of type Integer or Text
+krrood.entity_query_language.predicate.Is: object 1 is the same object as object 2
 krrood.entity_query_language.predicate.Length: the length of an object
 krrood.entity_query_language.verbalization.example_domain.IsReachable: an object is reachable
 krrood.entity_query_language.verbalization.example_domain.WorksIn: object 1 works in object 2
