@@ -2,6 +2,7 @@ import os
 from dataclasses import dataclass, field
 from time import sleep
 
+import pytest
 from rclpy.duration import Duration
 from rclpy.time import Time
 from visualization_msgs.msg import MarkerArray, Marker
@@ -135,12 +136,12 @@ def test_visualization_marker_tracy(rclpy_node, tracy_world):
     else:
         assert False, "Callback timed out"
 
-    # table has no texture, so white should be used
+    # table has no embedded texture, so its URDF material color ("grey") should be used
     for marker in callback.last_msg.markers:
         if marker.ns == str(tracy_world.get_body_by_name("table").name):
-            assert marker.color.r == 1.0
-            assert marker.color.g == 1.0
-            assert marker.color.b == 1.0
+            assert marker.color.r == pytest.approx(0.792156862745098)
+            assert marker.color.g == pytest.approx(0.819607843137255)
+            assert marker.color.b == pytest.approx(0.933333333333333)
             assert marker.color.a == 1.0
             break
     else:

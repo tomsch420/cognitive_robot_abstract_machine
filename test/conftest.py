@@ -61,7 +61,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Handle,
 )
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Vector3
-from semantic_digital_twin.utils import rclpy_installed, tracy_installed
+from semantic_digital_twin.utils import icub_installed, rclpy_installed, tracy_installed
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     OmniDrive,
@@ -474,6 +474,16 @@ def tracy_world():
     world_with_tracy = tracy_parser.parse()
     Tracy.from_world(world_with_tracy)
     return world_with_tracy
+
+
+@pytest.fixture(scope="session")
+def icub3_world():
+    if not icub_installed():
+        pytest.skip("ICub3 not installed")
+    icub3_parser = URDFParser.from_file(file_path=ICub3.get_ros_file_path())
+    world_with_icub3 = icub3_parser.parse()
+    ICub3.from_world(world_with_icub3)
+    return world_with_icub3
 
 
 @pytest.fixture(scope="session")

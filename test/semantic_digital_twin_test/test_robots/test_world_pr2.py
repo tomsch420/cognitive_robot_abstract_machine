@@ -13,6 +13,7 @@ from semantic_digital_twin.exceptions import (
 from semantic_digital_twin.orm.ormatic_interface import *  # noqa
 from semantic_digital_twin.reasoning.predicates import LeftOf
 from semantic_digital_twin.robots.hsrb import HSRB
+from semantic_digital_twin.robots.icub3 import ICub3
 from semantic_digital_twin.robots.pr2 import (
     PR2,
     PR2MobileBase,
@@ -471,6 +472,16 @@ def test_tracy_semantic_annotation(tracy_world):
 
     assert len(tracy.get_end_effectors()) == 2
     assert len(tracy.get_sensors()) == 1
+
+
+def test_icub3_semantic_annotation(icub3_world):
+    icub3 = icub3_world.get_semantic_annotations_by_type(ICub3)[0]
+
+    icub3_world._notify_model_change()
+
+    assert len(icub3.get_end_effectors()) == 2
+    assert len(icub3.get_arms()) == 2
+    assert len(icub3.get_sensors()) == 1
 
 
 def test_hsrb_semantic_annotation(_hsr_world_setup):

@@ -171,6 +171,19 @@ def hsrb_installed() -> bool:
         return False
 
 
+def icub_installed() -> bool:
+    try:
+        from ament_index_python.packages import get_package_share_directory
+
+        pkg_name = "iai_icub_description"
+
+        if get_package_share_directory(pkg_name):
+            return True
+        return False
+    except (ImportError, PackageNotFoundError, ValueError):
+        return False
+
+
 def type_string_to_type(type_string: str) -> type:
     """
     Convert a string representation of a type to the actual type.
