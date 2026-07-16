@@ -32,6 +32,7 @@ from krrood.entity_query_language.core.base_expressions import (
     Selectable,
     SymbolicExpression,
 )
+from krrood.entity_query_language.core.helpers import _resolve_domain
 from krrood.entity_query_language.core.mapped_variable import (
     Attribute,
     FlatVariable,
@@ -412,8 +413,6 @@ class Match(Evaluable, AbstractMatchExpression[T], HasFactoryAndKwargs[T]):
 
             self.variable = variable(self.type, domain=self.domain)
             return
-
-        from krrood.entity_query_language.factories import _resolve_domain
 
         self.variable._update_domain_(_resolve_domain(self.type, self.domain))
 
