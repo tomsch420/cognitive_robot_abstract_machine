@@ -1,7 +1,7 @@
 """
 Semantic annotations for the objects that appear in the ``icub_montessori_no_hands``
-episode: the shape-sorting board, its shape-holes, and the loose shapes that are
-dropped through them.
+episode: the shape-sorting board, its shape-holes, and the loose shapes that are dropped
+through them.
 """
 
 from __future__ import annotations
@@ -17,6 +17,7 @@ from semantic_digital_twin.semantic_annotations.mixins import (
     HasCaseAsRootBody,
     HasDrawers,
     HasRootBody,
+    HasRootKinematicStructureEntity,
 )
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Aperture
 from semantic_digital_twin.spatial_types import Vector3
@@ -49,13 +50,17 @@ class MontessoriShape(HasRootBody):
     :attr:`ShapeSortingHole.shape_category` to decide which hole it fits through.
     """
 
-
 @dataclass(eq=False)
 class ShapeSortingHole(Aperture):
     """
     A hole cut into the lid of a :class:`ShapeSortingBoard`, shaped after a single
     :class:`MontessoriShapeCategory`; only a :class:`MontessoriShape` of the matching
     category passes through it.
+
+    Unlike a generic :class:`Aperture`, mounting this onto its board does not cut an
+    axis-aligned bounding box out of the board's geometry: the board's mesh already has
+    this hole's true (possibly non-rectangular) shape cut into it when it is built, from
+    the same mesh this hole's shape was detected from.
     """
 
     shape_category: Optional[MontessoriShapeCategory] = field(
@@ -66,15 +71,48 @@ class ShapeSortingHole(Aperture):
     :attr:`MontessoriShape.shape_category` to decide which pieces fit through it.
     """
 
+    def _mount_strategy(self, main_has_root_body_annotation: HasRootBody) -> None:
+        HasRootKinematicStructureEntity._mount_strategy(
+            self, main_has_root_body_annotation
+        )
+
+
+class NoMatchingHoleError(Exception):
+    """
+    Raised when a :class:`ShapeSortingBoard` has no :class:`ShapeSortingHole` whose
+    category matches a given :class:`MontessoriShape`.
+    """
+
+    def __init__(self, montessori_shape: MontessoriShape, board: ShapeSortingBoard):
+        super().__init__(
+            f"{board.name} has no hole matching {montessori_shape.name}'s category "
+            f"{montessori_shape.shape_category}."
+        )
+
 
 @dataclass(eq=False)
 class ShapeSortingBoard(HasCaseAsRootBody, HasDrawers, HasApertures):
     """
     The Montessori shape-sorting board: a wooden case whose lid has one
-    :class:`ShapeSortingHole` per :class:`MontessoriShapeCategory` and whose body
-    houses drawers for storing the shapes when they are not on the board.
+    :class:`ShapeSortingHole` per :class:`MontessoriShapeCategory` and whose body houses
+    drawers for storing the shapes when they are not on the board.
     """
 
     @classproperty
     def hole_direction(self) -> Vector3:
         return Vector3.Z()
+
+    def hole_for(self, montessori_shape: MontessoriShape) -> ShapeSortingHole:
+        """
+        Find this board's :class:`ShapeSortingHole` matching ``montessori_shape``'s
+        category.
+
+        :raises NoMatchingHoleError: If this board has no such hole.
+        """
+        for hole in self.apertures:
+            if (
+                isinstance(hole, ShapeSortingHole)
+                and hole.shape_category == montessori_shape.shape_category
+            ):
+                return hole
+        raise NoMatchingHoleError(montessori_shape, self)

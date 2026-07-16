@@ -1,7 +1,7 @@
 """
-Build a semantic digital twin world for the Montessori shape-sorting scene: a table
-carrying a smaller table, a shape-sorting board with holes and drawers, the loose
-shapes that are dropped through the holes, and (optionally) an ICub3 robot standing in
+Build a semantic digital twin world for the Montessori shape-sorting scene: a floor
+carrying a table with a shape-sorting board (with its holes and drawers) and the loose
+shapes that are dropped through the holes, and (optionally) an HSRB robot standing in
 front of it.
 
 The scene is constructed directly with the semantic digital twin API (bodies, regions,
@@ -11,12 +11,18 @@ episode or any other external dataset.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 import trimesh
-from typing_extensions import List
+from typing_extensions import List, Optional
 
+from experiments.montessori.hole_geometry import (
+    HOLE_MARKER_THICKNESS,
+    HoleFootprint,
+    cut_board_mesh,
+    detect_hole_footprints,
+)
 from experiments.montessori.semantics import (
     MontessoriShape,
     MontessoriShapeCategory,
@@ -25,19 +31,22 @@ from experiments.montessori.semantics import (
 )
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.robots.icub3 import ICub3
+from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.semantic_annotations.mixins import (
     HasRootKinematicStructureEntity,
 )
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Drawer,
+    Floor,
     Handle,
-    SideTable,
     Table,
 )
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Point3
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connections import FixedConnection
+from semantic_digital_twin.world_description.connections import (
+    FixedConnection,
+    OmniDrive,
+)
 from semantic_digital_twin.world_description.geometry import (
     Box,
     Color,
@@ -55,27 +64,57 @@ NAME_PREFIX = "montessori"
 Prefix given to every :class:`PrefixedName` created by this module.
 """
 
-TABLE_SCALE = Scale(2.0, 1.0, 0.1)
-TABLE_POSITION = Point3(0.0, 0.0, 1.0)
+FLOOR_Z = 0.0
+"""
+Height of the ground the Montessori scene stands on.
+"""
 
-SMALL_TABLE_SCALE = Scale(0.5, 1.0, 0.025)
-SMALL_TABLE_POSITION = Point3(-0.35, 0.0, 1.3)
+FLOOR_SCALE = Scale(6.0, 4.0, 0.02)
+"""
+Size of the floor slab; large enough to comfortably fit the table, the row of loose
+shapes, and a standing HSRB.
+"""
+
+TABLE_SCALE = Scale(0.5, 1.0, 0.025)
+TABLE_POSITION = Point3(-0.35, 0.0, 0.5)
+
+TABLE_LEG_FOOTPRINT = 0.05
+"""
+Cross-sectional width/depth of each of the table's four legs.
+"""
+
+_LEG_CORNER_SIGNS = [(-1, -1), (-1, 1), (1, -1), (1, 1)]
+"""
+The four ``(x, y)`` sign combinations at which a table's legs are placed, relative to
+its center.
+"""
 
 BOARD_SCALE = Scale(0.13, 0.30, 0.08)
-BOARD_POSITION = Point3(-0.4, 0.0, 1.353)
+BOARD_POSITION = Point3(-0.4, 0.0, 0.553)
 BOARD_COLOR = Color.BEIGE()
 
 DRAWER_SCALE = Scale(0.09, 0.08, 0.06)
 HANDLE_SCALE = Scale(0.03, 0.015, 0.015)
 
-SHAPE_HOVER_HEIGHT = 0.05
+TABLE_SHAPE_ROW_X = -0.15
 """
-Height above its matching hole at which a loose shape is initially placed.
+X-coordinate, in the world frame, of the row in which loose shapes are placed on the
+table; clear of the shape-sorting board's footprint.
 """
 
-DEFAULT_ICUB3_STANDOFF_DISTANCE = 0.6
+TABLE_SHAPE_ROW_START_Y = -0.45
 """
-Default distance the spawned ICub3 stands in front of the Montessori table's near edge.
+Y-coordinate of the first loose shape in the row on the table.
+"""
+
+TABLE_SHAPE_ROW_SPACING = 0.15
+"""
+Distance, along y, between adjacent loose shapes in the row on the table.
+"""
+
+DEFAULT_HSRB_STANDOFF_DISTANCE = 0.6
+"""
+Default distance the spawned HSRB stands in front of the Montessori table's near edge.
 """
 
 _SHAPE_COLORS = {
@@ -91,7 +130,6 @@ The color used to render a loose shape and the hole it fits through, keyed by th
 shared :class:`~experiments.montessori.semantics.MontessoriShapeCategory`.
 """
 
-
 @dataclass(frozen=True)
 class _HoleSpec:
     """
@@ -101,59 +139,80 @@ class _HoleSpec:
     key: str
     category: MontessoriShapeCategory
     position: Point3
-    footprint: Scale
+    shape: HoleFootprint
+    """
+    The hole's true, mesh-detected shape; used to build both the board's cut and this
+    hole's own marker region.
+    """
 
 
-_HOLES: List[_HoleSpec] = [
-    _HoleSpec(
-        "square_hole",
-        MontessoriShapeCategory.CUBE,
-        Point3(-0.38, -0.087, 1.3905),
-        Scale(0.03, 0.03, 0.005),
-    ),
-    _HoleSpec(
-        "circular_hole_1",
-        MontessoriShapeCategory.CYLINDER,
-        Point3(-0.4215, -0.087, 1.3905),
-        Scale(0.03, 0.03, 0.005),
-    ),
-    _HoleSpec(
-        "triangle_hole",
-        MontessoriShapeCategory.TRIANGULAR_PRISM,
-        Point3(-0.381, 0.0, 1.3905),
-        Scale(0.03, 0.03, 0.005),
-    ),
-    _HoleSpec(
-        "rectangular_hole",
-        MontessoriShapeCategory.RECTANGULAR_PRISM,
-        Point3(-0.427, 0.0, 1.3905),
-        Scale(0.015, 0.03, 0.005),
-    ),
-    _HoleSpec(
-        "circular_hole_2",
-        MontessoriShapeCategory.CYLINDER,
-        Point3(-0.418, 0.091, 1.3905),
-        Scale(0.03, 0.03, 0.005),
-    ),
-    _HoleSpec(
-        "disk_hole",
-        MontessoriShapeCategory.DISK,
-        Point3(-0.375, 0.091, 1.3905),
-        Scale(0.005, 0.04, 0.005),
-    ),
-]
+_HOLE_KEY_BY_CATEGORY = {
+    MontessoriShapeCategory.CUBE: "square_hole",
+    MontessoriShapeCategory.TRIANGULAR_PRISM: "triangle_hole",
+    MontessoriShapeCategory.RECTANGULAR_PRISM: "rectangular_hole",
+    MontessoriShapeCategory.DISK: "disk_hole",
+}
+"""
+Name given to a hole of a given category, for the categories that occur at most once on
+the board.
+
+The :attr:`~MontessoriShapeCategory.CYLINDER` category occurs twice and is numbered
+instead (``circular_hole_1``, ``circular_hole_2``).
+"""
+
+
+def _hole_spec_from_footprint(footprint: HoleFootprint, key: str) -> _HoleSpec:
+    """
+    Place a mesh-detected :class:`HoleFootprint` onto the board, flush with its top
+    surface, and pair it with a semantic key.
+    """
+    position = Point3(
+        BOARD_POSITION.x + footprint.center[0],
+        BOARD_POSITION.y + footprint.center[1],
+        BOARD_POSITION.z + BOARD_SCALE.z / 2 - HOLE_MARKER_THICKNESS / 2,
+    )
+    return _HoleSpec(key, footprint.category, position, footprint)
+
+
+def _build_hole_specs(footprints: List[HoleFootprint]) -> List[_HoleSpec]:
+    """
+    Build the board's hole specifications from its mesh-detected hole shapes.
+    """
+    circular_hole_count = 0
+    hole_specs = []
+    for footprint in footprints:
+        if footprint.category is MontessoriShapeCategory.CYLINDER:
+            circular_hole_count += 1
+            key = f"circular_hole_{circular_hole_count}"
+        else:
+            key = _HOLE_KEY_BY_CATEGORY[footprint.category]
+        hole_specs.append(_hole_spec_from_footprint(footprint, key))
+    return hole_specs
+
+
+_HOLE_FOOTPRINTS: List[HoleFootprint] = detect_hole_footprints()
+"""
+The board's hole shapes, detected once from its mesh
+(:func:`~experiments.montessori.hole_geometry.detect_hole_footprints`); the single
+source both :const:`_HOLES` and the board's cut mesh are built from.
+"""
+
+_HOLES: List[_HoleSpec] = _build_hole_specs(_HOLE_FOOTPRINTS)
 """
 One hole per :class:`~experiments.montessori.semantics.MontessoriShapeCategory` that has
 a matching shape (two holes, both circular, accept the
 :attr:`~experiments.montessori.semantics.MontessoriShapeCategory.CYLINDER` shape); the
 sphere has no matching hole, mirroring the real Montessori board this scene is modelled
 after.
+
+Detected from the board's mesh by
+:func:`~experiments.montessori.hole_geometry.detect_hole_footprints`.
 """
 
 _DRAWER_POSITIONS: List[Point3] = [
-    Point3(-0.403, 0.087, 1.353),
-    Point3(-0.403, 0.0, 1.353),
-    Point3(-0.403, -0.087, 1.353),
+    Point3(-0.403, 0.087, 0.553),
+    Point3(-0.403, 0.0, 0.553),
+    Point3(-0.403, -0.087, 0.553),
 ]
 
 _HANDLE_OFFSET = Point3(-0.061, 0.0, 0.001)
@@ -166,11 +225,68 @@ def _name(name: str) -> PrefixedName:
     return PrefixedName(name, NAME_PREFIX)
 
 
+def _body_with_shapes(name: PrefixedName, shapes: List[Shape]) -> Body:
+    """
+    Build a :class:`Body` whose collision and visual geometry are the given shapes.
+    """
+    return Body.from_shape_collection(name, ShapeCollection(shapes))
+
+
 def _body_with_shape(name: PrefixedName, shape: Shape) -> Body:
     """
     Build a :class:`Body` whose collision and visual geometry are a single shape.
     """
-    return Body.from_shape_collection(name, ShapeCollection([shape]))
+    return _body_with_shapes(name, [shape])
+
+
+def _body_with_visual_only_shape(name: PrefixedName, shape: Shape) -> Body:
+    """
+    Build a :class:`Body` with a visual-only shape and no collision geometry.
+
+    Used for the floor: CRAM's navigation reachability costmaps assume the ground
+    itself has no collision mesh, and treat any collidable geometry at ground level
+    as an obstacle blocking every standing spot.
+    """
+    return Body(name=name, visual=ShapeCollection([shape]))
+
+
+def _table_shapes(
+    table_scale: Scale,
+    table_center_z: float,
+    leg_footprint: float,
+    support_z: float,
+    color: Color,
+) -> List[Shape]:
+    """
+    Build a tabletop :class:`Box` plus four leg :class:`Box`\\ es that support it from
+    ``support_z`` up to its underside, at its four corners.
+
+    :param table_scale: Size of the tabletop.
+    :param table_center_z: Height of the tabletop's own center, in the world frame.
+    :param leg_footprint: Cross-sectional width/depth of each leg.
+    :param support_z: Height of the surface the legs stand on.
+    :param color: Color shared by the tabletop and its legs.
+    :return: The tabletop shape followed by its four leg shapes, positioned relative to
+        the tabletop's own origin.
+    """
+    half_x = table_scale.x / 2 - leg_footprint / 2
+    half_y = table_scale.y / 2 - leg_footprint / 2
+    leg_height = table_center_z - table_scale.z / 2 - support_z
+    leg_center_local_z = support_z + leg_height / 2 - table_center_z
+
+    shapes = [Box(scale=table_scale, color=color)]
+    for sign_x, sign_y in _LEG_CORNER_SIGNS:
+        leg_origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+            x=sign_x * half_x, y=sign_y * half_y, z=leg_center_local_z
+        )
+        shapes.append(
+            Box(
+                scale=Scale(leg_footprint, leg_footprint, leg_height),
+                color=color,
+                origin=leg_origin,
+            )
+        )
+    return shapes
 
 
 def _triangular_prism_mesh(base: float, height: float, thickness: float) -> Mesh:
@@ -188,6 +304,16 @@ def _triangular_prism_mesh(base: float, height: float, thickness: float) -> Mesh
     )
     prism.apply_translation([0.0, 0.0, -thickness / 2])
     return Mesh.from_trimesh(mesh=prism)
+
+
+def _hole_marker_shape(footprint: HoleFootprint, color: Color) -> Mesh:
+    """
+    Build a thin :class:`Mesh` matching a hole's true cross-section shape, for its
+    :class:`~experiments.montessori.semantics.ShapeSortingHole` region.
+    """
+    marker = Mesh.from_trimesh(mesh=footprint.extrude(HOLE_MARKER_THICKNESS))
+    marker.color = color
+    return marker
 
 
 def _shape_body(name: PrefixedName, category: MontessoriShapeCategory) -> Body:
@@ -213,182 +339,204 @@ def _shape_body(name: PrefixedName, category: MontessoriShapeCategory) -> Body:
     return _body_with_shape(name, shape)
 
 
-def _spawn(
-    world: World,
-    annotation: HasRootKinematicStructureEntity,
-    position: Point3,
-) -> HasRootKinematicStructureEntity:
+@dataclass(eq=False)
+class MontessoriWorld:
     """
-    Connect a semantic annotation's root entity to the world root at ``position`` with
-    a fixed connection, and register the annotation with the world.
+    The Montessori shape-sorting scene: a semantic digital twin world containing a
+    floor, a table carrying a shape-sorting board (with its holes and drawers), and the
+    loose shapes dropped through the holes.
 
-    :param world: The world to spawn the annotation into.
-    :param annotation: The semantic annotation to spawn.
-    :param position: The annotation's position, expressed in the world root frame.
-    :return: The spawned annotation.
+    The scene is built as soon as an instance is constructed; use :meth:`spawn_hsrb`
+    afterwards to add the HSRB robot, since it is not spawned by default.
     """
-    world.add_connection(
-        FixedConnection(
-            parent=world.root,
-            child=annotation.root,
-            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
-                x=position.x, y=position.y, z=position.z
+
+    world: World = field(init=False, default_factory=World)
+    """
+    The assembled semantic digital twin world.
+    """
+
+    board: ShapeSortingBoard = field(init=False)
+    """
+    The shape-sorting board spawned into :attr:`world`.
+    """
+
+    hsrb: Optional[HSRB] = field(init=False, default=None)
+    """
+    The HSRB robot spawned into :attr:`world` by :meth:`spawn_hsrb`, or ``None`` if it
+    has not been spawned.
+    """
+
+    def __post_init__(self) -> None:
+        root = Body(name=PrefixedName(name="root", prefix="world"))
+        with self.world.modify_world():
+            self.world.add_kinematic_structure_entity(root)
+
+        with self.world.modify_world():
+            self._build_floor_and_table()
+            self.board = self._build_shape_sorting_board()
+            self._build_shapes()
+
+    def spawn_hsrb(
+        self, standoff_distance: float = DEFAULT_HSRB_STANDOFF_DISTANCE
+    ) -> HSRB:
+        """
+        Spawn an HSRB robot standing in front of the Montessori table, facing it, and
+        store it as :attr:`hsrb`.
+
+        Attached via an :class:`OmniDrive` (a real, hardware-controlled mobile-base
+        connection), not a plain 6DoF join: CRAM's motion planner needs a proper
+        drive connection to navigate the robot at all.
+
+        :param standoff_distance: How far in front of the table's near edge the robot
+            stands.
+        :return: The spawned robot.
+        """
+        table_bounding_box = (
+            self.world.get_body_by_name("table")
+            .collision.as_bounding_box_collection_in_frame(self.world.root)
+            .bounding_box()
+        )
+        hsrb_world = URDFParser.from_file(HSRB.get_ros_file_path()).parse()
+        with self.world.modify_world():
+            drive = OmniDrive.create_with_dofs(
+                parent=self.world.root, child=hsrb_world.root, world=self.world
+            )
+            self.world.merge_world(hsrb_world, drive)
+            drive.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+                table_bounding_box.min_x - standoff_distance,
+                0.0,
+                0.0,
+                reference_frame=self.world.root,
+            )
+        self.hsrb = HSRB.from_world(self.world)
+        return self.hsrb
+
+    def _spawn(
+        self,
+        annotation: HasRootKinematicStructureEntity,
+        position: Point3,
+    ) -> HasRootKinematicStructureEntity:
+        """
+        Connect a semantic annotation's root entity to the world root at ``position``
+        with a fixed connection, and register the annotation with the world.
+
+        :param annotation: The semantic annotation to spawn.
+        :param position: The annotation's position, expressed in the world root frame.
+        :return: The spawned annotation.
+        """
+        self.world.add_connection(
+            FixedConnection(
+                parent=self.world.root,
+                child=annotation.root,
+                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    x=position.x, y=position.y, z=position.z
+                ),
+            )
+        )
+        self.world.add_semantic_annotation(annotation)
+        return annotation
+
+    def _build_floor_and_table(self) -> None:
+        floor = Floor(
+            name=_name("floor"),
+            root=_body_with_visual_only_shape(
+                _name("floor"), Box(scale=FLOOR_SCALE, color=Color.GREY())
             ),
         )
-    )
-    world.add_semantic_annotation(annotation)
-    return annotation
+        self._spawn(floor, Point3(0.0, 0.0, FLOOR_Z - FLOOR_SCALE.z / 2))
 
-
-def _build_tables(world: World) -> None:
-    table = Table(
-        name=_name("table"),
-        root=_body_with_shape(
-            _name("table"), Box(scale=TABLE_SCALE, color=Color.GREY())
-        ),
-    )
-    _spawn(world, table, TABLE_POSITION)
-
-    small_table = SideTable(
-        name=_name("small_table"),
-        root=_body_with_shape(
-            _name("small_table"), Box(scale=SMALL_TABLE_SCALE, color=BOARD_COLOR)
-        ),
-    )
-    _spawn(world, small_table, SMALL_TABLE_POSITION)
-
-
-def _build_shape_sorting_board(world: World) -> ShapeSortingBoard:
-    board = ShapeSortingBoard(
-        name=_name("board"),
-        root=_body_with_shape(_name("board"), Box(scale=BOARD_SCALE, color=BOARD_COLOR)),
-    )
-    _spawn(world, board, BOARD_POSITION)
-
-    for hole_spec in _HOLES:
-        hole = ShapeSortingHole(
-            name=_name(hole_spec.key),
-            root=Region(
-                name=_name(hole_spec.key),
-                area=ShapeCollection(
-                    [
-                        Box(
-                            scale=hole_spec.footprint,
-                            color=_SHAPE_COLORS[hole_spec.category],
-                        )
-                    ]
+        table = Table(
+            name=_name("table"),
+            root=_body_with_shapes(
+                _name("table"),
+                _table_shapes(
+                    TABLE_SCALE,
+                    float(TABLE_POSITION.z),
+                    TABLE_LEG_FOOTPRINT,
+                    FLOOR_Z,
+                    BOARD_COLOR,
                 ),
             ),
-            shape_category=hole_spec.category,
         )
-        _spawn(world, hole, hole_spec.position)
-        board.add(hole)
+        self._spawn(table, TABLE_POSITION)
 
-    for index, drawer_position in enumerate(_DRAWER_POSITIONS, start=1):
-        drawer = Drawer(
-            name=_name(f"drawer_{index}"),
-            root=_body_with_shape(
-                _name(f"drawer_{index}"), Box(scale=DRAWER_SCALE, color=BOARD_COLOR)
-            ),
+    def _build_shape_sorting_board(self) -> ShapeSortingBoard:
+        board_shape = Mesh.from_trimesh(
+            mesh=cut_board_mesh(BOARD_SCALE, _HOLE_FOOTPRINTS)
         )
-        _spawn(world, drawer, drawer_position)
-        board.add(drawer)
-
-        handle = Handle(
-            name=_name(f"drawer_{index}_handle"),
-            root=_body_with_shape(
-                _name(f"drawer_{index}_handle"),
-                Box(scale=HANDLE_SCALE, color=Color.GREY()),
-            ),
+        board_shape.color = BOARD_COLOR
+        board = ShapeSortingBoard(
+            name=_name("board"),
+            root=_body_with_shape(_name("board"), board_shape),
         )
-        handle_position = Point3(
-            drawer_position.x + _HANDLE_OFFSET.x,
-            drawer_position.y + _HANDLE_OFFSET.y,
-            drawer_position.z + _HANDLE_OFFSET.z,
-        )
-        _spawn(world, handle, handle_position)
-        drawer.add(handle)
+        self._spawn(board, BOARD_POSITION)
 
-    return board
+        for hole_spec in _HOLES:
+            hole = ShapeSortingHole(
+                name=_name(hole_spec.key),
+                root=Region(
+                    name=_name(hole_spec.key),
+                    area=ShapeCollection(
+                        [
+                            _hole_marker_shape(
+                                hole_spec.shape, _SHAPE_COLORS[hole_spec.category]
+                            )
+                        ]
+                    ),
+                ),
+                shape_category=hole_spec.category,
+            )
+            self._spawn(hole, hole_spec.position)
+            board.add(hole)
 
+        for index, drawer_position in enumerate(_DRAWER_POSITIONS, start=1):
+            drawer = Drawer(
+                name=_name(f"drawer_{index}"),
+                root=_body_with_shape(
+                    _name(f"drawer_{index}"), Box(scale=DRAWER_SCALE, color=BOARD_COLOR)
+                ),
+            )
+            self._spawn(drawer, drawer_position)
+            board.add(drawer)
 
-def _build_shapes(world: World) -> None:
-    for hole_spec in _HOLES:
-        shape_key = f"{hole_spec.key}_shape"
-        shape = MontessoriShape(
-            name=_name(shape_key),
-            root=_shape_body(_name(shape_key), hole_spec.category),
-            shape_category=hole_spec.category,
-        )
-        hover_position = Point3(
-            hole_spec.position.x,
-            hole_spec.position.y,
-            hole_spec.position.z + SHAPE_HOVER_HEIGHT,
-        )
-        _spawn(world, shape, hover_position)
+            handle = Handle(
+                name=_name(f"drawer_{index}_handle"),
+                root=_body_with_shape(
+                    _name(f"drawer_{index}_handle"),
+                    Box(scale=HANDLE_SCALE, color=Color.GREY()),
+                ),
+            )
+            handle_position = Point3(
+                drawer_position.x + _HANDLE_OFFSET.x,
+                drawer_position.y + _HANDLE_OFFSET.y,
+                drawer_position.z + _HANDLE_OFFSET.z,
+            )
+            self._spawn(handle, handle_position)
+            drawer.add(handle)
 
-    # The sphere has no matching hole in this scene, so it is placed on the main
-    # table instead of hovering over a hole.
-    sphere = MontessoriShape(
-        name=_name("sphere_shape"),
-        root=_shape_body(_name("sphere_shape"), MontessoriShapeCategory.SPHERE),
-        shape_category=MontessoriShapeCategory.SPHERE,
-    )
-    _spawn(world, sphere, Point3(-0.55, 0.3, 1.07))
+        return board
 
+    def _build_shapes(self) -> None:
+        categories = [hole_spec.category for hole_spec in _HOLES] + [
+            MontessoriShapeCategory.SPHERE
+        ]
+        keys = [hole_spec.key for hole_spec in _HOLES] + ["sphere"]
 
-def build_montessori_world() -> World:
-    """
-    Build the Montessori shape-sorting world from scratch: a table, a smaller table
-    carrying a shape-sorting board (with its holes and drawers), and the loose shapes
-    dropped through the holes.
+        for index, (key, category) in enumerate(zip(keys, categories)):
+            shape_key = f"{key}_shape"
+            body = _shape_body(_name(shape_key), category)
+            shape = MontessoriShape(
+                name=_name(shape_key), root=body, shape_category=category
+            )
+            y = TABLE_SHAPE_ROW_START_Y + index * TABLE_SHAPE_ROW_SPACING
+            self._spawn(shape, self._resting_position_on_table(body, y))
 
-    The iCub robot is not spawned by this function; use :func:`spawn_icub3` to add it
-    separately.
-
-    :return: The assembled world.
-    """
-    world = World()
-    root = Body(name=PrefixedName(name="root", prefix="world"))
-    with world.modify_world():
-        world.add_kinematic_structure_entity(root)
-
-    with world.modify_world():
-        _build_tables(world)
-        _build_shape_sorting_board(world)
-        _build_shapes(world)
-
-    return world
-
-
-def spawn_icub3(
-    world: World, standoff_distance: float = DEFAULT_ICUB3_STANDOFF_DISTANCE
-) -> ICub3:
-    """
-    Spawn an ICub3 robot standing in front of the Montessori table, facing it.
-
-    :param world: The world to spawn the robot into, modified in place. Must already
-        contain a body named ``"table"``, as built by :func:`build_montessori_world`.
-    :param standoff_distance: How far in front of the table's near edge the robot
-        stands.
-    :return: The spawned robot.
-    """
-    table_bounding_box = (
-        world.get_body_by_name("table")
-        .collision.as_bounding_box_collection_in_frame(world.root)
-        .bounding_box()
-    )
-    icub_world = URDFParser.from_file(ICub3.get_ros_file_path()).parse()
-    world.merge_world_at_pose(
-        icub_world,
-        HomogeneousTransformationMatrix.from_xyz_rpy(
-            table_bounding_box.min_x - standoff_distance,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            reference_frame=world.root,
-        ),
-    )
-    return ICub3.from_world(world)
+    @staticmethod
+    def _resting_position_on_table(body: Body, y: float) -> Point3:
+        """
+        Position, at ``y`` along :const:`TABLE_SHAPE_ROW_X`, at which ``body`` rests
+        exactly on the table's surface, given its own local geometry.
+        """
+        lowest_local_z = body.collision.combined_mesh.bounds[0][2]
+        table_top_z = float(TABLE_POSITION.z) + TABLE_SCALE.z / 2
+        return Point3(TABLE_SHAPE_ROW_X, y, table_top_z - lowest_local_z)

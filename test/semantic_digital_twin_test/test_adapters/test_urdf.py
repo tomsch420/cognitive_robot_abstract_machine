@@ -116,6 +116,28 @@ def test_mimic_joints(pr2_parser):
     assert joint_to_be_mimicked.dofs == mimic_joint.dofs
 
 
+def test_revolute_joint_with_near_unit_axis_is_not_truncated_to_zero():
+    # a real-world axis is rarely an exact integer, e.g. this is l_shoulder_pitch's
+    # axis from the iCub3 URDF
+    urdf = """<?xml version="1.0"?>
+    <robot name="axis_test">
+      <link name="parent_link"/>
+      <link name="child_link"/>
+      <joint name="test_joint" type="revolute">
+        <parent link="parent_link"/>
+        <child link="child_link"/>
+        <axis xyz="3.323079797554136e-07 0.9999999783534342 1.4452224303420037e-07"/>
+        <limit lower="-1.0" upper="1.0" effort="1.0" velocity="1.0"/>
+      </joint>
+    </robot>
+    """
+    world = URDFParser(urdf=urdf).parse()
+
+    connection = world.get_connection_by_name("test_joint")
+
+    assert connection.axis.to_np()[:3] == pytest.approx([0.0, 1.0, 0.0], abs=1e-6)
+
+
 def test_xacro():
     path = "package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro"
     parser = URDFParser.from_xacro(path)

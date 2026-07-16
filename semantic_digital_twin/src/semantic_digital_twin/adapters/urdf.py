@@ -273,7 +273,7 @@ class URDFParser:
             parent_T_connection_expression=parent_T_connection,
             multiplier=multiplier,
             offset=offset,
-            axis=Vector3(*map(int, joint.axis), reference_frame=parent),
+            axis=Vector3(*map(float, joint.axis), reference_frame=parent),
             raw_dof=dof,
         )
         return result
