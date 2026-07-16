@@ -81,6 +81,57 @@ class TestGraphNodes:
 
         assert visualizer.graph_nodes()[0]["tag"] == "extra"
 
+    def test_fixed_layout_pins_nodes_at_the_position_getters_3d_result(self):
+        visualizer = named_visualizer(
+            chain_graph(["a"]),
+            layout=GraphLayout.FIXED,
+            position_getter=lambda payload: (1.0, 2.0, 3.0),
+        )
+
+        node = visualizer.graph_nodes()[0]
+        assert (node["fx"], node["fy"], node["fz"]) == (1.0, 2.0, 3.0)
+
+    def test_fixed_layout_supports_a_2d_position(self):
+        visualizer = named_visualizer(
+            chain_graph(["a"]),
+            layout=GraphLayout.FIXED,
+            position_getter=lambda payload: (1.0, 2.0),
+        )
+
+        node = visualizer.graph_nodes()[0]
+        assert (node["fx"], node["fy"]) == (1.0, 2.0)
+        assert "fz" not in node
+
+    def test_non_fixed_layout_ignores_the_position_getter(self):
+        visualizer = named_visualizer(
+            chain_graph(["a"]),
+            layout=GraphLayout.SPRING,
+            position_getter=lambda payload: (1.0, 2.0, 3.0),
+        )
+
+        node = visualizer.graph_nodes()[0]
+        assert "fx" not in node and "fy" not in node and "fz" not in node
+
+    def test_fixed_layout_without_a_position_getter_leaves_the_node_unpinned(self):
+        visualizer = named_visualizer(chain_graph(["a"]), layout=GraphLayout.FIXED)
+
+        node = visualizer.graph_nodes()[0]
+        assert "fx" not in node and "fy" not in node and "fz" not in node
+
+    def test_fixed_position_values_are_plain_json_safe_floats(self):
+        import numpy as np
+
+        visualizer = named_visualizer(
+            chain_graph(["a"]),
+            layout=GraphLayout.FIXED,
+            position_getter=lambda payload: (np.float64(1.0), np.float64(2.0), np.float64(3.0)),
+        )
+
+        node = visualizer.graph_nodes()[0]
+        assert type(node["fx"]) is float
+        assert type(node["fy"]) is float
+        assert type(node["fz"]) is float
+
 
 class TestGraphLinks:
     def test_links_connect_node_ids(self):
@@ -176,6 +227,12 @@ class TestLayout:
 
         options = visualizer.three_layout_options()
         assert options["cooldownTicks"] < math.inf
+
+    def test_fixed_layout_runs_just_enough_ticks_to_apply_pinned_positions(self):
+        visualizer = named_visualizer(chain_graph(["a"]), layout=GraphLayout.FIXED)
+
+        options = visualizer.three_layout_options()
+        assert 0 < options["cooldownTicks"] < math.inf
 
 
 class TestExtensionHooks:

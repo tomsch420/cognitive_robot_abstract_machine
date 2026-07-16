@@ -28,6 +28,10 @@ _LAYOUT_OPTIONS: Dict[GraphLayout, LayoutOptions] = {
     GraphLayout.SPRING: {"cooldownTicks": 100},
     GraphLayout.LAYERED: {"dagMode": "td", "cooldownTicks": 100},
     GraphLayout.PHYSICS: {"cooldownTicks": float("inf")},
+    # A handful of ticks rather than 0: d3-force applies fx/fy/fz to x/y/z during its normal tick
+    # loop, so the simulation still needs to run briefly for fixed positions to actually take
+    # effect, even though there's nothing left to iteratively settle.
+    GraphLayout.FIXED: {"cooldownTicks": 10},
 }
 """The 3d-force-graph layout options used for each :class:`GraphLayout`."""
 
@@ -241,7 +245,11 @@ class ThreeGraphVisualizer(GraphVisualizerBase):
     :attr:`info_getter`'s details in a popup next to the cursor, and clicking a node shows the same
     details in the side panel. With
     :attr:`~krrood.rustworkx_utils.graph_visualizer_base.GraphLayout.PHYSICS` the layout keeps
-    simulating, so nodes self-organize and drift when new nodes appear.
+    simulating, so nodes self-organize and drift when new nodes appear. With
+    :attr:`~krrood.rustworkx_utils.graph_visualizer_base.GraphLayout.FIXED`, nodes are pinned at
+    :attr:`~krrood.rustworkx_utils.graph_visualizer_base.GraphVisualizerBase.position_getter`'s
+    result instead of being simulated — for example, placing each node at its payload's real
+    spatial position rather than an arbitrary force-directed layout.
 
     .. note::
         Flask is imported lazily so that importing this module does not require it; install it with
@@ -272,8 +280,27 @@ class ThreeGraphVisualizer(GraphVisualizerBase):
                 "color": self.node_color(index),
             }
             node.update(self.node_extra_data(index))
+            node.update(self._fixed_position_fields(index))
             nodes.append(node)
         return nodes
+
+    def _fixed_position_fields(self, node_index: int) -> Dict[str, float]:
+        """
+        :param node_index: The rustworkx index of the node.
+        :return: ``fx``/``fy``/(``fz``) fields pinning the node at :meth:`node_position`'s result,
+            the d3-force convention for a fixed (non-simulated) position; empty outside
+            :attr:`~krrood.rustworkx_utils.graph_visualizer_base.GraphLayout.FIXED` or for nodes
+            :meth:`node_position` doesn't cover.
+        """
+        if self.layout is not GraphLayout.FIXED:
+            return {}
+        position = self.node_position(node_index)
+        if position is None:
+            return {}
+        fields = {"fx": float(position[0]), "fy": float(position[1])}
+        if len(position) > 2:
+            fields["fz"] = float(position[2])
+        return fields
 
     def graph_links(self) -> List[ThreeLink]:
         """

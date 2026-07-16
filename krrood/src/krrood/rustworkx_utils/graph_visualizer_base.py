@@ -14,6 +14,10 @@ RustworkxGraph = Union[rx.PyDiGraph, rx.PyGraph]
 DEFAULT_NODE_COLOR = "#79a6d2"
 """The marker color used when no ``color_getter`` is provided."""
 
+NodePosition = Union[Tuple[float, float], Tuple[float, float, float]]
+"""An explicit 2D or 3D node position, in whatever coordinate space the caller intends (for
+example a world frame, so nodes end up placed at bodies' real spatial positions)."""
+
 
 class GraphLayout(Enum):
     """The algorithm used to place nodes in the drawing."""
@@ -26,6 +30,10 @@ class GraphLayout(Enum):
 
     PHYSICS = auto()
     """Continuous force-directed placement where nodes keep simulating, self-organize and bounce."""
+
+    FIXED = auto()
+    """Nodes are placed at the explicit position :attr:`~GraphVisualizerBase.position_getter`
+    returns for each one, instead of being simulated."""
 
 
 class GraphVisualizerBackend(Enum):
@@ -82,6 +90,10 @@ class GraphVisualizerBase(ABC):
     border_color_getter: Optional[Callable[[Any], str]] = None
     """Maps a node payload to its border color; derived automatically from its fill color when not provided."""
 
+    position_getter: Optional[Callable[[Any], NodePosition]] = None
+    """Maps a node payload to an explicit position; used when :attr:`layout` is
+    :attr:`GraphLayout.FIXED`, ignored otherwise."""
+
     layout: GraphLayout = GraphLayout.SPRING
     """The algorithm used to place the nodes."""
 
@@ -121,6 +133,15 @@ class GraphVisualizerBase(ABC):
         if self.border_color_getter is None:
             return None
         return self.border_color_getter(self.graph[node_index])
+
+    def node_position(self, node_index: int) -> Optional[NodePosition]:
+        """
+        :param node_index: The rustworkx index of the node.
+        :return: The node's explicit position, or ``None`` if no :attr:`position_getter` is set.
+        """
+        if self.position_getter is None:
+            return None
+        return self.position_getter(self.graph[node_index])
 
     def node_details(self, node_index: int) -> List[str]:
         """
