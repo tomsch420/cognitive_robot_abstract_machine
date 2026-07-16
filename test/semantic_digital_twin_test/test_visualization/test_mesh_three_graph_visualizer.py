@@ -204,6 +204,20 @@ class TestExtraScript:
         assert "SpriteText" not in script
         assert "node-label" not in script
 
+    def test_loaded_meshes_render_from_both_sides(self):
+        visualizer = named_visualizer(body_graph(body_with_visual_sphere("a")))
+
+        script = visualizer.extra_script()
+        loader_callback = script[script.index("loader.load(") : script.index("function spin(")]
+        assert "THREE.DoubleSide" in loader_callback
+
+    def test_loaded_meshes_are_not_forced_fully_metallic(self):
+        visualizer = named_visualizer(body_graph(body_with_visual_sphere("a")))
+
+        script = visualizer.extra_script()
+        loader_callback = script[script.index("loader.load(") : script.index("function spin(")]
+        assert "material.metalness = 0" in loader_callback
+
 
 class TestCheckDependencies:
     @pytest.mark.parametrize("missing_module", ["flask", "trimesh"])

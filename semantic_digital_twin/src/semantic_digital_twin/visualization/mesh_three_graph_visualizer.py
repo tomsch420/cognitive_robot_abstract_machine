@@ -165,6 +165,28 @@ class MeshThreeGraphVisualizer(ThreeGraphVisualizer):
         const size = bounds.getSize(new THREE.Vector3());
         const largestDimension = Math.max(size.x, size.y, size.z) || 1;
         gltf.scene.scale.setScalar(targetSize / largestDimension);
+        // Bodies' meshes come from arbitrary sources (URDF/mesh files, trimesh's glTF export)
+        // whose face winding isn't guaranteed to match three.js's front-face convention. With the
+        // default single-sided material, a mesh with reversed winding renders solid from one
+        // viewing hemisphere and disappears (backface-culled) from the other as it spins or the
+        // camera orbits. Rendering both sides trades a little performance for always being visible.
+        gltf.scene.traverse((child) => {{
+          if (!child.isMesh) {{ return; }}
+          const materials = Array.isArray(child.material) ? child.material : [child.material];
+          materials.forEach((material) => {{
+            material.side = THREE.DoubleSide;
+            // glTF's PBR metallic-roughness model defaults an unset metallic factor to 1 (fully
+            // metallic), which trimesh's export doesn't override for meshes without their own
+            // material info. A fully metallic surface has almost no diffuse response and only
+            // reflects light via an environment map, which this scene doesn't provide — under
+            // plain ambient/directional lighting it renders near-black except for a thin specular
+            // streak wherever the light direction happens to catch the camera, i.e. visible from
+            // only one direction. Treating meshes as non-metallic makes them respond to the
+            // scene's lights the same ordinary diffuse way the fallback sphere's Lambert material
+            // does.
+            material.metalness = 0;
+          }});
+        }});
         group.add(gltf.scene);
       }},
       undefined,
