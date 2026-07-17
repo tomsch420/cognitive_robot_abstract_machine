@@ -422,17 +422,9 @@ class SymbolicExpression(ABC):
     def _root_(self) -> SymbolicExpression:
         """
         :return: The root of the symbolic expression tree.
-
-        Traversal stops at ``ResultQuantifier`` boundaries so that inner query
-        subtrees are not merged with outer query trees when a query is used as a
-        sub-expression (e.g. ``set_of(query[A], query[B]).where(query[C].x == v)``).
         """
-        from krrood.entity_query_language.query.quantifiers import ResultQuantifier
-
         expression = self
-        while expression._parent_ is not None and not isinstance(
-            expression, ResultQuantifier
-        ):
+        while expression._parent_ is not None:
             expression = expression._parent_
         return expression
 
