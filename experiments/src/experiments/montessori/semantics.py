@@ -11,6 +11,7 @@ from enum import StrEnum
 
 from typing_extensions import Optional
 
+from krrood.exceptions import DataclassException
 from krrood.ormatic.utils import classproperty
 from semantic_digital_twin.semantic_annotations.mixins import (
     HasApertures,
@@ -77,17 +78,31 @@ class ShapeSortingHole(Aperture):
         )
 
 
-class NoMatchingHoleError(Exception):
+@dataclass
+class NoMatchingHoleError(DataclassException):
     """
     Raised when a :class:`ShapeSortingBoard` has no :class:`ShapeSortingHole` whose
     category matches a given :class:`MontessoriShape`.
     """
 
-    def __init__(self, montessori_shape: MontessoriShape, board: ShapeSortingBoard):
-        super().__init__(
-            f"{board.name} has no hole matching {montessori_shape.name}'s category "
-            f"{montessori_shape.shape_category}."
+    montessori_shape: MontessoriShape
+    """
+    The shape that has no matching hole.
+    """
+
+    board: ShapeSortingBoard
+    """
+    The board that has no hole matching :attr:`montessori_shape`.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{self.board.name} has no hole matching {self.montessori_shape.name}'s "
+            f"category {self.montessori_shape.shape_category}."
         )
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass(eq=False)

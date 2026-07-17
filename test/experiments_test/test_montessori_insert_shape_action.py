@@ -1,0 +1,133 @@
+import pytest
+
+import experiments.orm.ormatic_interface  # type: ignore
+from coraplex.datastructures.dataclasses import Context
+from coraplex.datastructures.enums import Arms
+from coraplex.execution_environment import simulated_robot
+from coraplex.plans.executables import Executable
+from coraplex.plans.factories import execute_single
+from krrood.entity_query_language.backends import ProbabilisticBackend
+from krrood.utils import clear_memoization_cache
+
+from experiments.montessori.insert_shape_action import InsertMontessoriShapeAction
+from experiments.montessori.semantics import MontessoriShape, NoMatchingHoleError
+from experiments.montessori.world import MontessoriWorld
+from semantic_digital_twin.utils import hsrb_installed
+
+
+@pytest.fixture
+def montessori_with_hsrb():
+    if not hsrb_installed():
+        pytest.skip("hsr_description is not installed")
+
+    montessori = MontessoriWorld()
+    montessori.spawn_hsrb()
+    montessori.world.update_forward_kinematics()
+    return montessori
+
+
+def shape_with_category(montessori: MontessoriWorld, category: str) -> MontessoriShape:
+    [shape] = [
+        shape
+        for shape in montessori.world.get_semantic_annotations_by_type(MontessoriShape)
+        if shape.shape_category == category
+    ]
+    return shape
+
+
+def test_insert_montessori_shape_action_builds_a_valid_plan(montessori_with_hsrb):
+    montessori = montessori_with_hsrb
+    cube_shape = shape_with_category(montessori, "cube")
+    context = Context(
+        montessori.world, montessori.hsrb, query_backend=ProbabilisticBackend()
+    )
+
+    action = InsertMontessoriShapeAction(
+        montessori_shape=cube_shape, board=montessori.board, arm=Arms.RIGHT
+    )
+    plan = execute_single(action, context=context)
+    plan.notify()
+    executable = plan.parse()
+
+    assert isinstance(executable, Executable)
+
+
+def test_insert_montessori_shape_action_moves_the_shape_to_its_matching_hole(
+    montessori_with_hsrb,
+):
+    montessori = montessori_with_hsrb
+    cube_shape = shape_with_category(montessori, "cube")
+    hole = montessori.board.hole_for(cube_shape)
+    hole_position = hole.root.global_transform.to_position()
+    context = Context(
+        montessori.world, montessori.hsrb, query_backend=ProbabilisticBackend()
+    )
+
+    action = InsertMontessoriShapeAction(
+        montessori_shape=cube_shape, board=montessori.board, arm=Arms.RIGHT
+    )
+    with simulated_robot:
+        node = execute_single(action, context=context)
+        node.perform()
+
+    shape_position = cube_shape.global_transform.to_position()
+    assert float(shape_position.x) == pytest.approx(float(hole_position.x), abs=0.05)
+    assert float(shape_position.y) == pytest.approx(float(hole_position.y), abs=0.05)
+
+
+def test_insert_montessori_shape_action_runs_twice_in_a_row(montessori_with_hsrb):
+    """
+    World.get_kinematic_structure_entities_of_branch is memoized per (world, root-
+    object) and never invalidated across an attach/detach cycle, so a second insertion's
+    gripper-contents query can silently see a stale, empty branch for the previous
+    insertion's already-released grasp.
+
+    Clearing the memoization cache
+    before each insertion (as :func:`~experiments.montessori.montessori_demo._insert_all_shapes`
+    does) works around this.
+    """
+    montessori = montessori_with_hsrb
+    cube_shape = shape_with_category(montessori, "cube")
+    triangle_shape = shape_with_category(montessori, "triangular_prism")
+    context = Context(
+        montessori.world, montessori.hsrb, query_backend=ProbabilisticBackend()
+    )
+
+    for shape in (cube_shape, triangle_shape):
+        hole = montessori.board.hole_for(shape)
+        hole_position = hole.root.global_transform.to_position()
+
+        clear_memoization_cache(montessori.world)
+        action = InsertMontessoriShapeAction(
+            montessori_shape=shape, board=montessori.board, arm=Arms.RIGHT
+        )
+        with simulated_robot:
+            node = execute_single(action, context=context)
+            node.perform()
+
+        shape_position = shape.global_transform.to_position()
+        assert float(shape_position.x) == pytest.approx(
+            float(hole_position.x), abs=0.05
+        )
+        assert float(shape_position.y) == pytest.approx(
+            float(hole_position.y), abs=0.05
+        )
+
+
+def test_insert_montessori_shape_action_raises_for_a_shape_without_a_matching_hole(
+    montessori_with_hsrb,
+):
+    montessori = montessori_with_hsrb
+    sphere_shape = shape_with_category(montessori, "sphere")
+    context = Context(
+        montessori.world, montessori.hsrb, query_backend=ProbabilisticBackend()
+    )
+
+    action = InsertMontessoriShapeAction(
+        montessori_shape=sphere_shape, board=montessori.board, arm=Arms.RIGHT
+    )
+
+    with pytest.raises(NoMatchingHoleError):
+        plan = execute_single(action, context=context)
+        plan.notify()
+        plan.parse()

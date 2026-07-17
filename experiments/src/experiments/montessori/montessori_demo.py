@@ -29,6 +29,7 @@ import mujoco
 import rclpy
 from rclpy.executors import SingleThreadedExecutor
 
+import experiments.orm.ormatic_interface  # type: ignore
 from coraplex.datastructures.dataclasses import Context
 from coraplex.datastructures.enums import Arms
 from coraplex.execution_environment import simulated_robot
@@ -36,6 +37,7 @@ from coraplex.plans.factories import execute_single
 from experiments.montessori.insert_shape_action import InsertMontessoriShapeAction
 from experiments.montessori.semantics import MontessoriShape, NoMatchingHoleError
 from experiments.montessori.world import MontessoriWorld
+from krrood.entity_query_language.backends import ProbabilisticBackend
 from krrood.utils import clear_memoization_cache
 from semantic_digital_twin.adapters.multi_sim import MujocoActuator, MujocoSim
 from semantic_digital_twin.adapters.ros.tf_publisher import TFPublisher
@@ -118,7 +120,9 @@ def _insert_all_shapes(montessori: MontessoriWorld) -> None:
     :param montessori: The Montessori scene, with :attr:`MontessoriWorld.hsrb` already
         spawned.
     """
-    context = Context(montessori.world, montessori.hsrb)
+    context = Context(
+        montessori.world, montessori.hsrb, query_backend=ProbabilisticBackend()
+    )
     for shape in montessori.world.get_semantic_annotations_by_type(MontessoriShape):
         try:
             montessori.board.hole_for(shape)
