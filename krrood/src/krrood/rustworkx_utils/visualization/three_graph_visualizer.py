@@ -10,8 +10,8 @@ from typing_extensions import Any, ClassVar, Dict, List, TYPE_CHECKING, Tuple
 from krrood.rustworkx_utils.graph_visualizer_base import (
     GraphLayout,
     GraphVisualizerBase,
+    GraphLayoutOptions,
 )
-from rustworkx_utils.graph_visualizer_base import GraphLayoutOptions
 
 if TYPE_CHECKING:
     from flask import Flask
