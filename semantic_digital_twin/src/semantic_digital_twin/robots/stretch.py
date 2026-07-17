@@ -149,7 +149,7 @@ class StretchArm(Arm[StretchGripper]):
         cls, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
-            root=robot_root._world.get_body_in_branch_by_name(robot_root, "link_mast"),
+            root=robot_root._world.get_body_in_branch_by_name(robot_root, "link_lift"),
             tip=robot_root._world.get_body_in_branch_by_name(
                 robot_root, "link_wrist_roll"
             ),
@@ -343,7 +343,9 @@ class StretchMobileBase(MobileBase, HasTorso[StretchTorso]):
 @dataclass(eq=False)
 class Stretch(AbstractRobot, HasMobileBase[StretchMobileBase]):
     """
-    The Stretch 2 robot by Hello Robot. https://teal-blue-zpt3.squarespace.com/stretch-2
+    The Stretch 2 robot by Hello Robot.
+
+    https://teal-blue-zpt3.squarespace.com/stretch-2
     """
 
     @classmethod

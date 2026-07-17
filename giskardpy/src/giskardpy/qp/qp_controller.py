@@ -23,7 +23,9 @@ if TYPE_CHECKING:
 @dataclass
 class QPController:
     """
-    Wraps around QP Solver. Builds the required matrices from constraints.
+    Wraps around QP Solver.
+
+    Builds the required matrices from constraints.
     """
 
     config: QPControllerConfig
@@ -118,8 +120,8 @@ class QPController:
             world_state, life_cycle_state, float_variables
         )
         qp_data_filtered = qp_data_raw.apply_filters()
-        xdot_full = self.qp_solver.solver_call(qp_data_filtered)
-        return self.xdot_to_control_commands(xdot_full)
+        solution = self.qp_solver.solver_call(qp_data_filtered)
+        return self.xdot_to_control_commands(solution)
 
     def xdot_to_control_commands(self, xdot: np.ndarray) -> np.ndarray:
         offset = len(self.active_dofs) * (self.config.prediction_horizon - 2)

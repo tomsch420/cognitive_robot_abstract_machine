@@ -6,6 +6,7 @@ from typing_extensions import TYPE_CHECKING, Type, List
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode
 from krrood.entity_query_language.factories import ConditionType, get_false_statements
 from krrood.exceptions import DataclassException
+from coraplex.datastructures.enums import ExecutionType
 from coraplex.plans.failures import PlanFailure
 
 if TYPE_CHECKING:
@@ -20,9 +21,11 @@ if TYPE_CHECKING:
 @dataclass
 class ContextIsUnavailable(DataclassException):
     """
-    Raised when an instance that tries to access the context of a plan has no reference to the plan.
+    Raised when an instance that tries to access the context of a plan has no reference
+    to the plan.
 
-    Most likely raised when an action created a subplan without calling `ActionDescription.add_subplan`
+    Most likely raised when an action created a subplan without calling
+    `ActionDescription.add_subplan`
     """
 
     instance: Designator
@@ -42,8 +45,8 @@ class ContextIsUnavailable(DataclassException):
 @dataclass
 class TipLinkDoesNotMatchAnyArm(DataclassException):
     """
-    Raised when a reachability validator's tip link is not the tool frame of any arm of the robot,
-    so no arm can be selected to reach the requested pose.
+    Raised when a reachability validator's tip link is not the tool frame of any arm of
+    the robot, so no arm can be selected to reach the requested pose.
     """
 
     tip_link: KinematicStructureEntity
@@ -88,6 +91,24 @@ class MotionDidNotFinish(PlanFailure):
 
     def error_message(self) -> str:
         return f"Motion did not finish, following motions failed: {self.failed_motions}"
+
+    def suggest_correction(self) -> str:
+        return ""
+
+
+@dataclass
+class UnknownExecutionType(DataclassException):
+    """
+    Raised when an executable is run with an execution type it does not handle.
+    """
+
+    execution_type: ExecutionType
+    """
+    The execution type that is not supported.
+    """
+
+    def error_message(self) -> str:
+        return f"Unknown execution type: {self.execution_type}"
 
     def suggest_correction(self) -> str:
         return ""

@@ -1,4 +1,5 @@
 import json
+import threading
 import time
 from dataclasses import dataclass
 
@@ -32,6 +33,7 @@ from giskardpy.motion_statechart.monitors.payload_monitors import (
     Pulse,
     CountSeconds,
     CountControlCycles,
+    ThreadedPredicateMonitor,
 )
 from giskardpy.motion_statechart.motion_statechart import (
     MotionStatechart,
@@ -335,6 +337,95 @@ def test_thread_payload_monitor_non_blocking_and_caching():
     time.sleep(mon.delay * 2)
     val1 = mon.compute_observation()
     assert val1 == ObservationStateValues.TRUE
+
+
+def _tick_until(sim, predicate, timeout=2.0):
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        sim.tick()
+        if predicate():
+            return
+        time.sleep(0.005)
+    raise AssertionError("condition not reached within timeout")
+
+
+def test_threaded_predicate_monitor_unknown_then_true():
+    gate = threading.Event()
+    msc = MotionStatechart()
+    # predicate blocks on the gate, so we can observe the UNKNOWN phase
+    mon = ThreadedPredicateMonitor(predicate=lambda: gate.wait(2.0), name="cond")
+    msc.add_node(mon)
+    end = EndMotion.when_true(mon)
+    msc.add_node(end)
+
+    sim = Executor(MotionStatechartContext(world=World()))
+    sim.compile(motion_statechart=msc)
+
+    # while the predicate is blocked, the monitor stays UNKNOWN and ticking
+    # never blocks on the (slow) evaluation
+    for _ in range(3):
+        t0 = time.perf_counter()
+        sim.tick()
+        assert time.perf_counter() - t0 < 0.5
+        assert mon.observation_state == ObservationStateValues.UNKNOWN
+        assert not msc.is_end_motion()
+
+    gate.set()
+    _tick_until(sim, lambda: mon.observation_state == ObservationStateValues.TRUE)
+    assert mon.observation_state == ObservationStateValues.TRUE
+    sim.tick()
+    assert msc.is_end_motion()
+
+
+def test_threaded_predicate_monitor_false():
+    msc = MotionStatechart()
+    mon = ThreadedPredicateMonitor(predicate=lambda: False, name="cond")
+    msc.add_node(mon)
+    end = EndMotion.when_true(mon)
+    msc.add_node(end)
+
+    sim = Executor(MotionStatechartContext(world=World()))
+    sim.compile(motion_statechart=msc)
+
+    _tick_until(sim, lambda: mon.observation_state == ObservationStateValues.FALSE)
+    assert mon.observation_state == ObservationStateValues.FALSE
+    assert not msc.is_end_motion()
+
+
+def test_threaded_predicate_monitor_false_triggers_cancel():
+    msc = MotionStatechart()
+    mon = ThreadedPredicateMonitor(predicate=lambda: False, name="cond")
+    msc.add_node(mon)
+    cancel = CancelMotion(exception=Exception("condition is false"))
+    cancel.start_condition = trinary_logic_not(mon.observation_variable)
+    msc.add_node(cancel)
+
+    sim = Executor(MotionStatechartContext(world=World()))
+    sim.compile(motion_statechart=msc)
+
+    with pytest.raises(Exception, match="condition is false"):
+        _tick_until(sim, lambda: False)
+
+
+def test_threaded_predicate_monitor_exception_is_false():
+    def boom():
+        raise RuntimeError("query failed")
+
+    msc = MotionStatechart()
+    mon = ThreadedPredicateMonitor(predicate=boom, name="cond")
+    msc.add_node(mon)
+    end = EndMotion.when_true(mon)
+    msc.add_node(end)
+
+    sim = Executor(MotionStatechartContext(world=World()))
+    sim.compile(motion_statechart=msc)
+
+    # a raising predicate must not crash the control loop; it reports FALSE
+    try:
+        _tick_until(sim, lambda: mon.observation_state == ObservationStateValues.FALSE)
+    except RuntimeError:
+        pass
+    assert mon.observation_state == ObservationStateValues.UNKNOWN
 
 
 class TestMotionStatechartLogic:
@@ -1155,7 +1246,9 @@ class TestTemplates:
         kin_sim.tick_until_end()
 
     def test_parallel_minimum_success(self):
-        """Test that Parallel completes when minimum_success nodes are True"""
+        """
+        Test that Parallel completes when minimum_success nodes are True.
+        """
         msc = MotionStatechart()
         msc.add_nodes(
             [
@@ -1180,7 +1273,9 @@ class TestTemplates:
         assert kin_sim.control_cycles == 6
 
     def test_parallel_minimum_success_zero(self):
-        """Test that Parallel completes when no node is True"""
+        """
+        Test that Parallel completes when no node is True.
+        """
         msc = MotionStatechart()
         msc.add_nodes(
             [
@@ -1207,8 +1302,9 @@ class TestTemplates:
 
 def test_constraint_collection(pr2_world_state_reset: World):
     """
-    Test the constraint collection naming behavior. Expected behavior is:
-    - Not naming constraints should result in automatically generated unique names
+    Test the constraint collection naming behavior.
+
+    Expected behavior is: - Not naming constraints should result in automatically generated unique names
     - Manually naming constraints the same name should result in an Exception
     - Merging constraint collections should handle duplicates via prefix if they are in different collections
     - Merge raises an Exception if a collection contains duplicates in itself
@@ -1300,7 +1396,8 @@ def test_constraint_collection(pr2_world_state_reset: World):
 
 class TestLifeCycleTransitions:
     """
-    Tests the LifeCycle transitions of nodes in various edge cases and intended behavior.
+    Tests the LifeCycle transitions of nodes in various edge cases and intended
+    behavior.
     """
 
     def test_run_after_stop(self):
@@ -1360,6 +1457,7 @@ class TestLifeCycleTransitions:
     def test_end_before_start(self):
         """
         Test for node to start even if it's end condition is met before start condition.
+
         Node3 should start and run for 1 tick before ending, instead of never starting.
         """
         msc = MotionStatechart()
@@ -1656,9 +1754,9 @@ class TestLifeCycleTransitions:
     def test_unpause_unknown_from_parent_pause(self):
         """
         Test for child node to unpause when parent node unpauses.
+
         Child node pause condition is unknown.
         """
-
         msc = MotionStatechart()
 
         pulse = Pulse()
