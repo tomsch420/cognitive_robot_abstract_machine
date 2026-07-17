@@ -371,21 +371,38 @@ def _table_shapes(
     return shapes
 
 
-def _triangular_prism_mesh(base: float, height: float, thickness: float) -> Mesh:
-    """
-    Build a :class:`Mesh` shape of a triangular prism, centered on its own origin.
+SHAPE_FOOTPRINT_CLEARANCE_SCALE = 0.85
+"""
+In-plane scale applied to a hole's true footprint when deriving the matching loose
+shape's cross-section from it, so the shape is a smaller copy of the hole rather than an
+exact fit, leaving clearance to actually pass through.
+"""
 
-    :param base: Width of the triangular cross-section's base.
-    :param height: Height of the triangular cross-section.
-    :param thickness: Extrusion depth of the prism along its own z-axis.
+
+def _footprint_shape_mesh(
+    footprint: HoleFootprint, thickness: float, color: Color
+) -> Mesh:
     """
-    triangle = np.array([[0.0, 0.0], [base, 0.0], [base / 2, height]])
-    triangle -= triangle.mean(axis=0)
-    prism = trimesh.creation.extrude_triangulation(
-        vertices=triangle, faces=np.array([[0, 1, 2]]), height=thickness
-    )
-    prism.apply_translation([0.0, 0.0, -thickness / 2])
-    return Mesh.from_trimesh(mesh=prism)
+    Build a solid :class:`Mesh` whose cross-section is a clearance-scaled copy of a
+    hole's true footprint, centered on its own origin.
+
+    Deriving the shape from the same :class:`HoleFootprint` its hole is cut from (rather
+    than independently hand-authoring a same-category shape, as done for a hole's
+    non-rectangular category, e.g. :attr:`MontessoriShapeCategory.TRIANGULAR_PRISM`)
+    keeps the two in the same local orientation by construction, since both are read
+    from one detected outline instead of risking two independent authors picking
+    different reference orientations for the same nominal shape.
+
+    :param footprint: The hole this shape is sized and oriented after.
+    :param thickness: Extrusion depth of the solid along its own z-axis.
+    :param color: Color of the resulting shape.
+    """
+    scale = SHAPE_FOOTPRINT_CLEARANCE_SCALE
+    solid = footprint.extrude(thickness)
+    solid.apply_transform(np.diag([scale, scale, 1.0, 1.0]))
+    mesh = Mesh.from_trimesh(mesh=solid)
+    mesh.color = color
+    return mesh
 
 
 def _hole_marker_shape(footprint: HoleFootprint, color: Color) -> Mesh:
@@ -398,10 +415,20 @@ def _hole_marker_shape(footprint: HoleFootprint, color: Color) -> Mesh:
     return marker
 
 
-def _shape_body(name: PrefixedName, category: MontessoriShapeCategory) -> Body:
+def _shape_body(
+    name: PrefixedName,
+    category: MontessoriShapeCategory,
+    footprint: Optional[HoleFootprint],
+) -> Body:
     """
     Build the :class:`Body` of a loose Montessori shape, its geometry depending on its
     category.
+
+    :param footprint: The footprint of the hole this shape is meant to be dropped
+        through, used to derive the shape's cross-section for categories whose fit
+        depends on orientation (see :func:`_footprint_shape_mesh`). Unused (and may be
+        ``None``) for every other category: cube, cylinder, and disk look the same from
+        any yaw, and the sphere has no hole at all.
     """
     color = _SHAPE_COLORS[category]
     match category:
@@ -414,10 +441,9 @@ def _shape_body(name: PrefixedName, category: MontessoriShapeCategory) -> Body:
         case MontessoriShapeCategory.SPHERE:
             shape = Sphere(radius=0.02, color=color)
         case MontessoriShapeCategory.RECTANGULAR_PRISM:
-            shape = Box(scale=Scale(0.02, 0.04, 0.03), color=color)
+            shape = _footprint_shape_mesh(footprint, thickness=0.03, color=color)
         case MontessoriShapeCategory.TRIANGULAR_PRISM:
-            shape = _triangular_prism_mesh(base=0.03, height=0.03, thickness=0.02)
-            shape.color = color
+            shape = _footprint_shape_mesh(footprint, thickness=0.02, color=color)
     return _body_with_shape(name, shape)
 
 
@@ -601,10 +627,13 @@ class MontessoriWorld:
             MontessoriShapeCategory.SPHERE
         ]
         keys = [hole_spec.key for hole_spec in _HOLES] + ["sphere"]
+        footprints = [hole_spec.shape for hole_spec in _HOLES] + [None]
 
-        for index, (key, category) in enumerate(zip(keys, categories)):
+        for index, (key, category, footprint) in enumerate(
+            zip(keys, categories, footprints)
+        ):
             shape_key = f"{key}_shape"
-            body = _shape_body(_name(shape_key), category)
+            body = _shape_body(_name(shape_key), category, footprint)
             shape = MontessoriShape(
                 name=_name(shape_key), root=body, shape_category=category
             )

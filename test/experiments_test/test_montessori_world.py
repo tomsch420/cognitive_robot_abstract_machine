@@ -1,4 +1,6 @@
+import numpy as np
 import pytest
+from trimesh import Trimesh
 
 from experiments.montessori.semantics import (
     MontessoriShape,
@@ -9,6 +11,7 @@ from experiments.montessori.semantics import (
 from experiments.montessori.world import (
     BOARD_SCALE,
     FLOOR_Z,
+    SHAPE_FOOTPRINT_CLEARANCE_SCALE,
     TABLE_POSITION,
     TABLE_SCALE,
     TABLE_SHAPE_ROW_X,
@@ -16,6 +19,16 @@ from experiments.montessori.world import (
 )
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Floor, Table
 from semantic_digital_twin.utils import hsrb_installed
+
+
+def _sorted_xy(mesh: Trimesh) -> np.ndarray:
+    """
+    A mesh's vertices, projected to (x, y) and sorted into a canonical order, so two
+    meshes built from the same footprint can be compared regardless of internal vertex
+    ordering.
+    """
+    xy = np.round(mesh.vertices[:, :2], 6)
+    return xy[np.lexsort((xy[:, 1], xy[:, 0]))]
 
 
 def test_montessori_world_creates_one_board_with_holes_and_drawers():
@@ -71,6 +84,38 @@ def test_montessori_world_creates_one_shape_per_hole_category_plus_the_sphere():
     # the sphere, which has no matching hole
     assert set(shape_categories) == hole_categories | {MontessoriShapeCategory.SPHERE}
     assert len(shape_categories) == len(holes) + 1
+
+
+@pytest.mark.parametrize(
+    "category",
+    [
+        MontessoriShapeCategory.TRIANGULAR_PRISM,
+        MontessoriShapeCategory.RECTANGULAR_PRISM,
+    ],
+)
+def test_orientation_sensitive_shape_matches_its_holes_footprint_orientation(category):
+    montessori = MontessoriWorld()
+    montessori.world.update_forward_kinematics()
+
+    [shape] = [
+        shape
+        for shape in montessori.world.get_semantic_annotations_by_type(MontessoriShape)
+        if shape.shape_category == category
+    ]
+    hole = montessori.board.hole_for(shape)
+
+    # a shape whose fit through its hole depends on rotation (unlike e.g. a cube or a
+    # cylinder) must be a scaled, same-orientation copy of that hole's true footprint,
+    # not an independently authored shape that merely shares its category: scaling the
+    # shape's cross-section back up must recover the hole's own footprint, not some
+    # rotation of it.
+    shape_xy = _sorted_xy(shape.root.collision.combined_mesh)
+    hole_xy = _sorted_xy(hole.root.area.combined_mesh)
+
+    assert shape_xy.shape == hole_xy.shape
+    np.testing.assert_allclose(
+        shape_xy / SHAPE_FOOTPRINT_CLEARANCE_SCALE, hole_xy, atol=1e-4
+    )
 
 
 def test_montessori_world_places_loose_shapes_resting_on_the_table():
