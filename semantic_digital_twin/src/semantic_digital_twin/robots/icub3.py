@@ -540,7 +540,9 @@ class ICub3MobileBase(MobileBase):
 @dataclass(eq=False)
 class ICub3(AbstractRobot, HasTorso[ICub3Torso], HasMobileBase[ICub3MobileBase]):
     """
-    The ICub3 robot built by the Istituto Italiano di Tecnologia. https://ami.iit.it/telexistence
+    The ICub3 robot built by the Istituto Italiano di Tecnologia.
+
+    https://ami.iit.it/telexistence
     """
 
     def _setup_collision_rules(self):
@@ -548,9 +550,7 @@ class ICub3(AbstractRobot, HasTorso[ICub3Torso], HasMobileBase[ICub3MobileBase])
 
     @classmethod
     def get_ros_file_path(cls) -> str:
-        return (
-            "package://iai_icub_description/robots/iCubGazeboV3_visuomanip/iCub3.urdf"
-        )
+        return "package://iai_icub_description/robots/iCubGazeboV3_visuomanip/iCub3.urdf"
 
     @classmethod
     def _get_root_body_name(cls) -> str:

@@ -58,14 +58,13 @@ def urdf_joint_to_limits(
 ) -> Tuple[DerivativeMap[float], DerivativeMap[float]]:
     """
     Maps the URDF joint specifications to lower and upper joint limits, including
-    position and velocity constraints. Mimics and safety controller parameters are
-    also considered when determining the limits.
+    position and velocity constraints. Mimics and safety controller parameters are also
+    considered when determining the limits.
 
-    :param urdf_joint: A URDF (Unified Robot Description Format) joint object
-                       which contains the joint's type, limits, safety controller,
-                       and mimic information.
-    :return: A tuple containing two DerivativeMap objects, representing the lower
-             and upper limits of the joint in terms of position and velocity.
+    :param urdf_joint: A URDF (Unified Robot Description Format) joint object which
+        contains the joint's type, limits, safety controller, and mimic information.
+    :return: A tuple containing two DerivativeMap objects, representing the lower and
+        upper limits of the joint in terms of position and velocity.
     """
     lower_limits = DerivativeMap()
     upper_limits = DerivativeMap()
@@ -105,6 +104,7 @@ def urdf_joint_to_limits(
 class URDFParser:
     """
     Class to parse URDF files to worlds.
+
     Must set either urdf or file_path.
     """
 
@@ -161,17 +161,14 @@ class URDFParser:
         """
         Creates a parser from a xacro file by expanding it to URDF.
 
-        The xacro file is resolved and processed into a URDF string,
-        applying the given substitution arguments, before constructing
-        the parser.
+        The xacro file is resolved and processed into a URDF string, applying the given
+        substitution arguments, before constructing the parser.
 
         :param xacro_path: The path to the xacro file to expand.
         :param prefix: The prefix for every name used in this world.
-        :param mappings: The xacro substitution arguments to apply
-            during expansion (the ``arg`` values, e.g. ``{"ur_type":
-            "ur5"}``).
-        :return: A parser for the world described by the expanded xacro
-            file.
+        :param mappings: The xacro substitution arguments to apply during expansion (the
+            ``arg`` values, e.g. ``{"ur_type": "ur5"}``).
+        :return: A parser for the world described by the expanded xacro file.
         """
         xacro_path = CompositePathResolver().resolve(xacro_path)
         urdf = process_file(xacro_path, mappings=mappings).toxml()
@@ -214,12 +211,12 @@ class URDFParser:
         """
         Parses a given URDF joint and creates a corresponding connection object.
 
-        The function processes the provided joint data, extracting necessary
-        information including translation offsets, rotation offsets, connection type,
-        and relevant joint limits. It maps URDF joint types to predefined connection
-        types and either retrieves or creates a degree of freedom (DOF) in the world
-        context. It generates and returns a connection object representing the
-        relationship between a parent and a child body.
+        The function processes the provided joint data, extracting necessary information
+        including translation offsets, rotation offsets, connection type, and relevant
+        joint limits. It maps URDF joint types to predefined connection types and either
+        retrieves or creates a degree of freedom (DOF) in the world context. It
+        generates and returns a connection object representing the relationship between
+        a parent and a child body.
 
         :param joint: The URDF joint to be parsed.
         :param parent: The parent body to be connected by the joint.
@@ -276,7 +273,7 @@ class URDFParser:
             parent_T_connection_expression=parent_T_connection,
             multiplier=multiplier,
             offset=offset,
-            axis=Vector3(*map(int, joint.axis), reference_frame=parent),
+            axis=Vector3(*map(float, joint.axis), reference_frame=parent),
             raw_dof=dof,
         )
         return result
@@ -284,8 +281,10 @@ class URDFParser:
     def parse_link(self, link: urdfpy.Link, parent_frame: PrefixedName) -> Body:
         """
         Parses a URDF link to a link object.
+
         :param link: The URDF link to parse.
-        :param parent_frame: The parent frame of the link, used for transformations of collisions and visuals.
+        :param parent_frame: The parent frame of the link, used for transformations of
+            collisions and visuals.
         :return: The parsed link object.
         """
         name = PrefixedName(prefix=self.prefix, name=link.name)
@@ -296,6 +295,27 @@ class URDFParser:
         body.collision = collisions
         return body
 
+    @staticmethod
+    def _parse_material_color(
+        geom: Union[urdfpy.Visual, urdfpy.Collision],
+        material_dict: Dict[str, Optional[Tuple[float, float, float, float]]],
+    ) -> Color:
+        """
+        Determine the RGBA color a URDF geometry's material specifies.
+
+        A ``<material>`` element may define its color inline, or only reference a
+        material declared globally on the ``<robot>`` by name; both forms are supported.
+
+        :param geom: The URDF visual or collision element to read the material from.
+        :param material_dict: Globally declared material colors, keyed by material name.
+        :return: The resolved color, defaulting to white when none is specified.
+        """
+        if not (hasattr(geom, "material") and geom.material):
+            return Color(1, 1, 1, 1)
+        inline_color = geom.material.color.rgba if geom.material.color else None
+        rgba = inline_color or material_dict.get(geom.material.name) or (1, 1, 1, 1)
+        return Color(*rgba)
+
     def parse_geometry(
         self,
         geometry: Union[List[urdfpy.Collision], List[urdfpy.Visual]],
@@ -303,6 +323,7 @@ class URDFParser:
     ) -> ShapeCollection:
         """
         Parses a URDF geometry to the corresponding shapes.
+
         :param geometry: The URDF geometry to parse either the collisions of visuals.'
         :param body: The body of the geometry, used for back referencing.
         :return: A List of shapes corresponding to the URDF geometry.
@@ -322,12 +343,8 @@ class URDFParser:
             origin_transform = HomogeneousTransformationMatrix.from_xyz_rpy(
                 *params, reference_frame=body
             )
+            color = self._parse_material_color(geom, material_dict)
             if isinstance(geom.geometry, urdfpy.Box):
-                color = (
-                    Color(*material_dict.get(geom.material.name, (1, 1, 1, 1)))
-                    if hasattr(geom, "material") and geom.material
-                    else Color(1, 1, 1, 1)
-                )
                 res.append(
                     Box(
                         origin=origin_transform,
@@ -336,11 +353,6 @@ class URDFParser:
                     )
                 )
             elif isinstance(geom.geometry, urdfpy.Sphere):
-                color = (
-                    Color(*material_dict.get(geom.material.name, (1, 1, 1, 1)))
-                    if hasattr(geom, "material") and geom.material
-                    else Color(1, 1, 1, 1)
-                )
                 res.append(
                     Sphere(
                         origin=origin_transform,
@@ -349,11 +361,6 @@ class URDFParser:
                     )
                 )
             elif isinstance(geom.geometry, urdfpy.Cylinder):
-                color = (
-                    Color(*material_dict.get(geom.material.name, (1, 1, 1, 1)))
-                    if hasattr(geom, "material") and geom.material
-                    else Color(1, 1, 1, 1)
-                )
                 res.append(
                     Cylinder(
                         origin=origin_transform,
@@ -370,6 +377,7 @@ class URDFParser:
                         origin=origin_transform,
                         filename=self.path_resolver.resolve(geom.geometry.filename),
                         scale=Scale(*(geom.geometry.scale or (1, 1, 1))),
+                        color=color,
                     )
                 )
         return ShapeCollection(res, reference_frame=body)

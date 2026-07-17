@@ -6,6 +6,7 @@ import pytest
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.world_description.connections import FixedConnection
+from semantic_digital_twin.world_description.geometry import Color, Mesh
 
 
 @dataclass
@@ -115,6 +116,28 @@ def test_mimic_joints(pr2_parser):
     assert joint_to_be_mimicked.dofs == mimic_joint.dofs
 
 
+def test_revolute_joint_with_near_unit_axis_is_not_truncated_to_zero():
+    # a real-world axis is rarely an exact integer, e.g. this is l_shoulder_pitch's
+    # axis from the iCub3 URDF
+    urdf = """<?xml version="1.0"?>
+    <robot name="axis_test">
+      <link name="parent_link"/>
+      <link name="child_link"/>
+      <joint name="test_joint" type="revolute">
+        <parent link="parent_link"/>
+        <child link="child_link"/>
+        <axis xyz="3.323079797554136e-07 0.9999999783534342 1.4452224303420037e-07"/>
+        <limit lower="-1.0" upper="1.0" effort="1.0" velocity="1.0"/>
+      </joint>
+    </robot>
+    """
+    world = URDFParser(urdf=urdf).parse()
+
+    connection = world.get_connection_by_name("test_joint")
+
+    assert connection.axis.to_np()[:3] == pytest.approx([0.0, 1.0, 0.0], abs=1e-6)
+
+
 def test_xacro():
     path = "package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro"
     parser = URDFParser.from_xacro(path)
@@ -123,3 +146,91 @@ def test_xacro():
     assert len(world.kinematic_structure_entities) > 0
     assert len(world.connections) > 0
     assert world.root.name.name == "base_footprint"
+
+
+@pytest.fixture
+def milk_mesh_file_path(urdf_paths):
+    """
+    Fixture providing the path to a small mesh file usable as a URDF visual geometry.
+    """
+    return os.path.join(
+        os.path.dirname(os.path.abspath(urdf_paths.table)),
+        "..",
+        "stl",
+        "milk.stl",
+    )
+
+
+@pytest.fixture
+def globally_declared_material_urdf_path(milk_mesh_file_path, tmp_path):
+    """
+    Fixture providing a URDF whose mesh visual references a material declared once on
+    the ``<robot>`` root by name, the way ``iai_tracy_description`` and
+    ``iai_kitchen`` describe their meshes.
+    """
+    urdf = f"""<?xml version="1.0"?>
+<robot name="colored_mesh_robot">
+  <material name="milk_material">
+    <color rgba="0.8 0.2 0.1 1.0"/>
+  </material>
+  <link name="milk_carton">
+    <visual>
+      <geometry>
+        <mesh filename="{milk_mesh_file_path}"/>
+      </geometry>
+      <material name="milk_material"/>
+    </visual>
+  </link>
+</robot>
+"""
+    urdf_path = tmp_path / "colored_mesh_robot.urdf"
+    urdf_path.write_text(urdf)
+    return str(urdf_path)
+
+
+@pytest.fixture
+def inline_material_urdf_path(milk_mesh_file_path, tmp_path):
+    """
+    Fixture providing a URDF whose mesh visual defines its material's color inline,
+    without declaring it on the ``<robot>`` root, the way the Montessori board scene
+    describes its meshes.
+    """
+    urdf = f"""<?xml version="1.0"?>
+<robot name="colored_mesh_robot">
+  <link name="milk_carton">
+    <visual>
+      <geometry>
+        <mesh filename="{milk_mesh_file_path}"/>
+      </geometry>
+      <material name="milk_material">
+        <color rgba="0.8 0.2 0.1 1.0"/>
+      </material>
+    </visual>
+  </link>
+</robot>
+"""
+    urdf_path = tmp_path / "colored_mesh_robot.urdf"
+    urdf_path.write_text(urdf)
+    return str(urdf_path)
+
+
+def test_mesh_visual_color_from_globally_declared_material_is_parsed(
+    globally_declared_material_urdf_path,
+):
+    world = URDFParser.from_file(
+        file_path=globally_declared_material_urdf_path
+    ).parse()
+    body = world.get_body_by_name("milk_carton")
+
+    mesh_shape = body.visual.shapes[0]
+    assert isinstance(mesh_shape, Mesh)
+    assert mesh_shape.color == Color(0.8, 0.2, 0.1, 1.0)
+
+
+def test_mesh_visual_color_from_inline_material_is_parsed(inline_material_urdf_path):
+    world = URDFParser.from_file(file_path=inline_material_urdf_path).parse()
+    body = world.get_body_by_name("milk_carton")
+
+    mesh_shape = body.visual.shapes[0]
+    assert isinstance(mesh_shape, Mesh)
+    assert mesh_shape.color == Color(0.8, 0.2, 0.1, 1.0)

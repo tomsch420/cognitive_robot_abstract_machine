@@ -39,17 +39,17 @@ class RerunMode(StrEnum):
     """
     Record to an ``.rrd`` file with no viewer (uses ``target`` path).
     """
+
     NONE = "none"
     """
     Do not attach an output; the caller manages the recording's output.
     """
 
-
 @dataclass(eq=False)
 class RerunModelCallback(ModelChangeCallback):
     """
-    Logs the world's static geometry and compiles the body forward kinematics
-    on every model change.
+    Logs the world's static geometry and compiles the body forward kinematics on every
+    model change.
     """
 
     recording: rerun.RecordingStream = field(kw_only=True)
@@ -66,8 +66,8 @@ class RerunModelCallback(ModelChangeCallback):
     """
     Stacked forward kinematics of all bodies, evaluated in one call.
 
-    The body at index ``i`` in ``world.bodies`` occupies rows ``i * 4`` to
-    ``i * 4 + 4``.
+    The body at index ``i`` in ``world.bodies`` occupies rows ``i * 4`` to ``i * 4 +
+    4``.
     """
 
     def on_model_change(self, **kwargs) -> None:
@@ -82,10 +82,12 @@ class RerunModelCallback(ModelChangeCallback):
         if not bodies:
             return
         body_fks = [
-            HomogeneousTransformationMatrix()
-            if body == self._world.root
-            else self._world.compose_forward_kinematics_expression(
-                self._world.root, body
+            (
+                HomogeneousTransformationMatrix()
+                if body == self._world.root
+                else self._world.compose_forward_kinematics_expression(
+                    self._world.root, body
+                )
             )
             for body in bodies
         ]
@@ -180,14 +182,13 @@ class RerunAdapter(StateChangeCallback):
 
     state_history: bool = field(default=False, kw_only=True)
     """
-    Keep a scrubbable state history (bounded by ``memory_limit``); if
-    ``False``, keep only the current state.
+    Keep a scrubbable state history (bounded by ``memory_limit``); if ``False``, keep
+    only the current state.
     """
 
     memory_limit: str = field(default="10%", kw_only=True)
     """
-    Spawned-viewer memory budget (e.g. ``"2GB"``); oldest data is dropped past
-    it.
+    Spawned-viewer memory budget (e.g. ``"2GB"``); oldest data is dropped past it.
 
     Only used by the ``SPAWN`` mode.
     """
@@ -196,13 +197,14 @@ class RerunAdapter(StateChangeCallback):
     """
     The Rerun recording stream all data is logged to.
     """
+
     model_cb: RerunModelCallback = field(init=False)
     """
     The owned callback that logs and re-logs geometry on model changes.
     """
 
     def __post_init__(self) -> None:
-        self.recording = rerun.RecordingStream(self.application_id)
+        self.recording = rerun.new_recording(self.application_id)
         match self.mode:
             case RerunMode.SPAWN:
                 self.recording.spawn(memory_limit=self.memory_limit)
