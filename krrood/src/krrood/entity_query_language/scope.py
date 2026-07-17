@@ -21,6 +21,7 @@ from typing_extensions import Any, Dict, Optional, Tuple
 
 import krrood.entity_query_language
 from krrood.entity_query_language import factories as eql
+from krrood.entity_query_language.utils import T
 from krrood.entity_query_language.rules.conclusion import Add
 from krrood.entity_query_language.rules.conclusion_selector import (
     Alternative,
@@ -60,7 +61,7 @@ def _is_internal_frame(
 
 
 def capture_caller_scope(
-    skip_packages: Optional[Tuple[str, ...]] = None, max_depth: int = 60
+    skip_packages: Tuple[str, ...] = (), max_depth: int = 60
 ) -> Dict[str, Any]:
     """
     Snapshot the merged ``{**f_globals, **f_locals}`` of the innermost user frame.
@@ -125,7 +126,7 @@ def eql_factory_namespace() -> Dict[str, Any]:
     return namespace
 
 
-def attach_definition_scope(obj: Any, scope: Optional[Dict[str, Any]] = None) -> Any:
+def attach_definition_scope(obj: T, scope: Optional[Dict[str, Any]] = None) -> T:
     """
     Capture (or store a provided) caller scope onto ``obj`` for later retrieval.
 

@@ -20,7 +20,7 @@ from krrood.entity_query_language.core.base_expressions import (
     Selectable,
     BinaryExpression,
 )
-from krrood.entity_query_language.core.helpers import unwrap_literal
+from krrood.entity_query_language.core.helpers import unwrap_if_literal
 from krrood.entity_query_language.core.variable import Variable
 
 
@@ -59,10 +59,10 @@ class Conclusion(BinaryExpression, ABC):
             return NotImplemented
         if self.left._id_ != other.left._id_:
             return False
-        return unwrap_literal(self.right) == unwrap_literal(other.right)
+        return unwrap_if_literal(self.right) == unwrap_if_literal(other.right)
 
     def __hash__(self):
-        return hash((self.left._id_, unwrap_literal(self.right)))
+        return hash((self.left._id_, unwrap_if_literal(self.right)))
 
     @property
     def value(self) -> Any:
@@ -71,7 +71,7 @@ class Conclusion(BinaryExpression, ABC):
     @property
     def unwrapped_value(self) -> Any:
         """:return: The right-hand value with any :class:`Literal` wrapper removed."""
-        return unwrap_literal(self.right)
+        return unwrap_if_literal(self.right)
 
     @property
     def _name_(self) -> str:

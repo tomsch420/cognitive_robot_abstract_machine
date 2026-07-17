@@ -11,10 +11,10 @@ if TYPE_CHECKING:
     from krrood.entity_query_language.core.variable import DomainType
 
 
-def unwrap_literal(value: Any) -> Any:
+def unwrap_if_literal(value: Any) -> Any:
     """
     Unwrap a :class:`~krrood.entity_query_language.core.variable.Literal` wrapper to get
-    the raw value.
+    the raw value; a value that is not a :class:`Literal` is returned as it is.
     """
     return value._value_ if isinstance(value, Literal) else value
 
