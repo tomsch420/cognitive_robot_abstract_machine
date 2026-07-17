@@ -31,6 +31,10 @@ from experiments.montessori.semantics import (
 )
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.pipeline.mesh_decomposition.coacd import (
+    ApproximationMode,
+    COACDMeshDecomposer,
+)
 from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.semantic_annotations.mixins import (
     HasRootKinematicStructureEntity,
@@ -209,6 +213,65 @@ Detected from the board's mesh by
 :func:`~experiments.montessori.hole_geometry.detect_hole_footprints`.
 """
 
+_BOARD_MESH: trimesh.Trimesh = cut_board_mesh(BOARD_SCALE, _HOLE_FOOTPRINTS)
+"""
+The shape-sorting board's mesh, with all of :const:`_HOLE_FOOTPRINTS` cut fully through
+it.
+
+Used directly as the board's visual geometry.
+"""
+
+_BOARD_COLLISION_DECOMPOSER = COACDMeshDecomposer(
+    threshold=0.01, approximation_mode=ApproximationMode.CONVEX_HULL
+)
+"""
+Decomposes :const:`_BOARD_MESH` into convex sub-pieces for collision purposes.
+
+Physics engines that only support convex collision geometry (MuJoCo among them) collide
+mesh geometry against its convex hull, which would silently fill in the board's cut
+holes if the un-decomposed, concave mesh were used directly as collision geometry; a
+convex decomposition keeps each piece individually convex while the pieces together
+still leave the holes open.
+
+CoACD was chosen over V-HACD after measuring both: ray-casting a grid of points across
+each hole's opening after decomposition (a shape can only fall through if the whole
+opening, not just its center, is collision-free) showed CoACD leaving substantially more
+of each hole open. ``threshold=0.01`` is CoACD's minimum (finest) supported value, and
+``ApproximationMode.CONVEX_HULL`` (true convex hulls) leaves holes open more reliably
+than CoACD's default ``ApproximationMode.BOX``.
+
+Even so, this remains an approximation: the smallest hole (for the thin ``disk``
+category) is only partially open, since a general-purpose decomposer optimizing for
+volume tends to smooth over narrow slot-shaped features. A shape dropped through one of
+the other, larger holes settles noticeably closer to (though, at the time of writing,
+not yet fully through) the hole, confirmed by physically simulating the drop in MuJoCo.
+"""
+
+MINIMUM_COLLISION_PART_VOLUME = 1e-9
+"""
+Volume (in cubic meters) below which a convex decomposition part is treated as a
+degenerate, zero-thickness sliver and dropped.
+
+V-HACD occasionally emits perfectly flat (2-dimensional) pieces along a decomposition
+seam; MuJoCo's mesh compiler cannot build a convex hull from a flat point set and fails
+to load the model. Such pieces contribute no real collision volume, so removing them is
+safe.
+"""
+
+_BOARD_COLLISION_PARTS: List[trimesh.Trimesh] = [
+    part.mesh
+    for part in _BOARD_COLLISION_DECOMPOSER.apply_to_mesh(Mesh.from_trimesh(mesh=_BOARD_MESH))
+    if part.mesh.volume > MINIMUM_COLLISION_PART_VOLUME
+]
+"""
+Convex decomposition of :const:`_BOARD_MESH`, computed once at import time rather than
+per :class:`MontessoriWorld`.
+
+Each :class:`MontessoriWorld` wraps these in its own fresh :class:`Mesh` shapes:
+:class:`ShapeCollection` transforms a shape's origin into its owning body's frame in
+place, so the same ``Mesh`` instance must not be shared between worlds.
+"""
+
 _DRAWER_POSITIONS: List[Point3] = [
     Point3(-0.403, 0.087, 0.553),
     Point3(-0.403, 0.0, 0.553),
@@ -248,6 +311,25 @@ def _body_with_visual_only_shape(name: PrefixedName, shape: Shape) -> Body:
     as an obstacle blocking every standing spot.
     """
     return Body(name=name, visual=ShapeCollection([shape]))
+
+
+def _board_body(name: PrefixedName, board_shape: Mesh) -> Body:
+    """
+    Build the shape-sorting board's :class:`Body`: ``board_shape`` as visual geometry,
+    and a convex decomposition of the board mesh (:const:`_BOARD_COLLISION_PARTS`) as
+    collision geometry, so the cut holes stay physically open to physics engines that
+    only support convex collision geometry.
+
+    :param name: Name of the body.
+    :param board_shape: The board's (single, concave) visual mesh shape.
+    """
+    return Body(
+        name=name,
+        visual=ShapeCollection([board_shape]),
+        collision=ShapeCollection(
+            [Mesh.from_trimesh(mesh=part) for part in _BOARD_COLLISION_PARTS]
+        ),
+    )
 
 
 def _table_shapes(
@@ -384,8 +466,8 @@ class MontessoriWorld:
         store it as :attr:`hsrb`.
 
         Attached via an :class:`OmniDrive` (a real, hardware-controlled mobile-base
-        connection), not a plain 6DoF join: CRAM's motion planner needs a proper
-        drive connection to navigate the robot at all.
+        connection), not a plain 6DoF join: CRAM's motion planner needs a proper drive
+        connection to navigate the robot at all.
 
         :param standoff_distance: How far in front of the table's near edge the robot
             stands.
@@ -461,13 +543,11 @@ class MontessoriWorld:
         self._spawn(table, TABLE_POSITION)
 
     def _build_shape_sorting_board(self) -> ShapeSortingBoard:
-        board_shape = Mesh.from_trimesh(
-            mesh=cut_board_mesh(BOARD_SCALE, _HOLE_FOOTPRINTS)
-        )
+        board_shape = Mesh.from_trimesh(mesh=_BOARD_MESH)
         board_shape.color = BOARD_COLOR
         board = ShapeSortingBoard(
             name=_name("board"),
-            root=_body_with_shape(_name("board"), board_shape),
+            root=_board_body(_name("board"), board_shape),
         )
         self._spawn(board, BOARD_POSITION)
 

@@ -304,12 +304,10 @@ class URDFParser:
         Determine the RGBA color a URDF geometry's material specifies.
 
         A ``<material>`` element may define its color inline, or only reference a
-        material declared globally on the ``<robot>`` by name; both forms are
-        supported.
+        material declared globally on the ``<robot>`` by name; both forms are supported.
 
         :param geom: The URDF visual or collision element to read the material from.
-        :param material_dict: Globally declared material colors, keyed by material
-            name.
+        :param material_dict: Globally declared material colors, keyed by material name.
         :return: The resolved color, defaulting to white when none is specified.
         """
         if not (hasattr(geom, "material") and geom.material):

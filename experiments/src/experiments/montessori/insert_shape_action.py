@@ -1,6 +1,6 @@
 """
-CRAM action that picks up a loose Montessori shape and inserts it through the
-shape-sorting board's hole matching its category.
+CRAM action that picks up a loose Montessori shape and inserts it through the shape-
+sorting board's hole matching its category.
 """
 
 from __future__ import annotations
@@ -27,16 +27,15 @@ from semantic_digital_twin.spatial_types.spatial_types import Pose
 
 INSERTION_HOVER_HEIGHT = 0.03
 """
-Height above the target hole at which the shape is released, so the gripper clears
-the board's surface on approach.
+Height above the target hole at which the shape is released, so the gripper clears the
+board's surface on approach.
 """
-
 
 @dataclass
 class InsertMontessoriShapeAction(ActionDescription):
     """
-    Picks up a loose Montessori shape and inserts it through the shape-sorting
-    board's hole matching its category.
+    Picks up a loose Montessori shape and inserts it through the shape-sorting board's
+    hole matching its category.
 
     The robot navigates to a reachable stance before picking the shape up, and again
     before placing it, so this works regardless of where the robot happens to be

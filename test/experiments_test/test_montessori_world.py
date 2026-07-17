@@ -32,12 +32,29 @@ def test_montessori_world_cuts_a_watertight_board_mesh():
     montessori = MontessoriWorld()
     montessori.world.update_forward_kinematics()
 
-    board_mesh = montessori.board.root.combined_mesh
+    # The board's *visual* geometry is the single, precisely cut mesh; its *collision*
+    # geometry is a convex decomposition of that mesh (see
+    # test_montessori_world_board_collision_is_a_convex_decomposition), which is only
+    # an approximation and does not preserve the exact cut volume.
+    board_mesh = montessori.board.root.visual.combined_mesh
 
     assert board_mesh.is_watertight
     # cutting 6 holes must strictly shrink the solid board's volume
     uncut_volume = BOARD_SCALE.x * BOARD_SCALE.y * BOARD_SCALE.z
     assert 0 < board_mesh.volume < uncut_volume
+
+
+def test_montessori_world_board_collision_is_a_convex_decomposition():
+    montessori = MontessoriWorld()
+    montessori.world.update_forward_kinematics()
+
+    board_collision_shapes = montessori.board.root.collision.shapes
+
+    # MuJoCo (and other physics engines) collide mesh geometry against its convex hull,
+    # which would silently fill in the board's cut holes if the single, concave visual
+    # mesh were used directly as collision geometry.
+    assert len(board_collision_shapes) > 1
+    assert all(shape.mesh.is_convex for shape in board_collision_shapes)
 
 
 def test_montessori_world_creates_one_shape_per_hole_category_plus_the_sphere():
