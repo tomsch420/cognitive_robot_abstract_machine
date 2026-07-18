@@ -204,7 +204,7 @@ class RerunAdapter(StateChangeCallback):
     """
 
     def __post_init__(self) -> None:
-        self.recording = rerun.new_recording(self.application_id)
+        self.recording = rerun.RecordingStream(self.application_id)
         match self.mode:
             case RerunMode.SPAWN:
                 self.recording.spawn(memory_limit=self.memory_limit)
