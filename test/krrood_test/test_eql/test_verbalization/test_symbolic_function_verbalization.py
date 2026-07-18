@@ -119,7 +119,7 @@ def test_migrated_length_reads_as_a_noun_phrase_and_keeps_its_value():
     assert length([1, 2, 3]) == 3
     assert (
         verbalize_expression(a(set_of(length(variable(list, [])))))
-        == "Find the length of a list"
+        == "Find the length of an iterable"
     )
 
 

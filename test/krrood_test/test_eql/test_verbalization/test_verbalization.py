@@ -1594,7 +1594,7 @@ def test_verbalize_custom_predicate_robotics_domain(handles_and_containers_world
     handle = variable(Handle, world.bodies)
     predicate = IsReachable(handle)
     text = verbalize_expression(predicate)
-    assert "Handle" in text
+    assert "a body" in text
     assert "is reachable" in text
 
 
@@ -1620,9 +1620,9 @@ def test_verbalize_custom_predicate_employee_domain():
     department = variable(Department, [])
     predicate = WorksInDepartment(employee, department)
     text = verbalize_expression(predicate)
-    assert "Employee" in text
+    assert "employee" in text
     assert "works in" in text
-    assert "Department" in text
+    assert "department" in text
 
 
 def test_verbalize_predicate_without_fragment_raises():
@@ -1666,7 +1666,7 @@ def test_name_based_clause_reads_a_verb_name_verb_first():
     employee = variable(Employee, [])
     assert (
         verbalize_expression(EarnsMoreThan(employee, 50000.0))
-        == "an Employee earns more than 50000.0"
+        == "an employee earns more than 50000.0"
     )
 
 
@@ -2012,11 +2012,11 @@ def test_verbalize_triple():
     predicate = ConnectsTo(source, target)
     text = verbalize_expression(predicate)
 
-    assert "Body" in text
+    assert "a source" in text
     assert "connects to" in text
-    assert "Handle" in text
+    assert "a target" in text
     # Subject–predicate–object order
-    assert text.index("Body") < text.index("Handle")
+    assert text.index("source") < text.index("target")
 
 
 def test_verbalize_1arg_predicate_without_fragment_raises():

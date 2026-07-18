@@ -62,7 +62,7 @@ SURFACES: Tuple[VerbalizationSurface, ...] = (
         AttributeOwnerClass, "the attribute owner class of an Attribute"
     ),
     VerbalizationSurface(IsClass, "an object is a class"),
-    VerbalizationSurface(IsSubclass, "object 1 is a subclass of object 2"),
+    VerbalizationSurface(IsSubclass, "a subclass is a subclass of a parent or parents"),
     VerbalizationSurface(NodeChildren, "the node children of a CanBehaveLikeAVariable"),
     VerbalizationSurface(
         NodeDescendants, "the node descendants of a SymbolicExpression"
@@ -73,15 +73,15 @@ SURFACES: Tuple[VerbalizationSurface, ...] = (
     VerbalizationSurface(RuntimeType, "the runtime type of an object"),
     VerbalizationSurface(HasType, "an object is of type Integer"),
     VerbalizationSurface(HasTypes, "an object is of type Integer or Text"),
-    VerbalizationSurface(Is, "object 1 is the same object as object 2"),
-    VerbalizationSurface(Length, "the length of an object"),
-    VerbalizationSurface(IsReachable, "an object is reachable"),
-    VerbalizationSurface(WorksIn, "object 1 works in object 2"),
+    VerbalizationSurface(Is, "an object is the same object as the other object"),
+    VerbalizationSurface(Length, "the length of an iterable"),
+    VerbalizationSurface(IsReachable, "a body is reachable"),
+    VerbalizationSurface(WorksIn, "an employee works in a department"),
     VerbalizationSurface(
         InheritancePathLength,
-        "the inheritance path length between object 1 and object 2",
+        "the inheritance path length between a child class and a parent class",
     ),
     VerbalizationSurface(
-        IsSameSemanticEntity, "object 1 is the same entity as object 2"
+        IsSameSemanticEntity, "an object is the same entity as the other object"
     ),
 )

@@ -18,7 +18,7 @@ from krrood.entity_query_language.verbalization.pipeline import verbalize_expres
 def test_verbalizable_predicate_renders_affirmatively():
     assert (
         verbalize_expression(inference(IsReachable)(body=variable(Robot, [])))
-        == "a Robot is reachable"
+        == "a body is reachable"
     )
 
 
@@ -29,5 +29,5 @@ def test_wrapping_not_negates_the_predicate_inline():
     """
     assert (
         verbalize_expression(Not(IsReachable(variable(Robot, []))))
-        == "a Robot is not reachable"
+        == "a body is not reachable"
     )

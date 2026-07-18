@@ -147,20 +147,20 @@ def test_negate_clause_returns_none_without_a_verb_or_copula():
 
 def test_copula_predicate_affirmative_and_negated():
     assert verbalize_expression(IsReachable(variable(Location, []))) == (
-        "a Location is reachable"
+        "a body is reachable"
     )
     assert verbalize_expression(Not(IsReachable(variable(Location, [])))) == (
-        "a Location is not reachable"
+        "a body is not reachable"
     )
 
 
 def test_verb_predicate_affirmative_and_negated_with_do_support():
     employee, department = variable(StaffMember, []), variable(Department, [])
     assert verbalize_expression(WorksIn(employee, department)) == (
-        "a StaffMember works in a Department"
+        "an employee works in a department"
     )
     assert verbalize_expression(Not(WorksIn(employee, department))) == (
-        "a StaffMember does not work in a Department"
+        "an employee does not work in a department"
     )
 
 
@@ -194,17 +194,17 @@ def test_clause_verb_agrees_with_plural_population():
     """
     employee, department = variable(StaffMember, []), variable(Department, [])
     assert verbalize_expression(for_all(employee, WorksIn(employee, department))) == (
-        "for all StaffMembers, they work in a Department"
+        "for all StaffMembers, they work in a department"
     )
 
 
 def test_clause_subject_keeps_noun_phrase_outside_a_subject_scope():
     """
-    A plain predicate (no enclosing subject) keeps its first-mention noun phrase — *"a
-    Location"*.
+    A plain predicate (no enclosing subject) keeps its first-mention noun phrase — the
+    anonymous operand is named by its field, *"a body"*, not pronominalised.
     """
     assert verbalize_expression(IsReachable(variable(Location, []))) == (
-        "a Location is reachable"
+        "a body is reachable"
     )
 
 

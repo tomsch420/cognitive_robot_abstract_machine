@@ -200,6 +200,15 @@ class ReferringExpressions:
     number them *"Robot 1"*.
     """
 
+    occurrences: Dict[uuid.UUID, int] = field(default_factory=dict)
+    """
+    How many times each node id is referenced across the whole expression.
+
+    A variable referenced exactly once has no independent discourse identity, which is
+    how operand naming tells an anonymous predicate operand (named by its field) from a
+    reused variable such as a query subject (named by its type and pronominalised).
+    """
+
     @classmethod
     def from_expression(cls, expression: SymbolicExpression) -> ReferringExpressions:
         """
@@ -212,7 +221,27 @@ class ReferringExpressions:
         'Robot 1'
         """
         labels, numbered = cls._build_disambiguation_map(expression)
-        return cls(disambiguation_map=labels, numbered_labels=numbered)
+        return cls(
+            disambiguation_map=labels,
+            numbered_labels=numbered,
+            occurrences=cls._count_occurrences(expression),
+        )
+
+    @staticmethod
+    def _count_occurrences(expression: SymbolicExpression) -> Dict[uuid.UUID, int]:
+        """:return: the number of times each node id occurs in the expression tree — a reference
+        count, so a node reached from several parents is counted once per reference.
+
+        >>> location = variable(Location, [])
+        >>> occurrences = ReferringExpressions._count_occurrences(
+        ...     an(entity(location).where(IsReachable(location))))
+        >>> occurrences[location._id_]
+        2
+        """
+        counts: Dict[uuid.UUID, int] = {}
+        for node in expression._all_expressions_:
+            counts[node._id_] = counts.get(node._id_, 0) + 1
+        return counts
 
     @classmethod
     def _build_disambiguation_map(
