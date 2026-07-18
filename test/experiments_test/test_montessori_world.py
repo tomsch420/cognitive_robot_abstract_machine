@@ -76,44 +76,61 @@ def _xy_bounds_overlap(a: tuple, b: tuple) -> bool:
     return x_overlaps and y_overlaps
 
 
+def _collision_box_world_bounds(shapes, position) -> list:
+    """
+    World-frame (x, y) bounds of every :class:`Box` in ``shapes``, a body's collision
+    shapes positioned at ``position``.
+
+    Collision boxes are built axis-aligned with no rotation (see
+    ``world.py::_tile_footprint_avoiding_holes``), so comparing their (x, y) bounds
+    directly, without trimesh's ray-cast-based ``contains``, is both correct and immune
+    to the numerical instability ray casting has against many mutually-touching box
+    faces.
+    """
+    bounds = []
+    for shape in shapes:
+        origin = shape.origin.to_position()
+        half_x, half_y = shape.scale.x / 2, shape.scale.y / 2
+        bounds.append(
+            (
+                float(position.x) + float(origin.x) - half_x,
+                float(position.x) + float(origin.x) + half_x,
+                float(position.y) + float(origin.y) - half_y,
+                float(position.y) + float(origin.y) + half_y,
+            )
+        )
+    return bounds
+
+
+def _hole_world_bounds(hole: ShapeSortingHole) -> tuple:
+    """A hole's true (x, y) bounding box, in the world frame, with tolerance applied."""
+    position = hole.global_transform.to_position()
+    local_bounds = hole.root.area.combined_mesh.bounds
+    return (
+        float(position.x) + local_bounds[0][0] + _BOUNDS_TOLERANCE,
+        float(position.x) + local_bounds[1][0] - _BOUNDS_TOLERANCE,
+        float(position.y) + local_bounds[0][1] + _BOUNDS_TOLERANCE,
+        float(position.y) + local_bounds[1][1] - _BOUNDS_TOLERANCE,
+    )
+
+
 def test_montessori_world_board_collision_leaves_every_holes_bounding_box_open():
     montessori = MontessoriWorld()
     montessori.world.update_forward_kinematics()
 
-    # Collision boxes are built axis-aligned with no rotation (see
-    # world.py::_board_collision_boxes), so comparing their (x, y) bounds directly,
-    # without trimesh's ray-cast-based `contains`, is both correct and immune to the
-    # numerical instability ray casting has against many mutually-touching box faces.
-    collision_box_bounds = []
-    for shape in montessori.board.root.collision.shapes:
-        origin = shape.origin.to_position()
-        half_x, half_y = shape.scale.x / 2, shape.scale.y / 2
-        collision_box_bounds.append(
-            (
-                float(origin.x) - half_x,
-                float(origin.x) + half_x,
-                float(origin.y) - half_y,
-                float(origin.y) + half_y,
-            )
-        )
+    board_position = montessori.board.global_transform.to_position()
+    collision_box_bounds = _collision_box_world_bounds(
+        montessori.board.root.collision.shapes, board_position
+    )
     assert collision_box_bounds
 
-    board_position = montessori.board.global_transform.to_position()
     holes = montessori.world.get_semantic_annotations_by_type(ShapeSortingHole)
     assert holes
     for hole in holes:
-        hole_position = hole.global_transform.to_position() - board_position
-        local_bounds = hole.root.area.combined_mesh.bounds
-        hole_bounds = (
-            float(hole_position.x) + local_bounds[0][0] + _BOUNDS_TOLERANCE,
-            float(hole_position.x) + local_bounds[1][0] - _BOUNDS_TOLERANCE,
-            float(hole_position.y) + local_bounds[0][1] + _BOUNDS_TOLERANCE,
-            float(hole_position.y) + local_bounds[1][1] - _BOUNDS_TOLERANCE,
-        )
         overlapping_boxes = [
             box_bounds
             for box_bounds in collision_box_bounds
-            if _xy_bounds_overlap(box_bounds, hole_bounds)
+            if _xy_bounds_overlap(box_bounds, _hole_world_bounds(hole))
         ]
         error = f"{hole.name} has collision material in its opening"
         assert not overlapping_boxes, error
@@ -121,15 +138,45 @@ def test_montessori_world_board_collision_leaves_every_holes_bounding_box_open()
     # sanity check the assertion above is not vacuous: solid material away from every
     # hole (a board corner) must still be covered by some collision box
     board_corner = (
-        BOARD_SCALE.x / 2 - 0.005,
-        BOARD_SCALE.x / 2 - 0.004,
-        BOARD_SCALE.y / 2 - 0.005,
-        BOARD_SCALE.y / 2 - 0.004,
+        float(board_position.x) + BOARD_SCALE.x / 2 - 0.005,
+        float(board_position.x) + BOARD_SCALE.x / 2 - 0.004,
+        float(board_position.y) + BOARD_SCALE.y / 2 - 0.005,
+        float(board_position.y) + BOARD_SCALE.y / 2 - 0.004,
     )
     assert any(
         _xy_bounds_overlap(box_bounds, board_corner)
         for box_bounds in collision_box_bounds
     )
+
+
+def test_montessori_world_drawer_collision_leaves_overlapping_holes_open():
+    montessori = MontessoriWorld()
+    montessori.world.update_forward_kinematics()
+
+    # Every hole cuts through the board's full thickness, and a drawer can sit
+    # anywhere within that thickness directly behind a hole (see
+    # world.py::_drawer_collision_boxes); a shape that cleanly passes the board's own
+    # collision must not then be stopped by a drawer immediately behind it.
+    holes = montessori.world.get_semantic_annotations_by_type(ShapeSortingHole)
+    assert holes
+    hole_bounds = [_hole_world_bounds(hole) for hole in holes]
+
+    assert montessori.board.drawers
+    for drawer in montessori.board.drawers:
+        drawer_position = drawer.global_transform.to_position()
+        collision_box_bounds = _collision_box_world_bounds(
+            drawer.root.collision.shapes, drawer_position
+        )
+        assert collision_box_bounds
+
+        for bounds in hole_bounds:
+            overlapping_boxes = [
+                box_bounds
+                for box_bounds in collision_box_bounds
+                if _xy_bounds_overlap(box_bounds, bounds)
+            ]
+            error = f"{drawer.name} has collision material overlapping a hole above it"
+            assert not overlapping_boxes, error
 
 
 def test_montessori_world_creates_one_shape_per_hole_category_plus_the_sphere():

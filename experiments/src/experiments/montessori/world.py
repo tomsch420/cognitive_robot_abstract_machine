@@ -240,50 +240,66 @@ def _footprint_bounds(footprint: HoleFootprint) -> Tuple[float, float, float, fl
     """
     boundary = np.asarray(footprint.boundary)
     return (
-        footprint.center[0] + boundary[:, 0].min(),
-        footprint.center[0] + boundary[:, 0].max(),
-        footprint.center[1] + boundary[:, 1].min(),
-        footprint.center[1] + boundary[:, 1].max(),
+        float(footprint.center[0] + boundary[:, 0].min()),
+        float(footprint.center[0] + boundary[:, 0].max()),
+        float(footprint.center[1] + boundary[:, 1].min()),
+        float(footprint.center[1] + boundary[:, 1].max()),
     )
 
 
-def _board_collision_boxes(
-    board_scale: Scale, footprints: List[HoleFootprint]
+def _tile_footprint_avoiding_holes(
+    outer_bounds: Tuple[float, float, float, float],
+    hole_bounds: List[Tuple[float, float, float, float]],
+    thickness: float,
 ) -> List[Box]:
     """
-    Tile the board's footprint into solid collision :class:`Box`\\ es, each spanning its
-    full thickness, leaving every hole's true bounding box entirely open.
+    Tile a rectangular footprint into solid collision :class:`Box`\\ es, each spanning
+    ``thickness``, leaving every given hole's bounding box entirely open.
 
     Physics engines that only support convex collision geometry (MuJoCo among them)
-    cannot use the board's single, holed mesh directly as collision geometry; the usual
-    fix is a convex decomposition of that mesh, but a general-purpose decomposer
-    optimizes for volume, not for keeping small or narrow openings (like the ``disk``
-    category's hole) fully clear, so a shape can still get caught on a decomposition
-    artifact instead of passing through. Native box primitives, cut exactly around each
-    hole's bounding box, avoid that approximation entirely: every hole is either fully
-    open or fully solid, with nothing in between to get caught on.
+    cannot use a single holed mesh directly as collision geometry; the usual fix is a
+    convex decomposition of that mesh, but a general-purpose decomposer optimizes for
+    volume, not for keeping small or narrow openings (like the ``disk`` category's hole)
+    fully clear, so a shape can still get caught on a decomposition artifact instead of
+    passing through. Native box primitives, cut exactly around each hole's bounding box,
+    avoid that approximation entirely: every hole is either fully open or fully solid,
+    with nothing in between to get caught on.
 
-    Splits the board's plan into a rectangular grid at every hole's bounding box edge (a
+    Splits the footprint into a rectangular grid at every hole's bounding box edge (a
     standard "rectangle minus rectangles" tiling: a grid cell is either entirely inside
     one hole's bounding box, so it is left open, or entirely outside every hole's
     bounding box, so it becomes one solid collision box), rather than assuming any
-    particular hole count or layout.
+    particular hole count or layout. A hole outside ``outer_bounds`` is clipped to it
+    first, so a hole that only partly overlaps the tiled footprint (e.g. one of the
+    board's holes passing through a drawer sitting underneath it, rather than the board
+    itself) still cuts exactly the overlapping part open.
 
-    :param board_scale: Size of the board blank the holes are cut into.
-    :param footprints: The holes to leave open.
+    :param outer_bounds: ``(min_x, max_x, min_y, max_y)`` of the footprint to tile, in
+        whatever local frame the returned boxes should be positioned in.
+    :param hole_bounds: ``(min_x, max_x, min_y, max_y)`` of each hole to leave open, in
+        the same frame and units as ``outer_bounds``.
+    :param thickness: Extent of every solid box along z, centered on ``z=0``.
     :return: One solid :class:`Box` per occupied grid cell.
     """
-    half_x, half_y = board_scale.x / 2, board_scale.y / 2
-    hole_bounds = [_footprint_bounds(footprint) for footprint in footprints]
+    outer_min_x, outer_max_x, outer_min_y, outer_max_y = outer_bounds
+    clipped_hole_bounds = [
+        (
+            min(max(min_x, outer_min_x), outer_max_x),
+            min(max(max_x, outer_min_x), outer_max_x),
+            min(max(min_y, outer_min_y), outer_max_y),
+            min(max(max_y, outer_min_y), outer_max_y),
+        )
+        for min_x, max_x, min_y, max_y in hole_bounds
+    ]
     x_edges = sorted(
-        {-half_x, half_x}
-        | {bound[0] for bound in hole_bounds}
-        | {bound[1] for bound in hole_bounds}
+        {outer_min_x, outer_max_x}
+        | {bound[0] for bound in clipped_hole_bounds}
+        | {bound[1] for bound in clipped_hole_bounds}
     )
     y_edges = sorted(
-        {-half_y, half_y}
-        | {bound[2] for bound in hole_bounds}
-        | {bound[3] for bound in hole_bounds}
+        {outer_min_y, outer_max_y}
+        | {bound[2] for bound in clipped_hole_bounds}
+        | {bound[3] for bound in clipped_hole_bounds}
     )
 
     boxes = []
@@ -296,18 +312,80 @@ def _board_collision_boxes(
             cell_x, cell_y = (x0 + x1) / 2, (y0 + y1) / 2
             if any(
                 min_x < cell_x < max_x and min_y < cell_y < max_y
-                for min_x, max_x, min_y, max_y in hole_bounds
+                for min_x, max_x, min_y, max_y in clipped_hole_bounds
             ):
                 continue
             boxes.append(
                 Box(
-                    scale=Scale(x1 - x0, y1 - y0, board_scale.z),
+                    scale=Scale(x1 - x0, y1 - y0, thickness),
                     origin=HomogeneousTransformationMatrix.from_xyz_rpy(
                         x=cell_x, y=cell_y, z=0.0
                     ),
                 )
             )
     return boxes
+
+
+def _board_collision_boxes(
+    board_scale: Scale, footprints: List[HoleFootprint]
+) -> List[Box]:
+    """
+    Tile the board's footprint into solid collision boxes, leaving every hole's true
+    bounding box entirely open; see :func:`_tile_footprint_avoiding_holes`.
+
+    :param board_scale: Size of the board blank the holes are cut into.
+    :param footprints: The holes to leave open.
+    :return: One solid :class:`Box` per occupied grid cell.
+    """
+    half_x, half_y = board_scale.x / 2, board_scale.y / 2
+    hole_bounds = [_footprint_bounds(footprint) for footprint in footprints]
+    return _tile_footprint_avoiding_holes(
+        (-half_x, half_x, -half_y, half_y), hole_bounds, board_scale.z
+    )
+
+
+def _drawer_collision_boxes(
+    drawer_scale: Scale,
+    drawer_position: Point3,
+    board_position: Point3,
+    footprints: List[HoleFootprint],
+) -> List[Box]:
+    """
+    Tile a drawer's footprint into solid collision boxes, leaving open whichever part
+    (if any) of a hole's shaft passes through it; see
+    :func:`_tile_footprint_avoiding_holes`.
+
+    Every hole cuts all the way through the board's full thickness (see
+    :func:`~experiments.montessori.hole_geometry.cut_board_mesh`), and a drawer can sit
+    anywhere within that thickness, directly behind a hole it has no relation to
+    otherwise; without this, a dropped shape could pass the board's own collision
+    cleanly and then be stopped by a drawer immediately behind it.
+
+    :param drawer_scale: Size of the drawer.
+    :param drawer_position: The drawer's position, in the same frame as
+        ``board_position``.
+    :param board_position: The board's position; :attr:`HoleFootprint.center` is
+        relative to it.
+    :param footprints: The holes to leave open wherever they overlap this drawer.
+    :return: One solid :class:`Box` per occupied grid cell, in the drawer's own frame.
+    """
+    half_x, half_y = drawer_scale.x / 2, drawer_scale.y / 2
+    offset_x = float(board_position.x) - float(drawer_position.x)
+    offset_y = float(board_position.y) - float(drawer_position.y)
+    hole_bounds = [
+        (
+            min_x + offset_x,
+            max_x + offset_x,
+            min_y + offset_y,
+            max_y + offset_y,
+        )
+        for min_x, max_x, min_y, max_y in (
+            _footprint_bounds(footprint) for footprint in footprints
+        )
+    ]
+    return _tile_footprint_avoiding_holes(
+        (-half_x, half_x, -half_y, half_y), hole_bounds, drawer_scale.z
+    )
 
 
 _DRAWER_POSITIONS: List[Point3] = [
@@ -369,6 +447,38 @@ def _board_body(
         name=name,
         visual=ShapeCollection([board_shape]),
         collision=ShapeCollection(_board_collision_boxes(BOARD_SCALE, footprints)),
+    )
+
+
+def _drawer_body(
+    name: PrefixedName,
+    drawer_scale: Scale,
+    color: Color,
+    drawer_position: Point3,
+    board_position: Point3,
+    footprints: List[HoleFootprint],
+) -> Body:
+    """
+    Build a drawer's :class:`Body`: a solid box as visual geometry, and a hand-built
+    grid of solid boxes (see :func:`_drawer_collision_boxes`) as collision geometry, so
+    the drawer does not block a hole shaft that happens to pass through it.
+
+    :param name: Name of the body.
+    :param drawer_scale: Size of the drawer.
+    :param color: Color of the drawer's visual box.
+    :param drawer_position: The drawer's position, in the same frame as
+        ``board_position``.
+    :param board_position: The board's position.
+    :param footprints: The holes to leave open wherever they overlap this drawer.
+    """
+    return Body(
+        name=name,
+        visual=ShapeCollection([Box(scale=drawer_scale, color=color)]),
+        collision=ShapeCollection(
+            _drawer_collision_boxes(
+                drawer_scale, drawer_position, board_position, footprints
+            )
+        ),
     )
 
 
@@ -638,8 +748,13 @@ class MontessoriWorld:
         for index, drawer_position in enumerate(_DRAWER_POSITIONS, start=1):
             drawer = Drawer(
                 name=_name(f"drawer_{index}"),
-                root=_body_with_shape(
-                    _name(f"drawer_{index}"), Box(scale=DRAWER_SCALE, color=BOARD_COLOR)
+                root=_drawer_body(
+                    _name(f"drawer_{index}"),
+                    DRAWER_SCALE,
+                    BOARD_COLOR,
+                    drawer_position,
+                    BOARD_POSITION,
+                    _HOLE_FOOTPRINTS,
                 ),
             )
             self._spawn(drawer, drawer_position)
