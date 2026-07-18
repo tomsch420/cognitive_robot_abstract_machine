@@ -3,8 +3,8 @@ Tests for predicate verbalization via a required :class:`VerbalizationFragment`.
 
 A :class:`Verbalizable` predicate builds its surface from the typed clause vocabulary (``clause`` /
 ``Noun`` / ``Verb`` / ``Copula``), so the result composes with the rest of the pipeline: a wrapping
-``Not`` negates it inline — *"a Robot is not reachable"* — instead of the opaque *"not (a Robot is
-reachable)"* a flat string blob would force.
+``Not`` negates it inline — *"a Robot is not reachable for another Robot"* — instead of the opaque
+*"not (a Robot is reachable for another Robot)"* a flat string blob would force.
 """
 
 from __future__ import annotations
@@ -17,8 +17,12 @@ from krrood.entity_query_language.verbalization.pipeline import verbalize_expres
 
 def test_verbalizable_predicate_renders_affirmatively():
     assert (
-        verbalize_expression(inference(IsReachable)(location=variable(Robot, [])))
-        == "a Robot is reachable"
+        verbalize_expression(
+            inference(IsReachable)(
+                location=variable(Robot, []), body=variable(Robot, [])
+            )
+        )
+        == "a Robot is reachable for another Robot"
     )
 
 
@@ -28,6 +32,6 @@ def test_wrapping_not_negates_the_predicate_inline():
     wrapping the whole clause in *"not (...)"*.
     """
     assert (
-        verbalize_expression(Not(IsReachable(variable(Robot, []))))
-        == "a Robot is not reachable"
+        verbalize_expression(Not(IsReachable(variable(Robot, []), variable(Robot, []))))
+        == "a Robot is not reachable for another Robot"
     )

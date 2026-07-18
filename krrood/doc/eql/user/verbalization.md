@@ -511,12 +511,14 @@ corresponding to the predicate's dataclass fields.
 
 ```{code-cell} ipython3
 from krrood.entity_query_language.verbalization.example_domain import (
-    Location,
     IsReachable,
+    Location,
+    Robot,
 )
 
 loc = variable(Location, domain=None)
-print(verbalize_expression(IsReachable(loc)))
+robot = variable(Robot, domain=None)
+print(verbalize_expression(IsReachable(loc, robot)))
 ```
 
 Predicates with multiple fields receive their arguments in positional order:

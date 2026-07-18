@@ -259,8 +259,8 @@ class CoreferenceProcessor(RealizationPass):
         The body's subject is the quantified population, so it reads *"they"* and the copula agrees:
 
         >>> robot = variable(Robot, [])
-        >>> verbalize_expression(for_all(robot, IsReachable(robot)))
-        'for all Robots, they are reachable'
+        >>> verbalize_expression(for_all(robot, IsReachable(robot, variable(Robot, []))))
+        'for all Robots, they are reachable for another Robot'
         """
         subject = clause.parts[0]
         if isinstance(subject, PossessiveChain):

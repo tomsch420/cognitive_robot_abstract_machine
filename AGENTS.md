@@ -13,6 +13,7 @@
 - When fixing failing tests, never modify the test itself
 - All new features and fixes must be covered by tests
 - Name test classes (and the mimic classes used by tests) after the pattern or behaviour they exercise, not after the concrete external class they happen to stand in for
+- Divide a test file into logical sections with `# %% <short description>` comment headers (e.g. `# %% same-noun disambiguation`), not decorative box-drawing dividers
 
 ## Code Style
 - Do not use abbreviations in variable names, methods, classes, or any other identifiers

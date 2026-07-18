@@ -25,6 +25,7 @@ from krrood.entity_query_language.verbalization.example_domain import (
     Department,
     IsReachable,
     Location,
+    Robot,
     StaffMember,
     WorksIn,
 )
@@ -57,7 +58,7 @@ from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech impor
     Verb,
 )
 
-# ── verb morphology ──────────────────────────────────────────────────────────────
+# %% verb morphology
 
 
 def test_third_person_singular_regular_and_irregular():
@@ -112,7 +113,7 @@ def test_morphology_realizes_negated_copula():
     assert MorphologyProcessor().rewrite(plural_copula).text == "are not"
 
 
-# ── typed clause vocabulary ──────────────────────────────────────────────────────
+# %% typed clause vocabulary
 
 
 def test_verb_element_is_a_verb_role_leaf_carrying_the_lemma():
@@ -130,7 +131,7 @@ def test_clause_joins_constituents_in_order():
     )
 
 
-# ── clause() coordinated-subject agreement ────────────────────────────────────────
+# %% clause() coordinated-subject agreement
 
 
 def _render(fragment):
@@ -169,7 +170,7 @@ def test_holds_given_branch_keeps_its_singular_subject():
     assert _render(built) == "one month holds given the begin and the end"
 
 
-# ── negate_clause (feature marking) ──────────────────────────────────────────────
+# %% negate_clause (feature marking)
 
 
 def test_negate_clause_marks_the_verb_head():
@@ -183,15 +184,16 @@ def test_negate_clause_returns_none_without_a_verb_or_copula():
     assert negate_clause(built) is None
 
 
-# ── end-to-end: affirmative and automatically negated predicates ─────────────────
+# %% end-to-end: affirmative and automatically negated predicates
 
 
 def test_copula_predicate_affirmative_and_negated():
-    assert verbalize_expression(IsReachable(variable(Location, []))) == (
-        "a Location is reachable"
+    location, robot = variable(Location, []), variable(Robot, [])
+    assert verbalize_expression(IsReachable(location, robot)) == (
+        "a Location is reachable for a Robot"
     )
-    assert verbalize_expression(Not(IsReachable(variable(Location, [])))) == (
-        "a Location is not reachable"
+    assert verbalize_expression(Not(IsReachable(location, robot))) == (
+        "a Location is not reachable for a Robot"
     )
 
 
@@ -205,7 +207,7 @@ def test_verb_predicate_affirmative_and_negated_with_do_support():
     )
 
 
-# ── subject-aware clause: pronominalisation and agreement ────────────────────────
+# %% subject-aware clause: pronominalisation and agreement
 
 
 def test_clause_subject_pronominalises_in_singular_scope():
@@ -214,9 +216,9 @@ def test_clause_subject_pronominalises_in_singular_scope():
     …"*.
     """
     location = variable(Location, [])
-    assert verbalize_expression(an(entity(location).where(IsReachable(location)))) == (
-        "Find a Location such that it is reachable"
-    )
+    assert verbalize_expression(
+        an(entity(location).where(IsReachable(location, variable(Robot, []))))
+    ) == ("Find a Location such that it is reachable for a Robot")
 
 
 def test_clause_subject_pronominalises_and_copula_agrees_with_plural_population():
@@ -224,9 +226,9 @@ def test_clause_subject_pronominalises_and_copula_agrees_with_plural_population(
     Under ``for_all`` the subject is a plural population — *"they"* and *"are"*.
     """
     location = variable(Location, [])
-    assert verbalize_expression(for_all(location, IsReachable(location))) == (
-        "for all Locations, they are reachable"
-    )
+    assert verbalize_expression(
+        for_all(location, IsReachable(location, variable(Robot, [])))
+    ) == ("for all Locations, they are reachable for a Robot")
 
 
 def test_clause_verb_agrees_with_plural_population():
@@ -244,12 +246,12 @@ def test_clause_subject_keeps_noun_phrase_outside_a_subject_scope():
     A plain predicate (no enclosing subject) keeps its first-mention noun phrase — a
     concrete operand type is its own identifier, *"a Location"*, not pronominalised.
     """
-    assert verbalize_expression(IsReachable(variable(Location, []))) == (
-        "a Location is reachable"
-    )
+    assert verbalize_expression(
+        IsReachable(variable(Location, []), variable(Robot, []))
+    ) == ("a Location is reachable for a Robot")
 
 
-# ── fragments are required ───────────────────────────────────────────────────────
+# %% fragments are required
 
 
 def test_predicate_returning_a_string_template_is_rejected():

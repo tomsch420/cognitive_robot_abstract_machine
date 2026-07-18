@@ -169,7 +169,7 @@ def operand_head_noun(node: Variable, edges: List[ParentEdge]) -> str:
     keeps its type noun even filling a field of ``IsReachable`` (whose ``location`` field is
     declared ``object``, an uninformative type on its own):
 
-    >>> reachable = IsReachable(variable(Robot, []))
+    >>> reachable = IsReachable(variable(Robot, []), variable(Robot, []))
     >>> operand_head_noun(variable(Robot, []), [ParentEdge(reachable, "location")])
     'Robot'
 

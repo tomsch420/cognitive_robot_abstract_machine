@@ -192,12 +192,17 @@ class Location:
 @dataclass(eq=False)
 class IsReachable(Predicate):
     """
-    Single-field custom predicate: *"<location> is reachable"*.
+    Two-field custom predicate: *"<location> is reachable for <body>"*.
     """
 
     location: object
     """
-    The thing whose reachability is asserted.
+    The place whose reachability is asserted.
+    """
+
+    body: object
+    """
+    The entity the location must be reachable for.
     """
 
     def __call__(self):
@@ -207,7 +212,13 @@ class IsReachable(Predicate):
     def _verbalization_fragment_(
         cls, fields: Mapping[str, VerbalizationFragment]
     ) -> VerbalizationFragment:
-        return clause(Noun(fields["location"]), Copula(), Adjective("reachable"))
+        return clause(
+            Noun(fields["location"]),
+            Copula(),
+            Adjective("reachable"),
+            Prepositions.FOR,
+            Noun(fields["body"]),
+        )
 
 
 @dataclass(eq=False)
