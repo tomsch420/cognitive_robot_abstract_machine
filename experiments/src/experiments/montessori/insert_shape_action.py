@@ -21,7 +21,7 @@ from coraplex.robot_plans.actions.core.placing import PlaceAction
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction
 from coraplex.view_manager import ViewManager
 from experiments.montessori.semantics import MontessoriShape, ShapeSortingBoard
-from krrood.entity_query_language.factories import a
+from krrood.entity_query_language.factories import underspecified
 from krrood.entity_query_language.query.match import Match
 from semantic_digital_twin.exceptions import PointOccupiedError
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Table
@@ -137,12 +137,12 @@ class InsertMontessoriShapeAction(ActionDescription):
         The :class:`~krrood.entity_query_language.backends.ProbabilisticBackend`
         (required by :meth:`_move_to_reach`'s underspecified standing offset; see
         ``query_backend`` on :class:`~coraplex.datastructures.dataclasses.Context`)
-        needs every field of every ``a(...)``-wrapped action's arguments expressed
+        needs every field of every ``underspecified(...)``-wrapped action's arguments expressed
         through the query DSL to build its probabilistic circuit, even fields that are
         already fully concrete: passing :attr:`grasp_description` directly raises
         ``ValueError: ... not in domain of variable ...`` once that backend is active.
         """
-        return a(GraspDescription)(
+        return underspecified(GraspDescription)(
             approach_direction=self.grasp_description.approach_direction,
             vertical_alignment=self.grasp_description.vertical_alignment,
             end_effector=self.grasp_description.end_effector,
@@ -180,8 +180,8 @@ class InsertMontessoriShapeAction(ActionDescription):
             )
         )
 
-        reach_query = a(MoveToReach)(
-            target_pose_offset_robot=a(Pose2D)(
+        reach_query = underspecified(MoveToReach)(
+            target_pose_offset_robot=underspecified(Pose2D)(
                 x=..., y=..., yaw=..., reference_frame=None
             ),
             hip_rotation=0.0,
@@ -225,14 +225,14 @@ class InsertMontessoriShapeAction(ActionDescription):
             [
                 ParkArmsAction(Arms.BOTH),
                 self._move_to_reach(self.montessori_shape.root, pickup_standoff_pose),
-                a(PickUpAction)(
+                underspecified(PickUpAction)(
                     object_designator=self.montessori_shape.root,
                     arm=self.arm,
                     grasp_description=self._grasp_description_query(),
                 ),
                 ParkArmsAction(Arms.BOTH),
                 self._move_to_reach(self.board.root, placement_standoff_pose),
-                a(PlaceAction)(
+                underspecified(PlaceAction)(
                     object_designator=self.montessori_shape.root,
                     target_location=target_location,
                     arm=self.arm,
