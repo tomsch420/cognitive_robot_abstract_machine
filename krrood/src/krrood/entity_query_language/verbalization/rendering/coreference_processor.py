@@ -5,6 +5,7 @@ from typing_extensions import Dict, Iterable, List, Optional, Set, Tuple
 import uuid
 
 from krrood.entity_query_language.verbalization.fragments.base import (
+    agree_finite,
     Clause,
     map_structural_children,
     NounPhrase,
@@ -12,14 +13,12 @@ from krrood.entity_query_language.verbalization.fragments.base import (
     PhraseFragment,
     PossessiveChain,
     VerbalizationFragment,
-    RoleFragment,
 )
 from krrood.entity_query_language.verbalization.navigation_path import PathStep
 from krrood.entity_query_language.verbalization.fragments.features import (
     Definiteness,
     GrammaticalNumber,
 )
-from krrood.entity_query_language.verbalization.fragments.roles import SemanticRole
 from krrood.entity_query_language.verbalization.microplanning.possessive import (
     attribute_fragment,
     chain_head_number,
@@ -269,7 +268,7 @@ class CoreferenceProcessor(RealizationPass):
             return rebuilt if rebuilt is not None else clause
         pronoun = Pronouns.nominative(number).as_fragment()
         agreed_rest = [
-            self._agree_finite(self._walk(part), number) for part in clause.parts[1:]
+            agree_finite(self._walk(part), number) for part in clause.parts[1:]
         ]
         return replace(clause, parts=[pronoun, *agreed_rest])
 
@@ -300,44 +299,8 @@ class CoreferenceProcessor(RealizationPass):
         """
         return replace(
             clause,
-            parts=[
-                CoreferenceProcessor._agree_finite(part, number)
-                for part in clause.parts
-            ],
+            parts=[agree_finite(part, number) for part in clause.parts],
         )
-
-    _FINITE_ROLES = (SemanticRole.OPERATOR, SemanticRole.VERB)
-    """
-    The clause roles a finite predicate agrees through — the copula /
-    comparison operator and a lexical verb.
-    """
-
-    @staticmethod
-    def _agree_finite(
-        part: VerbalizationFragment, number: GrammaticalNumber
-    ) -> VerbalizationFragment:
-        """:return: *part* re-tagged with *number* when it is the clause's finite slot — an
-        ``OPERATOR`` or ``VERB`` leaf, or a phrase led by one (the factored *"is greater than"*) —
-        else *part* unchanged. The copula inflects (*"is"* → *"are"*) and a lexical verb agrees
-        (*"works"* → *"work"*); a non-copula operator (*"contains"*) is tagged too but the morphology
-        pass leaves it be, so this never has to single the finite word out by text."""
-        if (
-            isinstance(part, RoleFragment)
-            and part.role in CoreferenceProcessor._FINITE_ROLES
-        ):
-            return replace(part, number=number)
-        leads_with_finite = (
-            isinstance(part, PhraseFragment)
-            and part.parts
-            and isinstance(part.parts[0], RoleFragment)
-            and part.parts[0].role in CoreferenceProcessor._FINITE_ROLES
-        )
-        if leads_with_finite:
-            return replace(
-                part,
-                parts=[replace(part.parts[0], number=number), *part.parts[1:]],
-            )
-        return part
 
     def _owned_attributes(self, owned: OwnedAttributes) -> VerbalizationFragment:
         """:return: the owner's attributes as the possessive *"its/their <attrs>"* when the owner is

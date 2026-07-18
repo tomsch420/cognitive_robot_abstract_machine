@@ -66,11 +66,11 @@ class InstantiatedVerbalizableRule(PhraseRule):
         over the generic *"a TypeName, where …"* form.
 
         Its contribution is the guard that admits this rule: ``IsReachable`` supplies a fragment, so
-        this rule wins and the example renders as *"a body is reachable"* instead of the generic
+        this rule wins and the example renders as *"a location is reachable"* instead of the generic
         decomposed phrase. :meth:`build` then assembles that fragment.
 
-        >>> verbalize_expression(inference(IsReachable)(body=variable(Robot, [])))
-        'a body is reachable'
+        >>> verbalize_expression(inference(IsReachable)(location=variable(Robot, [])))
+        'a location is reachable'
         """
         return InstantiatedPlanner.has_fragment(node)
 
@@ -78,14 +78,14 @@ class InstantiatedVerbalizableRule(PhraseRule):
         self, node: InstantiatedVariable, context: RuleContext
     ) -> VerbalizationFragment:
         """:return: the type's verbalization fragment, built from its rendered field fragments
-        (*"a body is reachable"*).
+        (*"a location is reachable"*).
 
         The type composes the surface from the shared vocabulary, so the result is a structured
         fragment that flows through the remaining passes (coreference, determiner, morphology) — not
         an opaque string blob — which is why a wrapping ``Not`` can negate it inline.
 
-        >>> verbalize_expression(inference(IsReachable)(body=variable(Robot, [])))
-        'a body is reachable'
+        >>> verbalize_expression(inference(IsReachable)(location=variable(Robot, [])))
+        'a location is reachable'
         """
         operand_fragments = OperandNaming(
             node._type_, context.refer.occurrences

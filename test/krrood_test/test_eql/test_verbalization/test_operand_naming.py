@@ -263,7 +263,7 @@ def test_same_type_pair_uses_determiner_not_numbering():
 def test_same_type_triple_uses_determiner_then_ordinals():
     assert verbalize_expression(
         SameNameTriple(variable(Marker, []), variable(Marker, []), variable(Marker, []))
-    ) == ("a point, the second point, and the third point is collinear")
+    ) == ("a point, the second point, and the third point are collinear")
 
 
 def test_metadata_display_name_names_the_operand():

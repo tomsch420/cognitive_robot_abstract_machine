@@ -50,8 +50,10 @@ from krrood.entity_query_language.verbalization.vocabulary.english import Prepos
 from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
     Adjective,
     clause,
+    ConjunctivePhrase,
     Copula,
     Noun,
+    predicate_clause,
     Verb,
 )
 
@@ -128,6 +130,45 @@ def test_clause_joins_constituents_in_order():
     )
 
 
+# ── clause() coordinated-subject agreement ────────────────────────────────────────
+
+
+def _render(fragment):
+    return flatten_fragment_to_plain_text(realize_tree(fragment))
+
+
+def test_coordinated_subject_takes_a_plural_copula():
+    built = clause(
+        ConjunctivePhrase([Noun("point"), Noun("point"), Noun("point")]),
+        Copula(),
+        Adjective("collinear"),
+    )
+    assert _render(built) == "a point, a point, and a point are collinear"
+
+
+def test_coordinated_subject_takes_a_plural_verb():
+    built = clause(ConjunctivePhrase([Noun("robot"), Noun("robot")]), Verb("work"))
+    assert _render(built) == "a robot and a robot work"
+
+
+def test_single_subject_keeps_a_singular_copula():
+    built = clause(Noun("point"), Copula(), Adjective("blue"))
+    assert _render(built) == "a point is blue"
+
+
+def test_holds_given_branch_keeps_its_singular_subject():
+    """
+    A coordination in OBJECT position (``predicate_clause``'s "holds given" branch) must
+    not be mistaken for the clause subject — the complement noun stays singular.
+    """
+
+    class IsOneMonth:
+        pass
+
+    built = predicate_clause(IsOneMonth, Noun.the("begin"), Noun.the("end"))
+    assert _render(built) == "one month holds given the begin and the end"
+
+
 # ── negate_clause (feature marking) ──────────────────────────────────────────────
 
 
@@ -147,10 +188,10 @@ def test_negate_clause_returns_none_without_a_verb_or_copula():
 
 def test_copula_predicate_affirmative_and_negated():
     assert verbalize_expression(IsReachable(variable(Location, []))) == (
-        "a body is reachable"
+        "a location is reachable"
     )
     assert verbalize_expression(Not(IsReachable(variable(Location, [])))) == (
-        "a body is not reachable"
+        "a location is not reachable"
     )
 
 
@@ -201,10 +242,10 @@ def test_clause_verb_agrees_with_plural_population():
 def test_clause_subject_keeps_noun_phrase_outside_a_subject_scope():
     """
     A plain predicate (no enclosing subject) keeps its first-mention noun phrase — the
-    anonymous operand is named by its field, *"a body"*, not pronominalised.
+    anonymous operand is named by its field, *"a location"*, not pronominalised.
     """
     assert verbalize_expression(IsReachable(variable(Location, []))) == (
-        "a body is reachable"
+        "a location is reachable"
     )
 
 

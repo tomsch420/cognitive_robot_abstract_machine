@@ -470,7 +470,7 @@ class NotVerbalizablePredicateRule(PhraseRule):
     back to the wrapped form.
 
     >>> verbalize_expression(Not(IsReachable(variable(Location, []))))
-    'a body is not reachable'
+    'a location is not reachable'
     >>> employee, department = variable(StaffMember, []), variable(Department, [])
     >>> verbalize_expression(Not(WorksIn(employee, department)))
     'an employee does not work in a department'

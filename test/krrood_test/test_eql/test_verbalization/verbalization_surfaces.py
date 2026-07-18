@@ -75,7 +75,7 @@ SURFACES: Tuple[VerbalizationSurface, ...] = (
     VerbalizationSurface(HasTypes, "an object is of type Integer or Text"),
     VerbalizationSurface(Is, "an object is the same object as the other object"),
     VerbalizationSurface(Length, "the length of an iterable"),
-    VerbalizationSurface(IsReachable, "a body is reachable"),
+    VerbalizationSurface(IsReachable, "a location is reachable"),
     VerbalizationSurface(WorksIn, "an employee works in a department"),
     VerbalizationSurface(
         InheritancePathLength,

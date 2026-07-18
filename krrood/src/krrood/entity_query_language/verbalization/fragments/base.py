@@ -601,3 +601,52 @@ def oxford_comma(
         result.append(WordFragment(text=Separator.COMMA))
     result.append(PhraseFragment(parts=[conjunction, tail]))
     return PhraseFragment(parts=result, separator=Separator.NONE)
+
+
+# %% Finite-slot agreement
+
+
+_FINITE_ROLES = (SemanticRole.OPERATOR, SemanticRole.VERB)
+"""
+The clause roles a finite predicate agrees through — the copula / comparison operator
+and a lexical verb.
+"""
+
+
+def agree_finite(
+    part: VerbalizationFragment, number: GrammaticalNumber
+) -> VerbalizationFragment:
+    """:return: *part* re-tagged with *number* when it is a clause's finite slot — an ``OPERATOR``
+    or ``VERB`` leaf, or a phrase led by one (the factored *"is greater than"*) — else *part*
+    unchanged. The copula inflects (*"is"* → *"are"*) and a lexical verb agrees (*"works"* →
+    *"work"*); a non-copula operator (*"contains"*) is tagged too but the morphology pass leaves
+    it be, so a caller never has to single the finite word out by text.
+
+    Shared by the coreference pass (a pronominalised subject re-agrees the clause it heads) and
+    :func:`~…vocabulary.parts_of_speech.clause` (a coordinated subject is plural from the moment
+    the clause is built).
+
+    >>> from krrood.entity_query_language.verbalization.fragments.roles import SemanticRole
+    >>> from krrood.entity_query_language.verbalization.fragments.features import (
+    ...     GrammaticalNumber,
+    ... )
+    >>> leaf = RoleFragment(text="is", role=SemanticRole.OPERATOR)
+    >>> agree_finite(leaf, GrammaticalNumber.PLURAL).number
+    <GrammaticalNumber.PLURAL: 'plural'>
+
+    :param part: A clause constituent, checked for the finite-slot shape.
+    :param number: The grammatical number to agree it to.
+    """
+    if isinstance(part, RoleFragment) and part.role in _FINITE_ROLES:
+        return replace(part, number=number)
+    leads_with_finite = (
+        isinstance(part, PhraseFragment)
+        and part.parts
+        and isinstance(part.parts[0], RoleFragment)
+        and part.parts[0].role in _FINITE_ROLES
+    )
+    if leads_with_finite:
+        return replace(
+            part, parts=[replace(part.parts[0], number=number), *part.parts[1:]]
+        )
+    return part
