@@ -492,6 +492,8 @@ class CoreferenceProcessor(RealizationPass):
         Employee subject is what renders *its salary* / *its starting_salary* instead of *the salary
         of the Employee*.
 
+        :param possessive_chain: The navigation chain to test.
+
         >>> employee = variable(Employee, [])
         >>> verbalize_expression(an(entity(employee).where(employee.salary > employee.starting_salary)))
         'Find an Employee such that its salary is greater than its starting_salary'
