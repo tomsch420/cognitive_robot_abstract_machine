@@ -33,12 +33,14 @@ def clear_file(file_path: Path) -> None:
     path.write_text("", encoding="utf-8")
 
 
-clear_file(
-    Path("../semantic_digital_twin/src/semantic_digital_twin/orm/ormatic_interface.py")
-)
-clear_file(Path("../coraplex/src/coraplex/orm/ormatic_interface.py"))
-clear_file(Path("../experiments/src/experiments/orm/ormatic_interface.py"))
+repo_root = Path(__file__).resolve().parent.parent
 
-regenerate(Path("../semantic_digital_twin/scripts/generate_orm.py"))
-regenerate(Path("../coraplex/scripts/generate_orm.py"))
-regenerate(Path("../experiments/scripts/generate_orm.py"))
+clear_file(
+    repo_root / "semantic_digital_twin/src/semantic_digital_twin/orm/ormatic_interface.py"
+)
+clear_file(repo_root / "coraplex/src/coraplex/orm/ormatic_interface.py")
+clear_file(repo_root / "experiments/src/experiments/orm/ormatic_interface.py")
+
+regenerate(repo_root / "semantic_digital_twin/scripts/generate_orm.py")
+regenerate(repo_root / "coraplex/scripts/generate_orm.py")
+regenerate(repo_root / "experiments/scripts/generate_orm.py")
