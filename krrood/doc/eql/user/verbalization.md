@@ -456,8 +456,12 @@ print(verbalize_expression(scoped_sum))
 
 ## Same-Type Variable Disambiguation
 
-When two variables of the same type appear in a query, the verbalizer distinguishes
-them by appending a numeric index — *"Employee 1"*, *"Employee 2"*.
+When two distinct variables of the same type appear in a query, the verbalizer tells
+them apart with a determiner rather than a number: the first mention reads plainly
+(*"an Employee"*), and the second reads with the indefinite alternative (*"another
+Employee"*) — the natural English form for a second, freshly introduced entity of the
+same kind. A later mention of either reduces to the matching definite form (*"the
+Employee"* / *"the other Employee"*).
 
 ```{code-cell} ipython3
 from krrood.entity_query_language.verbalization.example_domain import Employee
@@ -477,9 +481,10 @@ query_agg = an(entity(eql.average(emp.salary)).where(emp.starting_salary > 20000
 print(verbalize_expression(query_agg))
 ```
 
-It also counts the *related entity* a relational attribute introduces, so two missions assigned to
-two different robots read *"Robot 1"* / *"Robot 2"* rather than two indistinguishable *"the Robot"*s
-— and a repeat of either reduces to its numbered label:
+It also tells apart the *related entity* a relational attribute introduces, so two missions
+assigned to two different robots read *"the Robot to which its primary is assigned"* / *"the other
+Robot, to which its secondary is assigned"* rather than two indistinguishable *"the Robot"*s — a
+later mention of the distinguished robot keeps its *"the other"* form:
 
 ```{code-cell} ipython3
 from dataclasses import dataclass

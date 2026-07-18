@@ -201,8 +201,13 @@ class DistinguisherIndex:
     plain and who is another" is therefore deferred to the coreference pass, which walks the
     realised tree in the order it will actually be read.
 
-    Reference: :cite:t:`reiter2000building` — referring-expression generation as a discourse-order
-    decision, not an input-structure-order one.
+    References:
+
+    * :cite:t:`reiter2000building` — referring-expression generation as a discourse-order
+      decision, not an input-structure-order one.
+    * :cite:t:`gundel1993givenness` — the given/new distinction behind the indefinite
+      *"another"* (a fresh alternative) vs. the definite *"the other"* (an already-identified
+      one) that :attr:`Distinguisher.alternative` realises.
     """
 
     canonical_of: Dict[uuid.UUID, uuid.UUID] = field(default_factory=dict)
