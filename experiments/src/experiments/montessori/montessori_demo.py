@@ -1,9 +1,9 @@
 """
-Build the Montessori shape-sorting world and an HSRB robot in a semantic digital twin
-world, visualize it live in RViz, have the robot sort every loose shape into its
-matching hole (physically settling each one under gravity in MuJoCo right after it is
-placed, rather than leaving it exactly where it was kinematically teleported to), and
-finally physically simulate the finished scene live in MuJoCo.
+Build the Montessori shape-sorting world and, if ROS 2 is available, an HSRB robot in a
+semantic digital twin world, visualize it live in RViz, have the robot sort every loose
+shape into its matching hole (physically settling each one under gravity in MuJoCo right
+after it is placed, rather than leaving it exactly where it was kinematically teleported
+to), and finally physically simulate the finished scene live in MuJoCo.
 
 Run with (the ``experiments`` package must be importable)::
 
@@ -11,13 +11,17 @@ Run with (the ``experiments`` package must be importable)::
     python -m experiments.montessori.montessori_demo --headless
 
 .. note::
-    Requires a sourced ROS 2 workspace with ``rclpy`` installed (add a ``MarkerArray``
-    display in RViz2 for the topic printed at startup, with
-    ``DurabilityPolicy.TRANSIENT_LOCAL``, to see the scene) and the ``mujoco``
-    dependency (declared by ``semantic_digital_twin``; run ``uv sync`` once from the
-    repository root if it is not yet installed). The HSRB robot additionally requires
-    the ``hsr_description`` ROS package to be built and sourced; without it, the scene
-    is spawned without the robot, no shapes are inserted, and MuJoCo is not started.
+    ROS 2 (``rclpy``) is optional: without it, the scene is still built and viewable
+    through :class:`~experiments.montessori.world.MontessoriWorld` directly, but RViz
+    visualization is skipped and, since sorting the shapes requires the ROS-dependent
+    CRAM/Giskard motion stack, no robot is spawned, no shapes are inserted, and MuJoCo
+    is not started, regardless of whether ``hsr_description`` is installed. With
+    ``rclpy`` installed, add a ``MarkerArray`` display in RViz2 for the topic printed
+    at startup, with ``DurabilityPolicy.TRANSIENT_LOCAL``, to see the scene. The
+    ``mujoco`` dependency (declared by ``semantic_digital_twin``; run ``uv sync`` once
+    from the repository root if it is not yet installed) is required either way. The
+    HSRB robot additionally requires the ``hsr_description`` ROS package to be built
+    and sourced.
 """
 
 from __future__ import annotations
@@ -28,26 +32,14 @@ import threading
 import time
 
 import mujoco
-import rclpy
-from rclpy.executors import SingleThreadedExecutor
 
-import experiments.orm.ormatic_interface  # type: ignore
-from coraplex.datastructures.dataclasses import Context
-from coraplex.datastructures.enums import Arms
-from coraplex.execution_environment import simulated_robot
-from coraplex.plans.factories import execute_single
-from experiments.montessori.insert_shape_action import InsertMontessoriShapeAction
 from experiments.montessori.semantics import MontessoriShape, NoMatchingHoleError
 from experiments.montessori.world import MontessoriWorld
 from krrood.entity_query_language.backends import ProbabilisticBackend
 from krrood.utils import clear_memoization_cache
 from semantic_digital_twin.adapters.multi_sim import MujocoActuator, MujocoSim
-from semantic_digital_twin.adapters.ros.tf_publisher import TFPublisher
-from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
-    VizMarkerPublisher,
-)
 from semantic_digital_twin.robots.hsrb import HSRB
-from semantic_digital_twin.utils import hsrb_installed
+from semantic_digital_twin.utils import hsrb_installed, rclpy_installed
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection,
@@ -128,6 +120,16 @@ def _insert_all_shapes(montessori: MontessoriWorld, headless: bool) -> None:
     :param headless: Whether to run the settling MuJoCo simulations without opening a
         viewer window.
     """
+    # Imported lazily: coraplex.datastructures.dataclasses pulls in
+    # coraplex.plans.executables for GiskardExecutable, which imports rclpy at module
+    # level, so this whole chain would make the demo unimportable without ROS 2 even
+    # though nothing here runs without it anyway (see rclpy_installed() in main()).
+    from coraplex.datastructures.dataclasses import Context
+    from coraplex.datastructures.enums import Arms
+    from coraplex.execution_environment import simulated_robot
+    from coraplex.plans.factories import execute_single
+    from experiments.montessori.insert_shape_action import InsertMontessoriShapeAction
+
     context = Context(
         montessori.world, montessori.hsrb, query_backend=ProbabilisticBackend()
     )
@@ -440,30 +442,52 @@ def main() -> None:
         )
     logger.info("Built Montessori world with %d bodies.", len(montessori.world.bodies))
 
-    if not rclpy.ok():
-        rclpy.init()
-    node = rclpy.create_node("montessori_demo")
-    executor = SingleThreadedExecutor()
-    executor.add_node(node)
-    thread = threading.Thread(target=executor.spin, daemon=True, name="rclpy-executor")
-    thread.start()
-    time.sleep(0.1)
+    # Sorting the shapes goes through CRAM's execute_single, which pulls in
+    # coraplex.plans.executables for GiskardExecutable, which imports rclpy at module
+    # level regardless of whether a real robot ever executes a real ROS 2 motion; RViz
+    # visualization needs rclpy directly. Both are skipped without it, rather than the
+    # whole demo failing to even import.
+    ros_active = rclpy_installed()
+    node = executor = thread = tf_publisher = viz_marker_publisher = None
+    if ros_active:
+        import rclpy
+        from rclpy.executors import SingleThreadedExecutor
+        from semantic_digital_twin.adapters.ros.tf_publisher import TFPublisher
+        from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
+            VizMarkerPublisher,
+        )
 
-    tf_publisher = TFPublisher(node=node, _world=montessori.world)
-    viz_marker_publisher = VizMarkerPublisher(_world=montessori.world, node=node)
+        if not rclpy.ok():
+            rclpy.init()
+        node = rclpy.create_node("montessori_demo")
+        executor = SingleThreadedExecutor()
+        executor.add_node(node)
+        thread = threading.Thread(
+            target=executor.spin, daemon=True, name="rclpy-executor"
+        )
+        thread.start()
+        time.sleep(0.1)
 
-    logger.info(
-        "Visualizing the Montessori world on topic '%s'.",
-        viz_marker_publisher.topic_name,
-    )
+        tf_publisher = TFPublisher(node=node, _world=montessori.world)
+        viz_marker_publisher = VizMarkerPublisher(_world=montessori.world, node=node)
+        logger.info(
+            "Visualizing the Montessori world on topic '%s'.",
+            viz_marker_publisher.topic_name,
+        )
+    else:
+        logger.warning("rclpy is not installed; running without RViz visualization.")
 
     mujoco_sim = None
-    if montessori.hsrb is not None:
+    if montessori.hsrb is not None and ros_active:
+        import experiments.orm.ormatic_interface  # type: ignore
+
         _insert_all_shapes(montessori, headless=arguments.headless)
         logger.info("Sorting done; starting the MuJoCo simulation.")
         mujoco_sim = _simulate_finished_scene_in_mujoco(
             montessori, headless=arguments.headless
         )
+    elif montessori.hsrb is not None:
+        logger.warning("rclpy is not installed; skipping sorting and MuJoCo.")
 
     logger.info("Done. Press Ctrl+C to stop.")
     try:
@@ -474,12 +498,17 @@ def main() -> None:
     finally:
         if mujoco_sim is not None:
             mujoco_sim.stop_simulation()
-        viz_marker_publisher.stop()
-        tf_publisher.stop()
-        executor.shutdown()
-        thread.join(timeout=2.0)
-        node.destroy_node()
-        if rclpy.ok():
+        if viz_marker_publisher is not None:
+            viz_marker_publisher.stop()
+        if tf_publisher is not None:
+            tf_publisher.stop()
+        if executor is not None:
+            executor.shutdown()
+        if thread is not None:
+            thread.join(timeout=2.0)
+        if node is not None:
+            node.destroy_node()
+        if ros_active and rclpy.ok():
             rclpy.shutdown()
 
 
