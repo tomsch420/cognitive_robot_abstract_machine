@@ -33,11 +33,12 @@ import logging
 import random
 import threading
 import time
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import mujoco
 
-from typing_extensions import Type
+from typing_extensions import Optional, Type
 
 from experiments.montessori.semantics import MontessoriShape, NoMatchingHoleError
 from experiments.montessori.world import MontessoriWorld, robot_installed
@@ -160,12 +161,33 @@ def _random_horizontal_jitter() -> Point3:
     )
 
 
+@dataclass(frozen=True)
+class InsertionAttemptResult:
+    """
+    Outcome of a single :func:`_insert_shape` call.
+    """
+
+    target_horizontal_offset: Point3
+    """
+    The horizontal offset the attempt was actually released at (see
+    :attr:`~experiments.montessori.insert_shape_action.InsertMontessoriShapeAction.target_horizontal_offset`),
+    whether given by the caller or generated internally.
+    """
+
+    fell_through_hole: bool
+    """
+    Whether the shape actually fell through its hole after settling; see
+    :meth:`~experiments.montessori.insert_shape_action.InsertMontessoriShapeAction.has_fallen_through_hole`.
+    """
+
+
 def _insert_shape(
     shape: MontessoriShape,
     montessori: MontessoriWorld,
     context: Context,
     headless: bool,
-) -> bool:
+    target_horizontal_offset: Optional[Point3] = None,
+) -> InsertionAttemptResult:
     """
     Have the robot pick up and insert a single loose shape into its matching hole once,
     then physically settle it under gravity in MuJoCo (see
@@ -179,13 +201,16 @@ def _insert_shape(
     :param context: The CRAM execution context to run the insertion action in.
     :param headless: Whether to run the settling MuJoCo simulation without opening a
         viewer window.
-    :return: Whether the shape actually fell through its hole (see
-        :meth:`~experiments.montessori.insert_shape_action.InsertMontessoriShapeAction.has_fallen_through_hole`).
+    :param target_horizontal_offset: Horizontal offset to release the shape at; a
+        random :func:`_random_horizontal_jitter` is used if not given.
+    :return: The attempt's outcome.
     """
     from coraplex.datastructures.enums import Arms
     from coraplex.execution_environment import simulated_robot
     from coraplex.plans.factories import execute_single
     from experiments.montessori.insert_shape_action import InsertMontessoriShapeAction
+
+    offset = target_horizontal_offset or _random_horizontal_jitter()
 
     # World.get_kinematic_structure_entities_of_branch is @memoize'd per
     # (world, root-object) and never invalidated across the attach/detach cycle
@@ -197,7 +222,7 @@ def _insert_shape(
         montessori_shape=shape,
         board=montessori.board,
         arm=Arms.RIGHT,
-        target_horizontal_offset=_random_horizontal_jitter(),
+        target_horizontal_offset=offset,
     )
     with simulated_robot:
         node = execute_single(action, context=context)
@@ -206,7 +231,7 @@ def _insert_shape(
     logger.info("Settling %s in MuJoCo.", shape.name)
     _settle_shape_in_mujoco(shape, montessori, headless)
 
-    return action.has_fallen_through_hole()
+    return InsertionAttemptResult(offset, action.has_fallen_through_hole())
 
 
 def _insert_all_shapes(montessori: MontessoriWorld, headless: bool) -> None:
@@ -246,7 +271,7 @@ def _insert_all_shapes(montessori: MontessoriWorld, headless: bool) -> None:
                 attempt,
                 MAX_INSERTION_ATTEMPTS,
             )
-            if _insert_shape(shape, montessori, context, headless):
+            if _insert_shape(shape, montessori, context, headless).fell_through_hole:
                 break
         else:
             logger.warning(
