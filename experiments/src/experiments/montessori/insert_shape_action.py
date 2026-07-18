@@ -230,3 +230,51 @@ class InsertMontessoriShapeAction(ActionDescription):
                 ParkArmsAction(Arms.BOTH),
             ]
         )
+
+    def has_fallen_through_hole(self) -> bool:
+        """
+        Whether :attr:`montessori_shape` currently rests below the board's top
+        surface, directly beneath its matching hole, i.e. has actually fallen
+        through that hole rather than still resting on top of the board or having
+        never been moved there at all.
+
+        :attr:`_action_plan` only ever kinematically teleports the shape to its
+        target pose via
+        :class:`~coraplex.robot_plans.actions.core.placing.PlaceAction`, which does
+        not check whether the shape actually fits through a tight-clearance hole;
+        call this only after the shape has had a chance to physically settle (e.g.
+        by simulating it in MuJoCo), not right after the action plan finishes.
+
+        :return: ``True`` if the shape's own center is horizontally within the
+            hole's footprint and its highest point is below the board's top
+            surface.
+        """
+        hole = self.board.hole_for(self.montessori_shape)
+        hole_position = hole.root.global_transform.to_position()
+        hole_bounds = hole.root.area.combined_mesh.bounds
+        hole_min_x = float(hole_position.x) + hole_bounds[0][0]
+        hole_max_x = float(hole_position.x) + hole_bounds[1][0]
+        hole_min_y = float(hole_position.y) + hole_bounds[0][1]
+        hole_max_y = float(hole_position.y) + hole_bounds[1][1]
+
+        shape_position = self.montessori_shape.root.global_transform.to_position()
+        shape_x, shape_y = float(shape_position.x), float(shape_position.y)
+        is_below_the_hole = (
+            hole_min_x <= shape_x <= hole_max_x and hole_min_y <= shape_y <= hole_max_y
+        )
+
+        board_top_z = (
+            self.board.root.collision.as_bounding_box_collection_in_frame(
+                self.world.root
+            )
+            .bounding_box()
+            .max_z
+        )
+        shape_top_z = (
+            self.montessori_shape.root.collision.as_bounding_box_collection_in_frame(
+                self.world.root
+            )
+            .bounding_box()
+            .max_z
+        )
+        return bool(is_below_the_hole and shape_top_z < board_top_z)

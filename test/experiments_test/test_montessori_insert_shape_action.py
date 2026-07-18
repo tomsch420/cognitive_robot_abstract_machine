@@ -131,3 +131,50 @@ def test_insert_montessori_shape_action_raises_for_a_shape_without_a_matching_ho
         plan = execute_single(action, context=context)
         plan.notify()
         plan.parse()
+
+
+def test_has_fallen_through_hole_is_false_right_after_kinematic_placement(
+    montessori_with_hsrb,
+):
+    """
+    PlaceAction only ever kinematically teleports the shape to hover above its hole; it
+    never checks whether the shape actually fits through, so has_fallen_through_hole
+    must not read that teleport alone as success.
+    """
+    montessori = montessori_with_hsrb
+    cube_shape = shape_with_category(montessori, "cube")
+    context = Context(
+        montessori.world, montessori.hsrb, query_backend=ProbabilisticBackend()
+    )
+
+    action = InsertMontessoriShapeAction(
+        montessori_shape=cube_shape, board=montessori.board, arm=Arms.RIGHT
+    )
+    with simulated_robot:
+        node = execute_single(action, context=context)
+        node.perform()
+
+    assert action.has_fallen_through_hole() is False
+
+
+def test_has_fallen_through_hole_is_true_once_the_shape_settles_in_mujoco(
+    montessori_with_hsrb,
+):
+    from experiments.montessori.montessori_demo import _settle_shape_in_mujoco
+
+    montessori = montessori_with_hsrb
+    cube_shape = shape_with_category(montessori, "cube")
+    context = Context(
+        montessori.world, montessori.hsrb, query_backend=ProbabilisticBackend()
+    )
+
+    action = InsertMontessoriShapeAction(
+        montessori_shape=cube_shape, board=montessori.board, arm=Arms.RIGHT
+    )
+    with simulated_robot:
+        node = execute_single(action, context=context)
+        node.perform()
+
+    _settle_shape_in_mujoco(cube_shape, montessori, headless=True)
+
+    assert action.has_fallen_through_hole() is True
