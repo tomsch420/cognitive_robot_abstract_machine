@@ -1,9 +1,10 @@
 """
-Build the Montessori shape-sorting world and, if ROS 2 is available, an HSRB robot in a
-semantic digital twin world, visualize it live in RViz, have the robot sort every loose
-shape into its matching hole (physically settling each one under gravity in MuJoCo right
-after it is placed, rather than leaving it exactly where it was kinematically teleported
-to), and finally physically simulate the finished scene live in MuJoCo.
+Build the Montessori shape-sorting world and, if ROS 2 is available, a robot (see
+:data:`DEFAULT_ROBOT_CLASS`) in a semantic digital twin world, visualize it live in
+RViz, have the robot sort every loose shape into its matching hole (physically settling
+each one under gravity in MuJoCo right after it is placed, rather than leaving it
+exactly where it was kinematically teleported to), and finally physically simulate the
+finished scene live in MuJoCo.
 
 Run with (the ``experiments`` package must be importable)::
 
@@ -15,13 +16,14 @@ Run with (the ``experiments`` package must be importable)::
     through :class:`~experiments.montessori.world.MontessoriWorld` directly, but RViz
     visualization is skipped and, since sorting the shapes requires the ROS-dependent
     CRAM/Giskard motion stack, no robot is spawned, no shapes are inserted, and MuJoCo
-    is not started, regardless of whether ``hsr_description`` is installed. With
-    ``rclpy`` installed, add a ``MarkerArray`` display in RViz2 for the topic printed
-    at startup, with ``DurabilityPolicy.TRANSIENT_LOCAL``, to see the scene. The
-    ``mujoco`` dependency (declared by ``semantic_digital_twin``; run ``uv sync`` once
-    from the repository root if it is not yet installed) is required either way. The
-    HSRB robot additionally requires the ``hsr_description`` ROS package to be built
-    and sourced.
+    is not started, regardless of whether :data:`DEFAULT_ROBOT_CLASS`'s description is
+    installed. With ``rclpy`` installed, add a ``MarkerArray`` display in RViz2 for the
+    topic printed at startup, with ``DurabilityPolicy.TRANSIENT_LOCAL``, to see the
+    scene. The ``mujoco`` dependency (declared by ``semantic_digital_twin``; run
+    ``uv sync`` once from the repository root if it is not yet installed) is required
+    either way. :data:`DEFAULT_ROBOT_CLASS` additionally requires its own ROS package
+    (e.g. ``hsr_description`` for :class:`~semantic_digital_twin.robots.hsrb.HSRB`) to
+    be built and sourced.
 """
 
 from __future__ import annotations
@@ -33,13 +35,16 @@ import time
 
 import mujoco
 
+from typing_extensions import Type
+
 from experiments.montessori.semantics import MontessoriShape, NoMatchingHoleError
-from experiments.montessori.world import MontessoriWorld
+from experiments.montessori.world import MontessoriWorld, robot_installed
 from krrood.entity_query_language.backends import ProbabilisticBackend
 from krrood.utils import clear_memoization_cache
 from semantic_digital_twin.adapters.multi_sim import MujocoActuator, MujocoSim
 from semantic_digital_twin.robots.hsrb import HSRB
-from semantic_digital_twin.utils import hsrb_installed, rclpy_installed
+from semantic_digital_twin.robots.robot_parts import AbstractRobot
+from semantic_digital_twin.utils import rclpy_installed
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection,
@@ -51,6 +56,12 @@ from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFr
 from semantic_digital_twin.world_description.world_entity import Actuator
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_ROBOT_CLASS: Type[AbstractRobot] = HSRB
+"""
+The robot spawned by :func:`main` into the Montessori scene, via
+:meth:`~experiments.montessori.world.MontessoriWorld.spawn_robot`.
+"""
 
 ACTUATOR_TIME_CONSTANT = 0.1
 """
@@ -109,12 +120,12 @@ combined with their position hold and contact with the floor, and repeatedly dri
 
 def _insert_all_shapes(montessori: MontessoriWorld, headless: bool) -> None:
     """
-    Have the HSRB robot pick up and insert every loose shape that has a matching hole
-    into the shape-sorting board, skipping any that don't (e.g. the sphere), physically
+    Have the robot pick up and insert every loose shape that has a matching hole into
+    the shape-sorting board, skipping any that don't (e.g. the sphere), physically
     settling each one under gravity in MuJoCo (see :func:`_settle_shape_in_mujoco`)
     immediately after it is placed.
 
-    :param montessori: The Montessori scene, with :attr:`MontessoriWorld.hsrb` already
+    :param montessori: The Montessori scene, with :attr:`MontessoriWorld.robot` already
         spawned and its controlled joints already held (see
         :func:`_hold_controlled_joints_in_mujoco`).
     :param headless: Whether to run the settling MuJoCo simulations without opening a
@@ -131,7 +142,7 @@ def _insert_all_shapes(montessori: MontessoriWorld, headless: bool) -> None:
     from experiments.montessori.insert_shape_action import InsertMontessoriShapeAction
 
     context = Context(
-        montessori.world, montessori.hsrb, query_backend=ProbabilisticBackend()
+        montessori.world, montessori.robot, query_backend=ProbabilisticBackend()
     )
     for shape in montessori.world.get_semantic_annotations_by_type(MontessoriShape):
         try:
@@ -205,45 +216,48 @@ def _add_position_hold_actuator(
 
 
 def _base_degrees_of_freedom_without_hardware_interface(
-    hsrb: HSRB,
+    robot: AbstractRobot,
 ) -> list[DegreeOfFreedom]:
     """
     The degrees of freedom of :func:`_base_connections_without_hardware_interface`.
 
-    :param hsrb: The spawned HSRB robot.
+    :param robot: The spawned robot.
     """
     return [
         connection.raw_dof
-        for connection in _base_connections_without_hardware_interface(hsrb)
+        for connection in _base_connections_without_hardware_interface(robot)
     ]
 
 
 def _base_connections_without_hardware_interface(
-    hsrb: HSRB,
+    robot: AbstractRobot,
 ) -> list[ActiveConnection1DOF]:
     """
-    The HSRB's mobile-base joints (drive wheels, passive caster wheels, base roll) that
-    have a degree of freedom but, unlike the arm/wrist/head, are not part of
-    :attr:`HSRB.degrees_of_freedom_with_hardware_interface`: they are driven indirectly
-    through the :class:`OmniDrive` connection rather than controlled directly. Left
-    unactuated, MuJoCo's contact and gravity forces spin them up without bound.
+    The robot's mobile-base joints (drive wheels, passive caster wheels, base roll,
+    ...) that have a degree of freedom but, unlike the arm/wrist/head, are not part of
+    :attr:`AbstractRobot.degrees_of_freedom_with_hardware_interface`: they are driven
+    indirectly through the :class:`OmniDrive` connection rather than controlled
+    directly. Left unactuated, MuJoCo's contact and gravity forces spin them up
+    without bound.
 
-    Excludes the gripper's own uncontrolled (mimic/spring) joints, which already move
-    together through their mimic relationship and don't need an independent hold.
+    Excludes every end effector's own uncontrolled (mimic/spring) joints, which
+    already move together through their mimic relationship and don't need an
+    independent hold.
 
-    :param hsrb: The spawned HSRB robot.
+    :param robot: The spawned robot.
     """
-    controlled_dofs = set(hsrb.degrees_of_freedom_with_hardware_interface)
+    controlled_dofs = set(robot.degrees_of_freedom_with_hardware_interface)
     gripper_dofs = {
         dof
-        for connection in hsrb.end_effector.connections
+        for end_effector in robot.get_end_effectors()
+        for connection in end_effector.connections
         if isinstance(connection, ActiveConnection)
         for dof in connection.active_dofs
     }
 
     base_connections = []
     seen_dofs = set(controlled_dofs)
-    for connection in hsrb.connections:
+    for connection in robot.connections:
         if not isinstance(connection, ActiveConnection1DOF):
             continue
         if connection.raw_dof in seen_dofs or connection.raw_dof in gripper_dofs:
@@ -253,7 +267,7 @@ def _base_connections_without_hardware_interface(
     return base_connections
 
 
-def _hold_controlled_joints_in_mujoco(hsrb: HSRB) -> None:
+def _hold_controlled_joints_in_mujoco(robot: AbstractRobot) -> None:
     """
     Keep every joint of the robot that would otherwise be left to MuJoCo's own physics
     (arm, wrist, head, and the mobile base's wheels) from sagging or spinning under
@@ -267,18 +281,21 @@ def _hold_controlled_joints_in_mujoco(hsrb: HSRB) -> None:
     alone is not enough to stop them spinning once the robot has actually driven around
     and is resting at a real, contact-heavy pose rather than its spawn pose.
 
-    :param hsrb: The spawned HSRB robot, modified in place.
+    :param robot: The spawned robot, modified in place.
     """
-    with hsrb._world.modify_world():
-        for dof in hsrb.degrees_of_freedom_with_hardware_interface:
+    with robot._world.modify_world():
+        for dof in robot.degrees_of_freedom_with_hardware_interface:
             _add_position_hold_actuator(
-                hsrb._world, dof, ARM_ACTUATOR_POSITION_GAIN, ARM_ACTUATOR_VELOCITY_GAIN
+                robot._world,
+                dof,
+                ARM_ACTUATOR_POSITION_GAIN,
+                ARM_ACTUATOR_VELOCITY_GAIN,
             )
-        for connection in _base_connections_without_hardware_interface(hsrb):
+        for connection in _base_connections_without_hardware_interface(robot):
             connection.dynamics.damping = BASE_JOINT_DAMPING
             connection.dynamics.dry_friction = BASE_JOINT_DRY_FRICTION
             _add_position_hold_actuator(
-                hsrb._world,
+                robot._world,
                 connection.raw_dof,
                 BASE_ACTUATOR_POSITION_GAIN,
                 BASE_ACTUATOR_VELOCITY_GAIN,
@@ -394,7 +411,7 @@ def _simulate_finished_scene_in_mujoco(
     inserted (see :func:`_settle_shape_in_mujoco`); this final pass is for live viewing
     of the completed scene, not the shapes' only chance to physically settle.
 
-    :param montessori: The finished Montessori scene, with :attr:`MontessoriWorld.hsrb`
+    :param montessori: The finished Montessori scene, with :attr:`MontessoriWorld.robot`
         already spawned.
     :param headless: Whether to run without opening a MuJoCo viewer window.
     :return: The running :class:`MujocoSim`.
@@ -435,17 +452,18 @@ def main() -> None:
 
     montessori = MontessoriWorld()
 
-    if hsrb_installed():
-        montessori.spawn_hsrb()
+    if robot_installed(DEFAULT_ROBOT_CLASS):
+        montessori.spawn_robot(DEFAULT_ROBOT_CLASS)
         # Must happen before any MuJoCo simulation runs, including the per-shape
         # settling in _insert_all_shapes, or the robot's own joints sag/spin under
         # gravity for that simulation's duration (see
         # _hold_controlled_joints_in_mujoco).
-        _hold_controlled_joints_in_mujoco(montessori.hsrb)
+        _hold_controlled_joints_in_mujoco(montessori.robot)
     else:
         logger.warning(
-            "hsr_description is not installed; spawning the Montessori scene without "
-            "the HSRB robot."
+            "%s's description is not installed; spawning the Montessori scene "
+            "without a robot.",
+            DEFAULT_ROBOT_CLASS.__name__,
         )
     logger.info("Built Montessori world with %d bodies.", len(montessori.world.bodies))
 
@@ -485,7 +503,7 @@ def main() -> None:
         logger.warning("rclpy is not installed; running without RViz visualization.")
 
     mujoco_sim = None
-    if montessori.hsrb is not None and ros_active:
+    if montessori.robot is not None and ros_active:
         import experiments.orm.ormatic_interface  # type: ignore
 
         _insert_all_shapes(montessori, headless=arguments.headless)
@@ -493,7 +511,7 @@ def main() -> None:
         mujoco_sim = _simulate_finished_scene_in_mujoco(
             montessori, headless=arguments.headless
         )
-    elif montessori.hsrb is not None:
+    elif montessori.robot is not None:
         logger.warning("rclpy is not installed; skipping sorting and MuJoCo.")
 
     logger.info("Done. Press Ctrl+C to stop.")

@@ -13,9 +13,9 @@ from experiments.montessori.montessori_demo import (
     _settle_shape_in_mujoco,
 )
 from experiments.montessori.semantics import MontessoriShape, MontessoriShapeCategory
-from experiments.montessori.world import MontessoriWorld
+from experiments.montessori.world import MontessoriWorld, robot_installed
+from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
-from semantic_digital_twin.utils import hsrb_installed
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
     FixedConnection,
@@ -35,59 +35,59 @@ EXPECTED_BASE_DOF_NAMES = {
 
 
 @pytest.fixture
-def montessori_with_hsrb():
-    if not hsrb_installed():
+def montessori_with_robot():
+    if not robot_installed(HSRB):
         pytest.skip("hsr_description is not installed")
 
     montessori = MontessoriWorld()
-    montessori.spawn_hsrb()
+    montessori.spawn_robot(HSRB)
     return montessori
 
 
 def test_base_degrees_of_freedom_without_hardware_interface_finds_the_wheel_joints(
-    montessori_with_hsrb,
+    montessori_with_robot,
 ):
-    hsrb = montessori_with_hsrb.hsrb
+    robot = montessori_with_robot.robot
     base_dof_names = {
         dof.name.name
-        for dof in _base_degrees_of_freedom_without_hardware_interface(hsrb)
+        for dof in _base_degrees_of_freedom_without_hardware_interface(robot)
     }
 
     assert base_dof_names == EXPECTED_BASE_DOF_NAMES
 
 
 def test_base_degrees_of_freedom_without_hardware_interface_excludes_controlled_and_gripper_dofs(
-    montessori_with_hsrb,
+    montessori_with_robot,
 ):
-    hsrb = montessori_with_hsrb.hsrb
-    base_dofs = set(_base_degrees_of_freedom_without_hardware_interface(hsrb))
+    robot = montessori_with_robot.robot
+    base_dofs = set(_base_degrees_of_freedom_without_hardware_interface(robot))
 
-    assert base_dofs.isdisjoint(hsrb.degrees_of_freedom_with_hardware_interface)
+    assert base_dofs.isdisjoint(robot.degrees_of_freedom_with_hardware_interface)
     assert not any(dof.name.name.startswith("hand_") for dof in base_dofs)
 
 
 def test_hold_controlled_joints_in_mujoco_adds_one_actuator_per_held_dof(
-    montessori_with_hsrb,
+    montessori_with_robot,
 ):
-    hsrb = montessori_with_hsrb.hsrb
-    controlled_dofs = set(hsrb.degrees_of_freedom_with_hardware_interface)
-    base_dofs = set(_base_degrees_of_freedom_without_hardware_interface(hsrb))
+    robot = montessori_with_robot.robot
+    controlled_dofs = set(robot.degrees_of_freedom_with_hardware_interface)
+    base_dofs = set(_base_degrees_of_freedom_without_hardware_interface(robot))
 
-    _hold_controlled_joints_in_mujoco(hsrb)
+    _hold_controlled_joints_in_mujoco(robot)
 
-    held_dofs = {dof for actuator in hsrb._world.actuators for dof in actuator.dofs}
+    held_dofs = {dof for actuator in robot._world.actuators for dof in actuator.dofs}
     assert held_dofs == controlled_dofs | base_dofs
 
 
 def test_hold_controlled_joints_in_mujoco_uses_a_weaker_gain_for_the_base(
-    montessori_with_hsrb,
+    montessori_with_robot,
 ):
-    hsrb = montessori_with_hsrb.hsrb
-    base_dofs = set(_base_degrees_of_freedom_without_hardware_interface(hsrb))
+    robot = montessori_with_robot.robot
+    base_dofs = set(_base_degrees_of_freedom_without_hardware_interface(robot))
 
-    _hold_controlled_joints_in_mujoco(hsrb)
+    _hold_controlled_joints_in_mujoco(robot)
 
-    for actuator in hsrb._world.actuators:
+    for actuator in robot._world.actuators:
         [mujoco_actuator] = actuator.simulator_additional_properties
         expected_gain = (
             BASE_ACTUATOR_POSITION_GAIN
@@ -98,12 +98,12 @@ def test_hold_controlled_joints_in_mujoco_uses_a_weaker_gain_for_the_base(
 
 
 def test_hold_controlled_joints_in_mujoco_adds_joint_damping_to_the_base(
-    montessori_with_hsrb,
+    montessori_with_robot,
 ):
-    hsrb = montessori_with_hsrb.hsrb
-    base_connections = _base_connections_without_hardware_interface(hsrb)
+    robot = montessori_with_robot.robot
+    base_connections = _base_connections_without_hardware_interface(robot)
 
-    _hold_controlled_joints_in_mujoco(hsrb)
+    _hold_controlled_joints_in_mujoco(robot)
 
     for connection in base_connections:
         assert connection.dynamics.damping == BASE_JOINT_DAMPING

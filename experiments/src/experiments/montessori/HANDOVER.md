@@ -24,7 +24,8 @@ docstring in `montessori_demo.py`).
 ## File map
 
 - **`world.py`** — builds the scene (`MontessoriWorld`): floor, table, board (with
-  holes cut from its mesh), loose shapes, and `spawn_hsrb()`. Board mesh, hole
+  holes cut from its mesh), loose shapes, and `spawn_robot()` (generic over any
+  `AbstractRobot` subclass, e.g. `HSRB`). Board mesh, hole
   detection, and the board's convex collision decomposition are all computed once at
   **module import time** and cached at module level (`_BOARD_MESH`, `_HOLE_FOOTPRINTS`,
   `_BOARD_COLLISION_PARTS`), not per-`MontessoriWorld()` instance.

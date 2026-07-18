@@ -39,6 +39,7 @@ Horizontal clearance kept between a standoff point (see
 surface it stands off from.
 """
 
+
 @dataclass
 class InsertMontessoriShapeAction(ActionDescription):
     """
@@ -89,7 +90,7 @@ class InsertMontessoriShapeAction(ActionDescription):
         surface like a table or the sorting board reads as occupied, regardless of
         height), so a reach target actually on ``surface`` is never in free space.
         Stepping just past the nearest edge, mirroring
-        :meth:`~experiments.montessori.world.MontessoriWorld.spawn_hsrb`'s own
+        :meth:`~experiments.montessori.world.MontessoriWorld.spawn_robot`'s own
         ``table_bounding_box.min_x - standoff_distance`` pattern, gives
         :meth:`_move_to_reach` a genuinely free point near the target to reach for.
 
@@ -159,9 +160,7 @@ class InsertMontessoriShapeAction(ActionDescription):
         target_node = gcs.node_of_point(target_pose_end_effector.position)
         if target_node is None:
             raise PointOccupiedError(
-                self.world.transform(
-                    target_pose_end_effector, self.world.root
-                ).position
+                self.world.transform(target_pose_end_effector, self.world.root).position
             )
         gcs = gcs.create_subgraph(
             list(

@@ -16,9 +16,10 @@ from experiments.montessori.world import (
     TABLE_SCALE,
     TABLE_SHAPE_ROW_X,
     MontessoriWorld,
+    robot_installed,
 )
+from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Floor, Table
-from semantic_digital_twin.utils import hsrb_installed
 
 
 def _sorted_xy(mesh: Trimesh) -> np.ndarray:
@@ -271,20 +272,20 @@ def test_montessori_world_table_stands_on_the_floor():
     assert float(position.z) + lowest_local_z == pytest.approx(FLOOR_Z)
 
 
-def test_montessori_world_has_no_hsrb_until_spawned():
+def test_montessori_world_has_no_robot_until_spawned():
     montessori = MontessoriWorld()
 
-    assert montessori.hsrb is None
+    assert montessori.robot is None
 
 
-def test_montessori_world_spawn_hsrb_adds_the_robot_to_the_world():
-    if not hsrb_installed():
+def test_montessori_world_spawn_robot_adds_the_robot_to_the_world():
+    if not robot_installed(HSRB):
         pytest.skip("hsr_description is not installed")
 
     montessori = MontessoriWorld()
     body_count_before_spawn = len(montessori.world.bodies)
 
-    hsrb = montessori.spawn_hsrb()
+    robot = montessori.spawn_robot(HSRB)
 
-    assert hsrb is montessori.hsrb
+    assert robot is montessori.robot
     assert len(montessori.world.bodies) > body_count_before_spawn

@@ -11,17 +11,17 @@ from krrood.utils import clear_memoization_cache
 
 from experiments.montessori.insert_shape_action import InsertMontessoriShapeAction
 from experiments.montessori.semantics import MontessoriShape, NoMatchingHoleError
-from experiments.montessori.world import MontessoriWorld
-from semantic_digital_twin.utils import hsrb_installed
+from experiments.montessori.world import MontessoriWorld, robot_installed
+from semantic_digital_twin.robots.hsrb import HSRB
 
 
 @pytest.fixture
-def montessori_with_hsrb():
-    if not hsrb_installed():
+def montessori_with_robot():
+    if not robot_installed(HSRB):
         pytest.skip("hsr_description is not installed")
 
     montessori = MontessoriWorld()
-    montessori.spawn_hsrb()
+    montessori.spawn_robot(HSRB)
     montessori.world.update_forward_kinematics()
     return montessori
 
@@ -35,11 +35,11 @@ def shape_with_category(montessori: MontessoriWorld, category: str) -> Montessor
     return shape
 
 
-def test_insert_montessori_shape_action_builds_a_valid_plan(montessori_with_hsrb):
-    montessori = montessori_with_hsrb
+def test_insert_montessori_shape_action_builds_a_valid_plan(montessori_with_robot):
+    montessori = montessori_with_robot
     cube_shape = shape_with_category(montessori, "cube")
     context = Context(
-        montessori.world, montessori.hsrb, query_backend=ProbabilisticBackend()
+        montessori.world, montessori.robot, query_backend=ProbabilisticBackend()
     )
 
     action = InsertMontessoriShapeAction(
@@ -53,14 +53,14 @@ def test_insert_montessori_shape_action_builds_a_valid_plan(montessori_with_hsrb
 
 
 def test_insert_montessori_shape_action_moves_the_shape_to_its_matching_hole(
-    montessori_with_hsrb,
+    montessori_with_robot,
 ):
-    montessori = montessori_with_hsrb
+    montessori = montessori_with_robot
     cube_shape = shape_with_category(montessori, "cube")
     hole = montessori.board.hole_for(cube_shape)
     hole_position = hole.root.global_transform.to_position()
     context = Context(
-        montessori.world, montessori.hsrb, query_backend=ProbabilisticBackend()
+        montessori.world, montessori.robot, query_backend=ProbabilisticBackend()
     )
 
     action = InsertMontessoriShapeAction(
@@ -75,7 +75,7 @@ def test_insert_montessori_shape_action_moves_the_shape_to_its_matching_hole(
     assert float(shape_position.y) == pytest.approx(float(hole_position.y), abs=0.05)
 
 
-def test_insert_montessori_shape_action_runs_twice_in_a_row(montessori_with_hsrb):
+def test_insert_montessori_shape_action_runs_twice_in_a_row(montessori_with_robot):
     """
     World.get_kinematic_structure_entities_of_branch is memoized per (world, root-
     object) and never invalidated across an attach/detach cycle, so a second insertion's
@@ -86,11 +86,11 @@ def test_insert_montessori_shape_action_runs_twice_in_a_row(montessori_with_hsrb
     before each insertion (as :func:`~experiments.montessori.montessori_demo._insert_all_shapes`
     does) works around this.
     """
-    montessori = montessori_with_hsrb
+    montessori = montessori_with_robot
     cube_shape = shape_with_category(montessori, "cube")
     triangle_shape = shape_with_category(montessori, "triangular_prism")
     context = Context(
-        montessori.world, montessori.hsrb, query_backend=ProbabilisticBackend()
+        montessori.world, montessori.robot, query_backend=ProbabilisticBackend()
     )
 
     for shape in (cube_shape, triangle_shape):
@@ -115,12 +115,12 @@ def test_insert_montessori_shape_action_runs_twice_in_a_row(montessori_with_hsrb
 
 
 def test_insert_montessori_shape_action_raises_for_a_shape_without_a_matching_hole(
-    montessori_with_hsrb,
+    montessori_with_robot,
 ):
-    montessori = montessori_with_hsrb
+    montessori = montessori_with_robot
     sphere_shape = shape_with_category(montessori, "sphere")
     context = Context(
-        montessori.world, montessori.hsrb, query_backend=ProbabilisticBackend()
+        montessori.world, montessori.robot, query_backend=ProbabilisticBackend()
     )
 
     action = InsertMontessoriShapeAction(
@@ -134,17 +134,17 @@ def test_insert_montessori_shape_action_raises_for_a_shape_without_a_matching_ho
 
 
 def test_has_fallen_through_hole_is_false_right_after_kinematic_placement(
-    montessori_with_hsrb,
+    montessori_with_robot,
 ):
     """
     PlaceAction only ever kinematically teleports the shape to hover above its hole; it
     never checks whether the shape actually fits through, so has_fallen_through_hole
     must not read that teleport alone as success.
     """
-    montessori = montessori_with_hsrb
+    montessori = montessori_with_robot
     cube_shape = shape_with_category(montessori, "cube")
     context = Context(
-        montessori.world, montessori.hsrb, query_backend=ProbabilisticBackend()
+        montessori.world, montessori.robot, query_backend=ProbabilisticBackend()
     )
 
     action = InsertMontessoriShapeAction(
@@ -158,14 +158,14 @@ def test_has_fallen_through_hole_is_false_right_after_kinematic_placement(
 
 
 def test_has_fallen_through_hole_is_true_once_the_shape_settles_in_mujoco(
-    montessori_with_hsrb,
+    montessori_with_robot,
 ):
     from experiments.montessori.montessori_demo import _settle_shape_in_mujoco
 
-    montessori = montessori_with_hsrb
+    montessori = montessori_with_robot
     cube_shape = shape_with_category(montessori, "cube")
     context = Context(
-        montessori.world, montessori.hsrb, query_backend=ProbabilisticBackend()
+        montessori.world, montessori.robot, query_backend=ProbabilisticBackend()
     )
 
     action = InsertMontessoriShapeAction(

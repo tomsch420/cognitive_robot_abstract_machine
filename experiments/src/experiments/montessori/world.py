@@ -1,8 +1,8 @@
 """
 Build a semantic digital twin world for the Montessori shape-sorting scene: a floor
 carrying a table with a shape-sorting board (with its holes and drawers) and the loose
-shapes that are dropped through the holes, and (optionally) an HSRB robot standing in
-front of it.
+shapes that are dropped through the holes, and (optionally) a robot standing in front of
+it.
 
 The scene is constructed directly with the semantic digital twin API (bodies, regions,
 shapes, connections, and semantic annotations); nothing is loaded from a recorded
@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 import trimesh
-from typing_extensions import List, Optional, Tuple
+from typing_extensions import List, Optional, Tuple, Type
 
 from experiments.montessori.hole_geometry import (
     HOLE_MARKER_THICKNESS,
@@ -29,9 +29,11 @@ from experiments.montessori.semantics import (
     ShapeSortingBoard,
     ShapeSortingHole,
 )
+from semantic_digital_twin.adapters.package_resolver import CompositePathResolver
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.robots.hsrb import HSRB
+from semantic_digital_twin.exceptions import PathResolutionError
+from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.semantic_annotations.mixins import (
     HasRootKinematicStructureEntity,
 )
@@ -72,7 +74,7 @@ Height of the ground the Montessori scene stands on.
 FLOOR_SCALE = Scale(6.0, 4.0, 0.02)
 """
 Size of the floor slab; large enough to comfortably fit the table, the row of loose
-shapes, and a standing HSRB.
+shapes, and a standing robot.
 """
 
 TABLE_SCALE = Scale(0.5, 1.0, 0.025)
@@ -112,9 +114,9 @@ TABLE_SHAPE_ROW_SPACING = 0.15
 Distance, along y, between adjacent loose shapes in the row on the table.
 """
 
-DEFAULT_HSRB_STANDOFF_DISTANCE = 0.6
+DEFAULT_ROBOT_STANDOFF_DISTANCE = 0.6
 """
-Default distance the spawned HSRB stands in front of the Montessori table's near edge.
+Default distance the spawned robot stands in front of the Montessori table's near edge.
 """
 
 _SHAPE_COLORS = {
@@ -129,6 +131,7 @@ _SHAPE_COLORS = {
 The color used to render a loose shape and the hole it fits through, keyed by their
 shared :class:`~experiments.montessori.semantics.MontessoriShapeCategory`.
 """
+
 
 @dataclass(frozen=True)
 class _HoleSpec:
@@ -597,6 +600,25 @@ def _shape_body(
     return _body_with_shape(name, shape)
 
 
+def robot_installed(robot_class: Type[AbstractRobot]) -> bool:
+    """
+    Whether ``robot_class``'s description (its URDF and everything it references via
+    ``package://`` URIs) can currently be resolved, e.g. because the ROS package it
+    lives in is built and sourced.
+
+    Generic replacement for a robot-specific check like
+    :func:`~semantic_digital_twin.utils.hsrb_installed`, so :meth:`MontessoriWorld.spawn_robot`
+    is not limited to robots that happen to already have one.
+
+    :param robot_class: The robot to check.
+    """
+    try:
+        CompositePathResolver().resolve(robot_class.get_ros_file_path())
+        return True
+    except PathResolutionError:
+        return False
+
+
 @dataclass(eq=False)
 class MontessoriWorld:
     """
@@ -604,8 +626,8 @@ class MontessoriWorld:
     floor, a table carrying a shape-sorting board (with its holes and drawers), and the
     loose shapes dropped through the holes.
 
-    The scene is built as soon as an instance is constructed; use :meth:`spawn_hsrb`
-    afterwards to add the HSRB robot, since it is not spawned by default.
+    The scene is built as soon as an instance is constructed; use :meth:`spawn_robot`
+    afterwards to add a robot, since none is spawned by default.
     """
 
     world: World = field(init=False, default_factory=World)
@@ -618,10 +640,10 @@ class MontessoriWorld:
     The shape-sorting board spawned into :attr:`world`.
     """
 
-    hsrb: Optional[HSRB] = field(init=False, default=None)
+    robot: Optional[AbstractRobot] = field(init=False, default=None)
     """
-    The HSRB robot spawned into :attr:`world` by :meth:`spawn_hsrb`, or ``None`` if it
-    has not been spawned.
+    The robot spawned into :attr:`world` by :meth:`spawn_robot`, or ``None`` if none has
+    been spawned.
     """
 
     def __post_init__(self) -> None:
@@ -634,17 +656,22 @@ class MontessoriWorld:
             self.board = self._build_shape_sorting_board()
             self._build_shapes()
 
-    def spawn_hsrb(
-        self, standoff_distance: float = DEFAULT_HSRB_STANDOFF_DISTANCE
-    ) -> HSRB:
+    def spawn_robot(
+        self,
+        robot_class: Type[AbstractRobot],
+        standoff_distance: float = DEFAULT_ROBOT_STANDOFF_DISTANCE,
+    ) -> AbstractRobot:
         """
-        Spawn an HSRB robot standing in front of the Montessori table, facing it, and
-        store it as :attr:`hsrb`.
+        Spawn a robot of the given class standing in front of the Montessori table,
+        facing it, and store it as :attr:`robot`.
 
         Attached via an :class:`OmniDrive` (a real, hardware-controlled mobile-base
         connection), not a plain 6DoF join: CRAM's motion planner needs a proper drive
-        connection to navigate the robot at all.
+        connection to navigate the robot at all. This assumes ``robot_class`` has a
+        drivable mobile base; a robot description without one would need a different
+        connection here.
 
+        :param robot_class: The robot to spawn, e.g. :class:`~semantic_digital_twin.robots.hsrb.HSRB`.
         :param standoff_distance: How far in front of the table's near edge the robot
             stands.
         :return: The spawned robot.
@@ -654,20 +681,20 @@ class MontessoriWorld:
             .collision.as_bounding_box_collection_in_frame(self.world.root)
             .bounding_box()
         )
-        hsrb_world = URDFParser.from_file(HSRB.get_ros_file_path()).parse()
+        robot_world = URDFParser.from_file(robot_class.get_ros_file_path()).parse()
         with self.world.modify_world():
             drive = OmniDrive.create_with_dofs(
-                parent=self.world.root, child=hsrb_world.root, world=self.world
+                parent=self.world.root, child=robot_world.root, world=self.world
             )
-            self.world.merge_world(hsrb_world, drive)
+            self.world.merge_world(robot_world, drive)
             drive.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
                 table_bounding_box.min_x - standoff_distance,
                 0.0,
                 0.0,
                 reference_frame=self.world.root,
             )
-        self.hsrb = HSRB.from_world(self.world)
-        return self.hsrb
+        self.robot = robot_class.from_world(self.world)
+        return self.robot
 
     def _spawn(
         self,
