@@ -157,6 +157,13 @@ def _insert_all_shapes(montessori: MontessoriWorld, headless: bool) -> None:
         logger.info("Settling %s in MuJoCo.", shape.name)
         _settle_shape_in_mujoco(shape, montessori, headless)
 
+        if not action.has_fallen_through_hole():
+            logger.warning(
+                "%s did not fall through its hole; it may be resting on the board "
+                "or wedged in the opening.",
+                shape.name,
+            )
+
 
 def _position_hold_actuator(
     position_gain: float, velocity_gain: float
