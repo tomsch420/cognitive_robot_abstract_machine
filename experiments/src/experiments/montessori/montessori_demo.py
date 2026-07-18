@@ -30,8 +30,10 @@ from __future__ import annotations
 
 import argparse
 import logging
+import random
 import threading
 import time
+from typing import TYPE_CHECKING
 
 import mujoco
 
@@ -44,6 +46,7 @@ from krrood.utils import clear_memoization_cache
 from semantic_digital_twin.adapters.multi_sim import MujocoActuator, MujocoSim
 from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
+from semantic_digital_twin.spatial_types.spatial_types import Point3
 from semantic_digital_twin.utils import rclpy_installed
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
@@ -54,6 +57,12 @@ from semantic_digital_twin.world_description.connections import (
 )
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 from semantic_digital_twin.world_description.world_entity import Actuator
+
+if TYPE_CHECKING:
+    # coraplex.datastructures.dataclasses pulls in rclpy at module level (see
+    # _insert_all_shapes), so this is only ever imported for type hints, never at
+    # runtime.
+    from coraplex.datastructures.dataclasses import Context
 
 logger = logging.getLogger(__name__)
 
@@ -117,13 +126,96 @@ combined with their position hold and contact with the floor, and repeatedly dri
 ``QACC`` to ``NaN``/``Inf``.
 """
 
+MAX_INSERTION_ATTEMPTS = 3
+"""
+Number of times :func:`_insert_all_shapes` tries inserting a single shape (see
+:data:`RETRY_HORIZONTAL_JITTER`) before giving up and logging a warning.
+"""
+
+RETRY_HORIZONTAL_JITTER = 0.003
+"""
+Maximum magnitude, along either axis, of the random horizontal offset
+(:attr:`~experiments.montessori.insert_shape_action.InsertMontessoriShapeAction.target_horizontal_offset`)
+applied to a retried insertion's drop point.
+
+A retry that teleports the shape to the exact same pose and re-settles it in MuJoCo
+gives the physics engine no new information, so it is prone to failing the same way
+again; a few millimeters of jitter, small next to every hole's own clearance margin
+(see :data:`~experiments.montessori.world.SHAPE_FOOTPRINT_CLEARANCE_SCALE`), is enough
+to change how the shape first contacts the hole's edge without missing the opening
+outright.
+"""
+
+
+def _random_horizontal_jitter() -> Point3:
+    """
+    A random ``(x, y, 0)`` offset within :data:`RETRY_HORIZONTAL_JITTER` of the origin,
+    for :func:`_insert_all_shapes` to retry a failed insertion with an actually
+    different drop point.
+    """
+    return Point3(
+        random.uniform(-RETRY_HORIZONTAL_JITTER, RETRY_HORIZONTAL_JITTER),
+        random.uniform(-RETRY_HORIZONTAL_JITTER, RETRY_HORIZONTAL_JITTER),
+        0.0,
+    )
+
+
+def _insert_shape(
+    shape: MontessoriShape,
+    montessori: MontessoriWorld,
+    context: Context,
+    headless: bool,
+) -> bool:
+    """
+    Have the robot pick up and insert a single loose shape into its matching hole once,
+    then physically settle it under gravity in MuJoCo (see
+    :func:`_settle_shape_in_mujoco`).
+
+    :param shape: The shape to insert; must have a matching hole (see
+        :meth:`~experiments.montessori.semantics.ShapeSortingBoard.hole_for`).
+    :param montessori: The Montessori scene, with :attr:`MontessoriWorld.robot` already
+        spawned and its controlled joints already held (see
+        :func:`_hold_controlled_joints_in_mujoco`).
+    :param context: The CRAM execution context to run the insertion action in.
+    :param headless: Whether to run the settling MuJoCo simulation without opening a
+        viewer window.
+    :return: Whether the shape actually fell through its hole (see
+        :meth:`~experiments.montessori.insert_shape_action.InsertMontessoriShapeAction.has_fallen_through_hole`).
+    """
+    from coraplex.datastructures.enums import Arms
+    from coraplex.execution_environment import simulated_robot
+    from coraplex.plans.factories import execute_single
+    from experiments.montessori.insert_shape_action import InsertMontessoriShapeAction
+
+    # World.get_kinematic_structure_entities_of_branch is @memoize'd per
+    # (world, root-object) and never invalidated across the attach/detach cycle
+    # of the *previous* insertion's pick-and-place, so the next action's
+    # gripper-contents query silently returns a stale branch. Clearing it before
+    # each insertion forces a fresh read of the actual current world state.
+    clear_memoization_cache(montessori.world)
+    action = InsertMontessoriShapeAction(
+        montessori_shape=shape,
+        board=montessori.board,
+        arm=Arms.RIGHT,
+        target_horizontal_offset=_random_horizontal_jitter(),
+    )
+    with simulated_robot:
+        node = execute_single(action, context=context)
+        node.perform()
+
+    logger.info("Settling %s in MuJoCo.", shape.name)
+    _settle_shape_in_mujoco(shape, montessori, headless)
+
+    return action.has_fallen_through_hole()
+
 
 def _insert_all_shapes(montessori: MontessoriWorld, headless: bool) -> None:
     """
     Have the robot pick up and insert every loose shape that has a matching hole into
-    the shape-sorting board, skipping any that don't (e.g. the sphere), physically
-    settling each one under gravity in MuJoCo (see :func:`_settle_shape_in_mujoco`)
-    immediately after it is placed.
+    the shape-sorting board, skipping any that don't (e.g. the sphere), retrying a
+    shape that does not actually fall through its hole (see :func:`_insert_shape`) up to
+    :data:`MAX_INSERTION_ATTEMPTS` times with a jittered drop point before giving up on
+    it.
 
     :param montessori: The Montessori scene, with :attr:`MontessoriWorld.robot` already
         spawned and its controlled joints already held (see
@@ -136,10 +228,6 @@ def _insert_all_shapes(montessori: MontessoriWorld, headless: bool) -> None:
     # level, so this whole chain would make the demo unimportable without ROS 2 even
     # though nothing here runs without it anyway (see rclpy_installed() in main()).
     from coraplex.datastructures.dataclasses import Context
-    from coraplex.datastructures.enums import Arms
-    from coraplex.execution_environment import simulated_robot
-    from coraplex.plans.factories import execute_single
-    from experiments.montessori.insert_shape_action import InsertMontessoriShapeAction
 
     context = Context(
         montessori.world, montessori.robot, query_backend=ProbabilisticBackend()
@@ -151,28 +239,21 @@ def _insert_all_shapes(montessori: MontessoriWorld, headless: bool) -> None:
             logger.info("Skipping %s: no matching hole.", shape.name)
             continue
 
-        logger.info("Inserting %s into its matching hole.", shape.name)
-        # World.get_kinematic_structure_entities_of_branch is @memoize'd per
-        # (world, root-object) and never invalidated across the attach/detach cycle
-        # of the *previous* insertion's pick-and-place, so the next action's
-        # gripper-contents query silently returns a stale branch. Clearing it before
-        # each insertion forces a fresh read of the actual current world state.
-        clear_memoization_cache(montessori.world)
-        action = InsertMontessoriShapeAction(
-            montessori_shape=shape, board=montessori.board, arm=Arms.RIGHT
-        )
-        with simulated_robot:
-            node = execute_single(action, context=context)
-            node.perform()
-
-        logger.info("Settling %s in MuJoCo.", shape.name)
-        _settle_shape_in_mujoco(shape, montessori, headless)
-
-        if not action.has_fallen_through_hole():
-            logger.warning(
-                "%s did not fall through its hole; it may be resting on the board "
-                "or wedged in the opening.",
+        for attempt in range(1, MAX_INSERTION_ATTEMPTS + 1):
+            logger.info(
+                "Inserting %s into its matching hole (attempt %d/%d).",
                 shape.name,
+                attempt,
+                MAX_INSERTION_ATTEMPTS,
+            )
+            if _insert_shape(shape, montessori, context, headless):
+                break
+        else:
+            logger.warning(
+                "%s did not fall through its hole after %d attempts; it may be "
+                "resting on the board or wedged in the opening.",
+                shape.name,
+                MAX_INSERTION_ATTEMPTS,
             )
 
 

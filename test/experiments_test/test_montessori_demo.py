@@ -5,11 +5,13 @@ from experiments.montessori.montessori_demo import (
     BASE_ACTUATOR_POSITION_GAIN,
     BASE_JOINT_DAMPING,
     BASE_JOINT_DRY_FRICTION,
+    RETRY_HORIZONTAL_JITTER,
     _base_connections_without_hardware_interface,
     _base_degrees_of_freedom_without_hardware_interface,
     _hold_controlled_joints_in_mujoco,
     _make_all_shapes_movable_in_mujoco,
     _make_shape_movable_in_mujoco,
+    _random_horizontal_jitter,
     _settle_shape_in_mujoco,
 )
 from experiments.montessori.semantics import MontessoriShape, MontessoriShapeCategory
@@ -108,6 +110,23 @@ def test_hold_controlled_joints_in_mujoco_adds_joint_damping_to_the_base(
     for connection in base_connections:
         assert connection.dynamics.damping == BASE_JOINT_DAMPING
         assert connection.dynamics.dry_friction == BASE_JOINT_DRY_FRICTION
+
+
+def test_random_horizontal_jitter_stays_within_the_configured_bound():
+    jitter = _random_horizontal_jitter()
+
+    assert abs(float(jitter.x)) <= RETRY_HORIZONTAL_JITTER
+    assert abs(float(jitter.y)) <= RETRY_HORIZONTAL_JITTER
+    assert float(jitter.z) == 0.0
+
+
+def test_random_horizontal_jitter_varies_between_calls():
+    jitters = {
+        (float(jitter.x), float(jitter.y))
+        for jitter in (_random_horizontal_jitter() for _ in range(20))
+    }
+
+    assert len(jitters) > 1
 
 
 def test_make_shape_movable_in_mujoco_replaces_the_fixed_connection():

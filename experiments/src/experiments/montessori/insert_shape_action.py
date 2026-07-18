@@ -78,6 +78,16 @@ class InsertMontessoriShapeAction(ActionDescription):
     the board's surface on approach.
     """
 
+    target_horizontal_offset: Optional[Point3] = None
+    """
+    Offset added to the target hole's own (x, y) position before releasing the shape
+    above it. ``None`` (the default) targets the hole's center exactly; a small nonzero
+    offset lets a caller retry a failed insertion (see
+    :func:`~experiments.montessori.montessori_demo._insert_all_shapes`) with an actually
+    different drop point, rather than repeating the exact same teleport-then-settle that
+    just failed.
+    """
+
     def _standoff_point_near_surface(
         self, surface: Body, target_position: Point3
     ) -> Pose:
@@ -190,9 +200,10 @@ class InsertMontessoriShapeAction(ActionDescription):
     def _action_plan(self) -> PlanNode:
         hole = self.board.hole_for(self.montessori_shape)
         hole_position = hole.root.global_transform.to_position()
+        offset = self.target_horizontal_offset or Point3(0.0, 0.0, 0.0)
         target_location = Pose.from_xyz_rpy(
-            hole_position.x,
-            hole_position.y,
+            hole_position.x + offset.x,
+            hole_position.y + offset.y,
             hole_position.z + self.insertion_hover_height,
             reference_frame=self.world.root,
         )
