@@ -73,6 +73,10 @@ def get_full_class_name(cls):
 
 
 def module_and_class_name(t: Union[Type, _SpecialForm]) -> str:
+    """
+    :param t: A class or special form.
+    :return: Its fully qualified ``"{module}.{name}"`` identifier.
+    """
     return f"{t.__module__}.{t.__name__}"
 
 

@@ -40,6 +40,40 @@ def classes_of_module(module) -> List[Type]:
     return result
 
 
+def class_implements_own_method(cls: Type, base_class: Type, method_name: str) -> bool:
+    """
+    Whether *cls* provides its own *method_name* rather than inheriting *base_class*'s.
+
+    The stored attribute is compared without binding, so an override is detected for a
+    plain method and for a ``classmethod`` or ``staticmethod`` alike.
+
+    :param cls: The class that may override the method.
+    :param base_class: The base class whose implementation counts as not overridden.
+    :param method_name: The name of the method to look for an override of.
+    :return: True when *cls* resolves *method_name* to a different implementation than
+        *base_class* does.
+    """
+    return _underlying_function(cls, method_name) is not _underlying_function(
+        base_class, method_name
+    )
+
+
+def _underlying_function(cls: Type, method_name: str) -> Any:
+    """
+    The plain function *cls* stores for *method_name*, resolved through the MRO without
+    triggering descriptor binding.
+
+    :param cls: The class to resolve the method on.
+    :param method_name: The name of the method to resolve.
+    :return: The underlying function, unwrapped from a ``classmethod`` or
+        ``staticmethod`` descriptor.
+    """
+    attribute = inspect.getattr_static(cls, method_name)
+    if isinstance(attribute, (classmethod, staticmethod)):
+        return attribute.__func__
+    return attribute
+
+
 def behaves_like_a_built_in_type(
     clazz: Type,
 ) -> bool:
