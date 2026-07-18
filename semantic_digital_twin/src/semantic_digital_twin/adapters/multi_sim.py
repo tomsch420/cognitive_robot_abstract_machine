@@ -2832,8 +2832,13 @@ class MultiSim(ABC):
         """
         Stops the simulation. This will stop the physics simulation and the rendering.
         """
-        self.synchronizer.stop()
+        # self.simulator.stop() joins the simulation thread; that thread's step() may
+        # still be mid-read via self.synchronizer's state callback (see
+        # MultiSimSynchronizer._sim_to_world), so the simulator must be joined first,
+        # or synchronizer.stop() nulling that callback can race a concurrent read and
+        # raise AttributeError.
         self.simulator.stop()
+        self.synchronizer.stop()
 
     def pause_simulation(self):
         """

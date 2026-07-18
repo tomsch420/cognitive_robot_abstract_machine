@@ -45,6 +45,7 @@ from experiments.montessori.world import MontessoriWorld, robot_installed
 from krrood.entity_query_language.backends import ProbabilisticBackend
 from krrood.utils import clear_memoization_cache
 from semantic_digital_twin.adapters.multi_sim import MujocoActuator, MujocoSim
+from semantic_digital_twin.exceptions import PointOccupiedError
 from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.spatial_types.spatial_types import Point3
@@ -271,7 +272,24 @@ def _insert_all_shapes(montessori: MontessoriWorld, headless: bool) -> None:
                 attempt,
                 MAX_INSERTION_ATTEMPTS,
             )
-            if _insert_shape(shape, montessori, context, headless).fell_through_hole:
+            try:
+                fell_through_hole = _insert_shape(
+                    shape, montessori, context, headless
+                ).fell_through_hole
+            except PointOccupiedError as error:
+                # The jittered drop point (see RETRY_HORIZONTAL_JITTER) can land the
+                # reach target outside the navigation map's free space; that is a
+                # retryable placement failure like any other, not a reason to abort
+                # the whole demo.
+                logger.warning(
+                    "%s's reach target was occupied on attempt %d/%d (%s); retrying.",
+                    shape.name,
+                    attempt,
+                    MAX_INSERTION_ATTEMPTS,
+                    error,
+                )
+                continue
+            if fell_through_hole:
                 break
         else:
             logger.warning(
