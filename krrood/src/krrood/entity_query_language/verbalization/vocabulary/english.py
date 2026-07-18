@@ -717,12 +717,20 @@ class RankingWords(VocabEnum):
 
 class Articles(VocabEnum):
     """
-    Definite articles (THE, THE UNIQUE) and a static helper for indefinite
-    articles.
+    Definite articles (THE, THE UNIQUE), the fused *another* / *the other* alternative
+    determiners, and a static helper for indefinite articles.
     """
 
     THE = PlainWord("the")
     THE_UNIQUE = PlainWord("the unique")
+    ANOTHER = PlainWord("another")
+    """The fused indefinite alternative determiner — a second, distinct, freshly-introduced
+    same-noun referent (*"another Robot"*), not *"an other Robot"* (:class:`NounPhrase.alternative`
+    on first mention). Reference: :cite:t:`gundel1993givenness` — the given/new status of an
+    indefinite alternative."""
+    THE_OTHER = PlainWord("the other")
+    """The definite alternative determiner — the same referent once the pair is discourse-old
+    (:class:`NounPhrase.alternative` on repeat mention)."""
 
     @staticmethod
     def indefinite(following_word: str) -> WordFragment:

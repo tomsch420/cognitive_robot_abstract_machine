@@ -73,7 +73,7 @@ SURFACES: Tuple[VerbalizationSurface, ...] = (
     VerbalizationSurface(RuntimeType, "the runtime type of an object"),
     VerbalizationSurface(HasType, "an object is of type Integer"),
     VerbalizationSurface(HasTypes, "an object is of type Integer or Text"),
-    VerbalizationSurface(Is, "an object is the same object as the other object"),
+    VerbalizationSurface(Is, "an object is the same object as another object"),
     VerbalizationSurface(Length, "the length of an iterable"),
     VerbalizationSurface(IsReachable, "a location is reachable"),
     VerbalizationSurface(WorksIn, "an employee works in a department"),
@@ -82,6 +82,6 @@ SURFACES: Tuple[VerbalizationSurface, ...] = (
         "the inheritance path length between a child class and a parent class",
     ),
     VerbalizationSurface(
-        IsSameSemanticEntity, "an object is the same entity as the other object"
+        IsSameSemanticEntity, "an object is the same entity as another object"
     ),
 )

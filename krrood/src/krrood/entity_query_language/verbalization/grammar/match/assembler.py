@@ -312,7 +312,7 @@ class MatchAssembler(Assembler[Match, MatchPlan]):
         bound pair into a *between* is the verbalizer's concern, not this one's.
 
         >>> verbalize_expression(a(Robot)(name="R2").where(variable(Robot, []).battery > 50))
-        "Generate Robot 1 given that the name of Robot 1 is 'R2', where the battery of Robot 2 is greater than 50"
+        "Generate a Robot given that its name is 'R2', where the battery of another Robot is greater than 50"
         """
         if not plan.where_conditions:
             return None

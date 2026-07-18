@@ -343,9 +343,23 @@ class NounPhrase(HasNumber, VerbalizationFragment):
     relative_clause: bool = False
     """``True`` when the :attr:`modifiers` form a relative clause (*"to which its primary is
     assigned"*). Such modifiers are set off by commas when the head is independently identified — a
-    disambiguation number (*"Robot 1, to which …"*) makes the clause non-restrictive — but stay
-    comma-less while the clause itself identifies the head (*"the Robot to which a Mission is
-    assigned"*)."""
+    disambiguation distinguisher (*"the other Robot, to which …"*) makes the clause
+    non-restrictive — but stay comma-less while the clause itself identifies the head (*"the Robot
+    to which a Mission is assigned"*)."""
+
+    alternative: bool = False
+    """``True`` when this noun phrase is the second of a same-noun *pair* of distinct referents —
+    the determiner realises the fused indefinite *"another"* on first mention and *"the other"* on
+    repeat mention. Mutually exclusive with :attr:`ordinal`. Unlike :attr:`pre_head`, this survives
+    coreference reduction (:meth:`~…rendering.coreference_processor.CoreferenceProcessor._reduced`)
+    — it is part of the referent's identity, not a descriptive qualifier."""
+
+    ordinal: Optional[int] = None
+    """When set, this noun phrase is one of ≥ 3 same-noun distinct referents, and the value is its
+    1-based position in the group (2, 3, …) — realised as an ordinal word in the pre-head slot
+    (*"a second Robot"*, later *"the second Robot"*). Mutually exclusive with :attr:`alternative`;
+    ``None`` for the first member of any group. Like :attr:`alternative`, this survives coreference
+    reduction."""
 
 
 @dataclass
