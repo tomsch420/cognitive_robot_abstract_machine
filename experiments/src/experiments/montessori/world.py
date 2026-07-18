@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 import trimesh
-from typing_extensions import List, Optional
+from typing_extensions import List, Optional, Tuple
 
 from experiments.montessori.hole_geometry import (
     HOLE_MARKER_THICKNESS,
@@ -31,10 +31,6 @@ from experiments.montessori.semantics import (
 )
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.pipeline.mesh_decomposition.coacd import (
-    ApproximationMode,
-    COACDMeshDecomposer,
-)
 from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.semantic_annotations.mixins import (
     HasRootKinematicStructureEntity,
@@ -221,56 +217,98 @@ it.
 Used directly as the board's visual geometry.
 """
 
-_BOARD_COLLISION_DECOMPOSER = COACDMeshDecomposer(
-    threshold=0.01, approximation_mode=ApproximationMode.CONVEX_HULL
-)
+_MINIMUM_COLLISION_CELL_SIZE = 1e-4
 """
-Decomposes :const:`_BOARD_MESH` into convex sub-pieces for collision purposes.
-
-Physics engines that only support convex collision geometry (MuJoCo among them) collide
-mesh geometry against its convex hull, which would silently fill in the board's cut
-holes if the un-decomposed, concave mesh were used directly as collision geometry; a
-convex decomposition keeps each piece individually convex while the pieces together
-still leave the holes open.
-
-CoACD was chosen over V-HACD after measuring both: ray-casting a grid of points across
-each hole's opening after decomposition (a shape can only fall through if the whole
-opening, not just its center, is collision-free) showed CoACD leaving substantially more
-of each hole open. ``threshold=0.01`` is CoACD's minimum (finest) supported value, and
-``ApproximationMode.CONVEX_HULL`` (true convex hulls) leaves holes open more reliably
-than CoACD's default ``ApproximationMode.BOX``.
-
-Even so, this remains an approximation: the smallest hole (for the thin ``disk``
-category) is only partially open, since a general-purpose decomposer optimizing for
-volume tends to smooth over narrow slot-shaped features. A shape dropped through one of
-the other, larger holes settles noticeably closer to (though, at the time of writing,
-not yet fully through) the hole, confirmed by physically simulating the drop in MuJoCo.
+Minimum width or depth (in meters) a board collision grid cell (see
+:func:`_board_collision_boxes`) must have to be kept; smaller cells are floating-point
+slivers from two hole edges landing almost exactly on top of each other, not real
+geometry.
 """
 
-MINIMUM_COLLISION_PART_VOLUME = 1e-9
-"""
-Volume (in cubic meters) below which a convex decomposition part is treated as a
-degenerate, zero-thickness sliver and dropped.
 
-V-HACD occasionally emits perfectly flat (2-dimensional) pieces along a decomposition
-seam; MuJoCo's mesh compiler cannot build a convex hull from a flat point set and fails
-to load the model. Such pieces contribute no real collision volume, so removing them is
-safe.
-"""
+def _footprint_bounds(footprint: HoleFootprint) -> Tuple[float, float, float, float]:
+    """
+    A hole footprint's true axis-aligned bounding box, in the board's local frame.
 
-_BOARD_COLLISION_PARTS: List[trimesh.Trimesh] = [
-    part.mesh
-    for part in _BOARD_COLLISION_DECOMPOSER.apply_to_mesh(Mesh.from_trimesh(mesh=_BOARD_MESH))
-    if part.mesh.volume > MINIMUM_COLLISION_PART_VOLUME
-]
-"""
-Convex decomposition of :const:`_BOARD_MESH`, computed once at import time rather than
-per :class:`MontessoriWorld`.
+    :attr:`HoleFootprint.center` is the polygon's *area* centroid, which for an
+    asymmetric outline (e.g. the triangular hole) is not the geometric middle of its own
+    bounding box; reading the bounds from the boundary polygon itself, rather than
+    assuming ``center +/- size / 2``, keeps this correct for every hole shape.
 
-Each :class:`MontessoriWorld` wraps these in its own fresh :class:`Mesh` shapes:
-:class:`ShapeCollection` transforms a shape's origin into its owning body's frame in
-place, so the same ``Mesh`` instance must not be shared between worlds.
-"""
+    :param footprint: The hole to compute bounds for.
+    :return: ``(min_x, max_x, min_y, max_y)``.
+    """
+    boundary = np.asarray(footprint.boundary)
+    return (
+        footprint.center[0] + boundary[:, 0].min(),
+        footprint.center[0] + boundary[:, 0].max(),
+        footprint.center[1] + boundary[:, 1].min(),
+        footprint.center[1] + boundary[:, 1].max(),
+    )
+
+
+def _board_collision_boxes(
+    board_scale: Scale, footprints: List[HoleFootprint]
+) -> List[Box]:
+    """
+    Tile the board's footprint into solid collision :class:`Box`\\ es, each spanning its
+    full thickness, leaving every hole's true bounding box entirely open.
+
+    Physics engines that only support convex collision geometry (MuJoCo among them)
+    cannot use the board's single, holed mesh directly as collision geometry; the usual
+    fix is a convex decomposition of that mesh, but a general-purpose decomposer
+    optimizes for volume, not for keeping small or narrow openings (like the ``disk``
+    category's hole) fully clear, so a shape can still get caught on a decomposition
+    artifact instead of passing through. Native box primitives, cut exactly around each
+    hole's bounding box, avoid that approximation entirely: every hole is either fully
+    open or fully solid, with nothing in between to get caught on.
+
+    Splits the board's plan into a rectangular grid at every hole's bounding box edge (a
+    standard "rectangle minus rectangles" tiling: a grid cell is either entirely inside
+    one hole's bounding box, so it is left open, or entirely outside every hole's
+    bounding box, so it becomes one solid collision box), rather than assuming any
+    particular hole count or layout.
+
+    :param board_scale: Size of the board blank the holes are cut into.
+    :param footprints: The holes to leave open.
+    :return: One solid :class:`Box` per occupied grid cell.
+    """
+    half_x, half_y = board_scale.x / 2, board_scale.y / 2
+    hole_bounds = [_footprint_bounds(footprint) for footprint in footprints]
+    x_edges = sorted(
+        {-half_x, half_x}
+        | {bound[0] for bound in hole_bounds}
+        | {bound[1] for bound in hole_bounds}
+    )
+    y_edges = sorted(
+        {-half_y, half_y}
+        | {bound[2] for bound in hole_bounds}
+        | {bound[3] for bound in hole_bounds}
+    )
+
+    boxes = []
+    for x0, x1 in zip(x_edges, x_edges[1:]):
+        if x1 - x0 < _MINIMUM_COLLISION_CELL_SIZE:
+            continue
+        for y0, y1 in zip(y_edges, y_edges[1:]):
+            if y1 - y0 < _MINIMUM_COLLISION_CELL_SIZE:
+                continue
+            cell_x, cell_y = (x0 + x1) / 2, (y0 + y1) / 2
+            if any(
+                min_x < cell_x < max_x and min_y < cell_y < max_y
+                for min_x, max_x, min_y, max_y in hole_bounds
+            ):
+                continue
+            boxes.append(
+                Box(
+                    scale=Scale(x1 - x0, y1 - y0, board_scale.z),
+                    origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+                        x=cell_x, y=cell_y, z=0.0
+                    ),
+                )
+            )
+    return boxes
+
 
 _DRAWER_POSITIONS: List[Point3] = [
     Point3(-0.403, 0.087, 0.553),
@@ -313,22 +351,24 @@ def _body_with_visual_only_shape(name: PrefixedName, shape: Shape) -> Body:
     return Body(name=name, visual=ShapeCollection([shape]))
 
 
-def _board_body(name: PrefixedName, board_shape: Mesh) -> Body:
+def _board_body(
+    name: PrefixedName, board_shape: Mesh, footprints: List[HoleFootprint]
+) -> Body:
     """
     Build the shape-sorting board's :class:`Body`: ``board_shape`` as visual geometry,
-    and a convex decomposition of the board mesh (:const:`_BOARD_COLLISION_PARTS`) as
+    and a hand-built grid of solid boxes (see :func:`_board_collision_boxes`) as
     collision geometry, so the cut holes stay physically open to physics engines that
     only support convex collision geometry.
 
     :param name: Name of the body.
     :param board_shape: The board's (single, concave) visual mesh shape.
+    :param footprints: The holes cut into ``board_shape``, kept open in the collision
+        geometry.
     """
     return Body(
         name=name,
         visual=ShapeCollection([board_shape]),
-        collision=ShapeCollection(
-            [Mesh.from_trimesh(mesh=part) for part in _BOARD_COLLISION_PARTS]
-        ),
+        collision=ShapeCollection(_board_collision_boxes(BOARD_SCALE, footprints)),
     )
 
 
@@ -573,7 +613,7 @@ class MontessoriWorld:
         board_shape.color = BOARD_COLOR
         board = ShapeSortingBoard(
             name=_name("board"),
-            root=_board_body(_name("board"), board_shape),
+            root=_board_body(_name("board"), board_shape, _HOLE_FOOTPRINTS),
         )
         self._spawn(board, BOARD_POSITION)
 

@@ -46,9 +46,10 @@ def test_montessori_world_cuts_a_watertight_board_mesh():
     montessori.world.update_forward_kinematics()
 
     # The board's *visual* geometry is the single, precisely cut mesh; its *collision*
-    # geometry is a convex decomposition of that mesh (see
-    # test_montessori_world_board_collision_is_a_convex_decomposition), which is only
-    # an approximation and does not preserve the exact cut volume.
+    # geometry is a hand-built grid of boxes (see
+    # test_montessori_world_board_collision_leaves_every_holes_bounding_box_open) that
+    # approximates each hole by its bounding box rather than preserving its exact cut
+    # volume.
     board_mesh = montessori.board.root.visual.combined_mesh
 
     assert board_mesh.is_watertight
@@ -57,17 +58,78 @@ def test_montessori_world_cuts_a_watertight_board_mesh():
     assert 0 < board_mesh.volume < uncut_volume
 
 
-def test_montessori_world_board_collision_is_a_convex_decomposition():
+_BOUNDS_TOLERANCE = 1e-6
+"""
+Slack, in meters, subtracted from a hole's bounding box before checking it against a
+collision box: the hole's bounds and the collision grid's exclusion cell for that same
+hole are computed via two different (equivalent, but not bit-identical) arithmetic
+paths, which leaves edges that are meant to exactly touch off by a sub-micron amount;
+without this tolerance, that is indistinguishable from a genuine overlap.
+"""
+
+
+def _xy_bounds_overlap(a: tuple, b: tuple) -> bool:
+    a_min_x, a_max_x, a_min_y, a_max_y = a
+    b_min_x, b_max_x, b_min_y, b_max_y = b
+    x_overlaps = a_min_x < b_max_x and b_min_x < a_max_x
+    y_overlaps = a_min_y < b_max_y and b_min_y < a_max_y
+    return x_overlaps and y_overlaps
+
+
+def test_montessori_world_board_collision_leaves_every_holes_bounding_box_open():
     montessori = MontessoriWorld()
     montessori.world.update_forward_kinematics()
 
-    board_collision_shapes = montessori.board.root.collision.shapes
+    # Collision boxes are built axis-aligned with no rotation (see
+    # world.py::_board_collision_boxes), so comparing their (x, y) bounds directly,
+    # without trimesh's ray-cast-based `contains`, is both correct and immune to the
+    # numerical instability ray casting has against many mutually-touching box faces.
+    collision_box_bounds = []
+    for shape in montessori.board.root.collision.shapes:
+        origin = shape.origin.to_position()
+        half_x, half_y = shape.scale.x / 2, shape.scale.y / 2
+        collision_box_bounds.append(
+            (
+                float(origin.x) - half_x,
+                float(origin.x) + half_x,
+                float(origin.y) - half_y,
+                float(origin.y) + half_y,
+            )
+        )
+    assert collision_box_bounds
 
-    # MuJoCo (and other physics engines) collide mesh geometry against its convex hull,
-    # which would silently fill in the board's cut holes if the single, concave visual
-    # mesh were used directly as collision geometry.
-    assert len(board_collision_shapes) > 1
-    assert all(shape.mesh.is_convex for shape in board_collision_shapes)
+    board_position = montessori.board.global_transform.to_position()
+    holes = montessori.world.get_semantic_annotations_by_type(ShapeSortingHole)
+    assert holes
+    for hole in holes:
+        hole_position = hole.global_transform.to_position() - board_position
+        local_bounds = hole.root.area.combined_mesh.bounds
+        hole_bounds = (
+            float(hole_position.x) + local_bounds[0][0] + _BOUNDS_TOLERANCE,
+            float(hole_position.x) + local_bounds[1][0] - _BOUNDS_TOLERANCE,
+            float(hole_position.y) + local_bounds[0][1] + _BOUNDS_TOLERANCE,
+            float(hole_position.y) + local_bounds[1][1] - _BOUNDS_TOLERANCE,
+        )
+        overlapping_boxes = [
+            box_bounds
+            for box_bounds in collision_box_bounds
+            if _xy_bounds_overlap(box_bounds, hole_bounds)
+        ]
+        error = f"{hole.name} has collision material in its opening"
+        assert not overlapping_boxes, error
+
+    # sanity check the assertion above is not vacuous: solid material away from every
+    # hole (a board corner) must still be covered by some collision box
+    board_corner = (
+        BOARD_SCALE.x / 2 - 0.005,
+        BOARD_SCALE.x / 2 - 0.004,
+        BOARD_SCALE.y / 2 - 0.005,
+        BOARD_SCALE.y / 2 - 0.004,
+    )
+    assert any(
+        _xy_bounds_overlap(box_bounds, board_corner)
+        for box_bounds in collision_box_bounds
+    )
 
 
 def test_montessori_world_creates_one_shape_per_hole_category_plus_the_sphere():
