@@ -1,7 +1,9 @@
 """
 Build the Montessori shape-sorting world and an HSRB robot in a semantic digital twin
 world, visualize it live in RViz, have the robot sort every loose shape into its
-matching hole, and then physically simulate the finished scene live in MuJoCo.
+matching hole (physically settling each one under gravity in MuJoCo right after it is
+placed, rather than leaving it exactly where it was kinematically teleported to), and
+finally physically simulate the finished scene live in MuJoCo.
 
 Run with (the ``experiments`` package must be importable)::
 
@@ -51,6 +53,7 @@ from semantic_digital_twin.world_description.connections import (
     ActiveConnection,
     ActiveConnection1DOF,
     Connection6DoF,
+    FixedConnection,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 from semantic_digital_twin.world_description.world_entity import Actuator
@@ -112,13 +115,18 @@ combined with their position hold and contact with the floor, and repeatedly dri
 """
 
 
-def _insert_all_shapes(montessori: MontessoriWorld) -> None:
+def _insert_all_shapes(montessori: MontessoriWorld, headless: bool) -> None:
     """
     Have the HSRB robot pick up and insert every loose shape that has a matching hole
-    into the shape-sorting board, skipping any that don't (e.g. the sphere).
+    into the shape-sorting board, skipping any that don't (e.g. the sphere), physically
+    settling each one under gravity in MuJoCo (see :func:`_settle_shape_in_mujoco`)
+    immediately after it is placed.
 
     :param montessori: The Montessori scene, with :attr:`MontessoriWorld.hsrb` already
-        spawned.
+        spawned and its controlled joints already held (see
+        :func:`_hold_controlled_joints_in_mujoco`).
+    :param headless: Whether to run the settling MuJoCo simulations without opening a
+        viewer window.
     """
     context = Context(
         montessori.world, montessori.hsrb, query_backend=ProbabilisticBackend()
@@ -143,6 +151,9 @@ def _insert_all_shapes(montessori: MontessoriWorld) -> None:
         with simulated_robot:
             node = execute_single(action, context=context)
             node.perform()
+
+        logger.info("Settling %s in MuJoCo.", shape.name)
+        _settle_shape_in_mujoco(shape, montessori, headless)
 
 
 def _position_hold_actuator(
@@ -305,6 +316,64 @@ def _make_all_shapes_movable_in_mujoco(montessori: MontessoriWorld) -> None:
         _make_shape_movable_in_mujoco(shape, montessori.world)
 
 
+SHAPE_SETTLE_DURATION = 2.0
+"""
+Real-time seconds a just-inserted shape is given to physically settle under gravity and
+contacts in MuJoCo (see :func:`_settle_shape_in_mujoco`) before it is fixed in place and
+the next shape is inserted.
+"""
+
+
+def _settle_shape_in_mujoco(
+    shape: MontessoriShape, montessori: MontessoriWorld, headless: bool
+) -> None:
+    """
+    Physically settle a single, just-placed shape under gravity and contacts in MuJoCo,
+    then fix it in place wherever it comes to rest.
+
+    :class:`~coraplex.robot_plans.actions.core.placing.PlaceAction` only ever teleports
+    a shape kinematically to its target pose, so without this every shape is left
+    exactly where it was placed rather than where gravity actually settles it (e.g.
+    resting on the board's surface instead of having dropped through a hole). Settling
+    one shape at a time, right after it is inserted, rather than all of them together
+    only once at the very end (see :func:`_simulate_finished_scene_in_mujoco`), also
+    avoids MuJoCo resolving several simultaneous tight-clearance contacts in the same
+    step, which was observed to make an unrelated shape's contact resolution
+    nondeterministic (which of several simultaneously falling shapes gets wedged varied
+    from run to run, even though each one settles correctly when dropped alone).
+
+    The robot's controlled joints must already be held (see
+    :func:`_hold_controlled_joints_in_mujoco`) before this runs, or they sag/spin under
+    gravity for the duration of the settle and are left in that pose once MuJoCo stops.
+
+    :param shape: The just-inserted shape to settle.
+    :param montessori: The Montessori scene, modified in place.
+    :param headless: Whether to run without opening a MuJoCo viewer window.
+    """
+    _make_shape_movable_in_mujoco(shape, montessori.world)
+
+    mujoco_sim = MujocoSim(
+        world=montessori.world, headless=headless, step_size=MUJOCO_STEP_SIZE
+    )
+    mujoco_sim.start_simulation()
+    time.sleep(SHAPE_SETTLE_DURATION)
+    mujoco_sim.stop_simulation()
+
+    montessori.world.update_forward_kinematics()
+    settled_pose = montessori.world.compute_forward_kinematics(
+        montessori.world.root, shape.root
+    )
+    with montessori.world.modify_world():
+        montessori.world.remove_connection(shape.root.parent_connection)
+        montessori.world.add_connection(
+            FixedConnection(
+                parent=montessori.world.root,
+                child=shape.root,
+                parent_T_connection_expression=settled_pose,
+            )
+        )
+
+
 def _simulate_finished_scene_in_mujoco(
     montessori: MontessoriWorld, headless: bool
 ) -> MujocoSim:
@@ -312,15 +381,15 @@ def _simulate_finished_scene_in_mujoco(
     Physically simulate the sorted scene in MuJoCo, with the robot's controlled joints
     held in place and the shapes free to move under gravity and contacts.
 
-    Started only once sorting is finished: MuJoCo's physics and CRAM's own motion
-    planning would otherwise both be writing to the same joints at once.
+    Every shape has already individually settled under physics once, right after it was
+    inserted (see :func:`_settle_shape_in_mujoco`); this final pass is for live viewing
+    of the completed scene, not the shapes' only chance to physically settle.
 
     :param montessori: The finished Montessori scene, with :attr:`MontessoriWorld.hsrb`
         already spawned.
     :param headless: Whether to run without opening a MuJoCo viewer window.
     :return: The running :class:`MujocoSim`.
     """
-    _hold_controlled_joints_in_mujoco(montessori.hsrb)
     _make_all_shapes_movable_in_mujoco(montessori)
 
     mujoco_sim = MujocoSim(
@@ -359,6 +428,11 @@ def main() -> None:
 
     if hsrb_installed():
         montessori.spawn_hsrb()
+        # Must happen before any MuJoCo simulation runs, including the per-shape
+        # settling in _insert_all_shapes, or the robot's own joints sag/spin under
+        # gravity for that simulation's duration (see
+        # _hold_controlled_joints_in_mujoco).
+        _hold_controlled_joints_in_mujoco(montessori.hsrb)
     else:
         logger.warning(
             "hsr_description is not installed; spawning the Montessori scene without "
@@ -385,7 +459,7 @@ def main() -> None:
 
     mujoco_sim = None
     if montessori.hsrb is not None:
-        _insert_all_shapes(montessori)
+        _insert_all_shapes(montessori, headless=arguments.headless)
         logger.info("Sorting done; starting the MuJoCo simulation.")
         mujoco_sim = _simulate_finished_scene_in_mujoco(
             montessori, headless=arguments.headless

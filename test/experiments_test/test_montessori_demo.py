@@ -10,11 +10,16 @@ from experiments.montessori.montessori_demo import (
     _hold_controlled_joints_in_mujoco,
     _make_all_shapes_movable_in_mujoco,
     _make_shape_movable_in_mujoco,
+    _settle_shape_in_mujoco,
 )
-from experiments.montessori.semantics import MontessoriShape
+from experiments.montessori.semantics import MontessoriShape, MontessoriShapeCategory
 from experiments.montessori.world import MontessoriWorld
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.utils import hsrb_installed
-from semantic_digital_twin.world_description.connections import Connection6DoF
+from semantic_digital_twin.world_description.connections import (
+    Connection6DoF,
+    FixedConnection,
+)
 
 EXPECTED_BASE_DOF_NAMES = {
     "base_roll_joint",
@@ -147,3 +152,43 @@ def test_make_all_shapes_movable_in_mujoco_replaces_every_shapes_connection():
     assert all(
         isinstance(shape.root.parent_connection, Connection6DoF) for shape in shapes
     )
+
+
+def test_settle_shape_in_mujoco_fixes_the_shape_where_gravity_actually_settles_it():
+    montessori = MontessoriWorld()
+    montessori.world.update_forward_kinematics()
+
+    [shape] = [
+        shape
+        for shape in montessori.world.get_semantic_annotations_by_type(MontessoriShape)
+        if shape.shape_category == MontessoriShapeCategory.TRIANGULAR_PRISM
+    ]
+    hole = montessori.board.hole_for(shape)
+    hole_position = hole.root.global_transform.to_position()
+
+    # place the shape hovering just above its hole, as PlaceAction's kinematic
+    # teleport would, rather than physically dropped through it
+    with montessori.world.modify_world():
+        montessori.world.remove_connection(shape.root.parent_connection)
+        montessori.world.add_connection(
+            FixedConnection(
+                parent=montessori.world.root,
+                child=shape.root,
+                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    x=hole_position.x, y=hole_position.y, z=hole_position.z + 0.02
+                ),
+            )
+        )
+    montessori.world.update_forward_kinematics()
+    position_before = shape.global_transform.to_position()
+
+    _settle_shape_in_mujoco(shape, montessori, headless=True)
+    montessori.world.update_forward_kinematics()
+    position_after = shape.global_transform.to_position()
+
+    # settled back into a FixedConnection, not left as the free Connection6DoF used
+    # to simulate it
+    assert isinstance(shape.root.parent_connection, FixedConnection)
+    # physically dropped through the hole under gravity, not merely left hovering
+    # where it started
+    assert float(position_after.z) < float(position_before.z) - 0.05
