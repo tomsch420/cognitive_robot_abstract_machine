@@ -17,7 +17,6 @@ random_events
 plotly
 rtree
 daqp
-pathlib
 probabilistic_model
 python-fcl
 manifold3d

@@ -2,6 +2,9 @@ tmp/
 *.mypy_cache/
 build/
 data/
+.venv/
+.robostack/
+.ros2_ws/
 test/tmp_data/
 bin/
 lib/
