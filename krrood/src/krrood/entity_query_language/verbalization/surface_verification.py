@@ -114,7 +114,7 @@ class SymbolicSurfaceSnapshot:
         :return: whether *cls* decided its surface by implementing its own fragment.
         """
         return class_implements_own_method(
-            cls, Verbalizable, "_verbalization_fragment_"
+            cls._verbalization_fragment_, Verbalizable._verbalization_fragment_
         )
 
     def placeholder_operands(self, cls: Type[SymbolicCallable]) -> Dict[str, Any]:

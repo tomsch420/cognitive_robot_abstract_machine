@@ -11,7 +11,6 @@ from krrood.entity_query_language.verbalization.fragments.features import (
     GrammaticalNumber,
 )
 from krrood.entity_query_language.verbalization.exceptions import AmbiguousRuleError
-from krrood.class_diagrams.utils import class_implements_own_method
 from krrood.patterns.specificity_ranking import mro_depth, sole_maximum
 
 if TYPE_CHECKING:
@@ -197,7 +196,7 @@ def _is_guarded(rule: PhraseRule) -> bool:
     >>> _is_guarded(SetOfRule())
     False
     """
-    return class_implements_own_method(type(rule), PhraseRule, "when")
+    return type(rule).when is not PhraseRule.when
 
 
 def select(

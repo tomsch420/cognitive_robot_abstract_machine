@@ -40,38 +40,41 @@ def classes_of_module(module) -> List[Type]:
     return result
 
 
-def class_implements_own_method(cls: Type, base_class: Type, method_name: str) -> bool:
+def class_implements_own_method(candidate: Any, inherited: Any) -> bool:
     """
-    Whether *cls* provides its own *method_name* rather than inheriting *base_class*'s.
+    Whether a resolved method belongs to a different implementation than the one it
+    would otherwise inherit.
 
-    The stored attribute is compared without binding, so an override is detected for a
-    plain method and for a ``classmethod`` or ``staticmethod`` alike.
+    Both arguments are ordinary attribute lookups on a class (e.g.
+    ``Subclass.method_name`` and ``BaseClass.method_name``), so a plain method, a
+    ``classmethod``, or a ``staticmethod`` all compare correctly. Accessing a
+    ``classmethod`` produces a new bound-method object on every lookup, bound to
+    whichever class did the accessing, so comparing those directly would report every
+    class as overriding, even one that never touched the method; unwrapping to
+    ``__func__`` first compares the underlying function instead, which is the same
+    object for every class that inherits it unchanged. A plain method or
+    ``staticmethod`` access is already the bare function, so no unwrapping is needed
+    there.
 
-    :param cls: The class that may override the method.
-    :param base_class: The base class whose implementation counts as not overridden.
-    :param method_name: The name of the method to look for an override of.
-    :return: True when *cls* resolves *method_name* to a different implementation than
-        *base_class* does.
+    :param candidate: The method as resolved via attribute access on the candidate
+        class.
+    :param inherited: The same-named method as resolved via attribute access on the base
+        class whose implementation counts as not overridden.
+    :return: True when *candidate* is a different underlying function than *inherited*.
     """
-    return _underlying_function(cls, method_name) is not _underlying_function(
-        base_class, method_name
-    )
+    return _underlying_function(candidate) is not _underlying_function(inherited)
 
 
-def _underlying_function(cls: Type, method_name: str) -> Any:
+def _underlying_function(method: Any) -> Any:
     """
-    The plain function *cls* stores for *method_name*, resolved through the MRO without
-    triggering descriptor binding.
+    The plain function a resolved method wraps.
 
-    :param cls: The class to resolve the method on.
-    :param method_name: The name of the method to resolve.
-    :return: The underlying function, unwrapped from a ``classmethod`` or
-        ``staticmethod`` descriptor.
+    :param method: A method as resolved via attribute access on a class.
+    :return: ``method.__func__`` when *method* is a bound method (a ``classmethod``
+        accessed via its class), otherwise *method* itself (a plain function or
+        ``staticmethod`` access is already bare).
     """
-    attribute = inspect.getattr_static(cls, method_name)
-    if isinstance(attribute, (classmethod, staticmethod)):
-        return attribute.__func__
-    return attribute
+    return method.__func__ if hasattr(method, "__func__") else method
 
 
 def behaves_like_a_built_in_type(
