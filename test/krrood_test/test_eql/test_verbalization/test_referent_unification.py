@@ -10,7 +10,7 @@ than *"a Robot"* / *"another Robot"*.
 from __future__ import annotations
 
 from krrood.entity_query_language.factories import an, entity, variable
-from krrood.entity_query_language.verbalization.example_domain import Mission, Robot
+from krrood.entity_query_language.verbalization._example_domain import Mission, Robot
 from krrood.entity_query_language.verbalization.pipeline import verbalize_expression
 
 

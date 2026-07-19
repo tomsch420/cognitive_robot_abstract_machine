@@ -21,7 +21,7 @@ from krrood.entity_query_language.verbalization import morphology
 from krrood.entity_query_language.verbalization.exceptions import (
     NonFragmentPredicateError,
 )
-from krrood.entity_query_language.verbalization.example_domain import (
+from krrood.entity_query_language.verbalization._example_domain import (
     Department,
     IsReachable,
     Location,

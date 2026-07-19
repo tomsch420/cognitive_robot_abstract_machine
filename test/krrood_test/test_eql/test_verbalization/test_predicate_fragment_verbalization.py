@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from krrood.entity_query_language.factories import inference, not_, variable
 from krrood.entity_query_language.operators.core_logical_operators import Not
-from krrood.entity_query_language.verbalization.example_domain import (
+from krrood.entity_query_language.verbalization._example_domain import (
     IsReachable,
     Location,
     Robot,

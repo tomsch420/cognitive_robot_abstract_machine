@@ -32,7 +32,7 @@ from krrood.entity_query_language.predicate import (
     Length,
     SymbolicCallable,
 )
-from krrood.entity_query_language.verbalization.example_domain import (
+from krrood.entity_query_language.verbalization._example_domain import (
     IsReachable,
     WorksIn,
 )
