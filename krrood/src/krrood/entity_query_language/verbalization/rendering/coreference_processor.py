@@ -519,13 +519,8 @@ class CoreferenceProcessor(RealizationPass):
         :return: The resolved referring noun phrase (first / repeat), or the non-referring noun
             phrase rebuilt around its recursed children.
 
-        It is the entry that marks each Robot introduced and applies disambiguation — here both
-        Robots are first mentions of one shared noun, so it hands them to :meth:`_distinguished` and
-        the result is *a Robot* / *another Robot* (a lone Robot would stay *a Robot*):
-
-        >>> robot_one, robot_two = variable(Robot, []), variable(Robot, [])
-        >>> verbalize_expression(a(entity(robot_one).where(robot_one.battery > robot_two.battery)))
-        'Find a Robot whose battery is greater than the battery of another Robot'
+        Disambiguation is :meth:`_distinguished`'s own doctest to demonstrate — see there for a
+        worked example.
         """
         if noun_phrase.referent_id is None:
             return self._rebuilt(noun_phrase)

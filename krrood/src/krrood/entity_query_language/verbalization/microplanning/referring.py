@@ -4,7 +4,7 @@ import operator
 import uuid
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing_extensions import Dict, List, Optional, Set, Tuple, TYPE_CHECKING
+from typing_extensions import Dict, List, Optional, Set, TYPE_CHECKING
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.core.mapped_variable import Attribute
@@ -124,22 +124,24 @@ def _child_edges_by_id(
     return edges
 
 
-def _sole_predicate_field(edges: List[ParentEdge]) -> Optional[Tuple[type, str]]:
-    """:return: ``(predicate_class, field_name)`` when *edges* is exactly one edge and that edge is
-    a named predicate field, else ``None``. This is the structural (not heuristic) condition for
-    treating a variable as an anonymous operand of that one field: it must be reachable through
-    exactly that field and nowhere else in the expression.
+def _sole_predicate_field(edges: List[ParentEdge]) -> Optional[ParentEdge]:
+    """:return: the sole edge in *edges* when it is a named predicate field, else ``None``. This is
+    the structural (not heuristic) condition for treating a variable as an anonymous operand of that
+    one field: it must be reachable through exactly that field and nowhere else in the expression.
     """
     if len(edges) != 1:
         return None
     edge = edges[0]
     if edge.field_name is None or not isinstance(edge.parent, InstantiatedVariable):
         return None
-    return edge.parent._type_, edge.field_name
+    return edge
 
 
 def operand_head_noun(node: Variable, edges: List[ParentEdge]) -> str:
-    """:return: the head noun naming *node*, resolved in order of decreasing specificity:
+    """:return: the head noun naming *node*, resolved in order of decreasing specificity. *node* is
+    an *operand* — a variable filling one argument of a predicate or function — and its *head noun*
+    is the noun that names it in the rendered sentence (*"Robot"* in *"a Robot is reachable"*).
+    Resolution order:
 
     1. *node*'s own type noun, when its type is informative (a concrete class other than the bare
        ``object`` placeholder) — the type is the default identifier for a referring expression
@@ -196,11 +198,11 @@ def operand_head_noun(node: Variable, edges: List[ParentEdge]) -> str:
     sole_field = _sole_predicate_field(edges)
     if sole_field is None:
         return "object"
-    predicate_class, field_name = sole_field
-    metadata = GrammarMetadata.of_field(predicate_class, field_name)
+    predicate_class = sole_field.parent._type_
+    metadata = GrammarMetadata.of_field(predicate_class, sole_field.field_name)
     if metadata is not None and metadata.display_name is not None:
         return metadata.display_name
-    return field_name.replace("_", " ")
+    return sole_field.field_name.replace("_", " ")
 
 
 # %% Same-noun disambiguation
@@ -267,8 +269,8 @@ class DistinguisherIndex:
         """:return: the distinguishing feature for *referent_id*, or ``None`` when it is alone in
         its noun group (or shares no group at all). The first call for a given canonical assigns
         its position, in call order; every later call for the same canonical (a repeat mention)
-        returns the same feature, so re-mentioning a referent keeps the distinguisher its first
-        mention was assigned.
+        returns the same feature — it keeps the distinguisher that was assigned to its first
+        mention.
 
         :param referent_id: A referent's own id (before canonicalisation).
         """
@@ -294,8 +296,8 @@ class _HeadNounGrouping:
     Numberable referents grouped under their canonical entity (``==``-unified referents collapse
     to one) and then by resolved head noun, recording each noun's canonicals in first-encounter
     (pre-scan) order — feeding both the first-mention noun text
-    (:meth:`ReferringExpressions.head_noun_of`) and the group structure the coreference pass later
-    disambiguates by determiner (:class:`DistinguisherIndex`).
+    (:meth:`ReferringExpressions.head_noun_of`) and the group structure that the coreference pass
+    later disambiguates by determiner (:class:`DistinguisherIndex`).
     """
 
     canonicals_by_noun: Dict[str, List[uuid.UUID]] = field(
@@ -496,7 +498,7 @@ class ReferringExpressions:
     @staticmethod
     def _resolve_head_noun(
         node: SymbolicExpression,
-        edges_by_id: Dict[uuid.UUID, List[Tuple[SymbolicExpression, Optional[str]]]],
+        edges_by_id: Dict[uuid.UUID, List[ParentEdge]],
     ) -> Optional[str]:
         """:return: The head noun a node is disambiguated (and later referred to) under — the
         operand-aware resolution (:func:`operand_head_noun`) for a (non-literal) variable, or the
@@ -530,7 +532,30 @@ class ReferringExpressions:
 
     def head_noun_of(self, variable: Variable) -> str:
         """:return: *variable*'s resolved head noun — pre-computed in the pre-scan, or its type
-        label as a fallback for a variable outside the pre-scanned expression."""
+        label as a fallback when *variable* has no entry in :attr:`head_nouns`. That happens for a
+        variable never scanned in the first place (e.g. one built after
+        :meth:`from_expression` ran), and for a variable the pre-scan did see but deliberately
+        excluded — an aggregation source population is rendered
+        (:class:`~…grammar.aggregation.assembler.AggregationValueAssembler`) but is never given a
+        head noun (:meth:`_aggregation_source_ids`), so it always falls back to its plain type
+        label.
+
+        A scanned variable resolves from the map:
+
+        >>> robot = variable(Robot, [])
+        >>> ReferringExpressions.from_expression(an(entity(robot))).head_noun_of(robot)
+        'Robot'
+
+        An aggregation source is scanned but excluded, so it falls back to its type label:
+
+        >>> transaction = variable(BankTransaction, [])
+        >>> query = a(entity(sum(transaction.amount_details.amount)))
+        >>> referring = ReferringExpressions.from_expression(query)
+        >>> transaction._id_ in referring.head_nouns
+        False
+        >>> referring.head_noun_of(transaction)
+        'BankTransaction'
+        """
         return self.head_nouns.get(variable._id_, self._variable_type_label(variable))
 
     def noun_for_parts(self, variable: Variable) -> NounForm:
