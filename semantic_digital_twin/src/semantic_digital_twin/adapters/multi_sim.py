@@ -98,7 +98,14 @@ class GeomVisibilityAndCollisionType(IntEnum):
     """
     Enumeration of geometric visibility and collision attributes.
 
-    - Use VISIBLE_AND_COLLIDABLE_1 or VISIBLE_AND_COLLIDABLE_2 for geometries that should be both visible and collidable. These two values are equivalent and can be used for grouping.
+    - Use VISIBLE_AND_COLLIDABLE_2 for geometries that should be both visible and collidable;
+      this is the group this project's own MuJoCo writer emits for that case, and the only one
+      its MJCF reader treats as visible-and-collidable, so it round-trips.
+    - VISIBLE_AND_COLLIDABLE_1 (group 0) is *not* treated as visible by the reader: group 0 is
+      the conventional MuJoCo/robosuite default/collision-only group (used, for example, for
+      RoboCasa's collision-decomposition proxy geoms, which carry arbitrary debug colors and
+      are not meant to be rendered). Kept in this enum only to name the group number; this
+      project's writer never emits it.
     - Use ONLY_VISIBLE for geometries that are visible but not collidable (URDF: <visual>).
     - Use ONLY_COLLIDABLE for geometries that are collidable but not visible (URDF: <collision>).
     - UNDEFINED_1 and UNDEFINED_2 are placeholders used only when parsing from MuJoCo, and are treated as invisible by default.
@@ -109,12 +116,14 @@ class GeomVisibilityAndCollisionType(IntEnum):
 
     VISIBLE_AND_COLLIDABLE_1 = 0
     """
-    Geometry is both visible and collidable (variant 1).
+    The conventional MuJoCo/robosuite default/collision-only group; not treated as visible when
+    reading MJCF (see class docstring). Named here only so the group number has a label.
     """
 
     VISIBLE_AND_COLLIDABLE_2 = 1
     """
-    Geometry is both visible and collidable (variant 2).
+    Geometry is both visible and collidable; this is the group this project's writer emits and
+    its reader recognizes for that case.
     """
 
     ONLY_VISIBLE = 2
@@ -1105,7 +1114,7 @@ class MujocoGeomConverter(MujocoConverter, ShapeConverter, ABC):
         is_collidable = kwargs.get("collidable", True)
         if is_visible and is_collidable:
             shape_props["group"] = (
-                GeomVisibilityAndCollisionType.VISIBLE_AND_COLLIDABLE_1
+                GeomVisibilityAndCollisionType.VISIBLE_AND_COLLIDABLE_2
             )
         elif is_visible and not is_collidable:
             shape_props["contype"] = 0
