@@ -446,14 +446,25 @@ def _make_shape_movable_in_mujoco(shape: MontessoriShape, world: World) -> None:
     current_pose = world.compute_forward_kinematics(world.root, shape.root)
     with world.modify_world():
         world.remove_connection(shape.root.parent_connection)
-        world.add_connection(
-            Connection6DoF.create_with_dofs(
-                world=world,
-                parent=world.root,
-                child=shape.root,
-                parent_T_connection_expression=current_pose,
-            )
+        connection = Connection6DoF.create_with_dofs(
+            world=world,
+            parent=world.root,
+            child=shape.root,
         )
+        world.add_connection(connection)
+    # Bakes current_pose into the connection's own DOF values (x, y, z, qx, qy, qz, qw)
+    # rather than passing it as create_with_dofs' parent_T_connection_expression: MuJoCo
+    # export only reads a Connection6DoF's DOF values into the free joint's keyframe
+    # qpos, which is MuJoCo's *absolute* world position/orientation for a free joint, not
+    # a fixed offset applied on top of it. Passing current_pose as
+    # parent_T_connection_expression left the DOFs at their create_with_dofs default
+    # (identity), so MuJoCo always started the shape at the world origin regardless of
+    # current_pose - correct only for whichever shape happened to be the first one ever
+    # settled in a given MontessoriWorld, because MujocoBuilder.build_world's one-time
+    # "connect the existing root to a body literally named 'world'" step reparents that
+    # first shape's free joint via World.move_branch, which (unlike this) writes the
+    # DOF values directly.
+    connection.origin = current_pose
 
 
 def _make_all_shapes_movable_in_mujoco(montessori: MontessoriWorld) -> None:
