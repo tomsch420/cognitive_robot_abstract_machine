@@ -19,7 +19,7 @@ import krrood
 
 from krrood.entity_query_language.predicate import HasType, HasTypes
 from krrood.entity_query_language.verbalization.surface_verification import (
-    SymbolicCallableOverride,
+    OverriddenOperand,
     SymbolicSurfaceSnapshot,
 )
 
@@ -29,8 +29,8 @@ SNAPSHOT = SymbolicSurfaceSnapshot(
     package=krrood,
     surfaces=SURFACES,
     operand_overrides={
-        HasType: SymbolicCallableOverride({"types_": int}),
-        HasTypes: SymbolicCallableOverride({"types_": (int, str)}),
+        HasType: [OverriddenOperand("types_", int)],
+        HasTypes: [OverriddenOperand("types_", (int, str))],
     },
 )
 """

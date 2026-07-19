@@ -12,6 +12,7 @@ from uuid import UUID
 import typing_extensions
 from typing_extensions import (
     Any,
+    Callable,
     Dict,
     List,
     Optional,
@@ -40,7 +41,7 @@ def classes_of_module(module) -> List[Type]:
     return result
 
 
-def class_implements_own_method(candidate: Any, inherited: Any) -> bool:
+def class_implements_own_method(candidate: Callable, inherited: Callable) -> bool:
     """
     Whether a resolved method belongs to a different implementation than the one it
     would otherwise inherit.
@@ -65,7 +66,7 @@ def class_implements_own_method(candidate: Any, inherited: Any) -> bool:
     return _underlying_function(candidate) is not _underlying_function(inherited)
 
 
-def _underlying_function(method: Any) -> Any:
+def _underlying_function(method: Callable) -> Callable:
     """
     The plain function a resolved method wraps.
 

@@ -50,20 +50,24 @@ class VerbalizationSurface:
 
 
 @dataclass(frozen=True)
-class SymbolicCallableOverride:
+class OverriddenOperand:
     """
-    Concrete operands for a symbolic callable whose fragment reads a field's raw VALUE
-    rather than treating it as a symbolic operand.
+    One dataclass field's concrete VALUE for a symbolic callable whose fragment reads
+    that field directly rather than treating it as a symbolic operand.
 
     A ``Type`` field, for example, cannot be resolved by annotation alone — it may be a
     symbolic operand in one class and a named value in another — so its value is stated
     here per class.
     """
 
-    operands: Dict[str, Any]
+    name: str
     """
-    The concrete value to pass for each named field; every other field defaults to a
-    placeholder variable of its annotated type.
+    The dataclass field name being overridden.
+    """
+
+    value: Any
+    """
+    The concrete value to pass for that field.
     """
 
 
@@ -87,12 +91,12 @@ class SymbolicSurfaceSnapshot:
     The committed expected surfaces, one per covered class.
     """
 
-    operand_overrides: Dict[Type[SymbolicCallable], SymbolicCallableOverride] = field(
-        default_factory=dict
+    operand_overrides: Dict[Type[SymbolicCallable], Sequence[OverriddenOperand]] = (
+        field(default_factory=dict)
     )
     """
-    Concrete operands for classes whose fragment reads a field's raw VALUE rather than
-    treating it as a symbolic operand, keyed by the class.
+    Concrete field overrides for classes whose fragment reads a field's raw VALUE rather
+    than treating it as a symbolic operand, keyed by the class.
     """
 
     def discovered_callables(self) -> Tuple[Type[SymbolicCallable], ...]:
@@ -128,8 +132,10 @@ class SymbolicSurfaceSnapshot:
         :param cls: The symbolic callable to build operands for.
         :return: The operand to pass for each init field, keyed by field name.
         """
-        override = self.operand_overrides.get(cls)
-        overridden_operands = override.operands if override is not None else {}
+        overridden_operands = {
+            override.name: override.value
+            for override in self.operand_overrides.get(cls, ())
+        }
         wrapped_class = WrappedClass(clazz=cls)
         operands: Dict[str, Any] = {}
         for field_ in dataclass_fields(cls):
@@ -159,7 +165,13 @@ class SymbolicSurfaceSnapshot:
         Assert every discovered symbolic callable implements its own fragment — there is
         no undecided surface.
 
-        A new predicate or function that ships without one fails here.
+        A new predicate or function that ships without one fails here. This is not
+        redundant with Python's own ``abstractmethod`` enforcement:
+        :meth:`assert_surfaces_cover_every_callable` excludes fragment-less classes from
+        its comparison (via :meth:`has_fragment`), so this is the only one of the three
+        assertions that catches a fragment-less class — and it does so immediately,
+        rather than lazily whenever something first tries to instantiate or verbalize
+        it.
         """
         fragment_less = sorted(
             module_and_class_name(cls)
