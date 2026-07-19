@@ -1,10 +1,13 @@
 # Montessori shape-sorting demo — handover
 
-Status as of 2026-07-18. First run against a **real ROS 2 install, real HSRB, and real
+Status as of 2026-07-19. First run against a **real ROS 2 install, real HSRB, and real
 CRAM/Giskard motion planning** (prior sessions only ever ran against a sandbox with no
 `rclpy`, so most of this file used to describe untested, plan-building-only behavior).
 Full test suite green except for two known, environment-specific gaps (see "Running
-things").
+things"). A real bug found via this real execution (shapes always starting MuJoCo's
+gravity simulation at the world origin, see "What's verified working") turned out to
+explain most of what an earlier session had attributed to MuJoCo collision-decomposition
+imprecision — fixed; 4/6 shapes now fall through on the first attempt instead of 1/6.
 
 ## What this is
 
@@ -114,7 +117,7 @@ outside CI.
   `underspecified()` fix above — they could not even be collected before this session).
 - `test_sage10k.py` and `test_scalability.py` pass (4/4) — same "needs real rclpy to
   collect" class of test as above.
-- Two real bugs were found and fixed by this end-to-end run, both previously
+- Three real bugs were found and fixed by this end-to-end run, all previously
   unreachable without real rclpy + a real robot:
   - `_insert_all_shapes`'s retry loop didn't catch `PointOccupiedError` (raised by
     `_move_to_reach` when a jittered retry drop point lands outside the GCS navigation
@@ -129,44 +132,53 @@ outside CI.
     dies) rather than crashing the process outright, but it killed that MuJoCo
     settling simulation and left later attempts unable to physically settle at all.
     Fixed by joining the simulation thread first.
+  - **The big one**: `_make_shape_movable_in_mujoco` passed a shape's current pose as
+    `Connection6DoF`'s `parent_T_connection_expression` (a fixed offset on top of the
+    connection's own DOF values), but MuJoCo export only reads a `Connection6DoF`'s own
+    DOF values into the free joint's keyframe `qpos` — which MuJoCo treats as the body's
+    *absolute* world pose, not an offset relative to anything. Those DOFs default to
+    identity, so **every settled shape started MuJoCo's gravity simulation at the world
+    origin**, regardless of where it actually was. This was masked for whichever shape
+    happened to be the *first* one ever settled in a `MontessoriWorld` — a one-time
+    world-restructuring step in `MujocoBuilder.build_world` reparents that first shape's
+    free joint via `World.move_branch`, which happens to write the DOF values directly —
+    so it looked like things mostly worked until you looked at the second shape onward.
+    Fixed by setting `connection.origin = current_pose` after creating the connection,
+    using `Connection6DoF`'s own origin setter to write the DOF values directly instead
+    of the offset MuJoCo export ignores. This is what limitation #1 below used to
+    describe as a collision-decomposition problem — it mostly wasn't one.
 
 ## Known limitations (root cause understood, not fixed)
 
-1. **Shapes mostly don't fully fall through the holes in MuJoCo.** MuJoCo's default
-   mesh collision uses the convex hull, which would erase the board's holes entirely;
-   fixed by decomposing the board's collision geometry into ~40–50 convex pieces via
-   CoACD (`_BOARD_COLLISION_DECOMPOSER` in `world.py`). This is a large, measured
-   improvement over no decomposition at all, but far from a perfect fit: in a real
-   end-to-end run (real HSRB, real Giskard planning, 3 insertion attempts per shape),
-   only **1 of 6 shapes** (`circular_hole_1_shape`, on its first attempt) actually fell
-   through; the other 5 (`square_hole_shape`, `triangle_hole_shape`,
-   `rectangular_hole_shape`, `circular_hole_2_shape`, `disk_hole_shape`) did not fall
-   through after all 3 attempts each. A dropped shape gets caught on a residual,
-   imperfectly-approximated lip rather than passing all the way through. Confirmed via
-   direct MuJoCo contact inspection (`ncon`, `qvel`) in earlier sessions, not just
-   position — this is a genuine geometric limit of decomposition-based collision at
-   this hole size, not a bug. Next step if revisited: a hand-built cylindrical/slot
-   collision insert per hole, or MuJoCo's SDF plugin (bundled but not wired into
-   `semantic_digital_twin`'s MuJoCo adapter at all — would be new integration work).
+1. **Two of six shapes still don't fall through the holes in MuJoCo.** After fixing the
+   world-origin pose bug above, a real end-to-end run (real HSRB, real Giskard planning,
+   up to 3 insertion attempts per shape) gets **4 of 6 shapes falling through on their
+   very first attempt** (`circular_hole_1_shape`, `square_hole_shape`,
+   `triangle_hole_shape`, `rectangular_hole_shape`). The remaining two —
+   `circular_hole_2_shape` and `disk_hole_shape` — still don't fall through after 3 real
+   attempts each (confirmed each attempt actually reached and re-ran the MuJoCo settle,
+   not blocked by `PointOccupiedError`). This is plausibly the genuine, previously-claimed
+   collision-decomposition limitation: MuJoCo's default mesh collision uses the convex
+   hull, which would erase the board's holes entirely, so the board's collision geometry
+   is decomposed into ~40–50 convex pieces via CoACD (`_BOARD_COLLISION_DECOMPOSER` in
+   `world.py`), imperfectly — a dropped shape can get caught on a residual,
+   imperfectly-approximated lip rather than passing all the way through, and
+   `disk_hole` (a narrow ~5mm slot) is the tightest-clearance hole on the board. This
+   has *not* been re-confirmed via direct MuJoCo contact inspection since the pose fix
+   (an earlier session did that inspection, but against data now known to be
+   contaminated by the pose bug for every non-first shape) — worth re-verifying before
+   trusting this framing further. Next step if revisited: re-run that contact inspection
+   first; if it still holds, a hand-built cylindrical/slot collision insert per hole, or
+   MuJoCo's SDF plugin (bundled but not wired into `semantic_digital_twin`'s MuJoCo
+   adapter at all), are the next options.
 
-2. **A shape that fails to fall through also tends to occupy its own retry's reach
-   point.** In the same real run, 4 of the 5 shapes that failed to fall through hit
-   `PointOccupiedError` (see "What's verified working" above) on *every* retry after
-   the first, meaning `_move_to_reach` never got to plan a new attempt at all — the
-   ~3mm `RETRY_HORIZONTAL_JITTER` isn't enough to move the target reach point out from
-   under the shape (or robot) left resting there by the previous failed attempt.
-   `PointOccupiedError` no longer crashes the demo (see above), but the retry mechanism
-   is largely ineffective for these shapes as a result. Next step if revisited: either
-   a larger jitter, or explicitly re-planning the navigation map's free space after
-   each failed attempt instead of only before the first.
-
-3. **`hole_for()` matches by category only.** Two holes (`circular_hole_1`, 16mm
+2. **`hole_for()` matches by category only.** Two holes (`circular_hole_1`, 16mm
    radius, and `circular_hole_2`, 20mm radius) both categorize as `cylinder`, so a
    shape can get routed to the tighter-fitting same-category hole. Harmless for CRAM's
    kinematic placement (`PlaceAction` just teleports the shape), but relevant if you
    ever rely on exact hole/shape size matching.
 
-4. **Giskard collision avoidance (`simulated_robot(collision_avoidance=True)`) breaks
+3. **Giskard collision avoidance (`simulated_robot(collision_avoidance=True)`) breaks
    the pickup motion — currently left OFF.** Not a detected-and-cancelled violation
    (tested `cancel_if_collision_violated=False`, no change) and not simply "gripper
    can't touch the target" (tested adding the same gripper/target
