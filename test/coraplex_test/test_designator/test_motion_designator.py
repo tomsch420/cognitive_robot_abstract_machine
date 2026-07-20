@@ -12,7 +12,7 @@ from coraplex.datastructures.enums import (
     Arms,
 )
 from coraplex.datastructures.grasp import GraspDescription
-from coraplex.motion_executor import simulated_robot, real_robot
+from coraplex.execution_environment import simulated_robot, real_robot
 from coraplex.plans.factories import sequential, execute_single
 from coraplex.plans.plan_node import MotionNode, ActionNode
 from coraplex.robot_plans import MoveMotion
@@ -26,7 +26,9 @@ from semantic_digital_twin.spatial_types.spatial_types import Pose
 
 try:
     from coraplex.alternative_motion_mappings.hsrb_motion_mapping import *
-    from giskardpy.motion_statechart.ros2_nodes.ros_tasks import NavigateActionServerTask
+    from giskardpy.motion_statechart.ros2_nodes.ros_tasks import (
+        NavigateActionServerTask,
+    )
 
     skip_tests = False
 except (ImportError, ModuleNotFoundError, AttributeError):

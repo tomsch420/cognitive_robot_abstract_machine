@@ -24,6 +24,7 @@ if TYPE_CHECKING:
 class Ros2Executor(Executor):
     """
     A normal Executor which augments the BuildContext with a ros2 node.
+
     Required if you want to use MotionStatechartNodes that have ros2 dependencies.
     """
 
@@ -40,7 +41,9 @@ class Ros2Executor(Executor):
     _debug_expression_publisher: DebugExpressionPublisher | None = field(
         init=False, default=None
     )
-    """The publisher visualizing the debug expressions, created on compile when enabled."""
+    """
+    The publisher visualizing the debug expressions, created on compile when enabled.
+    """
 
     def __post_init__(self):
         super().__post_init__()

@@ -157,11 +157,15 @@ class NonObservationVariableError(InvalidConditionError):
 class ConditionScopeError(InvalidConditionError):
     """
     Raised when a condition references a node from a different scope level.
-    A condition may only reference the owning node itself or nodes sharing the same parent.
+
+    A condition may only reference the owning node itself or nodes sharing the same
+    parent.
     """
 
     dependency: MotionStatechartNode
-    """The referenced node that lives in a different scope than the condition's owner."""
+    """
+    The referenced node that lives in a different scope than the condition's owner.
+    """
 
     def reason(self) -> str:
         owner_scope = self._scope_name(self.condition.owner)
@@ -207,10 +211,14 @@ class DuplicateContextExtensionError(MotionStatechartError):
 
 @dataclass
 class PlotterNotConfiguredError(MotionStatechartError):
-    """Raised when a plot is requested but the corresponding plotter was never configured."""
+    """
+    Raised when a plot is requested but the corresponding plotter was never configured.
+    """
 
     plotter_name: str
-    """The human-readable name of the plotter that is missing."""
+    """
+    The human-readable name of the plotter that is missing.
+    """
 
     def error_message(self) -> str:
         return (
@@ -223,7 +231,9 @@ class PlotterNotConfiguredError(MotionStatechartError):
 
 @dataclass
 class EmptyDebugExpressionTrajectoryError(MotionStatechartError):
-    """Raised when a plot is requested but no debug expression samples were recorded."""
+    """
+    Raised when a plot is requested but no debug expression samples were recorded.
+    """
 
     def error_message(self) -> str:
         return "Cannot plot: no debug expression samples were recorded."

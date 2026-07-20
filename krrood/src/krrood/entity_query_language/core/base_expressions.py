@@ -14,6 +14,7 @@ from copy import copy
 from dataclasses import dataclass, field
 from functools import cached_property
 from uuid import UUID
+from functools import cached_property, lru_cache
 
 from ordered_set import OrderedSet
 from typing_extensions import (
@@ -30,25 +31,24 @@ from typing_extensions import (
     TYPE_CHECKING,
     Generic,
     Type,
+    TypeAlias,
 )
 
-from krrood.entity_query_language.exceptions import NoExpressionFoundForGivenID
-from krrood.entity_query_language.utils import make_list, T, make_set, is_iterable
-from krrood.symbol_graph.symbol_graph import SymbolGraph
-from krrood.utils import memoize
 from krrood.entity_query_language.evaluation_context import (
-    EvaluationContext,
     get_evaluation_context,
     set_evaluation_context,
     _evaluation_context_var,
 )
+from krrood.entity_query_language.exceptions import NoExpressionFoundForGivenID
+from krrood.entity_query_language.utils import make_list, T, make_set, is_iterable
+from krrood.symbol_graph.symbol_graph import SymbolGraph
 
 if TYPE_CHECKING:
     from krrood.entity_query_language.rules.conclusion import Conclusion
     from krrood.entity_query_language.core.variable import Variable
     from krrood.entity_query_language.query.query import Query
 
-Bindings = Dict[uuid.UUID, Any]
+Bindings: TypeAlias = Dict[uuid.UUID, Any]
 """
 A dictionary for expressions' bindings in EQL that maps the expression's unique identifier to its value.
 """
@@ -136,27 +136,37 @@ class SymbolicExpression(ABC):
 
     def tolist(
         self,
+        backend=None,
     ) -> list[TypingUnion[T, Dict[TypingUnion[T, SymbolicExpression], T]]]:
         """
         Evaluate and return the results as a list.
-        """
-        return make_list(self.evaluate())
 
-    def first(self) -> TypingUnion[T, Dict[TypingUnion[T, SymbolicExpression], T]]:
+        :param backend: Optional query backend; forwarded to :py:meth:`evaluate`.
+        """
+        return make_list(self.evaluate(backend=backend))
+
+    def first(
+        self, backend=None
+    ) -> TypingUnion[T, Dict[TypingUnion[T, SymbolicExpression], T]]:
         """
         Evaluate and return the first result of the query object descriptor.
 
+        :param backend: Optional query backend; forwarded to :py:meth:`evaluate`.
         :return: The first result of the query object descriptor.
         :raises StopIteration: If no results are found.
         """
-        return next(self.evaluate())
+        return next(self.evaluate(backend=backend))
 
     def evaluate(
         self,
+        backend=None,
     ) -> Iterator[TypingUnion[T, Dict[TypingUnion[T, SymbolicExpression], T]]]:
         """
         Evaluate the query and map the results to the correct output data structure.
         This is the exposed evaluation method for users.
+
+        :param backend: Accepted for interface uniformity with ``Query``/``Match``; the base
+            symbolic-expression engine always evaluates natively and ignores this argument.
         """
         SymbolGraph().remove_dead_instances()
         results = (
@@ -198,11 +208,17 @@ class SymbolicExpression(ABC):
         """
         Remove the parent relationship between this expression and the given parent expression.
 
+        When the removed parent is the primary one, another remaining parent is promoted so a node
+        that still lives elsewhere in the DAG keeps a valid primary parent.
+
         :param parent: The parent expression to remove.
         """
-        self._parents_.remove(parent)
+        if parent in self._parents_:
+            self._parents_.remove(parent)
+        if self._id_ in [child._id_ for child in parent._children_]:
+            parent._children_.remove(self)
         if parent is self._parent__:
-            self._parent_ = None
+            self._parent__ = self._parents_[-1] if self._parents_ else None
 
     def _update_children_(
         self, *children: SymbolicExpression
@@ -221,20 +237,32 @@ class SymbolicExpression(ABC):
             v if isinstance(v, SymbolicExpression) else Literal(_value_=v)
             for v in children
         ]
-        for v in children:
-            v._parent_ = self
-        return tuple(v._expression_ for v in children)
+        embedded_children = tuple(v._as_embeddable_child_(self) for v in children)
+        for child in embedded_children:
+            child._parent_ = self
+        return embedded_children
+
+    def _as_embeddable_child_(self, parent: SymbolicExpression) -> SymbolicExpression:
+        """
+        :param parent: The expression about to take this expression as a child.
+        :return: The node that should be stored as ``parent``'s child, defaulting to this
+            expression's compiled form. Subclasses whose compiled form is mutable and shared (for
+            example :class:`~krrood.entity_query_language.query.query.Query`) override this to embed
+            an immutable snapshot instead.
+        """
+        return self._expression_
 
     def _ensure_children_ids_are_cached_(self, *children: SymbolicExpression) -> None:
         """
-        Ensure that the IDs of the provided children expressions are cached within the current expression.
+        Ensure that the IDs of the provided children expressions, and all of their own descendants,
+        are cached within the current expression.
 
         :param children: The children expressions to cache IDs for.
         """
         for child in children:
             if child._id_ not in self._expression_id_cache_:
                 self._expression_id_cache_[child._id_] = child
-                child._ensure_children_ids_are_cached_(*child._children_)
+                self._ensure_children_ids_are_cached_(*child._children_)
 
     def _process_result_(self, result: OperationResult) -> Any:
         """
@@ -273,6 +301,7 @@ class SymbolicExpression(ABC):
 
             evaluation_context = create_default_evaluation_context()
             context_token = set_evaluation_context(evaluation_context)
+            evaluation_context.active_conditions_root.claim(self._conditions_root_)
         try:
             evaluation_context.on_evaluate_enter(expression=self, sources=sources)
             # Normalize sources: always work with an OperationResult
@@ -306,16 +335,29 @@ class SymbolicExpression(ABC):
 
         :param current_result: The current result of this expression.
         """
-        # Only evaluate the conclusions at the root condition expression (i.e. after all conditions have been evaluated)
-        # and when the result truth value is True.
-        if not (self._conditions_root_ is self) or current_result.is_false:
+        # Only evaluate the conclusions at the active conditions root of the current evaluation
+        # pass (i.e. after all conditions have been evaluated) and when the result truth value is
+        # True. "Active" is an evaluation-scoped fact, not a structural one: a node reused as the
+        # condition of more than one Filter has no single correct root, so this is resolved by
+        # which evaluation is currently running (see ActiveConditionsRoot), not by the node's
+        # construction history. When no evaluation context is active (this method is only ever
+        # reached from inside _evaluate_'s own thread, but a caller may drive evaluation from a
+        # thread that never had one set up — contextvars.ContextVar values do not propagate into a
+        # plain threading.Thread), fall back to the structural check: it is the only signal left.
+        evaluation_context = get_evaluation_context()
+        if evaluation_context is not None:
+            is_active_root = evaluation_context.active_conditions_root.is_active_root(
+                self
+            )
+        else:
+            is_active_root = self._conditions_root_ is self
+        if not is_active_root or current_result.is_false:
             return current_result
         for conclusion in self._conclusions_:
             current_result.bindings = next(
                 conclusion._evaluate_(current_result)
             ).bindings
 
-        evaluation_context = get_evaluation_context()
         if evaluation_context is not None:
             evaluation_context.on_conclusions_processed(
                 expression=self,
@@ -355,20 +397,24 @@ class SymbolicExpression(ABC):
         if value is self:
             return
 
-        if value is None and self._parent__ is not None:
-            if self._id_ in [v._id_ for v in self._parent__._children_]:
-                self._parent__._children_.remove(self)
-            if self._parent__ in self._parents_:
-                self._parents_.remove(self._parent__)
+        if value is None:
+            if self._parent__ is not None:
+                self._remove_parent_(self._parent__)
+            return
 
-        self._parent__ = value
-
-        if value is not None and value._id_ not in [v._id_ for v in self._parents_]:
+        if value._id_ not in [v._id_ for v in self._parents_]:
             self._parents_.append(value)
             value._ensure_children_ids_are_cached_(self)
 
-        if value is not None and self._id_ not in [v._id_ for v in value._children_]:
+        if self._id_ not in [v._id_ for v in value._children_]:
             value._children_.append(self)
+
+        # Keep the first structural parent as the primary one: a node reused as an operand
+        # elsewhere in the DAG records the extra parent above but must not have its primary
+        # parent hijacked. Structural re-parenting removes the old parent first (see
+        # ``_replace_child_``), so the promotion in ``_remove_parent_`` re-establishes the primary.
+        if self._parent__ is None:
+            self._parent__ = value
 
     @property
     def _conditions_root_(self) -> Optional[SymbolicExpression]:
@@ -401,13 +447,10 @@ class SymbolicExpression(ABC):
         """
         from krrood.entity_query_language.query.query import Query
 
-        root = self._root_
-        root_query = None
-        for descendant in root._descendants_:
-            if isinstance(descendant, Query):
-                root_query = descendant
-                break
-        return root_query
+        for expression in self._all_expressions_:
+            if isinstance(expression, Query):
+                return expression
+        return None
 
     @property
     @abstractmethod
@@ -429,6 +472,9 @@ class SymbolicExpression(ABC):
     def _descendants_(self) -> Iterator[SymbolicExpression]:
         """
         :return: All descendants of this symbolic expression in children first, then depth-first by subtree order.
+
+        Does not recurse into ``ResultQuantifier`` children so that inner query
+        subtrees remain isolated from outer query traversals.
         """
         yield from self._children_
         for child in self._children_:
@@ -797,7 +843,7 @@ class Selectable(SymbolicExpression, Generic[T], ABC):
     A variable that is used if the child class to this class want to provide a variable to be tracked other than 
     itself, this is specially useful for child classes that holds a variable instead of being a variable and want
      to delegate the variable behaviour to the variable it has instead.
-    For example, this is the case for the ResultQuantifiers & QueryDescriptors that operate on a single selected
+    For example, this is the case for queries and derived references that operate on a single selected
     variable.
     """
 

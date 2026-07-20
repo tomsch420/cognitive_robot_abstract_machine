@@ -786,8 +786,10 @@ def test_world_state_equality_is_order_independent():
 
 
 def test_world_str_contains_class_name():
-    """world.py:486 uses self.__class__.name (the dataclass field default, None)
-    instead of the class name, so every world stringifies as 'None v...'."""
+    """
+    world.py:486 uses self.__class__.name (the dataclass field default, None) instead of
+    the class name, so every world stringifies as 'None v...'.
+    """
     world = World()
     assert "World" in str(world)
 
@@ -926,9 +928,10 @@ def test_omnidrive_translation_dofs_get_translation_limits():
 
 
 def test_bug_05_has_collision_respects_volume_threshold():
-    """world_entity.py:487-497: Body.has_collision documents and accepts volume/
-    surface thresholds but ignores them entirely."""
-
+    """
+    world_entity.py:487-497: Body.has_collision documents and accepts volume/ surface
+    thresholds but ignores them entirely.
+    """
     tiny_body = Body(name=PrefixedName("tiny", prefix="review"))
     collision = Box(
         scale=Scale(0.001, 0.001, 0.001),
@@ -951,14 +954,8 @@ def test_copy_two_times(pr2_world_state_reset):
 
 
 def test_copy_drawer(apartment_world_copy):
-    handle = Handle(root=apartment_world_copy.get_body_by_name("handle_cab10_t"))
-    drawer = Drawer(
-        root=apartment_world_copy.get_body_by_name("cabinet10_drawer_top"),
-        handle=handle,
-    )
-    with apartment_world_copy.modify_world():
-        apartment_world_copy.add_semantic_annotation(handle)
-        apartment_world_copy.add_semantic_annotation(drawer)
+    [handle] = apartment_world_copy.get_semantic_annotations_by_type(Handle)
+    [drawer] = apartment_world_copy.get_semantic_annotations_by_type(Drawer)
 
     apartment_copy = deepcopy(apartment_world_copy)
     copied_handle = apartment_copy.get_semantic_annotation_by_name(handle.name)
@@ -1340,9 +1337,10 @@ def test_reattach_child_to_new_parent(world_setup):
 
 def test_move_branch_preserves_connection_type_and_pose():
     """
-    move_branch re-parents a branch keeping its connection type and global pose. Covers both the
-    FixedConnection branch (which silently passed an invalid ``_world`` kwarg before) and the
-    Connection6DoF branch.
+    move_branch re-parents a branch keeping its connection type and global pose.
+
+    Covers both the FixedConnection branch (which silently passed an invalid ``_world``
+    kwarg before) and the Connection6DoF branch.
     """
     world = World()
     root = Body(name=PrefixedName("root"))
@@ -1416,9 +1414,12 @@ def test_memoization_clears_only_last_modification_block():
 
 def test_move_branch_offline_preserves_connection_type_and_pose():
     """
-    The offline (enable_unsafe_inside_world_block) path of move_branch must, like the online
-    path, preserve a FixedConnection and a Connection6DoF and keep the global pose. The offline path is
-    what the semantic-annotation mounts use, and it runs inside an already-open modification block.
+    The offline (enable_unsafe_inside_world_block) path of move_branch must, like the
+    online path, preserve a FixedConnection and a Connection6DoF and keep the global
+    pose.
+
+    The offline path is what the semantic-annotation mounts use, and it runs inside an
+    already-open modification block.
     """
     world = World()
     root = Body(name=PrefixedName("root"))
@@ -1744,7 +1745,9 @@ def test_hash_table_lookup_survives_annotation_mutation():
 
     @dataclass(eq=False)
     class ReviewAnnotation(SemanticAnnotation):
-        """Semantic annotation with a mutable entity list, for hash-stability tests."""
+        """
+        Semantic annotation with a mutable entity list, for hash-stability tests.
+        """
 
         parts: list[Body] = field(default_factory=list)
 
@@ -1836,10 +1839,14 @@ def test_reset_state_context_restores_state_on_exception(world_setup):
 
 
 def test_broken_world_modification_history_after_exception_in_modification_block_is_raised():
-    """world.py:205-219: when an exception escapes a modify_world block, the
-    current modification block is discarded but the already-applied modifications
-    are not rolled back. Replay-based operations (deepcopy, sync) then produce a
-    different world than the original."""
+    """
+    world.py:205-219: when an exception escapes a modify_world block, the current
+    modification block is discarded but the already-applied modifications are not rolled
+    back.
+
+    Replay-based operations (deepcopy, sync) then produce a different world than the
+    original.
+    """
     world = World()
     body_1 = Body(name=PrefixedName("body_1", prefix="review"))
     body_2 = Body(name=PrefixedName("body_2", prefix="review"))

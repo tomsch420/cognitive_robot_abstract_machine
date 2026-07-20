@@ -13,7 +13,8 @@ from giskardpy.qp.solvers.qp_solver_piqp import QPSolverPIQP
 @pytest.fixture()
 def simple_inequality_qp() -> tuple[QPData, np.ndarray]:
     """
-    min_{x1, x2} x1^2 + x2^2
+    min_{x1, x2} x1^2 + x2^2.
+
     s.t.
         -inf <= x1 <= inf
         -inf <= x2 <= inf
@@ -40,7 +41,8 @@ def simple_inequality_qp() -> tuple[QPData, np.ndarray]:
 @pytest.fixture()
 def simple_eq_as_inequality_qp() -> tuple[QPData, np.ndarray]:
     """
-    min_{x1, x2} x1^2 + x2^2
+    min_{x1, x2} x1^2 + x2^2.
+
     s.t.
         -inf <= x1 <= inf
         -inf <= x2 <= inf
@@ -95,6 +97,7 @@ def simple_equality_qp() -> tuple[QPData, np.ndarray]:
 def box_constraints_qp() -> tuple[QPData, np.ndarray]:
     """
     min_{x1, x2} 0.5 * (2*x1^2 + 2*x2^2)
+
     s.t.
         -1.0 <= x1 <= 1.0
         0.5 <= x2 <= 2.0
@@ -365,9 +368,9 @@ def test_apply_filters_keeps_dof_columns_without_slack():
 
 def test_apply_filters_two_sided_inequality_with_box_and_inequality_rows():
     """
-    QPDataTwoSidedInequality.apply_filters must correctly filter a combined
-    box + inequality matrix (box rows must not be mistaken for the eq/ineq rows
-    when slicing self.inequality_matrix with the constraint filter).
+    QPDataTwoSidedInequality.apply_filters must correctly filter a combined box +
+    inequality matrix (box rows must not be mistaken for the eq/ineq rows when slicing
+    self.inequality_matrix with the constraint filter).
     """
     qp_data = QPDataTwoSidedInequality(
         quadratic_weights=np.array([1.0, 1.0]),

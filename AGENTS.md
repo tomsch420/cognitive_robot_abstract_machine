@@ -12,6 +12,7 @@
 - Always use a test-driven development approach. For example for bugs, always prove a bug by adding a meaningful, failing test first, before then fixing it
 - When fixing failing tests, never modify the test itself
 - All new features and fixes must be covered by tests
+- Name test classes (and the mimic classes used by tests) after the pattern or behaviour they exercise, not after the concrete external class they happen to stand in for
 
 ## Code Style
 - Do not use abbreviations in variable names, methods, classes, or any other identifiers
@@ -27,10 +28,14 @@
 
 ## Imports
 - Imports should always be absolute
+- Exception: within tests, importing another test module (for example a shared mimic or fixture from the test datasets) must use a relative import
 - Imports should always be global (top of module), except in very special cases (for example ORM interface imports)
 - Use stdlib type hints where possible, and for others use typing_extensions instead of typing
 - Whenever you would wrap types in strings for deferred resolution, use `from __future__ import annotations` instead.
 - use TYPE_CHECKING guard for type-only imports
+- `krrood` must stay self-contained: never import from another workspace package into `krrood` (this includes its tests under `test/krrood_test`). The only permitted exceptions are `random_events` and `probabilistic_model`, because `krrood`'s own source already depends on them. In particular, do not import from `coraplex`, `semantic_digital_twin`, `giskardpy`, `physics_simulators`, `robokudo`, or `experiments` inside `krrood`.
+- When a `krrood` test needs to exercise behaviour that another package triggers, mimic the relevant classes and patterns inside the `krrood` test datasets (`test/krrood_test/dataset`) and test against those mimics. Keep the test in `krrood`; do not move it to another package and do not depend on another package to reproduce the scenario.
+- Mimic classes in the `krrood` test datasets must never import directly from another workspace package either; the only packages they may import from are the ones `krrood`'s source already imports (`random_events`, `probabilistic_model`) plus `krrood` itself.
 
 ## Design Principles
 - Focus on strictly object oriented design
@@ -62,9 +67,16 @@
 - Keep docstrings short and concise
 - Use Sphinx directives (for example `..note::`, `..warning::`, and `:func:`) where appropriate
 - Do not create type information for docstrings (type hints already convey this)
+- Always run `docformatter` on modified files
 
 ## Domain-Specific Conventions
 - When dealing with spatial types and connections, adhere to the style guide documented in `semantic_digital_twin/doc/style_guide.md`
+
+## Version Control
+- Commits must be authored in the name of the human user running the tool, using their own configured git `user.name` and `user.email`. Never author or amend a commit as an assistant/agent identity.
+- Do not attribute authorship or co-authorship to an assistant: no `Co-Authored-By:` trailer for Claude or any assistant, and no `noreply@anthropic.com` (or similar) as author or committer. The commit's authorship reflects the person responsible for it.
+- It is fine — and encouraged — to acknowledge assistant help in the commit message body with a short plain line, for example `Made with the help of Claude`. Keep it a note, not an author/co-author trailer.
+- This applies to every contributor and every tool.
 
 ## Misc
 - If you find a package that could be replaced by a more powerful one, let us know

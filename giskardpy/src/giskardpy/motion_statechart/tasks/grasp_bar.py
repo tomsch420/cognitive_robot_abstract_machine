@@ -12,31 +12,61 @@ from semantic_digital_twin.world_description.world_entity import Body
 @dataclass(eq=False, repr=False)
 class GraspBar(Task):
     """
-    Like a CartesianPose but with more freedom: the tip link is allowed to be at any point along
-    the bar axis within ``bar_center +/- bar_length / 2``. It aligns ``tip_grasp_axis`` with
-    ``bar_axis`` while allowing rotation around it.
+    Like a CartesianPose but with more freedom: the tip link is allowed to be at any
+    point along the bar axis within ``bar_center +/- bar_length / 2``.
+
+    It aligns ``tip_grasp_axis`` with ``bar_axis`` while allowing rotation around it.
     """
 
     root_link: Body = field(kw_only=True)
-    """Root link of the kinematic chain."""
+    """
+    Root link of the kinematic chain.
+    """
+
     tip_link: Body = field(kw_only=True)
-    """Tip link of the kinematic chain."""
+    """
+    Tip link of the kinematic chain.
+    """
+
     tip_grasp_axis: Vector3 = field(kw_only=True)
-    """Axis of the tip link that will be aligned with the bar axis."""
+    """
+    Axis of the tip link that will be aligned with the bar axis.
+    """
+
     bar_center: Point3 = field(kw_only=True)
-    """Center of the bar to be grasped."""
+    """
+    Center of the bar to be grasped.
+    """
+
     bar_axis: Vector3 = field(kw_only=True)
-    """Alignment of the bar to be grasped."""
+    """
+    Alignment of the bar to be grasped.
+    """
+
     bar_length: float = field(kw_only=True)
-    """Length of the bar to be grasped."""
+    """
+    Length of the bar to be grasped.
+    """
+
     threshold: float = field(default=0.01, kw_only=True)
-    """Distance threshold to the bar for goal achievement in meters."""
+    """
+    Distance threshold to the bar for goal achievement in meters.
+    """
+
     reference_linear_velocity: float = field(default=0.1, kw_only=True)
-    """Reference linear velocity for normalization in m/s."""
+    """
+    Reference linear velocity for normalization in m/s.
+    """
+
     reference_angular_velocity: float = field(default=0.5, kw_only=True)
-    """Reference angular velocity for normalization in rad/s."""
+    """
+    Reference angular velocity for normalization in rad/s.
+    """
+
     weight: float = field(default=DefaultWeights.WEIGHT_ABOVE_CA, kw_only=True)
-    """Priority weight relative to other tasks."""
+    """
+    Priority weight relative to other tasks.
+    """
 
     def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         artifacts = NodeArtifacts()

@@ -51,7 +51,8 @@ class State(MutableMapping[MotionStatechartNode, float], SubclassJSONSerializer)
 
     def grow(self) -> None:
         """
-        Appends the default value to :attr:`data`, keeping it in sync with a newly added node.
+        Appends the default value to :attr:`data`, keeping it in sync with a newly added
+        node.
         """
         self.data = np.append(self.data, self.default_value)
 
@@ -75,7 +76,8 @@ class State(MutableMapping[MotionStatechartNode, float], SubclassJSONSerializer)
 
     def __setitem__(self, node: MotionStatechartNode, value: float) -> None:
         """
-        Writes `value` into :attr:`data` at `node`'s :attr:`~MotionStatechartNode.index`.
+        Writes `value` into :attr:`data` at `node`'s
+        :attr:`~MotionStatechartNode.index`.
         """
         self.data[node.index] = value
 
@@ -164,7 +166,8 @@ class State(MutableMapping[MotionStatechartNode, float], SubclassJSONSerializer)
 @dataclass(repr=False, eq=False)
 class LifeCycleState(State):
     """
-    The life cycle state of every node in a motion statechart, see :class:`MotionStatechart`.
+    The life cycle state of every node in a motion statechart, see
+    :class:`MotionStatechart`.
     """
 
     default_value: ClassVar[float] = LifeCycleValues.NOT_STARTED
@@ -173,6 +176,7 @@ class LifeCycleState(State):
     def compile(self):
         """
         Compiles updater for life cycle states.
+
         1. Define state transitions based on current life cycle state and conditions.
         2. Combine all node state transitions into a single expression and compile it.
         3. Bind compiled function arguments to memory views of observation and life cycle state data.
@@ -222,7 +226,8 @@ class LifeCycleState(State):
 
     def update_state(self):
         """
-        Evaluates the compiled updater created by :meth:`compile` and writes the result into :attr:`data`.
+        Evaluates the compiled updater created by :meth:`compile` and writes the result
+        into :attr:`data`.
         """
         np.copyto(self.data, self._compiled_updater.evaluate())
 
@@ -238,7 +243,8 @@ class LifeCycleState(State):
 @dataclass(repr=False, eq=False)
 class ObservationState(State):
     """
-    The observation state of every node in a motion statechart, see :class:`MotionStatechart`.
+    The observation state of every node in a motion statechart, see
+    :class:`MotionStatechart`.
     """
 
     default_value: ClassVar[ObservationStateValues] = ObservationStateValues.UNKNOWN
@@ -298,7 +304,8 @@ class ObservationState(State):
 
     def update_state(self):
         """
-        Evaluates the compiled updater created by :meth:`compile` and writes the result into :attr:`data`.
+        Evaluates the compiled updater created by :meth:`compile` and writes the result
+        into :attr:`data`.
         """
         np.copyto(self.data, self._compiled_updater.evaluate())
 
@@ -306,7 +313,8 @@ class ObservationState(State):
 @dataclass(repr=False, eq=False)
 class StateHistoryItem:
     """
-    A snapshot of a :class:`MotionStatechart`'s life cycle and observation state at one control cycle.
+    A snapshot of a :class:`MotionStatechart`'s life cycle and observation state at one
+    control cycle.
     """
 
     control_cycle: int
@@ -315,7 +323,8 @@ class StateHistoryItem:
 
     def __post_init__(self):
         """
-        Deep-copies the given states, so later mutation of the live states does not affect this snapshot.
+        Deep-copies the given states, so later mutation of the live states does not
+        affect this snapshot.
         """
         self.life_cycle_state = deepcopy(self.life_cycle_state)
         self.observation_state = deepcopy(self.observation_state)
@@ -347,15 +356,16 @@ class StateHistoryItem:
 @dataclass
 class StateHistory:
     """
-    The recorded sequence of :class:`StateHistoryItem` snapshots of a :class:`MotionStatechart`.
+    The recorded sequence of :class:`StateHistoryItem` snapshots of a
+    :class:`MotionStatechart`.
     """
 
     history: List[StateHistoryItem] = field(default_factory=list)
 
     def append(self, next_item: StateHistoryItem):
         """
-        Appends `next_item`, unless it is equal to the last recorded item, in which case it is dropped
-        to avoid storing consecutive duplicates.
+        Appends `next_item`, unless it is equal to the last recorded item, in which case
+        it is dropped to avoid storing consecutive duplicates.
         """
         if len(self.history) != 0:
             if next_item == self.history[-1]:
@@ -429,12 +439,14 @@ class MotionStatechart(SubclassJSONSerializer):
 
     observation_state: ObservationState = field(init=False)
     """
-    Combined representation of the observation state of the motion statechart, to enable an efficient tick().
+    Combined representation of the observation state of the motion statechart, to enable
+    an efficient tick().
     """
 
     life_cycle_state: LifeCycleState = field(init=False)
     """
-    Combined representation of the life cycle state of the motion statechart, to enable an efficient tick().
+    Combined representation of the life cycle state of the motion statechart, to enable
+    an efficient tick().
     """
 
     history: StateHistory = field(default_factory=StateHistory, init=False)
@@ -444,15 +456,19 @@ class MotionStatechart(SubclassJSONSerializer):
 
     def __post_init__(self):
         """
-        Creates the (initially empty) life cycle and observation states for this motion statechart.
+        Creates the (initially empty) life cycle and observation states for this motion
+        statechart.
         """
         self.life_cycle_state = LifeCycleState(self)
         self.observation_state = ObservationState(self)
 
     def create_structure_copy(self) -> MotionStatechart:
         """
-        Creates a copy of the motion statechart, where all nodes are MotionStatechartNodes or Goals.
-        This is useful if only the structure of the motion statechart is needed, for example, for visualization.
+        Creates a copy of the motion statechart, where all nodes are
+        MotionStatechartNodes or Goals.
+
+        This is useful if only the structure of the motion statechart is needed, for
+        example, for visualization.
         """
         motion_statechart_copy = MotionStatechart()
         # copy nodes in order to make sure index is correct
@@ -515,6 +531,7 @@ class MotionStatechart(SubclassJSONSerializer):
     def edges(self) -> List[TrinaryCondition]:
         """
         The edges of the underlying graph.
+
         .. warning:: This may return duplicate edges if a transition uses multiple nodes.
         """
         return self.rx_graph.edges()
@@ -528,7 +545,8 @@ class MotionStatechart(SubclassJSONSerializer):
 
     def add_node(self, node: MotionStatechartNode):
         """
-        Adds a node to the motion statechart and finalizes the initialization of the node.
+        Adds a node to the motion statechart and finalizes the initialization of the
+        node.
         """
         node.motion_statechart = self
         node.index = self.rx_graph.add_node(node)
@@ -551,7 +569,8 @@ class MotionStatechart(SubclassJSONSerializer):
 
     def _add_transitions(self):
         """
-        Rebuilds the graph's edges from the current start, pause, end, and reset conditions of every node.
+        Rebuilds the graph's edges from the current start, pause, end, and reset
+        conditions of every node.
         """
         self._validate_condition_scopes()
         self.rx_graph.clear_edges()
@@ -584,7 +603,8 @@ class MotionStatechart(SubclassJSONSerializer):
         """
         Checks that `condition` only depends on `owner` itself or siblings of `owner`.
 
-        :raises ConditionScopeError: If `condition` depends on a node from a different scope level.
+        :raises ConditionScopeError: If `condition` depends on a node from a different
+            scope level.
         """
         for dependency in condition.node_dependencies:
             if dependency is owner:
@@ -621,8 +641,10 @@ class MotionStatechart(SubclassJSONSerializer):
         built_node_indices: set[int],
     ):
         """
-        Builds `node`, recursively building its children first if it is a :class:`Goal`, and stores
-        the resulting :class:`~giskardpy.motion_statechart.graph_node.NodeArtifacts` on the node.
+        Builds `node`, recursively building its children first if it is a :class:`Goal`,
+        and stores the resulting
+        :class:`~giskardpy.motion_statechart.graph_node.NodeArtifacts` on the node.
+
         Already-built nodes (tracked via `built_node_indices`) are skipped.
         """
         if node.index in built_node_indices:
@@ -665,14 +687,16 @@ class MotionStatechart(SubclassJSONSerializer):
 
     def _expand_goals(self, context: MotionStatechartContext):
         """
-        Triggers the expansion of all goals in the motion statechart and add its children to the motion statechart.
+        Triggers the expansion of all goals in the motion statechart and add its
+        children to the motion statechart.
         """
         for goal in self.get_nodes_by_type(Goal):
             self._expand_goal(goal, context=context)
 
     def _expand_goal(self, goal: Goal, context: MotionStatechartContext):
         """
-        Expands `goal` and recursively expands every child of `goal` that is itself a :class:`Goal`.
+        Expands `goal` and recursively expands every child of `goal` that is itself a
+        :class:`Goal`.
         """
         goal.expand(context)
         for child_node in goal.nodes:
@@ -693,8 +717,8 @@ class MotionStatechart(SubclassJSONSerializer):
 
     def _update_observation_state(self, context: MotionStatechartContext):
         """
-        Updates the compiled observation state, then lets every RUNNING node overwrite its own
-        observation via :meth:`~MotionStatechartNode.on_tick`.
+        Updates the compiled observation state, then lets every RUNNING node overwrite
+        its own observation via :meth:`~MotionStatechartNode.on_tick`.
         """
         self.observation_state.update_state()
         for node in self.nodes:
@@ -705,8 +729,8 @@ class MotionStatechart(SubclassJSONSerializer):
 
     def _update_life_cycle_state(self, context: MotionStatechartContext):
         """
-        Updates the compiled life cycle state and triggers the life cycle callbacks for every node
-        whose life cycle state changed as a result.
+        Updates the compiled life cycle state and triggers the life cycle callbacks for
+        every node whose life cycle state changed as a result.
         """
         previous = self.life_cycle_state.data.copy()
         self.life_cycle_state.update_state()
@@ -721,9 +745,11 @@ class MotionStatechart(SubclassJSONSerializer):
         context: MotionStatechartContext,
     ) -> None:
         """
-        For every node whose life cycle state changed between `previous_state` and `current_state`,
-        calls the matching callback (e.g. :meth:`~MotionStatechartNode.on_start`,
-        :meth:`~MotionStatechartNode.on_end`). Transitions with no dedicated callback are ignored.
+        For every node whose life cycle state changed between `previous_state` and
+        `current_state`, calls the matching callback (e.g.
+        :meth:`~MotionStatechartNode.on_start`, :meth:`~MotionStatechartNode.on_end`).
+
+        Transitions with no dedicated callback are ignored.
         """
         for node in self.nodes:
             prev = LifeCycleValues(int(previous_state[node.index]))
@@ -752,6 +778,7 @@ class MotionStatechart(SubclassJSONSerializer):
     def tick(self, context: MotionStatechartContext):
         """
         Executes a single tick of the motion statechart.
+
         First the observation state is updated, then the life cycle state is updated.
         :param context: The context required to execute the tick.
         """
@@ -786,7 +813,8 @@ class MotionStatechart(SubclassJSONSerializer):
 
     def _raise_if_cancel_motion(self):
         """
-        Raises the exception of the first :class:`CancelMotion` node whose observation state is True.
+        Raises the exception of the first :class:`CancelMotion` node whose observation
+        state is True.
         """
         for node in self.get_nodes_by_type(CancelMotion):
             if self.observation_state[node] == ObservationStateValues.TRUE:
@@ -815,7 +843,8 @@ class MotionStatechart(SubclassJSONSerializer):
         Renders a Gantt chart of :attr:`history` and saves it at `path`.
 
         :param path: Where to save the resulting PDF.
-        :param context: If given (and it provides `dt`), the x-axis is scaled to seconds instead of control cycles.
+        :param context: If given (and it provides `dt`), the x-axis is scaled to seconds
+            instead of control cycles.
         :param second_length_in_cm: Width in cm of one second on the x-axis.
         """
         HistoryGanttChartPlotter(
@@ -838,8 +867,9 @@ class MotionStatechart(SubclassJSONSerializer):
     @classmethod
     def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
         """
-        Reconstructs a motion statechart from its JSON representation, as produced by :meth:`to_json`:
-        first all nodes, then their transition conditions, then goal/child parent links.
+        Reconstructs a motion statechart from its JSON representation, as produced by
+        :meth:`to_json`: first all nodes, then their transition conditions, then
+        goal/child parent links.
 
         :param data: The JSON dict.
         :return: The deserialized motion statechart.
