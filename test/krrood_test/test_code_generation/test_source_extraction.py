@@ -23,6 +23,8 @@ from krrood.exceptions import (
 )
 
 from test.krrood_test.dataset import department_and_employee, example_classes
+from test.krrood_test.dataset.department_and_employee import Department
+from test.krrood_test.dataset.example_classes import module_level_function
 
 
 class TestExtractFunctionSource:
@@ -32,30 +34,30 @@ class TestExtractFunctionSource:
 
     def test_extracts_named_function(self):
         result = extract_function_source(
-            ["module_level_function"], file_path=example_classes.__file__
+            [module_level_function.__name__], file_path=example_classes.__file__
         )
         assert [definition.name for definition in result.definitions] == [
-            "module_level_function"
+            module_level_function.__name__
         ]
-        assert "def module_level_function():" in result.source_of(
-            "module_level_function"
+        assert f"def {module_level_function.__name__}():" in result.source_of(
+            module_level_function.__name__
         )
 
     def test_extracts_all_when_names_empty(self):
         result = extract_function_source([], file_path=example_classes.__file__)
         assert [definition.name for definition in result.definitions] == [
-            "module_level_function"
+            module_level_function.__name__
         ]
 
     def test_does_not_extract_classes(self):
         result = extract_function_source(
-            ["Department"], file_path=department_and_employee.__file__
+            [Department.__name__], file_path=department_and_employee.__file__
         )
         assert result.definitions == []
 
     def test_line_span_is_reported(self):
         result = extract_function_source(
-            ["module_level_function"], file_path=example_classes.__file__
+            [module_level_function.__name__], file_path=example_classes.__file__
         )
         line_span = result.definitions[0].line_span
         assert isinstance(line_span, LineSpan)
@@ -63,35 +65,36 @@ class TestExtractFunctionSource:
 
     def test_exclude_signature(self):
         result = extract_function_source(
-            ["module_level_function"],
+            [module_level_function.__name__],
             file_path=example_classes.__file__,
             include_signature=False,
         )
-        assert "def module_level_function" not in result.source_of(
-            "module_level_function"
+        assert f"def {module_level_function.__name__}" not in result.source_of(
+            module_level_function.__name__
         )
-        assert "return 1" in result.source_of("module_level_function")
+        assert "return 1" in result.source_of(module_level_function.__name__)
 
     def test_lines_are_reported_individually(self):
         result = extract_function_source(
-            ["module_level_function"], file_path=example_classes.__file__
+            [module_level_function.__name__], file_path=example_classes.__file__
         )
         assert result.definitions[0].lines == [
-            "def module_level_function():",
+            f"def {module_level_function.__name__}():",
             "    return 1",
         ]
 
     def test_extracts_from_source_string(self):
         result = extract_function_source(
-            ["module_level_function"], source=inspect.getsource(example_classes)
+            [module_level_function.__name__],
+            source=inspect.getsource(example_classes),
         )
-        assert "def module_level_function():" in result.source_of(
-            "module_level_function"
+        assert f"def {module_level_function.__name__}():" in result.source_of(
+            module_level_function.__name__
         )
 
     def test_missing_source_raises(self):
         with pytest.raises(SourceDataNotProvided):
-            extract_function_source(["module_level_function"])
+            extract_function_source([module_level_function.__name__])
 
 
 class TestExtractClassSource:
@@ -101,14 +104,18 @@ class TestExtractClassSource:
 
     def test_extracts_named_class(self):
         result = extract_class_source(
-            ["Department"], file_path=department_and_employee.__file__
+            [Department.__name__], file_path=department_and_employee.__file__
         )
-        assert [definition.name for definition in result.definitions] == ["Department"]
-        assert "class Department(Symbol):" in result.source_of("Department")
+        assert [definition.name for definition in result.definitions] == [
+            Department.__name__
+        ]
+        assert f"class {Department.__name__}(Symbol):" in result.source_of(
+            Department.__name__
+        )
 
     def test_does_not_extract_functions(self):
         result = extract_class_source(
-            ["module_level_function"], file_path=example_classes.__file__
+            [module_level_function.__name__], file_path=example_classes.__file__
         )
         assert result.definitions == []
 
