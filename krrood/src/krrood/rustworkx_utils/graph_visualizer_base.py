@@ -17,9 +17,6 @@ from typing_extensions import (
     Dict,
 )
 
-RustworkxGraph = Union[rx.PyDiGraph, rx.PyGraph]
-"""A directed or undirected rustworkx graph."""
-
 DEFAULT_NODE_COLOR = "#79a6d2"
 """The marker color used when no ``color_getter`` is provided."""
 
@@ -73,6 +70,9 @@ def describe_by_repr(payload: Any) -> List[str]:
 
 @dataclass
 class GraphLayoutOptions:
+    """
+    Additional options that each visualization library needs to realise a specific layout.
+    """
 
     layout_options: Dict[GraphLayout, Dict[str, Any]]
     """
@@ -99,7 +99,7 @@ class GraphVisualizerBase(ABC):
     required_modules: ClassVar[Tuple[str, ...]] = ()
     """The importable modules the backend needs to run."""
 
-    graph: RustworkxGraph
+    graph: Union[rx.PyDiGraph, rx.PyGraph]
     """The live graph to display; re-read whenever the drawing is refreshed."""
 
     information_getter: Callable[[Any], List[str]] = describe_by_repr

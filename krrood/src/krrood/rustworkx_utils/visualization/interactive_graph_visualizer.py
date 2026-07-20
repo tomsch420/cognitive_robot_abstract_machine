@@ -8,7 +8,6 @@ import rustworkx as rx
 from typing_extensions import Any, ClassVar, Dict, List, Optional, Tuple, TYPE_CHECKING
 
 from krrood.rustworkx_utils.graph_visualizer_base import (
-    DEFAULT_NODE_COLOR,
     GraphLayout,
     GraphVisualizerBase,
 )

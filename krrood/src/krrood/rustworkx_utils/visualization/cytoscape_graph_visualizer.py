@@ -19,21 +19,6 @@ if TYPE_CHECKING:
 CytoscapeElement = Dict[str, Dict[str, Any]]
 
 
-LAYOUT_OPTIONS = GraphLayoutOptions(
-    layout_options={
-        GraphLayout.SPRING: {"name": "cose", "animate": True},
-        GraphLayout.LAYERED: {"name": "breadthfirst", "directed": True},
-        GraphLayout.PHYSICS: {
-            "name": "cola",
-            "infinite": True,
-            "fit": False,
-            "edgeLength": 120,
-            "nodeSpacing": 10,
-        },
-    }
-)
-
-
 @dataclass
 class CytoscapeGraphVisualizer(GraphVisualizerBase):
     """Render a live rustworkx graph as an interactive Flask application backed by Cytoscape.js.
@@ -52,6 +37,21 @@ class CytoscapeGraphVisualizer(GraphVisualizerBase):
 
     required_modules: ClassVar[Tuple[str, ...]] = ("flask",)
     """The libraries needed to serve the application."""
+
+    layout_options: ClassVar[GraphLayoutOptions] = GraphLayoutOptions(
+        layout_options={
+            GraphLayout.SPRING: {"name": "cose", "animate": True},
+            GraphLayout.LAYERED: {"name": "breadthfirst", "directed": True},
+            GraphLayout.PHYSICS: {
+                "name": "cola",
+                "infinite": True,
+                "fit": False,
+                "edgeLength": 120,
+                "nodeSpacing": 10,
+            },
+        }
+    )
+    """The Cytoscape.js layout options for each :class:`GraphLayout`."""
 
     def _node_element(self, node_index: int) -> CytoscapeElement:
         """
@@ -119,7 +119,7 @@ class CytoscapeGraphVisualizer(GraphVisualizerBase):
             return render_template(
                 "cytoscape_graph_visualizer.jinja",
                 title=self.title,
-                layout_options_json=json.dumps(LAYOUT_OPTIONS.get_options(self.layout)),
+                layout_options_json=json.dumps(self.layout_options.get_options(self.layout)),
                 extra_node_styles_json=json.dumps(self.extra_node_styles()),
                 interval_ms=int(self.refresh_interval_seconds * 1000),
                 extra_script=self.extra_script(),

@@ -8,7 +8,6 @@ import rustworkx as rx
 
 from krrood.rustworkx_utils.visualization.cytoscape_graph_visualizer import (
     CytoscapeGraphVisualizer,
-    LAYOUT_OPTIONS,
 )
 from krrood.rustworkx_utils.graph_visualizer_base import GraphLayout
 
@@ -147,12 +146,15 @@ class TestLayout:
     def test_layered_layout_maps_to_a_hierarchical_cytoscape_layout(self):
         visualizer = named_visualizer(chain_graph(["a"]), layout=GraphLayout.LAYERED)
 
-        assert LAYOUT_OPTIONS.get_options(visualizer.layout)["name"] == "breadthfirst"
+        assert (
+            CytoscapeGraphVisualizer.layout_options.get_options(visualizer.layout)["name"]
+            == "breadthfirst"
+        )
 
     def test_physics_layout_runs_a_continuous_force_simulation(self):
         visualizer = named_visualizer(chain_graph(["a"]), layout=GraphLayout.PHYSICS)
 
-        options = LAYOUT_OPTIONS.get_options(visualizer.layout)
+        options = CytoscapeGraphVisualizer.layout_options.get_options(visualizer.layout)
         assert options["name"] == "cola"
         assert options["infinite"] is True
 

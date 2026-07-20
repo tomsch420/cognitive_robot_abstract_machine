@@ -27,31 +27,6 @@ DEFAULT_BORDER_COLOR = "#888888"
 """The border color used for nodes and edges when no border color is given."""
 
 
-LAYOUT_OPTIONS = GraphLayoutOptions(
-    layout_options={
-        GraphLayout.SPRING: {
-            "physics": {
-                "enabled": True,
-                "stabilization": {"enabled": True, "iterations": 200},
-            },
-        },
-        GraphLayout.LAYERED: {
-            "layout": {
-                "hierarchical": {
-                    "direction": "UD",
-                    "sortMethod": "directed",
-                    "nodeSpacing": 150,
-                }
-            },
-            "physics": {"enabled": False},
-        },
-        GraphLayout.PHYSICS: {
-            "physics": {"enabled": True, "stabilization": {"enabled": False}},
-        },
-    }
-)
-
-
 @dataclass
 class VisNetworkGraphVisualizer(GraphVisualizerBase):
     """Render a live rustworkx graph as an interactive Flask application backed by vis-network.
@@ -70,6 +45,31 @@ class VisNetworkGraphVisualizer(GraphVisualizerBase):
 
     required_modules: ClassVar[Tuple[str, ...]] = ("flask",)
     """The libraries needed to serve the application."""
+
+    layout_options: ClassVar[GraphLayoutOptions] = GraphLayoutOptions(
+        layout_options={
+            GraphLayout.SPRING: {
+                "physics": {
+                    "enabled": True,
+                    "stabilization": {"enabled": True, "iterations": 200},
+                },
+            },
+            GraphLayout.LAYERED: {
+                "layout": {
+                    "hierarchical": {
+                        "direction": "UD",
+                        "sortMethod": "directed",
+                        "nodeSpacing": 150,
+                    }
+                },
+                "physics": {"enabled": False},
+            },
+            GraphLayout.PHYSICS: {
+                "physics": {"enabled": True, "stabilization": {"enabled": False}},
+            },
+        }
+    )
+    """The vis-network layout options for each :class:`GraphLayout`."""
 
     def graph_nodes(self) -> List[VisNode]:
         """
@@ -112,7 +112,7 @@ class VisNetworkGraphVisualizer(GraphVisualizerBase):
             return render_template(
                 "visnetwork_graph_visualizer.jinja",
                 title=self.title,
-                layout_options_json=json.dumps(LAYOUT_OPTIONS.get_options(self.layout)),
+                layout_options_json=json.dumps(self.layout_options.get_options(self.layout)),
                 interval_ms=int(self.refresh_interval_seconds * 1000),
             )
 

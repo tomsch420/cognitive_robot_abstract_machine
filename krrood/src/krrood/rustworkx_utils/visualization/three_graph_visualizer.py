@@ -22,18 +22,6 @@ ThreeNode = Dict[str, Any]
 ThreeLink = Dict[str, Any]
 """A single 3d-force-graph link."""
 
-LAYOUT_OPTIONS = GraphLayoutOptions(
-    layout_options={
-        GraphLayout.SPRING: {"cooldownTicks": 100},
-        GraphLayout.LAYERED: {"dagMode": "td", "cooldownTicks": 100},
-        GraphLayout.PHYSICS: {"cooldownTicks": float("inf")},
-        # A handful of ticks rather than 0: d3-force applies fx/fy/fz to x/y/z during its normal tick
-        # loop, so the simulation still needs to run briefly for fixed positions to actually take
-        # effect, even though there's nothing left to iteratively settle.
-        GraphLayout.FIXED: {"cooldownTicks": 10},
-    }
-)
-
 
 @dataclass
 class ThreeGraphVisualizer(GraphVisualizerBase):
@@ -60,6 +48,19 @@ class ThreeGraphVisualizer(GraphVisualizerBase):
 
     required_modules: ClassVar[Tuple[str, ...]] = ("flask",)
     """The libraries needed to serve the application."""
+
+    layout_options: ClassVar[GraphLayoutOptions] = GraphLayoutOptions(
+        layout_options={
+            GraphLayout.SPRING: {"cooldownTicks": 100},
+            GraphLayout.LAYERED: {"dagMode": "td", "cooldownTicks": 100},
+            GraphLayout.PHYSICS: {"cooldownTicks": float("inf")},
+            # A handful of ticks rather than 0: d3-force applies fx/fy/fz to x/y/z during its normal
+            # tick loop, so the simulation still needs to run briefly for fixed positions to
+            # actually take effect, even though there's nothing left to iteratively settle.
+            GraphLayout.FIXED: {"cooldownTicks": 10},
+        }
+    )
+    """The 3d-force-graph layout options for each :class:`GraphLayout`."""
 
     def node_extra_data(self, node_index: int) -> Dict[str, Any]:
         """
@@ -157,7 +158,7 @@ class ThreeGraphVisualizer(GraphVisualizerBase):
             return render_template(
                 "three_graph_visualizer.jinja",
                 title=self.title,
-                layout_options_json=json.dumps(LAYOUT_OPTIONS.get_options(self.layout)),
+                layout_options_json=json.dumps(self.layout_options.get_options(self.layout)),
                 interval_ms=int(self.refresh_interval_seconds * 1000),
                 extra_head=self.extra_head(),
                 extra_script=self.extra_script(),
