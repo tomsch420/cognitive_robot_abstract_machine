@@ -1,6 +1,6 @@
 """
-Mixing demo: a PR2 mixes the contents of a bowl on the apartment kitchen counter
-with a whisk mounted on its right gripper.
+Mixing demo: a PR2 mixes the contents of a bowl on the apartment kitchen counter with a
+whisk mounted on its right gripper.
 """
 
 from experiments.tool_based_actions.simple_demo.demo_world import (
@@ -8,7 +8,6 @@ from experiments.tool_based_actions.simple_demo.demo_world import (
     BOWL_COLOR,
     MIX_MOUNT,
     TARGET_POSITION_XYZ,
-    attach_tool,
     parse_object,
 )
 from semantic_digital_twin.datastructures.definitions import GripperState, TorsoState
@@ -31,7 +30,7 @@ from coraplex.robot_plans.actions.core.robot_body import (
     ParkArmsAction,
     SetGripperAction,
 )
-from coraplex.testing import setup_world
+from coraplex.testing import attach_tool, setup_world, start_visualization
 
 
 def main() -> None:
@@ -48,18 +47,7 @@ def main() -> None:
                 *TARGET_POSITION_XYZ, reference_frame=world.root
             ),
         )
-    try:
-        import rclpy
-
-        rclpy.init()
-        from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
-            VizMarkerPublisher,
-        )
-
-        node = rclpy.create_node("viz_marker")
-        v = VizMarkerPublisher(_world=world, node=node).with_tf_publisher()
-    except ImportError:
-        node = None
+    start_visualization(world)
 
     pr2 = PR2.from_world(world)
     context = Context(world=world, robot=pr2, _debug=False, ros_node=None)

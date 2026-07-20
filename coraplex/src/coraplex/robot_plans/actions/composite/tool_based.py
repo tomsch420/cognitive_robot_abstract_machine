@@ -60,6 +60,10 @@ class FullBodyControlledAction(ActionDescription, ABC):
     """
 
     def execute(self) -> Any:
+        """
+        Perform the action's plan with full body control enabled, restoring the previous
+        control state afterwards.
+        """
         previous_full_body_controlled = self._enable_full_body_control()
         try:
             self._perform_plan()
@@ -67,6 +71,9 @@ class FullBodyControlledAction(ActionDescription, ABC):
             self._restore_full_body_control(previous_full_body_controlled)
 
     def _perform_plan(self) -> None:
+        """
+        Add the action plan as a subplan and perform it.
+        """
         self.add_subplan(self.action_plan).perform()
 
     def _enable_full_body_control(self) -> Optional[bool]:
@@ -81,6 +88,10 @@ class FullBodyControlledAction(ActionDescription, ABC):
         return previous
 
     def _restore_full_body_control(self, previous: Optional[bool]) -> None:
+        """
+        :param previous: The full-body-control state to restore, or None if the robot
+            has no mobile base.
+        """
         if previous is None:
             return
         self.robot.mobile_base.full_body_controlled = previous
@@ -144,6 +155,10 @@ class ToolMotionAction(FullBodyControlledAction, ABC):
 
     @property
     def _alignment_pairs(self) -> List[AlignmentPair]:
+        """
+        :return: The normal pairs that keep the tool aligned with its target during
+            the motion, or an empty list if there is no alignment target.
+        """
         target = self._alignment_target
         if target is None:
             return []
@@ -151,6 +166,10 @@ class ToolMotionAction(FullBodyControlledAction, ABC):
 
     @property
     def _action_plan(self) -> PlanNode:
+        """
+        :return: A plan moving the tool along the sampled waypoints while keeping it
+            aligned with its target.
+        """
         return sequential(
             [
                 MoveTCPWaypointsAlignedMotion(
@@ -264,6 +283,7 @@ class WipingAction(ToolMotionAction):
 
     If None, ``target_pose`` is used instead.
     """
+
     target_pose: Optional[Pose] = None
     """
     Center pose of the wiping patch.
@@ -293,6 +313,9 @@ class WipingAction(ToolMotionAction):
     """
 
     def __post_init__(self):
+        """
+        :raises WipingTargetMissing: If neither a surface nor a target pose is given.
+        """
         if self.surface is None and self.target_pose is None:
             raise WipingTargetMissing(self)
 
@@ -339,6 +362,10 @@ class WipingAction(ToolMotionAction):
         return self.target_pose
 
     def _perform_plan(self) -> None:
+        """
+        Perform the wiping plan, accepting an unfinished motion if the tool still
+        reached the final waypoint.
+        """
         subplan = self.add_subplan(self.action_plan)
         try:
             subplan.perform()
@@ -384,6 +411,7 @@ class PouringAction(FullBodyControlledAction):
     """
     Tilt angle in radians applied to the source container while pouring.
     """
+
     pour_side: Optional[Arms] = None
     """
     Robot-relative side of the target container to pour from.
@@ -407,6 +435,9 @@ class PouringAction(FullBodyControlledAction):
     """
 
     def _effective_pour_side(self) -> Arms:
+        """
+        :return: The requested pour side, or the pouring arm if none was requested.
+        """
         if self.pour_side is None:
             return self.arm
         return self.pour_side
@@ -518,6 +549,13 @@ class PouringAction(FullBodyControlledAction):
     def _pose_from_rotation(
         self, x: float, y: float, z: float, rotation: Rotation
     ) -> Pose:
+        """
+        :param x: X position of the pose in the world frame.
+        :param y: Y position of the pose in the world frame.
+        :param z: Z position of the pose in the world frame.
+        :param rotation: Orientation of the pose.
+        :return: The pose in the world frame.
+        """
         quat_x, quat_y, quat_z, quat_w = rotation.as_quat()
         return Pose.from_xyz_quaternion(
             pos_x=x,
@@ -532,6 +570,10 @@ class PouringAction(FullBodyControlledAction):
 
     @property
     def _action_plan(self) -> PlanNode:
+        """
+        :return: A plan moving the source container to the pre-pour pose and then
+            tilting it into the pouring pose.
+        """
         pre_pour_pose, pour_pose = self._pour_poses()
         return sequential(
             [

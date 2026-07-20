@@ -1,6 +1,6 @@
 """
-Wiping demo: a PR2 wipes a patch of the apartment kitchen counter with a sponge
-mounted on its right gripper.
+Wiping demo: a PR2 wipes a patch of the apartment kitchen counter with a sponge mounted
+on its right gripper.
 """
 
 from experiments.tool_based_actions.simple_demo.demo_world import (
@@ -24,7 +24,7 @@ from coraplex.robot_plans.actions.core.robot_body import (
     ParkArmsAction,
     SetGripperAction,
 )
-from coraplex.testing import setup_world
+from coraplex.testing import setup_world, start_visualization
 
 
 def main() -> None:
@@ -32,19 +32,7 @@ def main() -> None:
     Build the demo world and run the plan on the simulated robot.
     """
     world = setup_world()
-
-    try:
-        import rclpy
-
-        rclpy.init()
-        from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
-            VizMarkerPublisher,
-        )
-
-        node = rclpy.create_node("viz_marker")
-        v = VizMarkerPublisher(_world=world, node=node).with_tf_publisher()
-    except ImportError:
-        node = None
+    start_visualization(world)
 
     pr2 = PR2.from_world(world)
     context = Context(world=world, robot=pr2, _debug=False, ros_node=None)

@@ -3,12 +3,13 @@ Cutting demo: a PR2 slices a bread on the apartment kitchen counter with a knife
 on its right gripper.
 """
 
+import logging
+
 from experiments.tool_based_actions.simple_demo.demo_world import (
     BASE_POSITION_XYZ,
     BREAD_COLOR,
     CUT_MOUNT,
     TARGET_POSITION_XYZ,
-    attach_tool,
     parse_object,
 )
 from semantic_digital_twin.datastructures.definitions import GripperState, TorsoState
@@ -31,7 +32,9 @@ from coraplex.robot_plans.actions.core.robot_body import (
     ParkArmsAction,
     SetGripperAction,
 )
-from coraplex.testing import setup_world
+from coraplex.testing import attach_tool, setup_world, start_visualization
+
+logger = logging.getLogger(__name__)
 
 
 def main() -> None:
@@ -48,19 +51,8 @@ def main() -> None:
                 *TARGET_POSITION_XYZ, reference_frame=world.root
             ),
         )
-    try:
-        import rclpy
-
-        rclpy.init()
-        from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
-            VizMarkerPublisher,
-        )
-
-        node = rclpy.create_node("viz_marker")
-        v = VizMarkerPublisher(_world=world, node=node).with_tf_publisher()
-    except ImportError:
-        node = None
-    print(world.root)
+    start_visualization(world)
+    logger.debug("World root: %s", world.root)
     pr2 = PR2.from_world(world)
     context = Context(world=world, robot=pr2, _debug=False, ros_node=None)
 

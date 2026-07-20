@@ -1359,6 +1359,7 @@ class Sponge(Tool):
 
     def _pose_surface_normal(self, pose: Pose) -> Vector3:
         """
+        :param pose: The pose whose surface normal is computed.
         :return: The pose's local Z axis expressed in the pose's reference frame.
         """
         reference_frame = (

@@ -268,6 +268,11 @@ class MoveTCPWaypointsAlignedMotion(BaseMotion):
         return
 
     def _resolve_tip(self) -> Body:
+        """
+        :return: The body that follows the waypoints: the explicit tip if given,
+            otherwise the arm's tool frame.
+        :raises MissingToolFrame: If no tip is given and the arm has no tool frame.
+        """
         if self.tip is not None:
             return self.tip
         tool_frame = (
