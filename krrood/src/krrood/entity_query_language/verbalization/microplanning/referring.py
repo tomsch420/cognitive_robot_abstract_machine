@@ -3,10 +3,8 @@ from __future__ import annotations
 import operator
 import uuid
 from collections import defaultdict
-from dataclasses import dataclass, field, fields as dataclass_fields
-from typing import Any
-
-from typing_extensions import Dict, List, Optional, Set, Type, TYPE_CHECKING
+from dataclasses import dataclass, field
+from typing_extensions import Dict, List, Optional, Set, TYPE_CHECKING
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.core.mapped_variable import Attribute
@@ -139,49 +137,24 @@ def _sole_predicate_field(edges: List[ParentEdge]) -> Optional[ParentEdge]:
     return edge
 
 
-def _field_declares_no_type(predicate_class: Type, field_name: str) -> bool:
-    """:return: ``True`` when *field_name* is declared ``Any`` on *predicate_class* — a field
-    typed this way (as opposed to a real, if generic, class like ``object``) carries no domain
-    concept at all, so its own name (``obj``, ``first_entity``, …) is not a trustworthy noun
-    either. Compares the raw annotation rather than resolving it with
-    :func:`typing.get_type_hints`, since resolving *every* field on the class would also
-    evaluate unrelated forward references the caller's namespace may not have in scope.
-
-    :param predicate_class: The predicate class declaring the field.
-    :param field_name: The field's name on *predicate_class*.
-    """
-    declared_field = next(
-        (f for f in dataclass_fields(predicate_class) if f.name == field_name), None
-    )
-    return declared_field is not None and declared_field.type in ("Any", Any)
-
-
 def operand_head_noun(node: Variable, edges: List[ParentEdge]) -> str:
-    """:return: the head noun naming *node*, resolved in order of decreasing specificity. *node* is
-    an *operand* — a variable filling one argument of a predicate or function — and its *head noun*
-    is the noun that names it in the rendered sentence (*"Robot"* in *"a Robot is reachable"*).
-    Resolution order:
+    """:return: the head noun naming *node* — an *operand*, a variable filling one argument of a
+    predicate or function. Resolved in order of decreasing specificity:
 
-    1. *node*'s own type noun, when its type is informative (a concrete class other than the bare
-       ``object`` placeholder) — the type is the default identifier for a referring expression
-       (the Incremental Algorithm's type attribute, included unconditionally per
-       :cite:t:`dale1995gricean`) and *always* wins once known, so a genuinely typed operand
-       (``HasType(a_body, Apple)`` → *"a Body"*) is never overridden by a field's metadata;
+    1. *node*'s own type noun, when informative (a concrete class other than the bare ``object``
+       placeholder) — the type is the default identifier for a referring expression
+       (:cite:t:`dale1995gricean`'s Incremental Algorithm) and always wins, so a genuinely typed
+       operand (``HasType(a_body, Apple)`` → *"a Body"*) is never overridden by a field's name;
     2. only once the type carries no information: the owning predicate field's declared
-       :attr:`~krrood.patterns.field_metadata.GrammarMetadata.display_name` — explicit lexical
-       metadata, checked only when *node* fills exactly that one field and appears nowhere else
-       (:func:`_sole_predicate_field`);
-    3. ``"object"``, when the field itself is declared ``Any`` (:func:`_field_declares_no_type`) —
-       a field typed this way was never given a domain concept to name it by, so its bare
-       attribute name (``obj``, ``first_entity``, …) is skipped rather than surfaced verbatim;
-    4. the sole owning field's name itself (verbatim, underscores read as spaces), when the field
-       declares a real (if generic) type and carries no metadata;
-    5. ``"object"`` as the last resort (no sole field at all).
+       :attr:`~krrood.patterns.field_metadata.GrammarMetadata.display_name`, checked only when
+       *node* fills exactly that one field and appears nowhere else (:func:`_sole_predicate_field`);
+    3. the sole owning field's name itself (verbatim, underscores read as spaces), when no
+       metadata is declared;
+    4. ``"object"`` as the last resort (no sole field at all).
 
     A variable referenced anywhere besides that one field (a query subject, an
-    ``==``-constrained pair) never reaches steps 2-4 — it always keeps its type-named identity,
-    because a tracked entity is identified by its category, not by the role it happens to fill
-    here.
+    ``==``-constrained pair) never reaches steps 2-3 — it keeps its type-named identity, since a
+    tracked entity is identified by its category, not by the role it happens to fill here.
 
     :param node: The referent variable.
     :param edges: *node*'s parent edges, from :func:`_child_edges_by_id`.
@@ -189,26 +162,18 @@ def operand_head_noun(node: Variable, edges: List[ParentEdge]) -> str:
     >>> operand_head_noun(variable(Robot, []), [])
     'Robot'
 
-    A sole predicate field only ever supplies a noun once the type gives none — a typed operand
-    keeps its type noun even filling a field of ``IsReachable`` (whose ``location`` field is
-    declared ``object``, an uninformative type on its own):
+    A typed operand keeps its type noun even filling a field of ``IsReachable`` (whose
+    ``location`` field is declared ``object``, an uninformative type on its own):
 
     >>> reachable = IsReachable(variable(Robot, []), variable(Robot, []))
     >>> operand_head_noun(variable(Robot, []), [ParentEdge(reachable, "location")])
     'Robot'
 
-    An untyped (``object``) operand falls through: to the field's declared
-    :attr:`~krrood.patterns.field_metadata.GrammarMetadata.display_name` when one is set, else to
-    ``"object"`` when the field itself is declared ``Any`` (no metadata needed for that — it's
-    inferred straight from the type hint), else to the field name itself, else to ``"object"``
-    once there is no sole field to name it by:
+    An untyped operand falls through to the field name, else to ``"object"`` once there is no
+    sole field to name it by:
 
     >>> operand_head_noun(variable(object, []), [ParentEdge(reachable, "location")])
     'location'
-    >>> from krrood.entity_query_language.factories import IsClass
-    >>> is_class = IsClass(variable(object, []))
-    >>> operand_head_noun(variable(object, []), [ParentEdge(is_class, "obj")])
-    'object'
     >>> operand_head_noun(variable(object, []), [])
     'object'
 
@@ -230,8 +195,6 @@ def operand_head_noun(node: Variable, edges: List[ParentEdge]) -> str:
     metadata = GrammarMetadata.of_field(predicate_class, sole_field.field_name)
     if metadata is not None and metadata.display_name is not None:
         return metadata.display_name
-    if _field_declares_no_type(predicate_class, sole_field.field_name):
-        return "object"
     return sole_field.field_name.replace("_", " ")
 
 

@@ -71,9 +71,9 @@ SURFACES: Tuple[VerbalizationSurface, ...] = (
     VerbalizationSurface(NodeParents, "the node parents of a SymbolicExpression"),
     VerbalizationSurface(NodeType, "the node type of a Selectable"),
     VerbalizationSurface(RuntimeType, "the runtime type of an object"),
-    VerbalizationSurface(HasType, "an object is of type Integer"),
-    VerbalizationSurface(HasTypes, "an object is of type Integer or Text"),
-    VerbalizationSurface(Is, "an object is the same object as another object"),
+    VerbalizationSurface(HasType, "a variable is of type Integer"),
+    VerbalizationSurface(HasTypes, "a variable is of type Integer or Text"),
+    VerbalizationSurface(Is, "a first entity is the same object as a second entity"),
     VerbalizationSurface(Length, "the length of an iterable"),
     VerbalizationSurface(IsReachable, "a location is reachable for a body"),
     VerbalizationSurface(WorksIn, "an employee works in a department"),
@@ -82,6 +82,6 @@ SURFACES: Tuple[VerbalizationSurface, ...] = (
         "the inheritance path length between a child class and a parent class",
     ),
     VerbalizationSurface(
-        IsSameSemanticEntity, "an object is the same entity as another object"
+        IsSameSemanticEntity, "an entity 1 is the same entity as an entity 2"
     ),
 )
