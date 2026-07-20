@@ -223,6 +223,13 @@ class Texture:
     own size, rather than scaled to fit it.
     """
 
+    def __post_init__(self):
+        """
+        Normalize :attr:`repeat` to a tuple of floats so a texture stays equal to itself
+        across a serialization round-trip, which restores the pair as a list.
+        """
+        self.repeat = tuple(float(value) for value in self.repeat)
+
 
 @dataclass
 class Scale:
