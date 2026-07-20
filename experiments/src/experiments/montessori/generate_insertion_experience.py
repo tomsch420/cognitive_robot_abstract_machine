@@ -44,14 +44,13 @@ from experiments.montessori.montessori_demo import (
     DEFAULT_ROBOT_CLASS,
     MAX_INSERTION_ATTEMPTS,
     _hold_controlled_joints_in_mujoco,
-    _insert_shape,
+    _insert_shape_or_none,
 )
 from experiments.montessori.semantics import MontessoriShape, NoMatchingHoleError
 from experiments.montessori.world import MontessoriWorld, robot_installed
 from krrood.entity_query_language.backends import ProbabilisticBackend
 from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.ormatic.utils import create_engine
-from semantic_digital_twin.exceptions import PointOccupiedError
 from semantic_digital_twin.utils import rclpy_installed
 
 logger = logging.getLogger(__name__)
@@ -94,22 +93,10 @@ def _run_once(run_index: int, headless: bool) -> List[ShapeInsertionExperience]:
             continue
 
         for attempt in range(1, MAX_INSERTION_ATTEMPTS + 1):
-            try:
-                result = _insert_shape(shape, montessori, context, headless)
-            except PointOccupiedError as error:
-                # The jittered drop point (see
-                # montessori_demo.RETRY_HORIZONTAL_JITTER) can land the reach target
-                # outside the navigation map's free space; that is a retryable
-                # placement failure like any other, not a reason to abort the whole
-                # run. No InsertionAttemptResult is produced, so there is nothing to
-                # record for this attempt.
-                logger.warning(
-                    "%s's reach target was occupied on attempt %d/%d (%s); retrying.",
-                    shape.name,
-                    attempt,
-                    MAX_INSERTION_ATTEMPTS,
-                    error,
-                )
+            result = _insert_shape_or_none(shape, montessori, context, headless, attempt)
+            if result is None:
+                # No InsertionAttemptResult is produced when the reach target was
+                # occupied, so there is nothing to record for this attempt.
                 continue
             experiences.append(
                 ShapeInsertionExperience(

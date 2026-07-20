@@ -235,6 +235,42 @@ def _insert_shape(
     return InsertionAttemptResult(offset, action.has_fallen_through_hole())
 
 
+def _insert_shape_or_none(
+    shape: MontessoriShape,
+    montessori: MontessoriWorld,
+    context: Context,
+    headless: bool,
+    attempt: int,
+) -> Optional[InsertionAttemptResult]:
+    """
+    Attempt one insertion via :func:`_insert_shape`, returning ``None`` instead of
+    letting :class:`~semantic_digital_twin.exceptions.PointOccupiedError` propagate if
+    this attempt's jittered drop point put the reach target outside the navigation
+    map's free space; that is a retryable placement failure like any other, not a
+    reason to abort the caller's whole run.
+
+    :param shape: The shape to insert; must have a matching hole.
+    :param montessori: The Montessori scene, with :attr:`MontessoriWorld.robot` already
+        spawned and its controlled joints already held.
+    :param context: The CRAM execution context to run the insertion action in.
+    :param headless: Whether to run the settling MuJoCo simulation without opening a
+        viewer window.
+    :param attempt: This attempt's 1-based index, used only for the log message.
+    :return: The attempt's outcome, or ``None`` if its reach target was occupied.
+    """
+    try:
+        return _insert_shape(shape, montessori, context, headless)
+    except PointOccupiedError as error:
+        logger.warning(
+            "%s's reach target was occupied on attempt %d/%d (%s); retrying.",
+            shape.name,
+            attempt,
+            MAX_INSERTION_ATTEMPTS,
+            error,
+        )
+        return None
+
+
 def _insert_all_shapes(montessori: MontessoriWorld, headless: bool) -> None:
     """
     Have the robot pick up and insert every loose shape that has a matching hole into
@@ -272,24 +308,8 @@ def _insert_all_shapes(montessori: MontessoriWorld, headless: bool) -> None:
                 attempt,
                 MAX_INSERTION_ATTEMPTS,
             )
-            try:
-                fell_through_hole = _insert_shape(
-                    shape, montessori, context, headless
-                ).fell_through_hole
-            except PointOccupiedError as error:
-                # The jittered drop point (see RETRY_HORIZONTAL_JITTER) can land the
-                # reach target outside the navigation map's free space; that is a
-                # retryable placement failure like any other, not a reason to abort
-                # the whole demo.
-                logger.warning(
-                    "%s's reach target was occupied on attempt %d/%d (%s); retrying.",
-                    shape.name,
-                    attempt,
-                    MAX_INSERTION_ATTEMPTS,
-                    error,
-                )
-                continue
-            if fell_through_hole:
+            result = _insert_shape_or_none(shape, montessori, context, headless, attempt)
+            if result is not None and result.fell_through_hole:
                 break
         else:
             logger.warning(
