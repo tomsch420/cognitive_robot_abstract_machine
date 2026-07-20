@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from typing_extensions import Any
 
@@ -14,15 +14,7 @@ from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech impor
     Copula,
     Noun,
 )
-from krrood.patterns.field_metadata import FieldMetadata, GrammarMetadata
 from krrood.patterns.role import Role
-
-_OPERAND_DISPLAY_NAME_OBJECT = FieldMetadata(
-    other_metadata=[GrammarMetadata(display_name="object")]
-).as_dict()
-"""Shared field metadata for a same-type generic operand pair whose declared field names
-(``entity_1``/``entity_2``) are not themselves good nouns — the display name keeps the operand
-head plain (*"an object"*) so the pair reads *"an object … another object"*."""
 
 
 @dataclass(eq=False)
@@ -41,12 +33,12 @@ class IsSameSemanticEntity(Predicate):
     symbolically inside an entity-query-language ``where`` clause.
     """
 
-    entity_1: Any = field(metadata=_OPERAND_DISPLAY_NAME_OBJECT)
+    entity_1: Any
     """
     The first operand; unwrapped to its root persistent entity when it is a role.
     """
 
-    entity_2: Any = field(metadata=_OPERAND_DISPLAY_NAME_OBJECT)
+    entity_2: Any
     """
     The second operand; unwrapped to its root persistent entity when it is a role.
     """

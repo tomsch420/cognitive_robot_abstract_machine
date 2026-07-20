@@ -8,7 +8,7 @@ symbolic expressions from regular Python functions when variables are present.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from functools import wraps
 
 from typing_extensions import (
@@ -47,18 +47,7 @@ from krrood.entity_query_language.utils import camel_case_to_words
 from krrood.patterns.code_parsing_utils import (
     get_accessed_attribute_name_in_return_statement_of_property,
 )
-from krrood.patterns.field_metadata import FieldMetadata, GrammarMetadata
 from krrood.symbol_graph.symbol_graph import Symbol
-
-_OPERAND_DISPLAY_NAME_OBJECT = FieldMetadata(
-    other_metadata=[GrammarMetadata(display_name="object")]
-).as_dict()
-"""
-Shared field metadata for a same-type generic operand pair whose declared field names
-(``first_entity``/``second_entity``) are not themselves good nouns — the display name
-keeps the operand head plain (*"an object"*) so the pair reads *"an object … another
-object"* rather than *"a first entity … a second entity"*.
-"""
 
 
 def symbolic_function(
@@ -401,7 +390,7 @@ class HasType(Triple):
     retrieve the domain and range values and perform direct checks.
     """
 
-    variable: Any = field(metadata=_OPERAND_DISPLAY_NAME_OBJECT)
+    variable: Any
     """
     The variable whose type is being checked.
     """
@@ -515,12 +504,12 @@ class Is(Predicate):
     Predicate asserting that two operands refer to the same object in memory.
     """
 
-    first_entity: Any = field(metadata=_OPERAND_DISPLAY_NAME_OBJECT)
+    first_entity: Any
     """
     The first entity.
     """
 
-    second_entity: Any = field(metadata=_OPERAND_DISPLAY_NAME_OBJECT)
+    second_entity: Any
     """
     The second entity.
     """

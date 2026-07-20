@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import inspect
 import operator
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from inspect import isclass
 from uuid import UUID
 
@@ -71,7 +71,6 @@ from krrood.entity_query_language.predicate import (
 from krrood.entity_query_language.query.match import (
     Match,
 )
-from krrood.patterns.field_metadata import FieldMetadata, GrammarMetadata
 from krrood.entity_query_language.query.quantifiers import (
     ResultQuantificationConstraint,
     An,
@@ -1047,22 +1046,13 @@ class IsSubclass(Predicate):
 issubclass_ = symbolic_callable_to_function(IsSubclass)
 
 
-_OPERAND_DISPLAY_NAME_OBJECT = FieldMetadata(
-    other_metadata=[GrammarMetadata(display_name="object")]
-).as_dict()
-"""
-Shared field metadata for a generic ``obj`` operand — the declared field name is not
-itself a good noun, so the display name keeps the operand head plain (*"an object"*).
-"""
-
-
 @dataclass(eq=False)
 class IsClass(Predicate):
     """
     Whether an object is a class.
     """
 
-    obj: Any = field(metadata=_OPERAND_DISPLAY_NAME_OBJECT)
+    obj: Any
     """
     The object checked.
     """
@@ -1093,7 +1083,7 @@ class RuntimeType(SymbolicFunction):
     The runtime class of an object, as a value operation.
     """
 
-    obj: Any = field(metadata=_OPERAND_DISPLAY_NAME_OBJECT)
+    obj: Any
     """
     The object whose runtime class is read.
     """
