@@ -40,6 +40,8 @@ from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
     Point3,
     Quaternion,
+    RotationMatrix,
+    Vector3,
 )
 from semantic_digital_twin.spatial_types.math import inverse_frame
 from semantic_digital_twin.world import World
@@ -887,9 +889,9 @@ class MujocoCamera(MultiSimCamera):
     """
 
     @staticmethod
-    def _look_at_quaternion(
-        camera_position: numpy.ndarray, target_position: numpy.ndarray
-    ) -> numpy.ndarray:
+    def _look_at_rotation(
+        camera_position: Point3, target_position: Point3
+    ) -> RotationMatrix:
         """
         Computes the world-frame orientation of a camera at ``camera_position`` looking at
         ``target_position``, following MuJoCo's convention (camera looks down its local -Z
@@ -897,21 +899,18 @@ class MujocoCamera(MultiSimCamera):
 
         :param camera_position: The world-frame position of the camera.
         :param target_position: The world-frame position the camera should look at.
-        :return: A ``[w, x, y, z]`` quaternion.
+        :return: The camera's world-frame orientation.
         """
         forward = target_position - camera_position
-        forward = forward / numpy.linalg.norm(forward)
-        up_hint = numpy.array([0.0, 0.0, 1.0])
-        if numpy.abs(numpy.dot(forward, up_hint)) > 0.99:
-            up_hint = numpy.array([0.0, 1.0, 0.0])
+        forward.scale(1)
+        up_hint = Vector3.Z()
+        if abs(float(forward.dot(up_hint).to_np().item())) > 0.99:
+            up_hint = Vector3.Y()
 
         z_axis = -forward
-        x_axis = numpy.cross(up_hint, z_axis)
-        x_axis = x_axis / numpy.linalg.norm(x_axis)
-        y_axis = numpy.cross(z_axis, x_axis)
-
-        rotation_matrix = numpy.column_stack([x_axis, y_axis, z_axis])
-        return Rotation.from_matrix(rotation_matrix).as_quat(scalar_first=True)
+        x_axis = up_hint.cross(z_axis)
+        x_axis.scale(1)
+        return RotationMatrix.from_vectors(x=x_axis, z=z_axis)
 
     @classmethod
     def overview_pose(
@@ -919,7 +918,7 @@ class MujocoCamera(MultiSimCamera):
         bounds: numpy.ndarray,
         minimum_distance: float = 1.0,
         distance_factor: float = 1.5,
-    ) -> Tuple[numpy.ndarray, numpy.ndarray]:
+    ) -> HomogeneousTransformationMatrix:
         """
         Computes a fixed diagonal viewpoint that frames an axis-aligned bounding box.
 
@@ -927,17 +926,21 @@ class MujocoCamera(MultiSimCamera):
         :param minimum_distance: Floor (in meters) for the camera's distance to the box center,
             so a box that collapses to a point still gets a sensibly framed camera.
         :param distance_factor: Multiplier applied to the box's bounding diagonal to place the camera.
-        :return: A ``(position, quaternion)`` tuple in world frame; the quaternion is ``[w, x, y, z]``.
+        :return: The framing camera's world-frame pose.
         """
-        minimum, maximum = bounds
-        center = (minimum + maximum) / 2.0
-        diagonal = float(numpy.linalg.norm(maximum - minimum))
+        minimum = Point3.from_iterable(bounds[0])
+        maximum = Point3.from_iterable(bounds[1])
+        diagonal_vector = maximum - minimum
+        center = minimum + diagonal_vector * 0.5
+        diagonal = float(diagonal_vector.norm().to_np().item())
         distance = max(diagonal, minimum_distance) * distance_factor
-        direction = numpy.array([1.0, -1.0, 1.0])
-        direction = direction / numpy.linalg.norm(direction)
+        direction = Vector3.from_iterable([1.0, -1.0, 1.0])
+        direction.scale(1)
         position = center + direction * distance
-        quaternion = cls._look_at_quaternion(position, center)
-        return position, quaternion
+        rotation = cls._look_at_rotation(position, center)
+        return HomogeneousTransformationMatrix.from_point_rotation_matrix(
+            position, rotation
+        )
 
 
 @dataclass

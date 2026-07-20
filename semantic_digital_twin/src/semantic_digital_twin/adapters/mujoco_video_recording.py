@@ -315,12 +315,14 @@ class MujocoVideoRecorder:
         if bounds is None:
             raise EmptyWorldVideoRecordingError(world=self.world)
 
-        position, quaternion = MujocoCamera.overview_pose(np.asarray(bounds))
+        pose = MujocoCamera.overview_pose(np.asarray(bounds))
+        # MuJoCo orders the quaternion scalar-first, while Quaternion.to_np is [x, y, z, w].
+        quaternion_xyzw = pose.to_quaternion().to_np().tolist()
         camera = MujocoCamera(
             name="cram_video_overview_camera",
             body=self.world.root,
-            position=position.tolist(),
-            quaternion=quaternion.tolist(),
+            position=pose.to_position().to_np()[:3].tolist(),
+            quaternion=[quaternion_xyzw[3]] + quaternion_xyzw[:3],
             resolution=[float(self.resolution.width), float(self.resolution.height)],
         )
         self.world.root.simulator_additional_properties.append(camera)
