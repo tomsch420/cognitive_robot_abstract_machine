@@ -3,6 +3,7 @@ import os.path
 import pytest
 
 from semantic_digital_twin.adapters.mjcf import MJCFParser
+from semantic_digital_twin.adapters.multi_sim import MujocoLight
 from semantic_digital_twin.world_description.connections import FixedConnection
 
 MJCF_DIR = os.path.join(
@@ -100,3 +101,41 @@ def test_joint_position_limits_are_python_floats():
     limits = world.get_degree_of_freedom_by_name("hinge").limits
     assert type(limits.lower.position) is float
     assert type(limits.upper.position) is float
+
+
+LIT_WORLD_MJCF = """
+<mujoco>
+  <worldbody>
+    <light pos="2.0 -2.0 2.0" dir="0.01 0.01 -1" specular="0.3 0.3 0.3" ambient="0.3 0.3 0.3"
+           diffuse="0.3 0.3 0.3" directional="true" castshadow="false"/>
+    <body name="base">
+      <geom type="box" size="0.1 0.1 0.1"/>
+    </body>
+  </worldbody>
+</mujoco>
+"""
+
+
+def test_light_is_parsed_and_attached_to_its_parent_body():
+    """
+    Regression test: MJCFParser used to have no handling for <light> elements at all, so every
+    world built through the parser -> World -> MujocoBuilder round-trip silently lost all
+    lighting information, falling back to MuJoCo's minimal default camera headlight instead of
+    the scene's own intended lights.
+    """
+    world = MJCFParser.from_xml_string(LIT_WORLD_MJCF).parse()
+
+    lights = [
+        light_property
+        for light_property in world.root.simulator_additional_properties
+        if isinstance(light_property, MujocoLight)
+    ]
+    assert len(lights) == 1
+    light = lights[0]
+    assert light.position == pytest.approx([2.0, -2.0, 2.0])
+    assert light.direction == pytest.approx([0.01, 0.01, -1.0], abs=1e-3)
+    assert light.ambient == pytest.approx([0.3, 0.3, 0.3])
+    assert light.diffuse == pytest.approx([0.3, 0.3, 0.3])
+    assert light.specular == pytest.approx([0.3, 0.3, 0.3])
+    assert light.directional is True
+    assert light.cast_shadow is False

@@ -156,6 +156,23 @@ class MultiSimCamera(SimulatorAdditionalProperty):
     """
 
 
+@dataclass(eq=False)
+class MultiSimLight(SimulatorAdditionalProperty):
+    """
+    Additional property representing a light in MultiSim.
+    """
+
+    name: str = ""
+    """
+    The name of the light.
+    """
+
+    body: Any = None
+    """
+    The body that the light is attached to. This can be set to the name of the body or a reference to the body object itself.
+    """
+
+
 @dataclass
 class InertialConverter:
     """
@@ -679,6 +696,29 @@ class CameraConverter(EntityConverter, ABC):
 
 
 @dataclass
+class LightConverter(EntityConverter, ABC):
+    """
+    Converts a Light object to a dictionary of light properties for Multiverse simulator.
+    """
+
+    entity_type: ClassVar[Type[MultiSimLight]] = MultiSimLight
+    """
+    The type of the entity to convert.
+    """
+
+    def _convert(self, entity: MultiSimLight, **kwargs) -> Dict[str, Any]:
+        """
+        Converts a Light object to a dictionary of light properties for Multiverse simulator.
+
+        :param entity: The Light object to convert.
+        :return: A dictionary of light properties, by default containing the parent body's name.
+        """
+        light_props = EntityConverter._convert(self, entity)
+        light_props["body"] = entity.body.name.name
+        return light_props
+
+
+@dataclass
 class MujocoActuator(SimulatorAdditionalProperty):
     """
     Represents a MuJoCo-specific actuator in the world model.
@@ -840,6 +880,84 @@ class MujocoCamera(MultiSimCamera):
     quaternion: List[float] = field(default_factory=lambda: [1, 0, 0, 0])
     """
     Orientation of the camera frame.
+    """
+
+
+@dataclass
+class MujocoLight(MultiSimLight):
+    """
+    Additional property representing a MuJoCo light in the world model.
+    For more information, see: https://mujoco.readthedocs.io/en/stable/XMLreference.html#body-light
+    """
+
+    name: str = ""
+    """
+    Name of the light.
+    """
+
+    mode: mujoco.mjtCamLight = mujoco.mjtCamLight.mjCAMLIGHT_FIXED
+    """
+    This attribute specifies how the light position and orientation in world coordinates are computed in forward kinematics.
+    """
+
+    directional: bool = False
+    """
+    Whether the light is directional (parallel rays, e.g. sunlight) or a positional point/spot light.
+    """
+
+    active: bool = True
+    """
+    Whether the light is active.
+    """
+
+    cast_shadow: bool = True
+    """
+    Whether this light casts shadows.
+    """
+
+    position: List[float] = field(default_factory=lambda: [0, 0, 0])
+    """
+    Position of the light frame.
+    """
+
+    direction: List[float] = field(default_factory=lambda: [0, 0, -1])
+    """
+    Direction the light points in, relevant only for directional and spot lights.
+    """
+
+    ambient: List[float] = field(default_factory=lambda: [0, 0, 0])
+    """
+    Ambient color of the light, as ``[r, g, b]``.
+    """
+
+    diffuse: List[float] = field(default_factory=lambda: [0.7, 0.7, 0.7])
+    """
+    Diffuse color of the light, as ``[r, g, b]``.
+    """
+
+    specular: List[float] = field(default_factory=lambda: [0.3, 0.3, 0.3])
+    """
+    Specular color of the light, as ``[r, g, b]``.
+    """
+
+    attenuation: List[float] = field(default_factory=lambda: [1, 0, 0])
+    """
+    Constant, linear, and quadratic attenuation coefficients for a positional light.
+    """
+
+    cutoff: float = 45.0
+    """
+    Cutoff angle, in degrees, for a spot light.
+    """
+
+    exponent: float = 10.0
+    """
+    Spotlight attenuation exponent for a spot light.
+    """
+
+    bulb_radius: float = 0.02
+    """
+    Radius of the light's bulb, used for soft shadows.
     """
 
 
@@ -1324,6 +1442,30 @@ class MujocoCameraConverter(CameraConverter, ABC):
 
 
 @dataclass
+class MujocoLightConverter(LightConverter, ABC):
+
+    entity_type: ClassVar[Type[MujocoLight]] = MujocoLight
+
+    def _post_convert(
+        self, entity: MujocoLight, light_props: Dict[str, Any], **kwargs
+    ) -> Dict[str, Any]:
+        light_props["mode"] = entity.mode
+        light_props["directional"] = entity.directional
+        light_props["active"] = entity.active
+        light_props["castshadow"] = entity.cast_shadow
+        light_props["pos"] = entity.position
+        light_props["dir"] = entity.direction
+        light_props["ambient"] = entity.ambient
+        light_props["diffuse"] = entity.diffuse
+        light_props["specular"] = entity.specular
+        light_props["attenuation"] = entity.attenuation
+        light_props["cutoff"] = entity.cutoff
+        light_props["exponent"] = entity.exponent
+        light_props["bulbradius"] = entity.bulb_radius
+        return light_props
+
+
+@dataclass
 class MultiSimBuilder(ABC):
     """
     A builder to build a world in the Multiverse simulator.
@@ -1421,9 +1563,11 @@ class MultiSimBuilder(ABC):
                 is_visible=shape in body.visual,
                 is_collidable=shape in body.collision,
             )
-        for camera in body.simulator_additional_properties:
-            if isinstance(camera, MultiSimCamera):
-                self._build_camera(camera=camera)
+        for additional_property in body.simulator_additional_properties:
+            if isinstance(additional_property, MultiSimCamera):
+                self._build_camera(camera=additional_property)
+            elif isinstance(additional_property, MultiSimLight):
+                self._build_light(light=additional_property)
 
     def build_region(self, region: Region):
         """
@@ -1515,6 +1659,15 @@ class MultiSimBuilder(ABC):
         Builds a camera in the simulator.
 
         :param camera: The camera to build.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def _build_light(self, light: MultiSimLight):
+        """
+        Builds a light in the simulator.
+
+        :param light: The light to build.
         """
         raise NotImplementedError
 
@@ -1823,6 +1976,25 @@ class MujocoBuilder(MultiSimBuilder):
             raise MujocoEntityNotFoundError(
                 entity_name=camera_name,
                 entity_type=mujoco.mjtObj.mjOBJ_CAMERA,
+                action="add",
+            )
+
+    def _build_light(self, light: MultiSimLight):
+        light_name = light.name
+        light_props = MujocoLightConverter.convert(light)
+        body_name = light_props.pop("body")
+        body_spec = self._find_entity(
+            entity_type=mujoco.mjtObj.mjOBJ_BODY, entity_name=body_name
+        )
+        if body_spec is None:
+            raise MujocoEntityNotFoundError(
+                entity_name=body_name, entity_type=mujoco.mjtObj.mjOBJ_BODY
+            )
+        light_spec = body_spec.add_light(**light_props)
+        if light_spec is None:
+            raise MujocoEntityNotFoundError(
+                entity_name=light_name,
+                entity_type=mujoco.mjtObj.mjOBJ_LIGHT,
                 action="add",
             )
 

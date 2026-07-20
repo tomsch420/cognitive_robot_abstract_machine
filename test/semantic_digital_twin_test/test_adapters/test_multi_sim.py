@@ -41,6 +41,7 @@ from semantic_digital_twin.adapters.multi_sim import (
     MujocoSim,
     MujocoActuator,
     MujocoBuilder,
+    MujocoLight,
 )
 
 urdf_dir = os.path.join(
@@ -411,6 +412,40 @@ def test_builder_does_not_confuse_different_textures_sharing_a_basename(tmp_path
     assert materials["quad_0"] != materials["quad_1"]
     texture_files = {texture.name: texture.file for texture in builder.spec.textures}
     assert len(texture_files) == 2
+
+
+def test_builder_writes_a_light_attached_to_a_body(tmp_path):
+    """
+    Regression test: MujocoBuilder had no handling for MujocoLight additional properties at
+    all, so a world's lights were silently dropped when built into a MuJoCo scene - every
+    recorded/simulated world fell back to MuJoCo's minimal default camera headlight instead
+    of the scene's own intended lighting.
+    """
+    world = World()
+    with world.modify_world():
+        root = Body(name=PrefixedName("root"))
+        world.add_body(root)
+        root.simulator_additional_properties.append(
+            MujocoLight(
+                name="overview_light",
+                body=root,
+                directional=True,
+                position=[2.0, -2.0, 2.0],
+                direction=[0.0, 0.0, -1.0],
+                ambient=[0.3, 0.3, 0.3],
+                diffuse=[0.5, 0.5, 0.5],
+                specular=[0.3, 0.3, 0.3],
+            )
+        )
+
+    builder = MujocoBuilder()
+    builder.build_world(world=world, file_path=str(tmp_path / "scene.xml"))
+
+    [light] = [light for body in builder.spec.bodies for light in body.lights]
+    assert light.name == "overview_light"
+    assert list(light.pos) == pytest.approx([2.0, -2.0, 2.0])
+    assert list(light.ambient) == pytest.approx([0.3, 0.3, 0.3])
+    assert list(light.diffuse) == pytest.approx([0.5, 0.5, 0.5])
 
 
 def test_mujoco_with_tracy_dae_files():

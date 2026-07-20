@@ -16,6 +16,7 @@ from semantic_digital_twin.adapters.multi_sim import (
     MujocoGeom,
     MujocoBody,
     MujocoJoint,
+    MujocoLight,
     MujocoTendon,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -117,6 +118,9 @@ class MJCFParser:
 
             for mujoco_camera in self.spec.cameras:
                 self.parse_camera(mujoco_camera=mujoco_camera)
+
+            for mujoco_light in self.spec.lights:
+                self.parse_light(mujoco_light=mujoco_light)
 
             for mujoco_actuator in self.spec.actuators:
                 self.parse_actuator(mujoco_actuator=mujoco_actuator)
@@ -600,6 +604,34 @@ class MJCFParser:
                 inter_pupilary_distance=mujoco_camera.ipd,
                 position=pos,
                 quaternion=quat,
+            )
+        )
+
+    def parse_light(self, mujoco_light: mujoco.MjsLight):
+        """
+        Parse a Mujoco light and attach it to its parent body.
+
+        :param mujoco_light: The Mujoco light to parse.
+        """
+        body_name = mujoco_light.parent.name
+        body = self.world.get_body_by_name(body_name)
+        body.simulator_additional_properties.append(
+            MujocoLight(
+                body=body,
+                name=mujoco_light.name,
+                mode=mujoco_light.mode,
+                directional=bool(mujoco_light.directional),
+                active=bool(mujoco_light.active),
+                cast_shadow=bool(mujoco_light.castshadow),
+                position=mujoco_light.pos.tolist(),
+                direction=mujoco_light.dir.tolist(),
+                ambient=mujoco_light.ambient.tolist(),
+                diffuse=mujoco_light.diffuse.tolist(),
+                specular=mujoco_light.specular.tolist(),
+                attenuation=mujoco_light.attenuation.tolist(),
+                cutoff=mujoco_light.cutoff,
+                exponent=mujoco_light.exponent,
+                bulb_radius=mujoco_light.bulbradius,
             )
         )
 
