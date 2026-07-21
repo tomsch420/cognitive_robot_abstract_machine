@@ -6,10 +6,12 @@ through them.
 
 from __future__ import annotations
 
+import math
+from abc import abstractmethod
 from dataclasses import dataclass, field
 from enum import StrEnum
 
-from typing_extensions import Optional
+from typing_extensions import Dict, Optional, Type
 
 from krrood.exceptions import DataclassException
 from krrood.ormatic.utils import classproperty
@@ -22,6 +24,7 @@ from semantic_digital_twin.semantic_annotations.mixins import (
 )
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Aperture
 from semantic_digital_twin.spatial_types import Vector3
+from semantic_digital_twin.spatial_types.spatial_types import Point3, Pose
 
 
 class MontessoriShapeCategory(StrEnum):
@@ -43,13 +46,180 @@ class MontessoriShape(HasRootBody):
     """
     A loose Montessori piece that a child (or robot) drops through the matching
     :class:`ShapeSortingHole` of a :class:`ShapeSortingBoard`.
+
+    Concrete per :class:`MontessoriShapeCategory` (e.g. :class:`CubeShape`), each fixing
+    its own :attr:`shape_category` and knowing the :class:`Pose` it needs relative to a
+    hole to actually drop through it (see :meth:`insertion_pose_relative_to_hole`).
     """
 
-    shape_category: MontessoriShapeCategory = field(kw_only=True)
+    @classproperty
+    @abstractmethod
+    def shape_category(self) -> MontessoriShapeCategory:
+        """
+        The geometric shape of this piece, matched against
+        :attr:`ShapeSortingHole.shape_category` to decide which hole it fits through.
+        """
+        ...
+
+    def insertion_pose_relative_to_hole(
+        self, hole: ShapeSortingHole, horizontal_offset: Point3, hover_height: float
+    ) -> Pose:
+        """
+        The :class:`Pose`, expressed in ``hole``'s own frame, at which this shape must
+        be released to drop through it.
+
+        Every shape's loose body and its matching hole are built from the same local
+        cross-section (see
+        :func:`~experiments.montessori.world._footprint_shape_mesh`) and spawned
+        without any relative rotation, so hovering directly above the hole's own
+        origin, unrotated, already lines any shape up with its hole regardless of
+        category; a shape category whose fit depends on some other relative
+        orientation would override this.
+
+        :param hole: The hole this shape is being inserted through.
+        :param horizontal_offset: Offset from the hole's own origin, in its local
+            ``(x, y)`` plane, to release the shape at.
+        :param hover_height: Height above the hole's own origin, along its local
+            z-axis, to release the shape at.
+        """
+        return Pose.from_xyz_rpy(
+            horizontal_offset.x,
+            horizontal_offset.y,
+            hover_height,
+            reference_frame=hole.root,
+        )
+
+    @property
+    def cross_section_size(self) -> float:
+        """
+        The larger of this shape's own local ``(x, y)`` footprint extents: the
+        practical diameter or width a hole must be at least as large as for this shape
+        to actually pass through it (see :meth:`fits_through`).
+        """
+        bounds = self.root.collision.combined_mesh.bounds
+        return float(max(bounds[1][0] - bounds[0][0], bounds[1][1] - bounds[0][1]))
+
+    def fits_through(self, hole: ShapeSortingHole) -> bool:
+        """
+        Whether this shape can actually pass through ``hole``.
+
+        Matching :attr:`shape_category` is necessary but not sufficient once more
+        than one hole shares a category (e.g. the board's two circular holes are both
+        :attr:`MontessoriShapeCategory.CYLINDER`, but sized differently), so this also
+        requires this shape to be no larger than ``hole``.
+
+        :param hole: The hole to check this shape against.
+        """
+        return (
+            hole.shape_category == self.shape_category
+            and self.cross_section_size <= hole.cross_section_size
+        )
+
+
+@dataclass(eq=False)
+class CubeShape(MontessoriShape):
     """
-    The geometric shape of this piece, matched against
-    :attr:`ShapeSortingHole.shape_category` to decide which hole it fits through.
+    A loose cube-shaped Montessori piece.
     """
+
+    @classproperty
+    def shape_category(self) -> MontessoriShapeCategory:
+        return MontessoriShapeCategory.CUBE
+
+
+@dataclass(eq=False)
+class CylinderShape(MontessoriShape):
+    """
+    A loose cylinder-shaped Montessori piece.
+    """
+
+    @classproperty
+    def shape_category(self) -> MontessoriShapeCategory:
+        return MontessoriShapeCategory.CYLINDER
+
+
+@dataclass(eq=False)
+class DiskShape(MontessoriShape):
+    """
+    A loose disk-shaped Montessori piece: a flat coin whose matching hole is a narrow
+    slot rather than a coin-shaped opening (see
+    :func:`~experiments.montessori.hole_geometry._classify_hole_shape`), so unlike
+    every other shape it must be tipped onto its edge to fit through, not just hover
+    above it flat.
+    """
+
+    @classproperty
+    def shape_category(self) -> MontessoriShapeCategory:
+        return MontessoriShapeCategory.DISK
+
+    def insertion_pose_relative_to_hole(
+        self, hole: ShapeSortingHole, horizontal_offset: Point3, hover_height: float
+    ) -> Pose:
+        """
+        Overrides :meth:`MontessoriShape.insertion_pose_relative_to_hole`: a disk
+        lying flat presents its full diameter to the hole's narrow slot and cannot
+        pass through it, so this rotates the disk a quarter turn about the hole's
+        local y-axis, presenting its thin edge (matching the slot's narrow width)
+        instead of its flat face.
+        """
+        return Pose.from_xyz_rpy(
+            horizontal_offset.x,
+            horizontal_offset.y,
+            hover_height,
+            pitch=math.pi / 2,
+            reference_frame=hole.root,
+        )
+
+
+@dataclass(eq=False)
+class SphereShape(MontessoriShape):
+    """
+    A loose sphere-shaped Montessori piece; the board has no hole shaped to accept it
+    (see :meth:`ShapeSortingBoard.hole_for`).
+    """
+
+    @classproperty
+    def shape_category(self) -> MontessoriShapeCategory:
+        return MontessoriShapeCategory.SPHERE
+
+
+@dataclass(eq=False)
+class TriangularPrismShape(MontessoriShape):
+    """
+    A loose triangular-prism-shaped Montessori piece.
+    """
+
+    @classproperty
+    def shape_category(self) -> MontessoriShapeCategory:
+        return MontessoriShapeCategory.TRIANGULAR_PRISM
+
+
+@dataclass(eq=False)
+class RectangularPrismShape(MontessoriShape):
+    """
+    A loose rectangular-prism-shaped Montessori piece.
+    """
+
+    @classproperty
+    def shape_category(self) -> MontessoriShapeCategory:
+        return MontessoriShapeCategory.RECTANGULAR_PRISM
+
+
+MONTESSORI_SHAPE_CLASSES: Dict[MontessoriShapeCategory, Type[MontessoriShape]] = {
+    MontessoriShapeCategory.CUBE: CubeShape,
+    MontessoriShapeCategory.CYLINDER: CylinderShape,
+    MontessoriShapeCategory.DISK: DiskShape,
+    MontessoriShapeCategory.SPHERE: SphereShape,
+    MontessoriShapeCategory.TRIANGULAR_PRISM: TriangularPrismShape,
+    MontessoriShapeCategory.RECTANGULAR_PRISM: RectangularPrismShape,
+}
+"""
+The concrete :class:`MontessoriShape` subclass for a given
+:class:`MontessoriShapeCategory`, for building a loose shape from its detected or
+authored category (see
+:meth:`~experiments.montessori.world.MontessoriWorld._build_shapes`).
+"""
+
 
 @dataclass(eq=False)
 class ShapeSortingHole(Aperture):
@@ -71,6 +241,15 @@ class ShapeSortingHole(Aperture):
     The geometric shape of this hole, matched against
     :attr:`MontessoriShape.shape_category` to decide which pieces fit through it.
     """
+
+    @property
+    def cross_section_size(self) -> float:
+        """
+        The larger of this hole's own local ``(x, y)`` footprint extents; see
+        :meth:`MontessoriShape.fits_through`.
+        """
+        bounds = self.root.area.combined_mesh.bounds
+        return float(max(bounds[1][0] - bounds[0][0], bounds[1][1] - bounds[0][1]))
 
     def _mount_strategy(self, main_has_root_body_annotation: HasRootBody) -> None:
         HasRootKinematicStructureEntity._mount_strategy(
@@ -119,15 +298,22 @@ class ShapeSortingBoard(HasCaseAsRootBody, HasDrawers, HasApertures):
 
     def hole_for(self, montessori_shape: MontessoriShape) -> ShapeSortingHole:
         """
-        Find this board's :class:`ShapeSortingHole` matching ``montessori_shape``'s
-        category.
+        Find this board's :class:`ShapeSortingHole` that ``montessori_shape`` actually
+        fits through (see :meth:`MontessoriShape.fits_through`).
 
-        :raises NoMatchingHoleError: If this board has no such hole.
+        More than one hole can share a category (e.g. the board's two circular holes
+        are both :attr:`MontessoriShapeCategory.CYLINDER`, but sized differently), so
+        the smallest fitting hole is returned, not just the first same-category one:
+        that is the one ``montessori_shape`` is actually meant for.
+
+        :raises NoMatchingHoleError: If this board has no hole ``montessori_shape``
+            fits through.
         """
-        for hole in self.apertures:
-            if (
-                isinstance(hole, ShapeSortingHole)
-                and hole.shape_category == montessori_shape.shape_category
-            ):
-                return hole
-        raise NoMatchingHoleError(montessori_shape, self)
+        fitting_holes = [
+            hole
+            for hole in self.apertures
+            if isinstance(hole, ShapeSortingHole) and montessori_shape.fits_through(hole)
+        ]
+        if not fitting_holes:
+            raise NoMatchingHoleError(montessori_shape, self)
+        return min(fitting_holes, key=lambda hole: hole.cross_section_size)

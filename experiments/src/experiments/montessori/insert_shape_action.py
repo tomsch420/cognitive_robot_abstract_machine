@@ -5,6 +5,7 @@ sorting board's hole matching its category.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 import rustworkx
@@ -16,6 +17,7 @@ from coraplex.plans.factories import sequential
 from coraplex.plans.plan_node import PlanNode
 from coraplex.robot_plans.actions.base import ActionDescription
 from coraplex.robot_plans.actions.core.misc import MoveToReach
+from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.pick_up import PickUpAction
 from coraplex.robot_plans.actions.core.placing import PlaceAction
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction
@@ -113,7 +115,10 @@ class InsertMontessoriShapeAction(ActionDescription):
         return (base_bounding_box.width + base_bounding_box.depth) / 4
 
     def _standoff_point_near_surface(
-        self, surface: Body, target_position: Point3
+        self,
+        surface: Body,
+        target_position: Point3,
+        clearance: float = STANDOFF_CLEARANCE,
     ) -> Pose:
         """
         A point just outside ``surface``'s bounding box, offset from whichever edge is
@@ -130,6 +135,10 @@ class InsertMontessoriShapeAction(ActionDescription):
 
         :param surface: The body ``target_position`` rests on (or near).
         :param target_position: The position to stand off from.
+        :param clearance: Horizontal clearance kept between the returned point and the
+            nearest edge of ``surface``'s bounding box; defaults to
+            :data:`STANDOFF_CLEARANCE`, the margin for a reach target rather than a
+            robot's whole body (see :meth:`_hardcoded_standing_pose`).
         """
         bounding_box = surface.collision.as_bounding_box_collection_in_frame(
             self.world.root
@@ -143,16 +152,48 @@ class InsertMontessoriShapeAction(ActionDescription):
         }
         nearest_edge = min(distance_to_edge, key=distance_to_edge.get)
         if nearest_edge == "min_x":
-            x = bounding_box.min_x - STANDOFF_CLEARANCE
+            x = bounding_box.min_x - clearance
         elif nearest_edge == "max_x":
-            x = bounding_box.max_x + STANDOFF_CLEARANCE
+            x = bounding_box.max_x + clearance
         elif nearest_edge == "min_y":
-            y = bounding_box.min_y - STANDOFF_CLEARANCE
+            y = bounding_box.min_y - clearance
         else:
-            y = bounding_box.max_y + STANDOFF_CLEARANCE
+            y = bounding_box.max_y + clearance
         return Pose.from_xyz_rpy(
             x, y, float(target_position.z), reference_frame=self.world.root
         )
+
+    def _hardcoded_standing_pose(
+        self, surface: Body, target_position: Point3
+    ) -> Pose:
+        """
+        A robot base pose standing just off ``surface``'s bounding box, near
+        ``target_position``, facing it.
+
+        Used in place of :meth:`_move_to_reach`'s underspecified, Graph-of-Convex-Sets-
+        resolved standing offset: that resolution goes through the
+        :class:`~krrood.entity_query_language.backends.ProbabilisticBackend` and can
+        take a very long time (or appear to hang) to find a satisfying standing offset,
+        which gets in the way of first establishing that the pick-and-place and grasp
+        mechanics themselves work. :meth:`_standoff_point_near_surface` already computes
+        this same kind of point, just with :data:`STANDOFF_CLEARANCE` (a margin sized
+        for a reach target, not a robot's whole body); using the robot's own footprint
+        clearance instead keeps the base from overlapping ``surface`` while standing
+        close enough for the arm to actually reach.
+
+        :param surface: The body ``target_position`` rests on (or near); the base
+            stands off this surface's bounding box, not ``target_position`` itself.
+        :param target_position: The position the returned pose should face.
+        """
+        standoff_pose = self._standoff_point_near_surface(
+            surface, target_position, clearance=self._base_footprint_clearance
+        )
+        standoff_position = standoff_pose.to_position()
+        x, y = float(standoff_position.x), float(standoff_position.y)
+        yaw = math.atan2(
+            float(target_position.y) - y, float(target_position.x) - x
+        )
+        return Pose.from_xyz_rpy(x, y, 0.0, yaw=yaw, reference_frame=self.world.root)
 
     def _grasp_description_query(self) -> Match[GraspDescription]:
         """
@@ -263,22 +304,13 @@ class InsertMontessoriShapeAction(ActionDescription):
     @property
     def _action_plan(self) -> PlanNode:
         hole = self.board.hole_for(self.montessori_shape)
-        hole_position = hole.root.global_transform.to_position()
         offset = self.target_horizontal_offset or Point3(0.0, 0.0, 0.0)
-        target_location = Pose.from_xyz_rpy(
-            hole_position.x + offset.x,
-            hole_position.y + offset.y,
-            hole_position.z + self.insertion_hover_height,
-            reference_frame=self.world.root,
+        insertion_pose = self.montessori_shape.insertion_pose_relative_to_hole(
+            hole, offset, self.insertion_hover_height
         )
+        target_location = self.world.transform(insertion_pose, self.world.root)
         shape_position = self.montessori_shape.root.global_pose.to_position()
         [table] = self.world.get_semantic_annotations_by_type(Table)
-        pickup_standoff_pose = self._standoff_point_near_surface(
-            table.root, shape_position
-        )
-        placement_standoff_pose = self._standoff_point_near_surface(
-            table.root, target_location.to_position()
-        )
         self.grasp_description = self.grasp_description or GraspDescription(
             ApproachDirection.FRONT,
             VerticalAlignment.TOP,
@@ -288,14 +320,20 @@ class InsertMontessoriShapeAction(ActionDescription):
         return sequential(
             [
                 ParkArmsAction(Arms.BOTH),
-                self._move_to_reach(self.montessori_shape.root, pickup_standoff_pose),
+                NavigateAction(
+                    self._hardcoded_standing_pose(table.root, shape_position)
+                ),
                 a(PickUpAction)(
                     object_designator=self.montessori_shape.root,
                     arm=self.arm,
                     grasp_description=self._grasp_description_query(),
                 ),
                 ParkArmsAction(Arms.BOTH),
-                self._move_to_reach(self.board.root, placement_standoff_pose),
+                NavigateAction(
+                    self._hardcoded_standing_pose(
+                        table.root, target_location.to_position()
+                    )
+                ),
                 a(PlaceAction)(
                     object_designator=self.montessori_shape.root,
                     target_location=target_location,

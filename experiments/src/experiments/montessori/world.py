@@ -24,7 +24,7 @@ from experiments.montessori.hole_geometry import (
     detect_hole_footprints,
 )
 from experiments.montessori.semantics import (
-    MontessoriShape,
+    MONTESSORI_SHAPE_CLASSES,
     MontessoriShapeCategory,
     ShapeSortingBoard,
     ShapeSortingHole,
@@ -578,17 +578,23 @@ def _shape_body(
     category.
 
     :param footprint: The footprint of the hole this shape is meant to be dropped
-        through, used to derive the shape's cross-section for categories whose fit
-        depends on orientation (see :func:`_footprint_shape_mesh`). Unused (and may be
-        ``None``) for every other category: cube, cylinder, and disk look the same from
-        any yaw, and the sphere has no hole at all.
+        through, used to derive the shape's cross-section (see
+        :func:`_footprint_shape_mesh`) for every category except cube, disk, and
+        sphere: a cube and a disk fit through their hole at any fixed size and yaw
+        (mirroring the board's single hole of each category), and the sphere has no
+        hole at all. A cylinder's cross-section is derived like the rectangular and
+        triangular prisms', not fixed like the cube's, because the board has two
+        circular holes of different sizes (see
+        :meth:`~experiments.montessori.semantics.MontessoriShape.fits_through`), so
+        each cylinder shape must be sized after its own matching hole rather than a
+        single shared constant.
     """
     color = _SHAPE_COLORS[category]
     match category:
         case MontessoriShapeCategory.CUBE:
             shape = Box(scale=Scale(0.03, 0.03, 0.03), color=color)
         case MontessoriShapeCategory.CYLINDER:
-            shape = Cylinder(width=0.03, height=0.03, color=color)
+            shape = _footprint_shape_mesh(footprint, thickness=0.03, color=color)
         case MontessoriShapeCategory.DISK:
             shape = Cylinder(width=0.044, height=0.004, color=color)
         case MontessoriShapeCategory.SPHERE:
@@ -816,9 +822,8 @@ class MontessoriWorld:
         ):
             shape_key = f"{key}_shape"
             body = _shape_body(_name(shape_key), category, footprint)
-            shape = MontessoriShape(
-                name=_name(shape_key), root=body, shape_category=category
-            )
+            shape_class = MONTESSORI_SHAPE_CLASSES[category]
+            shape = shape_class(name=_name(shape_key), root=body)
             y = TABLE_SHAPE_ROW_START_Y + index * TABLE_SHAPE_ROW_SPACING
             self._spawn(shape, self._resting_position_on_table(body, y))
 

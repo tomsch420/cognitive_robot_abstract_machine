@@ -196,6 +196,29 @@ def test_montessori_world_creates_one_shape_per_hole_category_plus_the_sphere():
     assert len(shape_categories) == len(holes) + 1
 
 
+def test_montessori_world_pairs_each_circular_shape_with_its_own_sized_hole():
+    montessori = MontessoriWorld()
+    montessori.world.update_forward_kinematics()
+
+    cylinder_shapes = [
+        shape
+        for shape in montessori.world.get_semantic_annotations_by_type(MontessoriShape)
+        if shape.shape_category == MontessoriShapeCategory.CYLINDER
+    ]
+
+    # the board has two circular holes of different sizes; each cylinder shape must be
+    # sized after its own hole's footprint (not a single shared, fixed size), and must
+    # resolve back to that same hole rather than to the other, differently-sized one
+    cross_section_sizes = {shape.cross_section_size for shape in cylinder_shapes}
+    assert len(cylinder_shapes) == 2
+    assert len(cross_section_sizes) == 2
+
+    for shape in cylinder_shapes:
+        hole = montessori.board.hole_for(shape)
+        assert hole.name.name == shape.name.name.removesuffix("_shape")
+        assert shape.cross_section_size <= hole.cross_section_size
+
+
 @pytest.mark.parametrize(
     "category",
     [

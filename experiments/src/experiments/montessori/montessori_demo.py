@@ -45,8 +45,10 @@ from experiments.montessori.world import MontessoriWorld, robot_installed
 from krrood.entity_query_language.backends import ProbabilisticBackend
 from krrood.utils import clear_memoization_cache
 from semantic_digital_twin.adapters.multi_sim import MujocoActuator, MujocoSim
+from coraplex.datastructures.enums import Arms
 from semantic_digital_twin.collision_checking.collision_rules import (
     AllowCollisionBetweenGroups,
+    AvoidCollisionBetweenGroups,
 )
 from semantic_digital_twin.exceptions import PointOccupiedError
 from semantic_digital_twin.robots.hsrb import HSRB
@@ -199,6 +201,16 @@ def _insert_shape(
     then physically settle it under gravity in MuJoCo (see
     :func:`_settle_shape_in_mujoco`).
 
+    Runs with Giskard's collision avoidance off
+    (:data:`~coraplex.execution_environment.simulated_robot`'s
+    ``collision_avoidance`` default): with it on, even the pre-grasp hover pose (well
+    clear of the table) consistently failed to converge for this scene, regardless of
+    how far the standing pose or collision buffer were tuned, pointing at the QP
+    solver's own performance under collision avoidance rather than at genuinely
+    unreachable geometry (see :func:`_enable_robot_table_collision_avoidance`, no
+    longer called here). Any resulting table/board interpenetration during the
+    kinematic reach is corrected once each shape settles under gravity in MuJoCo.
+
     :param shape: The shape to insert; must have a matching hole (see
         :meth:`~experiments.montessori.semantics.ShapeSortingBoard.hole_for`).
     :param montessori: The Montessori scene, with :attr:`MontessoriWorld.robot` already
@@ -230,7 +242,7 @@ def _insert_shape(
         arm=Arms.RIGHT,
         target_horizontal_offset=offset,
     )
-    with simulated_robot(collision_avoidance=True):
+    with simulated_robot():
         node = execute_single(action, context=context)
         node.perform()
 
@@ -249,10 +261,21 @@ def _insert_shape_or_none(
 ) -> Optional[InsertionAttemptResult]:
     """
     Attempt one insertion via :func:`_insert_shape`, returning ``None`` instead of
-    letting :class:`~semantic_digital_twin.exceptions.PointOccupiedError` propagate if
-    this attempt's jittered drop point put the reach target outside the navigation map's
-    free space; that is a retryable placement failure like any other, not a reason to
-    abort the caller's whole run.
+    letting a retryable failure propagate: either
+    :class:`~semantic_digital_twin.exceptions.PointOccupiedError`, if this attempt's
+    jittered drop point put the reach target outside the navigation map's free space; a
+    :class:`~coraplex.plans.failures.PlanFailure` (e.g. ``EmptyUnderspecified`` if no
+    standing offset/grasp satisfies every constraint, or ``MotionDidNotFinish`` if a
+    motion failed while executing), while actually reaching for and grasping the shape;
+    or a :class:`~giskardpy.motion_statechart.exceptions.CollisionViolatedError`, raised
+    when the gripper's approach to a shape resting on the table marginally breaches
+    :data:`GRIPPER_TABLE_BUFFER_ZONE_DISTANCE`, since the standing offset
+    :meth:`~experiments.montessori.insert_shape_action.InsertMontessoriShapeAction._move_to_reach`
+    resolves is not itself constrained to avoid that. None of these indicate a
+    fundamentally unreachable shape, only that this specific attempt's resolved
+    standing offset or approach did not work out, so retrying (with a jittered drop
+    point, changing what gets resolved next) is as reasonable as it is for
+    ``PointOccupiedError``.
 
     :param shape: The shape to insert; must have a matching hole.
     :param montessori: The Montessori scene, with :attr:`MontessoriWorld.robot` already
@@ -261,13 +284,17 @@ def _insert_shape_or_none(
     :param headless: Whether to run the settling MuJoCo simulation without opening a
         viewer window.
     :param attempt: This attempt's 1-based index, used only for the log message.
-    :return: The attempt's outcome, or ``None`` if its reach target was occupied.
+    :return: The attempt's outcome, or ``None`` if this attempt failed in a retryable
+        way.
     """
+    from coraplex.plans.failures import PlanFailure
+    from giskardpy.motion_statechart.exceptions import CollisionViolatedError
+
     try:
         return _insert_shape(shape, montessori, context, headless)
-    except PointOccupiedError as error:
+    except (PointOccupiedError, PlanFailure, CollisionViolatedError) as error:
         logger.warning(
-            "%s's reach target was occupied on attempt %d/%d (%s); retrying.",
+            "%s's insertion attempt %d/%d failed (%s); retrying.",
             shape.name,
             attempt,
             MAX_INSERTION_ATTEMPTS,
@@ -276,11 +303,40 @@ def _insert_shape_or_none(
         return None
 
 
+ROBOT_TABLE_BUFFER_ZONE_DISTANCE = 0.02
+"""
+Buffer-zone distance (see
+:attr:`~semantic_digital_twin.collision_checking.collision_rules.AvoidCollisionRule.buffer_zone_distance`)
+used for the robot against the table, instead of the robot's default 5cm
+(:meth:`~semantic_digital_twin.robots.hsrb.HSRB._setup_collision_rules`).
+
+A grasp pose sits at the target shape's own center, a couple of centimeters above the
+table at most for every Montessori shape (see
+:meth:`~experiments.montessori.world.MontessoriWorld._resting_position_on_table`); the
+default 5cm buffer keeps the whole robot no closer than that to any external body,
+which not just the gripper but the wrist and forearm too cannot honor while actually
+reaching down to grasp a shape resting on the table, so the reach never leaves its
+pre-grasp hover. Narrowing the buffer for the whole robot (not just the gripper; the
+lower arm needs to get close to the table too) against only the table (not the shapes
+or board, already excluded entirely below) keeps a real, if smaller, standoff instead
+of removing avoidance outright.
+"""
+
+
 def _enable_robot_table_collision_avoidance(montessori: MontessoriWorld) -> None:
     """
     Restrict Giskard's collision avoidance, enabled by ``collision_avoidance=True`` on
     :data:`~coraplex.execution_environment.simulated_robot` in :func:`_insert_shape`, to
-    the robot and the table.
+    the robot and the table, and let the robot approach the table more closely than its
+    default standoff.
+
+    .. note::
+        Currently unused: :func:`_insert_shape` runs with collision avoidance off
+        entirely, since even with this narrowing in place, the reach still failed to
+        converge to the pre-grasp hover pose (well clear of the table) once collision
+        avoidance was actually turned on. Kept for whoever next attempts to re-enable
+        collision avoidance for this scene, e.g. after addressing the QP solver's
+        performance under it.
 
     The robot's own default
     :class:`~semantic_digital_twin.collision_checking.collision_rules.AvoidExternalCollisions`
@@ -293,6 +349,13 @@ def _enable_robot_table_collision_avoidance(montessori: MontessoriWorld) -> None
     checked set: :attr:`~semantic_digital_twin.collision_checking.collision_manager.CollisionManager.ignore_collision_rules`
     are applied last and cannot be overwritten by the broader default rules already in
     place.
+
+    A second, narrower :class:`~semantic_digital_twin.collision_checking.collision_rules.AvoidCollisionBetweenGroups`
+    rule is added as a default rule for the robot against the table specifically, with
+    :data:`ROBOT_TABLE_BUFFER_ZONE_DISTANCE` instead of the default 5cm:
+    :meth:`~semantic_digital_twin.collision_checking.collision_manager.CollisionManager.get_buffer_zone_distance`
+    scans rules most-recently-added first, so this rule (added after the robot's own
+    default rule) wins for every robot-table pair.
 
     :param montessori: The Montessori scene, with :attr:`MontessoriWorld.robot` already
         spawned.
@@ -307,6 +370,13 @@ def _enable_robot_table_collision_avoidance(montessori: MontessoriWorld) -> None
         montessori.world.collision_manager.add_ignore_collision_rule(
             AllowCollisionBetweenGroups(
                 body_group_a=list(robot_bodies), body_group_b=list(other_bodies)
+            )
+        )
+        montessori.world.collision_manager.add_default_rule(
+            AvoidCollisionBetweenGroups(
+                body_group_a=list(robot_bodies),
+                body_group_b=list(table_bodies),
+                buffer_zone_distance=ROBOT_TABLE_BUFFER_ZONE_DISTANCE,
             )
         )
 
@@ -334,7 +404,6 @@ def _insert_all_shapes(montessori: MontessoriWorld, headless: bool) -> None:
     context = Context(
         montessori.world, montessori.robot, query_backend=ProbabilisticBackend()
     )
-    _enable_robot_table_collision_avoidance(montessori)
 
     for shape in montessori.world.get_semantic_annotations_by_type(MontessoriShape):
         try:

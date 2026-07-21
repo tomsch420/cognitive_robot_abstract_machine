@@ -124,11 +124,17 @@ class MoveGripperMotion(BaseMotion):
     def _motion_chart(self):
         arm = ViewManager().get_end_effector_view(self.gripper, self.robot)
 
-        return JointPositionList(
+        task = JointPositionList(
             goal_state=arm.get_joint_state_by_type(self.motion),
             name=(
                 "OpenGripper" if self.motion == GripperState.OPEN else "CloseGripper"
             ),
+        )
+        if not self.allow_gripper_collision:
+            return task
+        return Parallel(
+            [*self._only_allow_gripper_collision_rules(self.gripper), task],
+            name=task.name,
         )
 
 
@@ -184,7 +190,12 @@ class MoveToolCenterPointMotion(BaseMotion):
                 name="MoveTCP",
                 weight=DefaultWeights.WEIGHT_BELOW_CA,
             )
-        return task
+        if not self.allow_gripper_collision:
+            return task
+        return Parallel(
+            [*self._only_allow_gripper_collision_rules(self.arm), task],
+            name=task.name,
+        )
 
 
 @dataclass

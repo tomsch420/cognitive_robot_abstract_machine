@@ -3,6 +3,10 @@ from copy import deepcopy
 import numpy as np
 import pytest
 
+from giskardpy.motion_statechart.goals.collision_avoidance import (
+    UpdateTemporaryCollisionRules,
+)
+from giskardpy.motion_statechart.goals.templates import Parallel
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList
 from coraplex.datastructures.dataclasses import Context
@@ -19,7 +23,11 @@ from coraplex.robot_plans import MoveMotion
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.pick_up import PickUpAction
 from coraplex.robot_plans.actions.core.robot_body import MoveTorsoAction
-from semantic_digital_twin.datastructures.definitions import TorsoState
+from coraplex.robot_plans.motions.gripper import (
+    MoveGripperMotion,
+    MoveToolCenterPointMotion,
+)
+from semantic_digital_twin.datastructures.definitions import GripperState, TorsoState
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.spatial_types import Point3, Quaternion
 from semantic_digital_twin.spatial_types.spatial_types import Pose
@@ -97,6 +105,46 @@ def test_move_motion_chart(immutable_model_world):
 
     assert msc
     np.testing.assert_equal(msc.goal_pose.to_position().to_np(), np.array([1, 1, 1, 1]))
+
+
+def _collision_rule_nodes(motion_chart):
+    if not isinstance(motion_chart, Parallel):
+        return []
+    return [
+        node for node in motion_chart.nodes if isinstance(node, UpdateTemporaryCollisionRules)
+    ]
+
+
+def test_move_tool_center_point_motion_collision_rules_follow_allow_gripper_collision(
+    immutable_model_world,
+):
+    world, view, context = immutable_model_world
+    motion = MoveToolCenterPointMotion(
+        target=Pose(Point3.from_iterable([1, 1, 1]), reference_frame=world.root),
+        arm=Arms.LEFT,
+        allow_gripper_collision=True,
+    )
+    execute_single(motion, context=context)
+
+    assert len(_collision_rule_nodes(motion._motion_chart)) == 1
+
+    motion.allow_gripper_collision = False
+    assert len(_collision_rule_nodes(motion._motion_chart)) == 0
+
+
+def test_move_gripper_motion_collision_rules_follow_allow_gripper_collision(
+    immutable_model_world,
+):
+    world, view, context = immutable_model_world
+    motion = MoveGripperMotion(
+        motion=GripperState.CLOSE, gripper=Arms.LEFT, allow_gripper_collision=True
+    )
+    execute_single(motion, context=context)
+
+    assert len(_collision_rule_nodes(motion._motion_chart)) == 1
+
+    motion.allow_gripper_collision = False
+    assert len(_collision_rule_nodes(motion._motion_chart)) == 0
 
 
 @pytest.mark.skipif(skip_tests, reason="Alternative motion mappings not available")
