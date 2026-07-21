@@ -66,6 +66,12 @@ import enum
 import experiments.eql_experiments.monitoring_profile
 import experiments.experiment_definitions
 import experiments.graph_of_convex_sets_experiments
+import experiments.montessori.hole_geometry
+import experiments.montessori.insert_shape_action
+import experiments.montessori.insertion_experience
+import experiments.montessori.montessori_demo
+import experiments.montessori.semantics
+import experiments.montessori.world
 import experiments.ormatic_experiments.reliability
 import experiments.ormatic_experiments.scalability
 import experiments.querying
@@ -2310,6 +2316,40 @@ class HasDrawersDAO_drawers_association(Base, AssociationDataAccessObject):
 
     source_hasdrawersdao_id: Mapped[int] = mapped_column(
         ForeignKey("HasDrawersDAO.database_id")
+    )
+    target_drawerdao_id: Mapped[int] = mapped_column(
+        ForeignKey("DrawerDAO.database_id")
+    )
+
+    target: Mapped[DrawerDAO] = relationship(
+        "DrawerDAO", foreign_keys=[target_drawerdao_id], lazy="selectin"
+    )
+
+
+class ShapeSortingBoardDAO_apertures_association(Base, AssociationDataAccessObject):
+    __tablename__ = "_60942119851849114524878544038181947026758327674129854608370294"
+
+    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    source_shapesortingboarddao_id: Mapped[int] = mapped_column(
+        ForeignKey("ShapeSortingBoardDAO.database_id")
+    )
+    target_aperturedao_id: Mapped[int] = mapped_column(
+        ForeignKey("ApertureDAO.database_id")
+    )
+
+    target: Mapped[ApertureDAO] = relationship(
+        "ApertureDAO", foreign_keys=[target_aperturedao_id], lazy="selectin"
+    )
+
+
+class ShapeSortingBoardDAO_drawers_association(Base, AssociationDataAccessObject):
+    __tablename__ = "_48773354141420379860001795845876946123983394825045493859836279"
+
+    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    source_shapesortingboarddao_id: Mapped[int] = mapped_column(
+        ForeignKey("ShapeSortingBoardDAO.database_id")
     )
     target_drawerdao_id: Mapped[int] = mapped_column(
         ForeignKey("DrawerDAO.database_id")
@@ -6728,6 +6768,241 @@ class GraphOfConvexSetsFreespaceExperimentResultDAO(
         "inherit_condition": database_id == ExperimentResultDAO.database_id,
         "polymorphic_load": "selectin",
     }
+
+
+class HoleFootprintDAO(
+    Base, DataAccessObject[experiments.montessori.hole_geometry.HoleFootprint]
+):
+    __tablename__ = "HoleFootprintDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    category: Mapped[experiments.montessori.semantics.MontessoriShapeCategory] = (
+        mapped_column(
+            krrood.ormatic.custom_types.PolymorphicEnumType,
+            nullable=False,
+            use_existing_column=True,
+        )
+    )
+    center: Mapped[typing.List[builtins.float]] = mapped_column(
+        JSON, nullable=False, use_existing_column=True
+    )
+    size: Mapped[typing.List[builtins.float]] = mapped_column(
+        JSON, nullable=False, use_existing_column=True
+    )
+
+
+class InsertMontessoriShapeActionDAO(
+    ActionDescriptionDAO,
+    DataAccessObject[
+        experiments.montessori.insert_shape_action.InsertMontessoriShapeAction
+    ],
+):
+    __tablename__ = "InsertMontessoriShapeActionDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(ActionDescriptionDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    insertion_hover_height: Mapped[builtins.float] = mapped_column(
+        use_existing_column=True
+    )
+
+    arm: Mapped[coraplex.datastructures.enums.Arms] = mapped_column(
+        krrood.ormatic.custom_types.PolymorphicEnumType,
+        nullable=False,
+        use_existing_column=True,
+    )
+
+    montessori_shape_id: Mapped[int] = mapped_column(
+        ForeignKey("MontessoriShapeDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    board_id: Mapped[int] = mapped_column(
+        ForeignKey("ShapeSortingBoardDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    grasp_description_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
+        ForeignKey("GraspDescriptionDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    target_horizontal_offset_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
+        ForeignKey("Point3MappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    montessori_shape: Mapped[MontessoriShapeDAO] = relationship(
+        "MontessoriShapeDAO",
+        uselist=False,
+        foreign_keys=[montessori_shape_id],
+        post_update=True,
+    )
+    board: Mapped[ShapeSortingBoardDAO] = relationship(
+        "ShapeSortingBoardDAO", uselist=False, foreign_keys=[board_id], post_update=True
+    )
+    grasp_description: Mapped[GraspDescriptionDAO] = relationship(
+        "GraspDescriptionDAO",
+        uselist=False,
+        foreign_keys=[grasp_description_id],
+        post_update=True,
+    )
+    target_horizontal_offset: Mapped[Point3MappingDAO] = relationship(
+        "Point3MappingDAO",
+        uselist=False,
+        foreign_keys=[target_horizontal_offset_id],
+        post_update=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "InsertMontessoriShapeActionDAO",
+        "inherit_condition": database_id == ActionDescriptionDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class ShapeInsertionExperienceDAO(
+    Base,
+    DataAccessObject[
+        experiments.montessori.insertion_experience.ShapeInsertionExperience
+    ],
+):
+    __tablename__ = "ShapeInsertionExperienceDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    run_index: Mapped[builtins.int] = mapped_column(use_existing_column=True)
+    attempt_number: Mapped[builtins.int] = mapped_column(use_existing_column=True)
+    target_horizontal_offset_x: Mapped[builtins.float] = mapped_column(
+        use_existing_column=True
+    )
+    target_horizontal_offset_y: Mapped[builtins.float] = mapped_column(
+        use_existing_column=True
+    )
+    fell_through_hole: Mapped[builtins.bool] = mapped_column(use_existing_column=True)
+    recorded_at: Mapped[datetime.datetime] = mapped_column(use_existing_column=True)
+
+    shape_category: Mapped[experiments.montessori.semantics.MontessoriShapeCategory] = (
+        mapped_column(
+            krrood.ormatic.custom_types.PolymorphicEnumType,
+            nullable=False,
+            use_existing_column=True,
+        )
+    )
+
+
+class InsertionAttemptResultDAO(
+    Base,
+    DataAccessObject[experiments.montessori.montessori_demo.InsertionAttemptResult],
+):
+    __tablename__ = "InsertionAttemptResultDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    fell_through_hole: Mapped[builtins.bool] = mapped_column(use_existing_column=True)
+
+    target_horizontal_offset_id: Mapped[int] = mapped_column(
+        ForeignKey("Point3MappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    target_horizontal_offset: Mapped[Point3MappingDAO] = relationship(
+        "Point3MappingDAO",
+        uselist=False,
+        foreign_keys=[target_horizontal_offset_id],
+        post_update=True,
+    )
+
+
+class NoMatchingHoleErrorDAO(
+    Base, DataAccessObject[experiments.montessori.semantics.NoMatchingHoleError]
+):
+    __tablename__ = "NoMatchingHoleErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    montessori_shape_id: Mapped[int] = mapped_column(
+        ForeignKey("MontessoriShapeDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    board_id: Mapped[int] = mapped_column(
+        ForeignKey("ShapeSortingBoardDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    montessori_shape: Mapped[MontessoriShapeDAO] = relationship(
+        "MontessoriShapeDAO",
+        uselist=False,
+        foreign_keys=[montessori_shape_id],
+        post_update=True,
+    )
+    board: Mapped[ShapeSortingBoardDAO] = relationship(
+        "ShapeSortingBoardDAO", uselist=False, foreign_keys=[board_id], post_update=True
+    )
+
+
+class MontessoriWorldDAO(
+    Base, DataAccessObject[experiments.montessori.world.MontessoriWorld]
+):
+    __tablename__ = "MontessoriWorldDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+
+class _HoleSpecDAO(Base, DataAccessObject[experiments.montessori.world._HoleSpec]):
+    __tablename__ = "_HoleSpecDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    key: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+
+    category: Mapped[experiments.montessori.semantics.MontessoriShapeCategory] = (
+        mapped_column(
+            krrood.ormatic.custom_types.PolymorphicEnumType,
+            nullable=False,
+            use_existing_column=True,
+        )
+    )
+
+    position_id: Mapped[int] = mapped_column(
+        ForeignKey("Point3MappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    shape_id: Mapped[int] = mapped_column(
+        ForeignKey("HoleFootprintDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    position: Mapped[Point3MappingDAO] = relationship(
+        "Point3MappingDAO", uselist=False, foreign_keys=[position_id], post_update=True
+    )
+    shape: Mapped[HoleFootprintDAO] = relationship(
+        "HoleFootprintDAO", uselist=False, foreign_keys=[shape_id], post_update=True
+    )
 
 
 class ORMaticReliabilityAggregateResultDAO(
@@ -23160,6 +23435,32 @@ class HasRootBodyDAO(
     }
 
 
+class MontessoriShapeDAO(
+    HasRootBodyDAO, DataAccessObject[experiments.montessori.semantics.MontessoriShape]
+):
+    __tablename__ = "MontessoriShapeDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(HasRootBodyDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    shape_category: Mapped[experiments.montessori.semantics.MontessoriShapeCategory] = (
+        mapped_column(
+            krrood.ormatic.custom_types.PolymorphicEnumType,
+            nullable=False,
+            use_existing_column=True,
+        )
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "MontessoriShapeDAO",
+        "inherit_condition": database_id == HasRootBodyDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
 class PartNetLabelDAO(
     HasRootBodyDAO,
     DataAccessObject[
@@ -29266,6 +29567,44 @@ class HasDrawersDAO(
     }
 
 
+class ShapeSortingBoardDAO(
+    HasCaseAsRootBodyDAO,
+    DataAccessObject[experiments.montessori.semantics.ShapeSortingBoard],
+):
+    __tablename__ = "ShapeSortingBoardDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(HasCaseAsRootBodyDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    apertures: Mapped[builtins.list[ShapeSortingBoardDAO_apertures_association]] = (
+        relationship(
+            "ShapeSortingBoardDAO_apertures_association",
+            collection_class=builtins.list,
+            cascade="all, delete-orphan",
+            foreign_keys="[ShapeSortingBoardDAO_apertures_association.source_shapesortingboarddao_id]",
+            lazy="selectin",
+        )
+    )
+    drawers: Mapped[builtins.list[ShapeSortingBoardDAO_drawers_association]] = (
+        relationship(
+            "ShapeSortingBoardDAO_drawers_association",
+            collection_class=builtins.list,
+            cascade="all, delete-orphan",
+            foreign_keys="[ShapeSortingBoardDAO_drawers_association.source_shapesortingboarddao_id]",
+            lazy="selectin",
+        )
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "ShapeSortingBoardDAO",
+        "inherit_condition": database_id == HasCaseAsRootBodyDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
 class HasHandleDAO(
     HasRootBodyDAO,
     DataAccessObject[semantic_digital_twin.semantic_annotations.mixins.HasHandle],
@@ -29901,6 +30240,30 @@ class ApertureDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ApertureDAO",
         "inherit_condition": database_id == HasRootRegionDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class ShapeSortingHoleDAO(
+    ApertureDAO, DataAccessObject[experiments.montessori.semantics.ShapeSortingHole]
+):
+    __tablename__ = "ShapeSortingHoleDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(ApertureDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    shape_category: Mapped[
+        typing.Optional[experiments.montessori.semantics.MontessoriShapeCategory]
+    ] = mapped_column(
+        krrood.ormatic.custom_types.PolymorphicEnumType,
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "ShapeSortingHoleDAO",
+        "inherit_condition": database_id == ApertureDAO.database_id,
         "polymorphic_load": "selectin",
     }
 

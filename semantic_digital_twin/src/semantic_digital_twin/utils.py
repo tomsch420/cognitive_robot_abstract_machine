@@ -13,7 +13,12 @@ from krrood.class_diagrams.mocking import MockedModule, MockedClass
 try:
     from ament_index_python import PackageNotFoundError
 except ModuleNotFoundError:
-    PackageNotFoundError = None
+
+    class PackageNotFoundError(Exception):
+        """
+        Fallback used when ``ament_index_python`` is not installed, so callers can
+        still catch this name as a valid exception type.
+        """
 from xml.etree import ElementTree as ET
 
 from typing_extensions import Any, Tuple, ClassVar, Type

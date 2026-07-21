@@ -273,7 +273,7 @@ class URDFParser:
             parent_T_connection_expression=parent_T_connection,
             multiplier=multiplier,
             offset=offset,
-            axis=Vector3(*map(int, joint.axis), reference_frame=parent),
+            axis=Vector3(*map(float, joint.axis), reference_frame=parent),
             raw_dof=dof,
         )
         return result
@@ -294,6 +294,27 @@ class URDFParser:
         body.visual = visuals
         body.collision = collisions
         return body
+
+    @staticmethod
+    def _parse_material_color(
+        geom: Union[urdfpy.Visual, urdfpy.Collision],
+        material_dict: Dict[str, Optional[Tuple[float, float, float, float]]],
+    ) -> Color:
+        """
+        Determine the RGBA color a URDF geometry's material specifies.
+
+        A ``<material>`` element may define its color inline, or only reference a
+        material declared globally on the ``<robot>`` by name; both forms are supported.
+
+        :param geom: The URDF visual or collision element to read the material from.
+        :param material_dict: Globally declared material colors, keyed by material name.
+        :return: The resolved color, defaulting to white when none is specified.
+        """
+        if not (hasattr(geom, "material") and geom.material):
+            return Color(1, 1, 1, 1)
+        inline_color = geom.material.color.rgba if geom.material.color else None
+        rgba = inline_color or material_dict.get(geom.material.name) or (1, 1, 1, 1)
+        return Color(*rgba)
 
     def parse_geometry(
         self,
@@ -322,12 +343,8 @@ class URDFParser:
             origin_transform = HomogeneousTransformationMatrix.from_xyz_rpy(
                 *params, reference_frame=body
             )
+            color = self._parse_material_color(geom, material_dict)
             if isinstance(geom.geometry, urdfpy.Box):
-                color = (
-                    Color(*material_dict.get(geom.material.name, (1, 1, 1, 1)))
-                    if hasattr(geom, "material") and geom.material
-                    else Color(1, 1, 1, 1)
-                )
                 res.append(
                     Box(
                         origin=origin_transform,
@@ -336,11 +353,6 @@ class URDFParser:
                     )
                 )
             elif isinstance(geom.geometry, urdfpy.Sphere):
-                color = (
-                    Color(*material_dict.get(geom.material.name, (1, 1, 1, 1)))
-                    if hasattr(geom, "material") and geom.material
-                    else Color(1, 1, 1, 1)
-                )
                 res.append(
                     Sphere(
                         origin=origin_transform,
@@ -349,11 +361,6 @@ class URDFParser:
                     )
                 )
             elif isinstance(geom.geometry, urdfpy.Cylinder):
-                color = (
-                    Color(*material_dict.get(geom.material.name, (1, 1, 1, 1)))
-                    if hasattr(geom, "material") and geom.material
-                    else Color(1, 1, 1, 1)
-                )
                 res.append(
                     Cylinder(
                         origin=origin_transform,
@@ -370,6 +377,7 @@ class URDFParser:
                         origin=origin_transform,
                         filename=self.path_resolver.resolve(geom.geometry.filename),
                         scale=Scale(*(geom.geometry.scale or (1, 1, 1))),
+                        color=color,
                     )
                 )
         return ShapeCollection(res, reference_frame=body)
