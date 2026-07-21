@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from scipy.spatial.transform import Rotation
 from typing_extensions import Dict, Optional, Tuple, Union, List
 from urdf_parser_py import urdf as urdfpy
 from xacro import process_file
@@ -15,6 +16,7 @@ from semantic_digital_twin.exceptions import NegativeConnectionVelocity
 from semantic_digital_twin.spatial_types.derivatives import Derivatives, DerivativeMap
 from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
+    Point3,
     Vector3,
 )
 from semantic_digital_twin.utils import (
@@ -40,6 +42,10 @@ from semantic_digital_twin.world_description.geometry import (
     Mesh,
     Scale,
     Color,
+)
+from semantic_digital_twin.world_description.inertial_properties import (
+    Inertial,
+    InertiaTensor,
 )
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body, Connection
@@ -316,7 +322,50 @@ class URDFParser:
         collisions = self.parse_geometry(link.collisions, body)
         body.visual = visuals
         body.collision = collisions
+        inertial = self.parse_inertial(link, body)
+        if inertial is not None:
+            body.inertial = inertial
         return body
+
+    def parse_inertial(self, link: urdfpy.Link, body: Body) -> Optional[Inertial]:
+        """
+        Parses the inertial properties of a URDF link.
+
+        URDF expresses the inertia tensor in the inertial frame of the link, so it is
+        rotated into the link frame, which is the frame :class:`Inertial` expects.
+
+        :param link: The URDF link whose ``inertial`` element is parsed.
+        :param body: The body the properties belong to, used as their reference frame.
+        :return: The inertial properties, or ``None`` if the link declares none.
+        """
+        if link.inertial is None:
+            return None
+
+        origin = link.inertial.origin
+        center_of_mass = origin.xyz if origin is not None else [0.0, 0.0, 0.0]
+        roll_pitch_yaw = origin.rpy if origin is not None else [0.0, 0.0, 0.0]
+
+        urdf_inertia = link.inertial.inertia
+        inertia_in_inertial_frame = InertiaTensor.from_values(
+            ixx=urdf_inertia.ixx,
+            iyy=urdf_inertia.iyy,
+            izz=urdf_inertia.izz,
+            ixy=urdf_inertia.ixy,
+            ixz=urdf_inertia.ixz,
+            iyz=urdf_inertia.iyz,
+        )
+        link_R_inertial = Rotation.from_euler("xyz", roll_pitch_yaw).as_matrix()
+        inertia_in_link_frame = InertiaTensor(
+            data=link_R_inertial
+            @ inertia_in_inertial_frame.data
+            @ link_R_inertial.transpose()
+        )
+
+        return Inertial(
+            mass=link.inertial.mass,
+            center_of_mass=Point3(*center_of_mass, reference_frame=body),
+            inertia=inertia_in_link_frame,
+        )
 
     def parse_geometry(
         self,

@@ -1,12 +1,17 @@
 import os.path
 from dataclasses import dataclass
+from math import pi
 
+import numpy as np
 import pytest
+from urdf_parser_py import urdf as urdfpy
 
 from semantic_digital_twin.adapters.urdf import URDFParser
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.tiago import Tiago
 from semantic_digital_twin.world_description.connections import FixedConnection
+from semantic_digital_twin.world_description.world_entity import Body
 
 
 @dataclass
@@ -137,6 +142,47 @@ def test_undeclared_joint_dynamics_default_to_zero(pr2_parser):
     assert dynamics.damping == 0.0
     assert dynamics.dry_friction == 0.0
     assert dynamics.armature == 0.0
+
+
+def test_declared_link_inertial_is_imported(pr2_parser):
+    world = pr2_parser.parse()
+    inertial = world.get_body_by_name("l_elbow_flex_link").inertial
+    assert inertial.mass == 1.90327
+    assert inertial.center_of_mass.to_np()[:3].tolist() == [0.01014, 0.00032, -0.01211]
+    assert inertial.inertia.to_values() == (
+        0.00346541989,
+        0.00441606455,
+        0.00359156824,
+        0.00004066825,
+        0.00043171614,
+        -0.00003968914,
+    )
+
+
+def test_inertia_tensor_is_expressed_in_the_link_frame(table_parser):
+    link = urdfpy.Link(
+        name="rotated_inertial_link",
+        inertial=urdfpy.Inertial(
+            mass=2.0,
+            inertia=urdfpy.Inertia(
+                ixx=0.002, iyy=0.003, izz=0.004, ixy=0.0, ixz=0.0, iyz=0.0
+            ),
+            origin=urdfpy.Pose(xyz=[0.0, 0.0, 0.0], rpy=[0.0, 0.0, pi / 2]),
+        ),
+    )
+    body = Body(name=PrefixedName("rotated_inertial_link"))
+
+    inertial = table_parser.parse_inertial(link, body)
+    inertia_rotated_by_ninety_degrees_around_z = np.diag([0.003, 0.002, 0.004])
+    assert np.allclose(
+        inertial.inertia.data, inertia_rotated_by_ninety_degrees_around_z, atol=1e-12
+    )
+
+
+def test_undeclared_link_inertial_keeps_the_default(table_parser):
+    inertial = table_parser.parse().root.inertial
+    assert inertial.mass == 1.0
+    assert inertial.inertia.to_values() == (1.0, 1.0, 1.0, 0.0, 0.0, 0.0)
 
 
 def test_xacro():
