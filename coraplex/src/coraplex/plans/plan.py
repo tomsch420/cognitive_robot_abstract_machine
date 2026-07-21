@@ -344,7 +344,7 @@ class Plan:
         visualizer = self._visualizer_classes[backend](
             graph=self.plan_graph,
             label_getter=lambda node: node.__class__.__name__,
-            info_getter=self._node_details,
+            information_getter=self._node_details,
             color_getter=lambda node: node.status.color.replace("-", ""),
             layout=layout,
             title=repr(self),
