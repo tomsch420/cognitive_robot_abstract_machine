@@ -6,6 +6,7 @@ import mujoco
 import pytest
 import numpy
 from PIL import Image
+from scipy.spatial.transform import Rotation
 
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.adapters.urdf import URDFParser
@@ -22,6 +23,7 @@ from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
     FixedConnection,
+    OmniDrive,
     RevoluteConnection,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
@@ -754,6 +756,52 @@ def test_body_frame_excludes_joint_state_at_build_time():
         numpy.testing.assert_allclose(simulated_position, world_position, atol=1e-4)
     finally:
         stop_multisim_if_running(multi_sim)
+
+
+def test_omni_drive_spawn_pose_is_baked_into_static_body_frame(tmp_path):
+    """
+    Regression test: OmniDrive (and DifferentialDrive) never get a MuJoCo joint built for
+    them (see MultiSimBuilder._ignore_connection_types), so nothing else carries their
+    live x/y/yaw state into the exported scene. KinematicStructureEntityConverter._convert
+    used to always read reference_origin_as_position_quaternion(), which excludes that
+    live state - a robot spawned at a non-identity OmniDrive pose therefore ended up at
+    the world origin in MuJoCo, while e.g. RViz (which reads the full
+    origin_as_position_quaternion()) showed it at the correct spawn pose.
+    """
+    world = World()
+    with world.modify_world():
+        map_root = Body(name=PrefixedName("map"))
+        world.add_body(map_root)
+        robot_root = Body(name=PrefixedName("robot_root"))
+        drive = OmniDrive.create_with_dofs(
+            world=world, parent=map_root, child=robot_root
+        )
+        world.add_connection(drive)
+
+    drive.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+        x=1.5, y=-0.5, yaw=0.9, reference_frame=map_root
+    )
+
+    builder = MujocoBuilder()
+    builder.build_world(world=world, file_path=str(tmp_path / "scene.xml"))
+
+    [robot_body] = [
+        body for body in builder.spec.bodies if body.name == "robot_root"
+    ]
+
+    expected_pose = world.compute_forward_kinematics_np(world.root, robot_root)
+    expected_position = expected_pose[:3, 3]
+    expected_quat_wxyz = Rotation.from_matrix(expected_pose[:3, :3]).as_quat(
+        scalar_first=True
+    )
+
+    assert not numpy.allclose(expected_position, [0.0, 0.0, 0.0])
+    numpy.testing.assert_allclose(
+        list(robot_body.pos), expected_position, atol=1e-6
+    )
+    numpy.testing.assert_allclose(
+        list(robot_body.quat), expected_quat_wxyz, atol=1e-6
+    )
 
 
 def test_world_sim_state_sync():

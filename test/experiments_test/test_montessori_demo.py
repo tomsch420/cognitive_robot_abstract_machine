@@ -8,6 +8,7 @@ from experiments.montessori.montessori_demo import (
     RETRY_HORIZONTAL_JITTER,
     _base_connections_without_hardware_interface,
     _base_degrees_of_freedom_without_hardware_interface,
+    _enable_robot_table_collision_avoidance,
     _hold_controlled_joints_in_mujoco,
     _make_all_shapes_movable_in_mujoco,
     _make_shape_movable_in_mujoco,
@@ -17,6 +18,7 @@ from experiments.montessori.montessori_demo import (
 from experiments.montessori.semantics import MontessoriShape, MontessoriShapeCategory
 from experiments.montessori.world import MontessoriWorld, robot_installed
 from semantic_digital_twin.robots.hsrb import HSRB
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Table
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
@@ -211,3 +213,43 @@ def test_settle_shape_in_mujoco_fixes_the_shape_where_gravity_actually_settles_i
     # physically dropped through the hole under gravity, not merely left hovering
     # where it started
     assert float(position_after.z) < float(position_before.z) - 0.05
+
+
+def test_enable_robot_table_collision_avoidance_checks_the_robot_against_the_table(
+    montessori_with_robot,
+):
+    montessori = montessori_with_robot
+    [table] = montessori.world.get_semantic_annotations_by_type(Table)
+
+    _enable_robot_table_collision_avoidance(montessori)
+    montessori.world.collision_manager.update_collision_matrix()
+
+    checked_bodies = {
+        body
+        for check in montessori.world.collision_manager.collision_matrix.collision_checks
+        for body in (check.body_a, check.body_b)
+    }
+    assert set(table.bodies_with_collision) <= checked_bodies
+    assert set(montessori.robot.bodies_with_collision) & checked_bodies
+
+
+def test_enable_robot_table_collision_avoidance_does_not_check_the_board(
+    montessori_with_robot,
+):
+    """
+    Only the table is registered, not the shape-sorting board: checking the robot
+    against the board's ~40-50-piece CoACD collision decomposition too overloads
+    Giskard's QP solver for the tight-clearance pickup motion (a convergence timeout,
+    not a detected collision).
+    """
+    montessori = montessori_with_robot
+
+    _enable_robot_table_collision_avoidance(montessori)
+    montessori.world.collision_manager.update_collision_matrix()
+
+    checked_bodies = {
+        body
+        for check in montessori.world.collision_manager.collision_matrix.collision_checks
+        for body in (check.body_a, check.body_b)
+    }
+    assert set(montessori.board.bodies_with_collision).isdisjoint(checked_bodies)

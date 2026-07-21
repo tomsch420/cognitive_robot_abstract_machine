@@ -45,9 +45,13 @@ from experiments.montessori.world import MontessoriWorld, robot_installed
 from krrood.entity_query_language.backends import ProbabilisticBackend
 from krrood.utils import clear_memoization_cache
 from semantic_digital_twin.adapters.multi_sim import MujocoActuator, MujocoSim
+from semantic_digital_twin.collision_checking.collision_rules import (
+    AllowCollisionBetweenGroups,
+)
 from semantic_digital_twin.exceptions import PointOccupiedError
 from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Table
 from semantic_digital_twin.spatial_types.spatial_types import Point3
 from semantic_digital_twin.utils import rclpy_installed
 from semantic_digital_twin.world import World
@@ -136,8 +140,8 @@ Number of times :func:`_insert_all_shapes` tries inserting a single shape (see
 
 RETRY_HORIZONTAL_JITTER = 0.003
 """
-Maximum magnitude, along either axis, of the random horizontal offset
-(:attr:`~experiments.montessori.insert_shape_action.InsertMontessoriShapeAction.target_horizontal_offset`)
+Maximum magnitude, along either axis, of the random horizontal offset (:attr:`~experimen
+ts.montessori.insert_shape_action.InsertMontessoriShapeAction.target_horizontal_offset`)
 applied to a retried insertion's drop point.
 
 A retry that teleports the shape to the exact same pose and re-settles it in MuJoCo
@@ -170,15 +174,16 @@ class InsertionAttemptResult:
 
     target_horizontal_offset: Point3
     """
-    The horizontal offset the attempt was actually released at (see
-    :attr:`~experiments.montessori.insert_shape_action.InsertMontessoriShapeAction.target_horizontal_offset`),
-    whether given by the caller or generated internally.
+    The horizontal offset the attempt was actually released at (see :attr:`~experiments.
+    montessori.insert_shape_action.InsertMontessoriShapeAction.target_horizontal_offset`
+    ), whether given by the caller or generated internally.
     """
 
     fell_through_hole: bool
     """
-    Whether the shape actually fell through its hole after settling; see
-    :meth:`~experiments.montessori.insert_shape_action.InsertMontessoriShapeAction.has_fallen_through_hole`.
+    Whether the shape actually fell through its hole after settling; see :meth:`~experim
+    ents.montessori.insert_shape_action.InsertMontessoriShapeAction.has_fallen_through_h
+    ole`.
     """
 
 
@@ -225,7 +230,7 @@ def _insert_shape(
         arm=Arms.RIGHT,
         target_horizontal_offset=offset,
     )
-    with simulated_robot:
+    with simulated_robot(collision_avoidance=True):
         node = execute_single(action, context=context)
         node.perform()
 
@@ -245,9 +250,9 @@ def _insert_shape_or_none(
     """
     Attempt one insertion via :func:`_insert_shape`, returning ``None`` instead of
     letting :class:`~semantic_digital_twin.exceptions.PointOccupiedError` propagate if
-    this attempt's jittered drop point put the reach target outside the navigation
-    map's free space; that is a retryable placement failure like any other, not a
-    reason to abort the caller's whole run.
+    this attempt's jittered drop point put the reach target outside the navigation map's
+    free space; that is a retryable placement failure like any other, not a reason to
+    abort the caller's whole run.
 
     :param shape: The shape to insert; must have a matching hole.
     :param montessori: The Montessori scene, with :attr:`MontessoriWorld.robot` already
@@ -271,11 +276,46 @@ def _insert_shape_or_none(
         return None
 
 
+def _enable_robot_table_collision_avoidance(montessori: MontessoriWorld) -> None:
+    """
+    Restrict Giskard's collision avoidance, enabled by ``collision_avoidance=True`` on
+    :data:`~coraplex.execution_environment.simulated_robot` in :func:`_insert_shape`, to
+    the robot and the table.
+
+    The robot's own default
+    :class:`~semantic_digital_twin.collision_checking.collision_rules.AvoidExternalCollisions`
+    rules (added when it is spawned, e.g. :meth:`~semantic_digital_twin.robots.hsrb.HSRB.__post_init__`)
+    already check it against every other collision body in the world once that flag is
+    on, including the shape-sorting board's ~40-50-piece CoACD decomposition, which
+    overloads Giskard's QP solver (a convergence timeout, not a detected collision) for
+    the tight-clearance pickup motion. Force-excluding everything but the table, rather
+    than adding another avoid-rule on top of those, is what actually narrows the
+    checked set: :attr:`~semantic_digital_twin.collision_checking.collision_manager.CollisionManager.ignore_collision_rules`
+    are applied last and cannot be overwritten by the broader default rules already in
+    place.
+
+    :param montessori: The Montessori scene, with :attr:`MontessoriWorld.robot` already
+        spawned.
+    """
+    [table] = montessori.world.get_semantic_annotations_by_type(Table)
+    robot_bodies = set(montessori.robot.bodies_with_collision)
+    table_bodies = set(table.bodies_with_collision)
+    other_bodies = (
+        set(montessori.world.bodies_with_collision) - robot_bodies - table_bodies
+    )
+    with montessori.world.modify_world():
+        montessori.world.collision_manager.add_ignore_collision_rule(
+            AllowCollisionBetweenGroups(
+                body_group_a=list(robot_bodies), body_group_b=list(other_bodies)
+            )
+        )
+
+
 def _insert_all_shapes(montessori: MontessoriWorld, headless: bool) -> None:
     """
     Have the robot pick up and insert every loose shape that has a matching hole into
-    the shape-sorting board, skipping any that don't (e.g. the sphere), retrying a
-    shape that does not actually fall through its hole (see :func:`_insert_shape`) up to
+    the shape-sorting board, skipping any that don't (e.g. the sphere), retrying a shape
+    that does not actually fall through its hole (see :func:`_insert_shape`) up to
     :data:`MAX_INSERTION_ATTEMPTS` times with a jittered drop point before giving up on
     it.
 
@@ -294,6 +334,8 @@ def _insert_all_shapes(montessori: MontessoriWorld, headless: bool) -> None:
     context = Context(
         montessori.world, montessori.robot, query_backend=ProbabilisticBackend()
     )
+    _enable_robot_table_collision_avoidance(montessori)
+
     for shape in montessori.world.get_semantic_annotations_by_type(MontessoriShape):
         try:
             montessori.board.hole_for(shape)
@@ -377,16 +419,15 @@ def _base_connections_without_hardware_interface(
     robot: AbstractRobot,
 ) -> list[ActiveConnection1DOF]:
     """
-    The robot's mobile-base joints (drive wheels, passive caster wheels, base roll,
-    ...) that have a degree of freedom but, unlike the arm/wrist/head, are not part of
+    The robot's mobile-base joints (drive wheels, passive caster wheels, base roll, ...)
+    that have a degree of freedom but, unlike the arm/wrist/head, are not part of
     :attr:`AbstractRobot.degrees_of_freedom_with_hardware_interface`: they are driven
     indirectly through the :class:`OmniDrive` connection rather than controlled
-    directly. Left unactuated, MuJoCo's contact and gravity forces spin them up
-    without bound.
+    directly. Left unactuated, MuJoCo's contact and gravity forces spin them up without
+    bound.
 
-    Excludes every end effector's own uncontrolled (mimic/spring) joints, which
-    already move together through their mimic relationship and don't need an
-    independent hold.
+    Excludes every end effector's own uncontrolled (mimic/spring) joints, which already
+    move together through their mimic relationship and don't need an independent hold.
 
     :param robot: The spawned robot.
     """

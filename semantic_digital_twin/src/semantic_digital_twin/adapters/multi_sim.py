@@ -318,11 +318,17 @@ class KinematicStructureEntityConverter(EntityConverter, ABC):
         """
 
         kinematic_structure_entity_props = EntityConverter._convert(self, entity)
-        # The simulator joint supplies the variable part, so the static frame must
-        # exclude it (see Connection.reference_origin_expression).
-        [px, py, pz, qx, qy, qz, qw] = (
-            entity.parent_connection.reference_origin_as_position_quaternion().evaluate()[0]
-        )
+        connection = entity.parent_connection
+        if isinstance(connection, (OmniDrive, DifferentialDrive)):
+            # OmniDrive/DifferentialDrive never get a simulator joint (see
+            # MultiSimBuilder._ignore_connection_types), so no joint will supply
+            # their live x/y/yaw state: bake the full pose instead.
+            origin = connection.origin_as_position_quaternion()
+        else:
+            # The simulator joint supplies the variable part, so the static frame must
+            # exclude it (see Connection.reference_origin_expression).
+            origin = connection.reference_origin_as_position_quaternion()
+        [px, py, pz, qx, qy, qz, qw] = origin.evaluate()[0]
         kinematic_structure_entity_pos = [px, py, pz]
         kinematic_structure_entity_quat = [qw, qx, qy, qz]
         kinematic_structure_entity_props.update(

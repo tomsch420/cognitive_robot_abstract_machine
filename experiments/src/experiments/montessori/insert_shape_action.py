@@ -21,6 +21,7 @@ from coraplex.robot_plans.actions.core.placing import PlaceAction
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction
 from coraplex.view_manager import ViewManager
 from experiments.montessori.semantics import MontessoriShape, ShapeSortingBoard
+from experiments.montessori.world import DEFAULT_ROBOT_STANDOFF_DISTANCE
 from krrood.entity_query_language.factories import a
 from krrood.entity_query_language.query.match import Match
 from semantic_digital_twin.exceptions import PointOccupiedError
@@ -37,6 +38,13 @@ STANDOFF_CLEARANCE = 0.1
 Horizontal clearance kept between a standoff point (see
 :meth:`InsertMontessoriShapeAction._standoff_point_near_surface`) and the edge of the
 surface it stands off from.
+
+This only needs to step the point off the surface's own 2D-projected footprint (see
+that method's docstring), not clear the robot's whole body: unlike
+:attr:`InsertMontessoriShapeAction._base_footprint_clearance`, it is independent of the
+robot, since inflating it to a wide robot's full footprint would push the pre-grasp
+hover point (and, transitively, the base stance :meth:`_move_to_reach` resolves near
+it) far enough from the target to put the actual grasp out of comfortable arm reach.
 """
 
 @dataclass
@@ -88,6 +96,21 @@ class InsertMontessoriShapeAction(ActionDescription):
     different drop point, rather than repeating the exact same teleport-then-settle that
     just failed.
     """
+
+    @property
+    def _base_footprint_clearance(self) -> float:
+        """
+        How far the robot's own body extends from its base origin, so a point this far
+        from an obstacle is clear of the whole base, not just of the origin point
+        itself.
+
+        Used to bloat obstacles in :meth:`_move_to_reach`'s navigation map for the
+        robot's standing offset: a resolved standing offset is otherwise only checked as
+        a zero-radius point against the free space, which lets the robot's real body
+        overlap nearby furniture even though that point itself is unobstructed.
+        """
+        base_bounding_box = self.robot.mobile_base.bounding_box
+        return (base_bounding_box.width + base_bounding_box.depth) / 4
 
     def _standoff_point_near_surface(
         self, surface: Body, target_position: Point3
@@ -162,24 +185,64 @@ class InsertMontessoriShapeAction(ActionDescription):
         left underspecified and constrained to the navigation map's free space, letting
         it be resolved generatively.
 
+        Two navigation maps are built around ``target``, not one: an unbloated one, at
+        the default search range, to find the free region actually touching
+        ``target_pose_end_effector`` (bloating this one too would make small objects
+        and holes on the board reject standoff points meant to sit just past their own
+        edge), and one bloated by :attr:`_base_footprint_clearance` to constrain where
+        the robot's own base, which has a real footprint rather than a single point,
+        may stand within that same region.
+
+        The standing map's own search range is kept to twice
+        :data:`~experiments.montessori.world.DEFAULT_ROBOT_STANDOFF_DISTANCE`, well
+        short of the reachability map's default: free space bloated by a wide robot's
+        own footprint tends to merge into a few large, far-reaching regions rather
+        than fragmenting the way barely-bloated free space does, and the underspecified
+        query has no notion of preferring the near part of such a region over its far
+        corners, so an unbounded search range risks resolving a standing offset too far
+        from ``target`` for the following pickup/placement itself to actually reach.
+
         :param target: The body to build the navigation map around.
         :param target_pose_end_effector: The pose the end effector should reach.
         :raises PointOccupiedError: If ``target_pose_end_effector`` is not in the
-            navigation map's free space.
+            navigation map's free space, or if no standing room remains for the
+            robot's own footprint near it.
         """
-        gcs = navigation_map_at_target(target=target)
-        target_node = gcs.node_of_point(target_pose_end_effector.position)
+        reachability_gcs = navigation_map_at_target(target=target)
+        target_node = reachability_gcs.node_of_point(target_pose_end_effector.position)
         if target_node is None:
             raise PointOccupiedError(
                 self.world.transform(target_pose_end_effector, self.world.root).position
             )
-        gcs = gcs.create_subgraph(
-            list(
-                rustworkx.node_connected_component(
-                    gcs.graph, gcs.box_to_index_map[target_node]
-                )
+        reachable_boxes = [
+            reachability_gcs.graph[index]
+            for index in rustworkx.node_connected_component(
+                reachability_gcs.graph,
+                reachability_gcs.box_to_index_map[target_node],
             )
+        ]
+
+        standing_search_range = 2 * DEFAULT_ROBOT_STANDOFF_DISTANCE
+        standing_gcs = navigation_map_at_target(
+            target=target,
+            search_range_x=standing_search_range,
+            search_range_y=standing_search_range,
+            bloat_obstacles=self._base_footprint_clearance,
         )
+        standing_gcs = standing_gcs.create_subgraph(
+            [
+                index
+                for box, index in standing_gcs.box_to_index_map.items()
+                if any(
+                    box.intersection_with(reachable_box) is not None
+                    for reachable_box in reachable_boxes
+                )
+            ]
+        )
+        if not standing_gcs.box_to_index_map:
+            raise PointOccupiedError(
+                self.world.transform(target_pose_end_effector, self.world.root).position
+            )
 
         reach_query = a(MoveToReach)(
             target_pose_offset_robot=a(Pose2D)(
@@ -190,7 +253,7 @@ class InsertMontessoriShapeAction(ActionDescription):
             grasp_description=self._grasp_description_query(),
         )
         where_condition = translate_free_space_to_where_condition(
-            gcs.free_space_event,
+            standing_gcs.free_space_event,
             reach_query.expression,
             x_variable_name="MoveToReach.target_pose_offset_robot.x",
             y_variable_name="MoveToReach.target_pose_offset_robot.y",
