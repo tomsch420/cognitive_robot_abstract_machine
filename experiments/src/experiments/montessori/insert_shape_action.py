@@ -21,7 +21,7 @@ from coraplex.robot_plans.actions.core.placing import PlaceAction
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction
 from coraplex.view_manager import ViewManager
 from experiments.montessori.semantics import MontessoriShape, ShapeSortingBoard
-from krrood.entity_query_language.factories import underspecified
+from krrood.entity_query_language.factories import a
 from krrood.entity_query_language.query.match import Match
 from semantic_digital_twin.exceptions import PointOccupiedError
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Table
@@ -38,7 +38,6 @@ Horizontal clearance kept between a standoff point (see
 :meth:`InsertMontessoriShapeAction._standoff_point_near_surface`) and the edge of the
 surface it stands off from.
 """
-
 
 @dataclass
 class InsertMontessoriShapeAction(ActionDescription):
@@ -81,7 +80,9 @@ class InsertMontessoriShapeAction(ActionDescription):
     target_horizontal_offset: Optional[Point3] = None
     """
     Offset added to the target hole's own (x, y) position before releasing the shape
-    above it. ``None`` (the default) targets the hole's center exactly; a small nonzero
+    above it.
+
+    ``None`` (the default) targets the hole's center exactly; a small nonzero
     offset lets a caller retry a failed insertion (see
     :func:`~experiments.montessori.montessori_demo._insert_all_shapes`) with an actually
     different drop point, rather than repeating the exact same teleport-then-settle that
@@ -142,7 +143,7 @@ class InsertMontessoriShapeAction(ActionDescription):
         already fully concrete: passing :attr:`grasp_description` directly raises
         ``ValueError: ... not in domain of variable ...`` once that backend is active.
         """
-        return underspecified(GraspDescription)(
+        return a(GraspDescription)(
             approach_direction=self.grasp_description.approach_direction,
             vertical_alignment=self.grasp_description.vertical_alignment,
             end_effector=self.grasp_description.end_effector,
@@ -180,8 +181,8 @@ class InsertMontessoriShapeAction(ActionDescription):
             )
         )
 
-        reach_query = underspecified(MoveToReach)(
-            target_pose_offset_robot=underspecified(Pose2D)(
+        reach_query = a(MoveToReach)(
+            target_pose_offset_robot=a(Pose2D)(
                 x=..., y=..., yaw=..., reference_frame=None
             ),
             hip_rotation=0.0,
@@ -225,14 +226,14 @@ class InsertMontessoriShapeAction(ActionDescription):
             [
                 ParkArmsAction(Arms.BOTH),
                 self._move_to_reach(self.montessori_shape.root, pickup_standoff_pose),
-                underspecified(PickUpAction)(
+                a(PickUpAction)(
                     object_designator=self.montessori_shape.root,
                     arm=self.arm,
                     grasp_description=self._grasp_description_query(),
                 ),
                 ParkArmsAction(Arms.BOTH),
                 self._move_to_reach(self.board.root, placement_standoff_pose),
-                underspecified(PlaceAction)(
+                a(PlaceAction)(
                     object_designator=self.montessori_shape.root,
                     target_location=target_location,
                     arm=self.arm,
@@ -243,10 +244,10 @@ class InsertMontessoriShapeAction(ActionDescription):
 
     def has_fallen_through_hole(self) -> bool:
         """
-        Whether :attr:`montessori_shape` currently rests below the board's top
-        surface, directly beneath its matching hole, i.e. has actually fallen
-        through that hole rather than still resting on top of the board or having
-        never been moved there at all.
+        Whether :attr:`montessori_shape` currently rests below the board's top surface,
+        directly beneath its matching hole, i.e. has actually fallen through that hole
+        rather than still resting on top of the board or having never been moved there
+        at all.
 
         :attr:`_action_plan` only ever kinematically teleports the shape to its
         target pose via
