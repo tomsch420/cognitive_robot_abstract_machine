@@ -21,9 +21,9 @@ class FeatureFunctionMonitor(MotionStatechartNode):
     root_link: Body = field(kw_only=True)
     """Link the reference feature is attached to."""
     reference_feature: Point3 | Vector3 = field(init=False)
-    """Reference feature, expressed in the root link frame after :meth:`build`."""
+    """Reference feature, typically the target for `controlled_feature`."""
     controlled_feature: Point3 | Vector3 = field(init=False)
-    """Controlled feature, expressed in the root link frame after :meth:`build`."""
+    """Controlled feature, typically moved towards `reference_feature`."""
 
     def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         """

@@ -127,7 +127,9 @@ class AlignPerpendicular(FeatureFunctionGoal):
     """
     The reference normal vector to align against, defined in the root link frame.
     """
-    weight: float = field(default=DefaultWeights.WEIGHT_BELOW_CA, kw_only=True)
+    weight: float = field(
+        default=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE, kw_only=True
+    )
     """
     Priority weight for the alignment constraint in the optimization problem.
     """
@@ -183,7 +185,9 @@ class HeightGoal(FeatureFunctionGoal):
     """
     Upper limit to control the distance away from the `reference_point`.
     """
-    weight: float = field(default=DefaultWeights.WEIGHT_BELOW_CA, kw_only=True)
+    weight: float = field(
+        default=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE, kw_only=True
+    )
     """
     Priority weight for the height constraint in the optimization problem.
     """
@@ -242,7 +246,9 @@ class DistanceGoal(FeatureFunctionGoal):
     """
     Upper limit to control the distance away from the `reference_point`.
     """
-    weight: float = field(default=DefaultWeights.WEIGHT_BELOW_CA, kw_only=True)
+    weight: float = field(
+        default=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE, kw_only=True
+    )
     """
     Priority weight for the distance constraint in the optimization problem.
     """
@@ -312,7 +318,9 @@ class AngleGoal(FeatureFunctionGoal):
     """
     Upper limit to control the angle between the `tip_vector` and the `reference_vector`.
     """
-    weight: float = field(default=DefaultWeights.WEIGHT_BELOW_CA, kw_only=True)
+    weight: float = field(
+        default=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE, kw_only=True
+    )
     """
     Priority weight for the angle constraint in the optimization problem.
     """

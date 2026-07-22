@@ -36,7 +36,9 @@ class JointPositionList(Task):
     state is true.
     """
 
-    weight: float = field(default=DefaultWeights.WEIGHT_BELOW_CA, kw_only=True)
+    weight: float = field(
+        default=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE, kw_only=True
+    )
     """
     The weight of this task.
     """

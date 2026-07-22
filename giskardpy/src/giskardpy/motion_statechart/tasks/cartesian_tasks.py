@@ -139,7 +139,7 @@ class CartesianPosition(CartesianTask):
     threshold: float = field(default=0.01, kw_only=True)
     """Distance threshold for goal achievement in meters."""
 
-    reference_velocity: float | None = field(
+    reference_velocity: float = field(
         default_factory=lambda: CartesianPosition.default_reference_velocity,
         kw_only=True,
     )
@@ -500,7 +500,8 @@ class CartesianPositionStraight(CartesianTask):
                 name=name,
                 reference_velocity=self.reference_velocity,
                 equality_bound=bound,
-                quadratic_weight=DefaultWeights.WEIGHT_ABOVE_CA * weight_mult,
+                quadratic_weight=DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE
+                * weight_mult,
                 task_expression=expr_p[i],
             )
 
@@ -698,7 +699,9 @@ class CartesianPositionVelocityLimit(Task):
     Default: 0.1 m/s. The enforcement ensures the Euclidean norm of the
     tip-frame translational velocity does not exceed this value.
     """
-    weight: float = field(default=DefaultWeights.WEIGHT_ABOVE_CA, kw_only=True)
+    weight: float = field(
+        default=DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE, kw_only=True
+    )
     """
     Optimization weight determining how strongly the linear velocity
     limit is enforced. Higher weights give this constraint soft priority
@@ -754,7 +757,9 @@ class CartesianRotationVelocityLimit(Task):
     """Maximum allowed angular speed. Interpreted in radians per second (rad/s).
     The enforcement ensures the magnitude of the instantaneous
     rotation rate does not exceed this threshold."""
-    weight: float = field(default=DefaultWeights.WEIGHT_ABOVE_CA, kw_only=True)
+    weight: float = field(
+        default=DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE, kw_only=True
+    )
     """Optimization weight determining how strongly the rotational velocity
     limit is enforced. Higher weights give this constraint soft priority
     over lower weighted constraints when conflicts occur."""
@@ -810,7 +815,9 @@ class CartesianVelocityLimit(Parallel):
     """Maximum allowed angular speed. Interpreted in radians per second (rad/s).
     Default: 0.5 rad/s. The enforcement ensures the magnitude of the instantaneous
     rotation rate does not exceed this threshold."""
-    weight: float = field(default=DefaultWeights.WEIGHT_ABOVE_CA, kw_only=True)
+    weight: float = field(
+        default=DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE, kw_only=True
+    )
     """Optimization weight determining how strongly both velocity
     limits are enforced. Higher weights give these constraints soft priority
     over lower weighted constraints when conflicts occur."""

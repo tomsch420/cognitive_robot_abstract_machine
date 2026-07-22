@@ -168,7 +168,7 @@ class MoveToolCenterPointMotion(BaseMotion):
                 tip_link=tip,
                 goal_point=self.target.to_position(),
                 name="MoveTCP",
-                weight=DefaultWeights.WEIGHT_BELOW_CA,
+                weight=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE,
             )
         else:
             task = CartesianPose(
@@ -176,7 +176,7 @@ class MoveToolCenterPointMotion(BaseMotion):
                 tip_link=tip,
                 goal_pose=self.target,
                 name="MoveTCP",
-                weight=DefaultWeights.WEIGHT_BELOW_CA,
+                weight=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE,
             )
         return task
 

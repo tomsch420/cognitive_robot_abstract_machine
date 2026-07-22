@@ -63,7 +63,9 @@ class GraspBar(Task):
     Reference angular velocity for normalization in rad/s.
     """
 
-    weight: float = field(default=DefaultWeights.WEIGHT_ABOVE_CA, kw_only=True)
+    weight: float = field(
+        default=DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE, kw_only=True
+    )
     """
     Priority weight relative to other tasks.
     """

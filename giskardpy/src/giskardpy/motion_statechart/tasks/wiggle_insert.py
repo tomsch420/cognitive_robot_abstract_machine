@@ -24,62 +24,141 @@ from semantic_digital_twin.world_description.world_entity import Body
 @dataclass(eq=False, repr=False)
 class WiggleInsert(Task):
     """
-    Presses the tip link down towards a hole while wiggling it with random translational and
-    angular noise. The wiggle is driven per control cycle through auxiliary variables that are
-    updated in :meth:`on_tick`.
+    Presses the tip link down towards a hole while wiggling it with random translational
+    and angular noise.
+
+    The wiggle is driven per control cycle through auxiliary variables that are updated
+    in :meth:`on_tick`.
     """
 
     root_link: Body = field(kw_only=True)
-    """Root link of the kinematic chain."""
+    """
+    Root link of the kinematic chain.
+    """
+
     tip_link: Body = field(kw_only=True)
-    """Tip link that is pressed into the hole."""
+    """
+    Tip link that is pressed into the hole.
+    """
+
     hole_point: Point3 = field(kw_only=True)
-    """Center point of the hole."""
+    """
+    Center point of the hole.
+    """
+
     noise_translation: float = field(kw_only=True, default=0.5)
-    """Strength of the translational wiggle. Default is an untuned preset, not a calibrated value."""
+    """
+    Strength of the translational wiggle.
+
+    Default is an untuned preset, not a calibrated value.
+    """
+
     noise_angle: float = field(kw_only=True, default=10)
-    """Strength of the angular wiggle. Default is an untuned preset, not a calibrated value."""
+    """
+    Strength of the angular wiggle.
+
+    Default is an untuned preset, not a calibrated value.
+    """
+
     down_velocity: float = field(kw_only=True, default=0.2)
-    """Reference velocity for pressing down in m/s. Default is an untuned preset, not a calibrated value."""
+    """
+    Reference velocity for pressing down in m/s.
+
+    Default is an untuned preset, not a calibrated value.
+    """
+
     hole_normal: Optional[Vector3] = field(default=None, kw_only=True)
-    """Vector perpendicular to the hole. Defaults to the root z-axis."""
+    """
+    Vector perpendicular to the hole.
+
+    Defaults to the root z-axis.
+    """
+
     threshold: float = field(default=0.01, kw_only=True)
-    """Distance to the hole point below which the task is achieved."""
+    """
+    Distance to the hole point below which the task is achieved.
+    """
+
     random_walk: bool = field(default=True, kw_only=True)
-    """If ``True`` a random walk is used, otherwise an uncorrelated random sample."""
+    """
+    If ``True`` a random walk is used, otherwise an uncorrelated random sample.
+    """
+
     vector_momentum_factor: float = field(default=0.9, kw_only=True)
-    """Influence of the previous translational momentum during a random walk."""
+    """
+    Influence of the previous translational momentum during a random walk.
+    """
+
     angular_momentum_factor: float = field(default=0.9, kw_only=True)
-    """Influence of the previous angular momentum during a random walk."""
+    """
+    Influence of the previous angular momentum during a random walk.
+    """
+
     center_pull_strength_angle: float = field(default=0.1, kw_only=True)
-    """Pull back towards the starting angle during a random walk."""
+    """
+    Pull back towards the starting angle during a random walk.
+    """
+
     center_pull_strength_vector: float = field(default=0.25, kw_only=True)
-    """Pull back towards the hole point during a random walk."""
-    weight: float = field(default=DefaultWeights.WEIGHT_ABOVE_CA, kw_only=True)
-    """Priority weight relative to other tasks."""
+    """
+    Pull back towards the hole point during a random walk.
+    """
+
+    weight: float = field(
+        default=DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE, kw_only=True
+    )
+    """
+    Priority weight relative to other tasks.
+    """
 
     _control_frequency: float = field(default=0.0, init=False, repr=False)
-    """Control frequency, used to scale the per-cycle noise."""
+    """
+    Control frequency, used to scale the per-cycle noise.
+    """
+
     _perpendicular_basis_first: np.ndarray = field(default=None, init=False, repr=False)
-    """First basis vector of the plane perpendicular to the hole normal."""
+    """
+    First basis vector of the plane perpendicular to the hole normal.
+    """
+
     _perpendicular_basis_second: np.ndarray = field(
         default=None, init=False, repr=False
     )
-    """Second basis vector of the plane perpendicular to the hole normal."""
+    """
+    Second basis vector of the plane perpendicular to the hole normal.
+    """
+
     _current_angle: float = field(default=0.0, init=False, repr=False)
-    """Current accumulated wiggle angle."""
+    """
+    Current accumulated wiggle angle.
+    """
+
     _angular_momentum: float = field(default=0.0, init=False, repr=False)
-    """Current angular momentum of the random walk."""
+    """
+    Current angular momentum of the random walk.
+    """
+
     _current_vector: np.ndarray = field(default=None, init=False, repr=False)
-    """Current accumulated wiggle translation."""
+    """
+    Current accumulated wiggle translation.
+    """
+
     _vector_momentum: np.ndarray = field(default=None, init=False, repr=False)
-    """Current translational momentum of the random walk."""
+    """
+    Current translational momentum of the random walk.
+    """
+
     _random_translation: Vector3 = field(default=None, init=False, repr=False)
-    """Auxiliary variable holding the current translational noise in the root frame."""
+    """
+    Auxiliary variable holding the current translational noise in the root frame.
+    """
+
     _random_angle: symbolic_math.FloatVariable = field(
         default=None, init=False, repr=False
     )
-    """Auxiliary variable holding the current angular noise."""
+    """
+    Auxiliary variable holding the current angular noise.
+    """
 
     def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         artifacts = NodeArtifacts()
@@ -186,8 +265,8 @@ class WiggleInsert(Task):
 
     def _random_walk_angle(self) -> float:
         """
-        Advance the angular random walk by one control cycle, blending in new random change,
-        applying momentum, and pulling back towards the starting angle.
+        Advance the angular random walk by one control cycle, blending in new random
+        change, applying momentum, and pulling back towards the starting angle.
 
         :return: The updated accumulated angle.
         """
@@ -207,7 +286,8 @@ class WiggleInsert(Task):
 
     def _random_sample_translation(self) -> np.ndarray:
         """
-        Draw an uncorrelated random translational offset within the plane perpendicular to the hole normal.
+        Draw an uncorrelated random translational offset within the plane perpendicular
+        to the hole normal.
 
         :return: The sampled translation vector.
         """
@@ -223,8 +303,8 @@ class WiggleInsert(Task):
 
     def _random_walk_translation(self) -> np.ndarray:
         """
-        Advance the translational random walk by one control cycle, blending in new random change,
-        applying momentum, and pulling back towards the hole center.
+        Advance the translational random walk by one control cycle, blending in new
+        random change, applying momentum, and pulling back towards the hole center.
 
         :return: The updated accumulated translation vector.
         """

@@ -71,8 +71,9 @@ def test_wiggle_insert_reaches_hole(pr2_world_state_reset: World, rclpy_node):
 
 def test_wiggle_insert_basis_uses_root_frame_hole_normal(pr2_world_state_reset: World):
     """
-    The wiggle basis vectors must be perpendicular to hole_normal as expressed in root_link,
-    since the wiggle noise they span is added to a root_link-frame point (root_P_hole).
+    The wiggle basis vectors must be perpendicular to hole_normal as expressed in
+    root_link, since the wiggle noise they span is added to a root_link-frame point
+    (root_P_hole).
     """
     tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
         "r_gripper_tool_frame"
@@ -172,7 +173,7 @@ def test_wiggle_insert(hsr_world_state_reset):
                             root_link=root_link,
                             tip_link=hpl,
                             hole_point=hole_point,
-                            weight=DefaultWeights.WEIGHT_BELOW_CA,
+                            weight=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE,
                         ),
                         barrier := Parallel(
                             [
@@ -183,7 +184,7 @@ def test_wiggle_insert(hsr_world_state_reset):
                                     goal_point=Point3(
                                         x=0.5, z=0.4, reference_frame=root_link
                                     ),
-                                    weight=DefaultWeights.WEIGHT_ABOVE_CA,
+                                    weight=DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE,
                                 ),
                             ],
                         ),

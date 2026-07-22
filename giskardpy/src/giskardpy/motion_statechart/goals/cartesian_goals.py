@@ -47,7 +47,9 @@ class DifferentialDriveBaseGoal(Sequence):
     Pose to reach.
     """
 
-    weight: float = field(default=DefaultWeights.WEIGHT_ABOVE_CA, kw_only=True)
+    weight: float = field(
+        default=DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE, kw_only=True
+    )
     """
     Task priority relative to other tasks.
     """
@@ -140,7 +142,7 @@ class CartesianPoseStraight(Parallel):
     The goal pose.
     """
 
-    weight: float = DefaultWeights.WEIGHT_ABOVE_CA
+    weight: float = DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE
     """
     Task priority relative to other tasks.
     """
