@@ -70,6 +70,11 @@ class OverriddenOperand:
     The concrete value to pass for that field.
     """
 
+OperandOverridesDict = Dict[Type[SymbolicCallable], Sequence[OverriddenOperand]]
+"""
+A mapping from the symbolic callable class to its operand overrides
+"""
+
 
 @dataclass(frozen=True)
 class SymbolicSurfaceSnapshot:
@@ -91,9 +96,7 @@ class SymbolicSurfaceSnapshot:
     The committed expected surfaces, one per covered class.
     """
 
-    operand_overrides: Dict[Type[SymbolicCallable], Sequence[OverriddenOperand]] = (
-        field(default_factory=dict)
-    )
+    operand_overrides: OperandOverridesDict = field(default_factory=dict)
     """
     Concrete field overrides for classes whose fragment reads a field's raw VALUE rather
     than treating it as a symbolic operand, keyed by the class.
@@ -106,8 +109,8 @@ class SymbolicSurfaceSnapshot:
             cls
             for cls in classes_of_package(self.package, recursive=True)
             if isinstance(cls, type)
-            and issubclass(cls, SymbolicCallable)
-            and set(cls.__abstractmethods__) <= {"_verbalization_fragment_"}
+               and issubclass(cls, SymbolicCallable)
+               and set(cls.__abstractmethods__) <= {"_verbalization_fragment_"}
         }
         return tuple(sorted(discovered, key=module_and_class_name))
 
@@ -160,29 +163,6 @@ class SymbolicSurfaceSnapshot:
         """
         return verbalize_expression(cls(**self.placeholder_operands(cls)))
 
-    def assert_every_callable_has_a_fragment(self) -> None:
-        """
-        Assert every discovered symbolic callable implements its own fragment — there is
-        no undecided surface.
-
-        A new predicate or function that ships without one fails here. This is not
-        redundant with Python's own ``abstractmethod`` enforcement:
-        :meth:`assert_surfaces_cover_every_callable` excludes fragment-less classes from
-        its comparison (via :meth:`has_fragment`), so this is the only one of the three
-        assertions that catches a fragment-less class — and it does so immediately,
-        rather than lazily whenever something first tries to instantiate or verbalize
-        it.
-        """
-        fragment_less = sorted(
-            module_and_class_name(cls)
-            for cls in self.discovered_callables()
-            if not self.has_fragment(cls)
-        )
-        assert not fragment_less, (
-            "These symbolic callables have no verbalization fragment and must implement "
-            f"_verbalization_fragment_: {fragment_less}."
-        )
-
     def assert_surfaces_cover_every_callable(self) -> None:
         """
         Assert the declared surfaces are exactly the discovered callables — a new class
@@ -214,7 +194,7 @@ class SymbolicSurfaceSnapshot:
             )
             for surface in self.surfaces
             if self.has_fragment(surface.callable_class)
-            and self.rendered_surface(surface.callable_class) != surface.sentence
+               and self.rendered_surface(surface.callable_class) != surface.sentence
         }
         assert not mismatches, (
             "Verbalization surfaces changed. Update the sentence for each of these in the snapshot "

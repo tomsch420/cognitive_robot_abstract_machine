@@ -28,7 +28,7 @@ from krrood.entity_query_language.verbalization.example_domain import (
     IsReachable,
     WorksIn,
 )
-from krrood.entity_query_language.verbalization.surface_verification import (
+from krrood.entity_query_language.testing.surface_verification import (
     VerbalizationSurface,
 )
 from krrood.inheritance_path_length import InheritancePathLength
