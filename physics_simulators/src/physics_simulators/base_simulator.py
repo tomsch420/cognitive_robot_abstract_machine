@@ -211,6 +211,19 @@ class BaseSimulator:
     Render thread, run render() method in this thread.
     """
 
+    _data_read_hooks: List[Callable[[], None]] = field(
+        init=False, default_factory=list, repr=False
+    )
+    """
+    Hooks invoked by :meth:`read_data_from_simulator`, in registration order.
+
+    Populated by synchronizers (see
+    :class:`semantic_digital_twin.adapters.multi_sim.MultiSimSynchronizer`) that need to
+    pull simulator state after every step. Using a list of hooks rather than overwriting
+    :meth:`read_data_from_simulator` lets more than one synchronizer attach to the same
+    simulator without one silently overwriting another's hook.
+    """
+
     class_level_callbacks: ClassVar[List[SimulatorCallback]] = []
     """
     Class level callback functions.
@@ -379,8 +392,11 @@ class BaseSimulator:
     def read_data_from_simulator(self):
         """
         Read data from the simulator.
+
+        Calls every hook in :attr:`_data_read_hooks`, in registration order.
         """
-        pass
+        for hook in list(self._data_read_hooks):
+            hook()
 
     def stop(self):
         """

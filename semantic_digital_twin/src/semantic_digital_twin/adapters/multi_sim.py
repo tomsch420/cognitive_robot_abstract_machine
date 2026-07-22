@@ -5,6 +5,7 @@ import inspect
 import hashlib
 import os
 from typing import Tuple
+from uuid import UUID
 
 import time
 import trimesh
@@ -35,6 +36,7 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import (
     QuaternionConversionError,
     MujocoEntityNotFoundError,
+    UnsupportedConnection6DoFParentError,
 )
 from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
@@ -2794,6 +2796,18 @@ class MultiSimSynchronizer(ModelChangeCallback, ABC):
         """
         raise NotImplementedError
 
+    def resync_from_simulator(self) -> None:
+        """
+        Force an immediate, unthrottled pull of the simulator's current state into
+        ``world.state``.
+
+        Called after :meth:`physics_simulators.base_simulator.BaseSimulator.reset`, since
+        a reset changes the simulator's state without going through the normal step loop
+        that the *sim → world* direction is otherwise driven by. Subclasses that support
+        that direction should override this; the default is a no-op.
+        """
+        pass
+
 
 @dataclass(eq=False)
 class MujocoSynchronizer(MultiSimSynchronizer):
@@ -2828,22 +2842,88 @@ class MujocoSynchronizer(MultiSimSynchronizer):
 
     _last_sync_time: float = field(init=False, default=0.0, repr=False)
 
+    _previous_dof_positions: Dict[UUID, float] = field(
+        init=False, default_factory=dict, repr=False
+    )
+    """
+    Last known-synced position of every dof this synchronizer has pushed or pulled, by
+    dof id.
+
+    Keyed by dof id rather than a positional snapshot of ``world.state.positions``, so
+    that adding/removing dofs elsewhere (which shifts ``world.state``'s column order)
+    can never cause one dof's stale value to be compared against a different, unrelated
+    dof. Updated only for the dofs actually touched by a given sync call, so a dof
+    changed concurrently by another thread while this synchronizer is mid-sync is never
+    mistaken for already-synced.
+    """
+
+    _qpos_adr_cache: Dict[str, int] = field(
+        init=False, default_factory=dict, repr=False
+    )
+    """
+    Cache of resolved qpos addresses, by connection joint name.
+
+    Cleared on every model change, since recompiling the MuJoCo model (e.g. via
+    attach/detach) can shift every joint's qpos address.
+    """
+
     def __post_init__(self):
         super().__post_init__()
-        self.simulator.read_data_from_simulator = self._sim_to_world
+        self.simulator._data_read_hooks.append(self._sim_to_world)
+
+    def on_model_change(self, **kwargs):
+        self._qpos_adr_cache.clear()
+        super().on_model_change(**kwargs)
+
+    def _dof_ids_for(self, connection: Connection) -> List[UUID]:
+        """
+        Return the world-state dof ids backing ``connection``, in a fixed order used
+        consistently by both sync directions.
+        """
+        if isinstance(connection, Connection6DoF):
+            return [
+                connection.x.id,
+                connection.y.id,
+                connection.z.id,
+                connection.qx.id,
+                connection.qy.id,
+                connection.qz.id,
+                connection.qw.id,
+            ]
+        return [connection.raw_dof.id]
 
     def _resolve_qpos_adr(self, connection: Connection) -> Optional[int]:
         """
         Resolve the qpos address for the MuJoCo joint backing ``connection``,
         or ``None`` if the joint is not present in the model.
         """
+        joint_name = connection.name.name
+        cached_qpos_adr = self._qpos_adr_cache.get(joint_name)
+        if cached_qpos_adr is not None:
+            return cached_qpos_adr
         mj_model = self.simulator._mj_model
-        joint_id = mujoco.mj_name2id(
-            mj_model, mujoco.mjtObj.mjOBJ_JOINT, connection.name.name
-        )
+        joint_id = mujoco.mj_name2id(mj_model, mujoco.mjtObj.mjOBJ_JOINT, joint_name)
         if joint_id == -1:
             return None
-        return mj_model.jnt_qposadr[joint_id]
+        qpos_adr = mj_model.jnt_qposadr[joint_id]
+        self._qpos_adr_cache[joint_name] = qpos_adr
+        return qpos_adr
+
+    def _assert_connection6dof_parent_is_world_root(
+        self, connection: Connection6DoF
+    ) -> None:
+        """
+        Guard the assumption behind :meth:`_read_6dof_from_qpos`/:meth:`_write_6dof_to_qpos`:
+        MuJoCo always expresses a free joint's qpos in the world frame, so treating it as
+        ``world_T_child`` and combining it with ``parent_T_connection_expression`` alone
+        (without also folding in the parent's own pose) is only correct when
+        ``connection``'s parent *is* the world root.
+        """
+        if connection.parent is not self._world.root:
+            raise UnsupportedConnection6DoFParentError(
+                connection_name=connection.name.name,
+                parent_name=connection.parent.name.name,
+            )
 
     @staticmethod
     def _make_pose_matrix(
@@ -2874,18 +2954,23 @@ class MujocoSynchronizer(MultiSimSynchronizer):
         Copy a 6DoF MuJoCo free-joint qpos block into ``world.state`` for
         ``connection``.
         """
+        self._assert_connection6dof_parent_is_world_root(connection)
         mj_data = self.simulator._mj_data
         state = self._world.state
 
         xyz = mj_data.qpos[qpos_adr : qpos_adr + 3]
         qwxyz = mj_data.qpos[qpos_adr + 3 : qpos_adr + 7]
 
-        mj_T_world = self._make_pose_matrix(
+        # MuJoCo always expresses a free joint's qpos in the world frame, so this is
+        # world_T_child regardless of where connection.parent sits in the twin's tree
+        # (see _assert_connection6dof_parent_is_world_root for why we require it to be
+        # the world root here).
+        world_T_child = self._make_pose_matrix(
             xyz,
             Rotation.from_quat(qwxyz.tolist(), scalar_first=True).as_matrix(),
         )
         parent_T_conn = connection.parent_T_connection_expression.to_np()
-        conn_T_child = inverse_frame(parent_T_conn) @ mj_T_world
+        conn_T_child = inverse_frame(parent_T_conn) @ world_T_child
         dof_xyz, dof_quat_xyzw = self._decompose_pose_matrix(conn_T_child)
 
         state[connection.x.id].position = float(dof_xyz[0])
@@ -2906,87 +2991,98 @@ class MujocoSynchronizer(MultiSimSynchronizer):
             self.simulator._mj_data.qpos[qpos_adr]
         )
 
-    def _sim_to_world(self) -> None:
+    def _sim_to_world(self, force: bool = False) -> None:
         """
         Copy ``_mj_data.qpos`` back into ``world.state``.
 
         Called by :meth:`physics_simulators.base_simulator.BaseSimulator.step`
         on the physics thread after every ``mj_step``. Throttled to
-        ``sync_rate_hz`` wall-clock Hz. The sibling state-change callback is
-        paused across the write so our own ``notify_state_change`` does not
-        echo back into :meth:`_on_state_change`.
+        ``sync_rate_hz`` wall-clock Hz, unless ``force`` is set (used by
+        :meth:`resync_from_simulator` to bypass the throttle window after a reset). The
+        sibling state-change callback is paused across the write so our own
+        ``notify_state_change`` does not echo back into :meth:`_on_state_change`.
+
+        Access to ``_mj_model``/``_mj_data`` is guarded by the simulator's
+        ``_model_lock`` so this can never overlap with an in-flight ``mj_step`` or model
+        recompile on another thread.
         """
         if self.sync_rate_hz <= 0:
             return
         now = time.time()
-        if now - self._last_sync_time < 1.0 / self.sync_rate_hz:
+        if not force and now - self._last_sync_time < 1.0 / self.sync_rate_hz:
             return
         self._last_sync_time = now
 
-        changed = False
         self._state_callback.pause()
+        changed_dof_positions: Dict[UUID, float] = {}
 
-        for connection in self._world.connections:
-            if isinstance(connection, FixedConnection):
-                continue
-            qpos_adr = self._resolve_qpos_adr(connection)
-            if qpos_adr is None:
-                continue
+        with self.simulator._model_lock:
+            for connection in self._world.connections:
+                if isinstance(connection, FixedConnection):
+                    continue
+                qpos_adr = self._resolve_qpos_adr(connection)
+                if qpos_adr is None:
+                    logger.warning(
+                        "sim→world sync: no MuJoCo joint found for connection "
+                        "%s; skipping",
+                        connection.name.name,
+                    )
+                    continue
 
-            if isinstance(connection, Connection6DoF):
-                self._read_6dof_from_qpos(connection, qpos_adr)
-                changed = True
-            elif isinstance(connection, ActiveConnection1DOF):
-                self._read_1dof_from_qpos(connection, qpos_adr)
-                changed = True
-            else:
-                logger.warning(
-                    "sim→world sync: unsupported connection type %s for "
-                    "joint %s; skipping",
-                    type(connection).__name__,
-                    connection.name.name,
-                )
+                if isinstance(connection, Connection6DoF):
+                    self._read_6dof_from_qpos(connection, qpos_adr)
+                elif isinstance(connection, ActiveConnection1DOF):
+                    self._read_1dof_from_qpos(connection, qpos_adr)
+                else:
+                    logger.warning(
+                        "sim→world sync: unsupported connection type %s for "
+                        "joint %s; skipping",
+                        type(connection).__name__,
+                        connection.name.name,
+                    )
+                    continue
 
-        if changed:
+                for dof_id in self._dof_ids_for(connection):
+                    new_value = self._world.state[dof_id].position
+                    if not numpy.isclose(
+                        new_value,
+                        self._previous_dof_positions.get(dof_id, numpy.nan),
+                        atol=1e-4,
+                        rtol=1e-4,
+                    ):
+                        changed_dof_positions[dof_id] = new_value
+
+        if changed_dof_positions:
+            self._previous_dof_positions.update(changed_dof_positions)
             self._world.notify_state_change()
             self._state_callback.update_previous_world_state()
         self._state_callback.resume()
 
-    def _write_6dof_to_qpos(
-        self,
-        connection: Connection6DoF,
-        qpos_adr: int,
-        positions: numpy.ndarray,
-        previous_positions: numpy.ndarray,
-        state_index: Dict[Any, int],
-    ) -> None:
+    def _write_6dof_to_qpos(self, connection: Connection6DoF, qpos_adr: int) -> bool:
         """
-        Push the 6DoF world state for ``connection`` into the MuJoCo qpos
-        block at ``qpos_adr``. No-op if the DoF values match the previous
-        snapshot within tolerance.
+        Push the 6DoF world state for ``connection`` into the MuJoCo qpos block at
+        ``qpos_adr``.
+
+        No-op if the dof values match :attr:`_previous_dof_positions` within tolerance.
+
+        :return: True if the qpos block was written.
         """
-        ix = state_index[connection.x.id]
-        iy = state_index[connection.y.id]
-        iz = state_index[connection.z.id]
-        iqx = state_index[connection.qx.id]
-        iqy = state_index[connection.qy.id]
-        iqz = state_index[connection.qz.id]
-        iqw = state_index[connection.qw.id]
+        self._assert_connection6dof_parent_is_world_root(connection)
+        dof_ids = self._dof_ids_for(connection)
+        state = self._world.state
+        current = {dof_id: state[dof_id].position for dof_id in dof_ids}
 
-        dof_indices = [ix, iy, iz, iqx, iqy, iqz, iqw]
-        if numpy.allclose(
-            positions[dof_indices],
-            previous_positions[dof_indices],
-            atol=1e-4,
-            rtol=1e-4,
-        ):
-            return
+        current_arr = numpy.array([current[dof_id] for dof_id in dof_ids])
+        previous_arr = numpy.array(
+            [self._previous_dof_positions.get(dof_id, numpy.nan) for dof_id in dof_ids]
+        )
+        if numpy.allclose(current_arr, previous_arr, atol=1e-4, rtol=1e-4):
+            return False
 
+        x, y, z, qx, qy, qz, qw = (current[dof_id] for dof_id in dof_ids)
         conn_T_child = self._make_pose_matrix(
-            numpy.array([positions[ix], positions[iy], positions[iz]]),
-            Rotation.from_quat(
-                [positions[iqx], positions[iqy], positions[iqz], positions[iqw]]
-            ).as_matrix(),
+            numpy.array([x, y, z]),
+            Rotation.from_quat([qx, qy, qz, qw]).as_matrix(),
         )
         parent_T_conn = connection.parent_T_connection_expression.to_np()
         mj_xyz, mj_quat_xyzw = self._decompose_pose_matrix(parent_T_conn @ conn_T_child)
@@ -2999,78 +3095,84 @@ class MujocoSynchronizer(MultiSimSynchronizer):
         mj_data.qpos[qpos_adr + 4] = mj_quat_xyzw[0]
         mj_data.qpos[qpos_adr + 5] = mj_quat_xyzw[1]
         mj_data.qpos[qpos_adr + 6] = mj_quat_xyzw[2]
+        return True
 
     def _write_1dof_to_qpos(
-        self,
-        connection: ActiveConnection1DOF,
-        qpos_adr: int,
-        positions: numpy.ndarray,
-        previous_positions: numpy.ndarray,
-        state_index: Dict[Any, int],
-    ) -> None:
+        self, connection: ActiveConnection1DOF, qpos_adr: int
+    ) -> bool:
         """
-        Push the 1DoF world state for ``connection`` into the MuJoCo qpos slot
-        at ``qpos_adr``. No-op if the DoF value is unchanged.
+        Push the 1DoF world state for ``connection`` into the MuJoCo qpos slot at
+        ``qpos_adr``.
+
+        No-op if the dof value matches :attr:`_previous_dof_positions`.
+
+        :return: True if the qpos slot was written.
         """
-        idx = state_index[connection.raw_dof.id]
-        if positions[idx] == previous_positions[idx]:
-            return
-        self.simulator._mj_data.qpos[qpos_adr] = positions[idx]
+        dof_id = connection.raw_dof.id
+        current = self._world.state[dof_id].position
+        if dof_id in self._previous_dof_positions and (
+            current == self._previous_dof_positions[dof_id]
+        ):
+            return False
+        self.simulator._mj_data.qpos[qpos_adr] = current
+        return True
 
     def _on_state_change(self) -> None:
         """
         Push ``world.state`` into ``_mj_data.qpos`` for every connection whose
-        DoF values changed since the last notification. Only non-fixed
-        connections that resolve to a MuJoCo joint are pushed.
+        dof values changed since the last sync. Only non-fixed connections that
+        resolve to a MuJoCo joint are pushed.
+
+        Access to ``_mj_model``/``_mj_data`` is guarded by the simulator's
+        ``_model_lock`` so this can never overlap with an in-flight ``mj_step`` or model
+        recompile on another thread.
         """
-        positions = self._world.state.positions
-        previous_positions = self._state_callback.previous_world_state_data
+        changed_dof_positions: Dict[UUID, float] = {}
 
-        if len(positions) != len(previous_positions):
-            # Model shape changed since the last notification (e.g. a spawn
-            # just added DoFs). The spawner already wrote the initial qpos
-            # for the new entities; just rebase the diff and return.
-            self._state_callback.update_previous_world_state()
-            return
+        with self.simulator._model_lock:
+            for connection in self._world.connections:
+                if isinstance(connection, FixedConnection):
+                    continue
+                qpos_adr = self._resolve_qpos_adr(connection)
+                if qpos_adr is None:
+                    logger.warning(
+                        "world→sim sync: no MuJoCo joint found for connection "
+                        "%s; skipping",
+                        connection.name.name,
+                    )
+                    continue
 
-        state_index = self._world.state._index
+                if isinstance(connection, Connection6DoF):
+                    written = self._write_6dof_to_qpos(connection, qpos_adr)
+                elif isinstance(connection, ActiveConnection1DOF):
+                    written = self._write_1dof_to_qpos(connection, qpos_adr)
+                else:
+                    logger.warning(
+                        "world→sim sync: unsupported connection type %s for "
+                        "joint %s; skipping",
+                        type(connection).__name__,
+                        connection.name.name,
+                    )
+                    continue
 
-        for connection in self._world.connections:
-            if isinstance(connection, FixedConnection):
-                continue
-            qpos_adr = self._resolve_qpos_adr(connection)
-            if qpos_adr is None:
-                continue
+                if written:
+                    state = self._world.state
+                    changed_dof_positions.update(
+                        {
+                            dof_id: state[dof_id].position
+                            for dof_id in self._dof_ids_for(connection)
+                        }
+                    )
 
-            if isinstance(connection, Connection6DoF):
-                self._write_6dof_to_qpos(
-                    connection,
-                    qpos_adr,
-                    positions,
-                    previous_positions,
-                    state_index,
-                )
-            elif isinstance(connection, ActiveConnection1DOF):
-                self._write_1dof_to_qpos(
-                    connection,
-                    qpos_adr,
-                    positions,
-                    previous_positions,
-                    state_index,
-                )
-            else:
-                logger.warning(
-                    "world→sim sync: unsupported connection type %s for "
-                    "joint %s; skipping",
-                    type(connection).__name__,
-                    connection.name.name,
-                )
-
+        self._previous_dof_positions.update(changed_dof_positions)
         self._state_callback.update_previous_world_state()
 
+    def resync_from_simulator(self) -> None:
+        self._sim_to_world(force=True)
+
     def stop(self):
-        if "read_data_from_simulator" in self.simulator.__dict__:
-            del self.simulator.read_data_from_simulator
+        if self._sim_to_world in self.simulator._data_read_hooks:
+            self.simulator._data_read_hooks.remove(self._sim_to_world)
         super().stop()
 
 
@@ -3175,9 +3277,14 @@ class MultiSim(ABC):
 
     def reset_simulation(self):
         """
-        Resets the simulation. This will reset the physics simulation to the initial state.
+        Resets the simulation. This will reset the physics simulation to the initial
+        state, and immediately pulls that reset state back into ``world.state`` (a
+        reset does not go through the normal step loop that otherwise drives the
+        *sim → world* direction, so without this ``world.state`` would keep reflecting
+        the pre-reset simulation until the next step).
         """
         self.simulator.reset()
+        self.synchronizer.resync_from_simulator()
 
     def is_running(self):
         return self.simulator.state == SimulatorState.RUNNING

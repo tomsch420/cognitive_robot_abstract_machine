@@ -1,5 +1,6 @@
 import logging
 import os
+import threading
 import time
 
 import mujoco
@@ -11,7 +12,10 @@ from scipy.spatial.transform import Rotation
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.exceptions import ParsingError
+from semantic_digital_twin.exceptions import (
+    ParsingError,
+    UnsupportedConnection6DoFParentError,
+)
 from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.robots.tracy import Tracy
 from semantic_digital_twin.spatial_types.spatial_types import (
@@ -46,6 +50,7 @@ from semantic_digital_twin.adapters.multi_sim import (
     MujocoActuator,
     MujocoBuilder,
     MujocoLight,
+    MujocoSynchronizer,
 )
 
 urdf_dir = os.path.join(
@@ -97,6 +102,67 @@ def stop_multisim_if_running(multi_sim: MujocoSim) -> None:
     if getattr(simulator, "state", None) is SimulatorState.STOPPED:
         return
     multi_sim.stop_simulation()
+
+
+def _spawn_revolute_joint(
+    world: World, joint_name: str, parent: Body = None
+) -> DegreeOfFreedom:
+    """
+    Adds a single-dof revolute joint, connected to ``parent`` (``world.root`` by
+    default), and returns its :class:`DegreeOfFreedom`. ``multi_sim`` must already be
+    built so ``world.root`` exists and the connection gets spawned into MuJoCo live.
+    """
+    body = Body(name=PrefixedName(f"{joint_name}_body"))
+    dof = DegreeOfFreedom(name=PrefixedName(joint_name))
+    with world.modify_world():
+        world.add_degree_of_freedom(dof)
+        world.add_connection(
+            RevoluteConnection(
+                name=dof.name,
+                parent=parent or world.root,
+                child=body,
+                axis=Vector3.Z(reference_frame=body),
+                raw_dof=dof,
+            )
+        )
+    return dof
+
+
+def _qpos_adr(multi_sim: MujocoSim, joint_name: str) -> int:
+    mj_model = multi_sim.simulator._mj_model
+    joint_id = mujoco.mj_name2id(mj_model, mujoco.mjtObj.mjOBJ_JOINT, joint_name)
+    assert joint_id != -1, f"joint {joint_name} not found in the compiled MuJoCo model"
+    return mj_model.jnt_qposadr[joint_id]
+
+
+class _RecordingLogHandler(logging.Handler):
+    """
+    Collects log records emitted by a specific named logger.
+
+    ``caplog`` relies on records propagating up to the root logger, but the
+    ``semantic_digital_twin``/``semantic_digital_twin.adapters.multi_sim`` loggers have
+    ``propagate=False`` in this environment (likely set up by the ROS/ament logging
+    integration pulled in transitively), so records never reach caplog's root-attached
+    handler. Attaching a handler directly to the target logger sidesteps that.
+    """
+
+    def __init__(self, logger_name: str, level=logging.WARNING):
+        super().__init__(level=level)
+        self.records: list = []
+        self._logger = logging.getLogger(logger_name)
+
+    def emit(self, record: logging.LogRecord) -> None:
+        self.records.append(record)
+
+    def __enter__(self) -> "_RecordingLogHandler":
+        self._logger.addHandler(self)
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        self._logger.removeHandler(self)
+
+    def has_message_containing(self, text: str) -> bool:
+        return any(text in record.getMessage() for record in self.records)
 
 
 @pytest.fixture
@@ -894,5 +960,329 @@ def test_world_sim_state_sync():
             f"Box did not settle at target: final_pos={final_pos}, "
             f"expected≈{target_pos}"
         )
+    finally:
+        stop_multisim_if_running(multi_sim)
+
+
+def test_reset_simulation_resyncs_world_state():
+    """
+    Regression test: MultiSim.reset_simulation used to only call simulator.reset()
+    without pulling the reset state back into world.state. The sim -> world direction
+    is otherwise driven only by the physics step loop, which a reset does not go
+    through, so world.state kept showing the pre-reset joint value until (if ever) the
+    simulation was stepped again.
+    """
+    world = World()
+    multi_sim = MujocoSim(world=world, headless=headless, step_size=STEP_SIZE)
+    try:
+        dof = _spawn_revolute_joint(world, "reset_test_joint")
+
+        world.state[dof.id].position = 1.2
+        world.notify_state_change()
+        assert multi_sim.simulator._mj_data.qpos[
+            _qpos_adr(multi_sim, "reset_test_joint")
+        ] == pytest.approx(1.2)
+
+        multi_sim.reset_simulation()
+
+        assert world.state[dof.id].position == pytest.approx(0.0)
+    finally:
+        stop_multisim_if_running(multi_sim)
+
+
+def test_sim_to_world_sync_does_not_drop_concurrent_edits_during_pause_window():
+    """
+    Regression test: MujocoSynchronizer._sim_to_world pauses its sibling state-change
+    callback, pulls qpos into world.state, then used to rebase the *entire*
+    previous-state snapshot to whatever world.state held at that moment - via
+    StateChangeCallback.update_previous_world_state(), a full positional copy of
+    world.state.positions - before resuming. A dof that a different thread edited
+    concurrently, while the callback happened to be paused, was swept up in that same
+    full rebase and looked "already synced", so the edit was silently never pushed to
+    MuJoCo and never retried.
+
+    joint_a is a real MuJoCo joint that _sim_to_world actually reads on every call, so
+    it always triggers the "something changed" rebase path. joint_b's own resolution
+    is monkeypatched away for the duration of the _sim_to_world call (simulating, e.g.,
+    a moment where a spawn is still in flight) so the loop never touches it, isolating
+    the edit made to it during the pause window from being simply overwritten by the
+    sim's own read of the same dof.
+    """
+    world = World()
+    multi_sim = MujocoSim(world=world, headless=headless, step_size=STEP_SIZE)
+    try:
+        _spawn_revolute_joint(world, "pause_window_joint_a")
+        dof_b = _spawn_revolute_joint(world, "pause_window_joint_b")
+        connection_b = next(
+            c for c in world.connections if getattr(c, "raw_dof", None) is dof_b
+        )
+
+        original_resolve_qpos_adr = multi_sim.synchronizer._resolve_qpos_adr
+        skip_joint_b = {"active": True}
+
+        def resolve_qpos_adr_hiding_b(connection):
+            if skip_joint_b["active"] and connection is connection_b:
+                return None
+            return original_resolve_qpos_adr(connection)
+
+        multi_sim.synchronizer._resolve_qpos_adr = resolve_qpos_adr_hiding_b
+
+        original_pause = multi_sim.synchronizer._state_callback.pause
+
+        def pause_and_make_concurrent_edit():
+            original_pause()
+            # simulates a different thread mutating world.state for joint_b while our
+            # callback is paused, without going through notify_state_change (which
+            # would be a no-op while paused anyway).
+            world.state[dof_b.id].position = 0.42
+
+        multi_sim.synchronizer._state_callback.pause = pause_and_make_concurrent_edit
+
+        multi_sim.synchronizer.sync_rate_hz = MujocoSynchronizer.UNTHROTTLED_SYNC_RATE_HZ
+        multi_sim.synchronizer._sim_to_world()
+
+        # joint_b is resolvable again, matching the spawn having finished; the edit
+        # made during the pause window must still be pending.
+        skip_joint_b["active"] = False
+        world.notify_state_change()
+
+        assert multi_sim.simulator._mj_data.qpos[
+            _qpos_adr(multi_sim, "pause_window_joint_b")
+        ] == pytest.approx(0.42)
+    finally:
+        stop_multisim_if_running(multi_sim)
+
+
+def test_world_to_sim_sync_holds_model_lock():
+    """
+    Regression test: MujocoSynchronizer._on_state_change used to write directly into
+    _mj_data.qpos without acquiring the simulator's _model_lock - the very lock
+    step_callback holds while running mj_step - so a state push from a user thread
+    could race a concurrently running physics step over the same qpos array. This
+    proves _on_state_change now blocks on that lock instead of writing straight
+    through it.
+    """
+    world = World()
+    multi_sim = MujocoSim(world=world, headless=headless, step_size=STEP_SIZE)
+    try:
+        dof = _spawn_revolute_joint(world, "lock_test_joint")
+
+        lock_acquired_by_holder = threading.Event()
+        release_lock = threading.Event()
+
+        def hold_lock():
+            with multi_sim.simulator._model_lock:
+                lock_acquired_by_holder.set()
+                release_lock.wait(timeout=5.0)
+
+        holder_thread = threading.Thread(target=hold_lock)
+        holder_thread.start()
+        assert lock_acquired_by_holder.wait(timeout=2.0)
+
+        state_change_finished = threading.Event()
+
+        def push_state_change():
+            world.state[dof.id].position = 0.9
+            world.notify_state_change()
+            state_change_finished.set()
+
+        pusher_thread = threading.Thread(target=push_state_change)
+        pusher_thread.start()
+
+        # the pusher should be blocked on _model_lock as long as hold_lock holds it
+        assert not state_change_finished.wait(timeout=0.5)
+
+        release_lock.set()
+        holder_thread.join(timeout=2.0)
+        assert state_change_finished.wait(timeout=2.0)
+        pusher_thread.join(timeout=2.0)
+    finally:
+        stop_multisim_if_running(multi_sim)
+
+
+def test_sim_to_world_sync_does_not_notify_when_nothing_moved():
+    """
+    Regression test: MujocoSynchronizer._sim_to_world used to call
+    world.notify_state_change() - bumping world.state.version and firing every
+    registered state-change callback - on every throttled tick as long as at least one
+    connection resolved to a MuJoCo joint, regardless of whether any value actually
+    changed. On a resting scene this fired a spurious notification on every tick.
+    """
+    world = World()
+    multi_sim = MujocoSim(world=world, headless=headless, step_size=STEP_SIZE)
+    try:
+        _spawn_revolute_joint(world, "resting_joint")
+
+        multi_sim.synchronizer.sync_rate_hz = MujocoSynchronizer.UNTHROTTLED_SYNC_RATE_HZ
+        multi_sim.synchronizer._sim_to_world()  # establish the baseline snapshot
+
+        version_before = world.state.version
+        multi_sim.synchronizer._sim_to_world()  # nothing moved in between
+
+        assert world.state.version == version_before
+    finally:
+        stop_multisim_if_running(multi_sim)
+
+
+def test_on_state_change_logs_when_no_mujoco_joint_is_found(monkeypatch):
+    """
+    Regression test: both sync directions used to silently skip a connection whenever
+    _resolve_qpos_adr found no matching MuJoCo joint, with no log line - unlike the
+    neighboring "unsupported connection type" branch, which does warn. A spawn failure
+    or a connection/joint name mismatch was therefore invisible.
+    """
+    world = World()
+    multi_sim = MujocoSim(world=world, headless=headless, step_size=STEP_SIZE)
+    try:
+        dof = _spawn_revolute_joint(world, "missing_joint_test")
+        monkeypatch.setattr(
+            multi_sim.synchronizer, "_resolve_qpos_adr", lambda connection: None
+        )
+
+        with _RecordingLogHandler(
+            "semantic_digital_twin.adapters.multi_sim"
+        ) as log_handler:
+            world.state[dof.id].position = 0.3
+            world.notify_state_change()
+
+        assert log_handler.has_message_containing("no MuJoCo joint found")
+    finally:
+        stop_multisim_if_running(multi_sim)
+
+
+def test_sim_to_world_logs_when_no_mujoco_joint_is_found(monkeypatch):
+    world = World()
+    multi_sim = MujocoSim(world=world, headless=headless, step_size=STEP_SIZE)
+    try:
+        _spawn_revolute_joint(world, "missing_joint_test_2")
+        monkeypatch.setattr(
+            multi_sim.synchronizer, "_resolve_qpos_adr", lambda connection: None
+        )
+
+        multi_sim.synchronizer.sync_rate_hz = MujocoSynchronizer.UNTHROTTLED_SYNC_RATE_HZ
+        with _RecordingLogHandler(
+            "semantic_digital_twin.adapters.multi_sim"
+        ) as log_handler:
+            multi_sim.synchronizer._sim_to_world()
+
+        assert log_handler.has_message_containing("no MuJoCo joint found")
+    finally:
+        stop_multisim_if_running(multi_sim)
+
+
+def test_multiple_synchronizers_can_share_one_simulator():
+    """
+    Regression test: MujocoSynchronizer used to monkeypatch
+    simulator.read_data_from_simulator as a single instance attribute - a second
+    synchronizer attaching to the same simulator silently overwrote the first's hook,
+    and stopping either synchronizer deleted the sole shared attribute regardless of
+    which one owned it, breaking the other synchronizer.
+    """
+    world = World()
+    multi_sim = MujocoSim(world=world, headless=headless, step_size=STEP_SIZE)
+    try:
+        simulator = multi_sim.simulator
+        first_synchronizer = multi_sim.synchronizer
+        second_synchronizer = MujocoSynchronizer(_world=world, simulator=simulator)
+        try:
+            assert first_synchronizer._sim_to_world in simulator._data_read_hooks
+            assert second_synchronizer._sim_to_world in simulator._data_read_hooks
+
+            second_synchronizer.stop()
+
+            assert first_synchronizer._sim_to_world in simulator._data_read_hooks
+            assert second_synchronizer._sim_to_world not in simulator._data_read_hooks
+        finally:
+            if second_synchronizer._sim_to_world in simulator._data_read_hooks:
+                second_synchronizer.stop()
+    finally:
+        stop_multisim_if_running(multi_sim)
+
+
+def test_resolve_qpos_adr_is_cached_and_invalidated_on_model_change(monkeypatch):
+    """
+    Regression test: _resolve_qpos_adr called mujoco.mj_name2id (a string joint-name
+    lookup) for every connection on every sync call, in both directions, instead of
+    caching the resolved qpos address. This asserts a second lookup for the same
+    connection is served from cache, and that a later model change (which can shift
+    every joint's qpos address after a recompile) invalidates that cache.
+
+    Adding a connection also triggers the framework's own automatic state resync
+    (World._notify_model_change calls notify_state_change right after notifying model
+    callbacks), which itself re-resolves every connection's qpos address as a side
+    effect - so this checks *which joint names* mj_name2id was asked to resolve around
+    the second spawn, rather than a raw call count, to isolate what this test is
+    actually checking: whether joint_1's now-stale cache entry gets looked up again.
+    """
+    world = World()
+    multi_sim = MujocoSim(world=world, headless=headless, step_size=STEP_SIZE)
+    try:
+        dof_1 = _spawn_revolute_joint(world, "cache_test_joint_1")
+        connection_1 = next(
+            c for c in world.connections if getattr(c, "raw_dof", None) is dof_1
+        )
+
+        looked_up_names = []
+        original_mj_name2id = mujoco.mj_name2id
+
+        def recording_mj_name2id(*args, **kwargs):
+            looked_up_names.append(args[2] if len(args) > 2 else kwargs.get("name"))
+            return original_mj_name2id(*args, **kwargs)
+
+        monkeypatch.setattr(mujoco, "mj_name2id", recording_mj_name2id)
+
+        multi_sim.synchronizer._qpos_adr_cache.clear()
+        looked_up_names.clear()
+        multi_sim.synchronizer._resolve_qpos_adr(connection_1)
+        multi_sim.synchronizer._resolve_qpos_adr(connection_1)
+        assert looked_up_names == [
+            "cache_test_joint_1"
+        ], "second lookup for the same connection was not served from cache"
+
+        looked_up_names.clear()
+        _spawn_revolute_joint(world, "cache_test_joint_2")  # a real model change
+
+        assert "cache_test_joint_1" in looked_up_names, (
+            "cache_test_joint_1's now-stale cache entry was not invalidated by the "
+            "model change"
+        )
+    finally:
+        stop_multisim_if_running(multi_sim)
+
+
+def test_connection6dof_with_non_root_parent_raises_instead_of_silently_wrong_sync():
+    """
+    Regression test: MujocoSynchronizer's 6DoF sync assumed a Connection6DoF's parent
+    is always the world root. MuJoCo always expresses a free joint's qpos directly in
+    the world frame, so converting it into the connection's own dofs needs to also
+    fold in the parent's own pose whenever the parent isn't the world root - silently
+    skipping that produced a wrong pose instead of failing loudly.
+
+    In practice MuJoCo's own compiler already refuses to build a free joint that isn't
+    a direct child of the top-level body ("free joint can only be used on top level"),
+    so a Connection6DoF with a non-root parent can never actually reach a live
+    MujocoSimulator through the normal build/spawn path - this exercises the
+    synchronizer's guard directly instead, so the assumption still fails loudly if that
+    ever changes (e.g. via body merging in the builder) rather than silently producing
+    a wrong pose.
+    """
+    world = World()
+    multi_sim = MujocoSim(world=world, headless=headless, step_size=STEP_SIZE)
+    try:
+        intermediate_body = Body(name=PrefixedName("intermediate"))
+        floating_body = Body(name=PrefixedName("floating_child"))
+        with world.modify_world():
+            world.add_connection(
+                FixedConnection(parent=world.root, child=intermediate_body)
+            )
+            connection = Connection6DoF.create_with_dofs(
+                world=world,
+                parent=intermediate_body,
+                child=floating_body,
+            )
+            # deliberately not world.add_connection(connection): see docstring above.
+
+        with pytest.raises(UnsupportedConnection6DoFParentError):
+            multi_sim.synchronizer._read_6dof_from_qpos(connection, qpos_adr=0)
     finally:
         stop_multisim_if_running(multi_sim)

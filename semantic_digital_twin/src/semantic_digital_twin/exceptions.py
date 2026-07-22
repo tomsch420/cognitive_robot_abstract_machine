@@ -1271,6 +1271,31 @@ class MujocoEntityNotFoundError(MujocoError):
 
 
 @dataclass
+class UnsupportedConnection6DoFParentError(MujocoError):
+    """
+    Raised when syncing a :class:`Connection6DoF` whose parent is not the world root.
+
+    MuJoCo expresses a free joint's qpos directly in the world frame, so converting it
+    to/from the connection's own dofs assumes ``parent_T_connection_expression`` already
+    is the world-to-connection transform, which only holds when the connection's parent
+    is the world root.
+    """
+
+    connection_name: str
+    parent_name: str
+
+    def error_message(self) -> str:
+        return (
+            f"Connection6DoF '{self.connection_name}' has parent '{self.parent_name}', "
+            f"but MuJoCo synchronization only supports Connection6DoF whose parent is "
+            f"the world root."
+        )
+
+    def suggest_correction(self) -> str:
+        return ""
+
+
+@dataclass
 class VideoRecordingError(MultiSimError):
     """
     Base class for all :class:`~semantic_digital_twin.adapters.mujoco_video_recording.MujocoVideoRecorder`
