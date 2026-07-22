@@ -34,7 +34,10 @@ from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech impor
     Noun,
     Verb,
 )
-from krrood.patterns.field_metadata import FieldMetadata, GrammarMetadata
+from krrood.entity_query_language.verbalization.grammar_metadata import (
+    GrammarMetadata,
+)
+from krrood.patterns.field_metadata import FieldMetadata
 
 # %% mimic domain
 

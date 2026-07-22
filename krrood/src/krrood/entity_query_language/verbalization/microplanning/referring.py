@@ -31,7 +31,9 @@ from krrood.entity_query_language.query.aggregation_structure import (
     aggregation_source_root,
     selected_aggregator,
 )
-from krrood.patterns.field_metadata import GrammarMetadata
+from krrood.entity_query_language.verbalization.grammar_metadata import (
+    GrammarMetadata,
+)
 
 if TYPE_CHECKING:
     from krrood.entity_query_language.verbalization.grammar.conditions.placement import (
@@ -146,7 +148,8 @@ def operand_head_noun(node: Variable, edges: List[ParentEdge]) -> str:
        (:cite:t:`dale1995gricean`'s Incremental Algorithm) and always wins, so a genuinely typed
        operand (``HasType(a_body, Apple)`` → *"a Body"*) is never overridden by a field's name;
     2. only once the type carries no information: the owning predicate field's declared
-       :attr:`~krrood.patterns.field_metadata.GrammarMetadata.display_name`, checked only when
+       :attr:`~krrood.entity_query_language.verbalization.grammar_metadata.GrammarMetadata.display_name`,
+       checked only when
        *node* fills exactly that one field and appears nowhere else (:func:`_sole_predicate_field`);
     3. the sole owning field's name itself (verbatim, underscores read as spaces), when no
        metadata is declared;
