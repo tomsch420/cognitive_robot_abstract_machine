@@ -20,14 +20,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from typing_extensions import Any, List, Optional, Tuple
+from typing_extensions import Any, List, Optional
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.adapters.robocasa_dataset.semantics import (
     GripperExclusionZone,
     PlacementArea,
 )
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Point3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import Box, Scale, Sphere
@@ -47,20 +47,20 @@ class PlacementSamplerRegion:
     Name the attached Region is given.
     """
 
-    local_center: Tuple[float, float]
+    body_name: str
+    """
+    Name of the body, already present in the world, this region was resolved for.
+    """
+
+    local_center: Point3
     """
     Centre of the region in the sampler's own frame, before the reference rotation and
     translation are applied.
     """
 
-    world_reference: Tuple[float, float, float]
+    world_pose: HomogeneousTransformationMatrix
     """
-    Origin of the sampler's frame in world coordinates.
-    """
-
-    reference_yaw: float
-    """
-    Rotation of the sampler's frame about the world z axis.
+    Pose of the sampler's frame in world coordinates.
     """
 
     width: float
@@ -91,8 +91,8 @@ class PlacementSamplerRegion:
             was resolved for.
         """
         box = Box(
-            origin=HomogeneousTransformationMatrix.from_xyz_rpy(
-                x=self.local_center[0], y=self.local_center[1]
+            origin=HomogeneousTransformationMatrix.from_point_rotation_matrix(
+                point=self.local_center
             ),
             scale=Scale(self.width, self.depth, self.thickness),
         )
@@ -102,15 +102,13 @@ class PlacementSamplerRegion:
         connection = FixedConnection(
             parent=world.root,
             child=region,
-            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
-                x=self.world_reference[0],
-                y=self.world_reference[1],
-                z=self.world_reference[2],
-                yaw=self.reference_yaw,
-                reference_frame=world.root,
+            parent_T_connection_expression=HomogeneousTransformationMatrix(
+                self.world_pose.to_np()
             ),
         )
-        annotation = PlacementArea(root=region, placed_object_name=self.name.name)
+        annotation = PlacementArea(
+            root=region, placed_object=world.get_body_by_name(self.body_name)
+        )
         with world.modify_world():
             world.add_connection(connection)
             world.add_semantic_annotation(annotation)
@@ -144,22 +142,27 @@ class PlacementSamplerRegionReader:
             sampler,
         ) in environment.placement_initializer.samplers.items():
             object_name = sampler_name[: -len(self.sampler_suffix)]
-            placed_object = environment.objects.get(object_name)
-            if placed_object is None or not hasattr(placed_object, "get_bbox_points"):
+            robocasa_object = environment.objects.get(object_name)
+            if robocasa_object is None or not hasattr(
+                robocasa_object, "get_bbox_points"
+            ):
                 continue
-            region = self.read_one(sampler, name_prefix, object_name)
+            region = self.read_one(
+                sampler, name_prefix, object_name, robocasa_object.root_body
+            )
             if region is not None:
                 regions.append(region)
         return regions
 
     @staticmethod
     def read_one(
-        sampler: Any, name_prefix: str, object_name: str
+        sampler: Any, name_prefix: str, object_name: str, body_name: str
     ) -> Optional[PlacementSamplerRegion]:
         """
         :param sampler: The sampler an environment built for an object.
         :param name_prefix: Prefix the attached region's name is given.
         :param object_name: Name the environment gave the object.
+        :param body_name: Name of the object's root body in the world.
         :return: The region's data, or ``None`` when the sampler resolved a degenerate
             (zero area) region.
         """
@@ -169,14 +172,20 @@ class PlacementSamplerRegionReader:
         depth = y_maximum - y_minimum
         if width <= 0.0 or depth <= 0.0:
             return None
+        world_x, world_y, world_z = (float(value) for value in sampler.reference_pos)
         return PlacementSamplerRegion(
             name=PrefixedName(object_name, prefix=name_prefix),
-            local_center=(
+            body_name=body_name,
+            local_center=Point3(
                 (x_minimum + x_maximum) / 2.0,
                 (y_minimum + y_maximum) / 2.0,
             ),
-            world_reference=tuple(float(value) for value in sampler.reference_pos),
-            reference_yaw=float(sampler.reference_rot),
+            world_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                x=world_x,
+                y=world_y,
+                z=world_z,
+                yaw=float(sampler.reference_rot),
+            ),
             width=float(width),
             depth=float(depth),
         )
@@ -200,7 +209,12 @@ class GripperExclusionZoneData:
     Name the attached Region is given.
     """
 
-    center: Tuple[float, float, float]
+    body_name: str
+    """
+    Name of the body, already present in the world, the gripper must stay away from.
+    """
+
+    center: Point3
     """
     World coordinates of the body at the moment the zone was resolved.
     """
@@ -224,15 +238,12 @@ class GripperExclusionZoneData:
         connection = FixedConnection(
             parent=world.root,
             child=region,
-            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
-                x=self.center[0],
-                y=self.center[1],
-                z=self.center[2],
-                reference_frame=world.root,
+            parent_T_connection_expression=HomogeneousTransformationMatrix.from_point_rotation_matrix(
+                point=self.center
             ),
         )
         annotation = GripperExclusionZone(
-            root=region, excluded_object_name=self.name.name
+            root=region, excluded_object=world.get_body_by_name(self.body_name)
         )
         with world.modify_world():
             world.add_connection(connection)
@@ -248,18 +259,20 @@ class GripperExclusionZoneReader:
 
     @staticmethod
     def read(
-        environment: Any, name_prefix: str, body_name: str, radius: float
+        environment: Any, name_prefix: str, object_name: str, radius: float
     ) -> GripperExclusionZoneData:
         """
         :param environment: A reset RoboCasa/robosuite task environment.
         :param name_prefix: Prefix the attached region's name is given.
-        :param body_name: Name of the body the gripper must stay away from.
+        :param object_name: Name the environment gave the object the gripper must stay
+            away from.
         :param radius: Distance from the body's centre the gripper must stay beyond.
         :return: The zone's data, centred on the body's resolved position.
         """
-        position = environment.sim.data.body_xpos[environment.obj_body_id[body_name]]
+        position = environment.sim.data.body_xpos[environment.obj_body_id[object_name]]
         return GripperExclusionZoneData(
-            name=PrefixedName(body_name, prefix=name_prefix),
-            center=(float(position[0]), float(position[1]), float(position[2])),
+            name=PrefixedName(object_name, prefix=name_prefix),
+            body_name=environment.objects[object_name].root_body,
+            center=Point3(*(float(value) for value in position)),
             radius=radius,
         )
