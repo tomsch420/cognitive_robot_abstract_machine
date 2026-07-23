@@ -1,16 +1,21 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from abc import ABC
+from dataclasses import dataclass
 
-from krrood.symbolic_math.symbolic_math import FloatVariable, Scalar
-from krrood.exceptions import DataclassException
-from semantic_digital_twin.collision_checking.collision_detector import ClosestPoints
 from typing_extensions import TYPE_CHECKING, Type
+
+from krrood.exceptions import DataclassException
+from krrood.symbolic_math.symbolic_math import FloatVariable, Scalar
+from semantic_digital_twin.collision_checking.collision_detector import ClosestPoints
 
 if TYPE_CHECKING:
     from giskardpy.motion_statechart.graph_node import (
         MotionStatechartNode,
         TrinaryCondition,
+    )
+    from semantic_digital_twin.world_description.world_entity import (
+        KinematicStructureEntity,
     )
 
 
@@ -31,23 +36,15 @@ class CollisionViolatedError(DataclassException):
 
 
 @dataclass
-class MotionStatechartError(DataclassException):
+class MotionStatechartError(DataclassException, ABC):
     """
     Base class for errors in the motion statechart.
     """
 
 
 @dataclass
-class NodeInitializationError(MotionStatechartError):
+class NodeInitializationError(MotionStatechartError, ABC):
     node: MotionStatechartNode
-    reason: str
-    suggestion: str = field(default="", kw_only=True)
-
-    def error_message(self) -> str:
-        return f'Failed to initialize Goal "{self.node.unique_name}". Reason: {self.reason}'
-
-    def suggest_correction(self) -> str:
-        return self.suggestion
 
 
 @dataclass
@@ -62,32 +59,60 @@ class EmptyMotionStatechartError(MotionStatechartError):
 @dataclass
 class NodeAlreadyBelongsToDifferentNodeError(NodeInitializationError):
     new_node: MotionStatechartNode
-    reason: str = field(init=False)
-    suggestion: str = field(
-        default="Create a copy of the node or remove it from its current parent first.",
-        kw_only=True,
-    )
 
-    def __post_init__(self):
+    def error_message(self) -> str:
         if self.new_node.parent_node is not None:
             parent_name = self.new_node.parent_node.unique_name
         else:
             parent_name = "top level of motion statechart"
-        self.reason = (
-            f'Node "{self.new_node.unique_name}" already belongs to "{parent_name}".'
-        )
-        super().__post_init__()
+        return f'Node "{self.new_node.unique_name}" already belongs to "{parent_name}".'
+
+    def suggest_correction(self) -> str:
+        return "Create a copy of the node or remove it from its current parent first."
 
 
 @dataclass
 class EndMotionInGoalError(NodeInitializationError):
-    reason: str = field(
-        default="Goals are not allowed to have EndMotion as a child.", init=False
-    )
-    suggestion: str = field(
-        default="Use a different node type or move the EndMotion node outside the Goal.",
-        kw_only=True,
-    )
+
+    def error_message(self) -> str:
+        return "Goals are not allowed to have EndMotion as a child."
+
+    def suggest_correction(self) -> str:
+        return "Use a different node type or move the EndMotion node outside the Goal."
+
+
+@dataclass
+class UnexpectedWorldEntityCountError(NodeInitializationError):
+    expected_count: int | str
+    actual_count: int
+    entity_type: Type | str | tuple[Type, ...]
+
+    def error_message(self) -> str:
+        return f"Expected {self.expected_count} entities of type {self.entity_type}, but found {self.actual_count}."
+
+    def suggest_correction(self) -> str:
+        return ""
+
+
+@dataclass
+class EmptyGoalStateError(NodeInitializationError):
+    def error_message(self) -> str:
+        return "Goal state is empty."
+
+    def suggest_correction(self) -> str:
+        return ""
+
+
+@dataclass
+class GoalPointsReferenceFrameMismatchError(NodeInitializationError):
+    reference_frame_a: KinematicStructureEntity
+    reference_frame_b: KinematicStructureEntity
+
+    def error_message(self) -> str:
+        return f"All goal points must have the same reference frame, but got {self.reference_frame_a} and {self.reference_frame_b}."
+
+    def suggest_correction(self) -> str:
+        return "Make sure all goal points have the same reference frame."
 
 
 @dataclass

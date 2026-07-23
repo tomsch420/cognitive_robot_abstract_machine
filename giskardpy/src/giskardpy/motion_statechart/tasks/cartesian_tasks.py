@@ -17,7 +17,7 @@ from giskardpy.motion_statechart.data_types import (
     DefaultWeights,
     ObservationStateValues,
 )
-from giskardpy.motion_statechart.exceptions import NodeInitializationError
+from giskardpy.motion_statechart.exceptions import GoalPointsReferenceFrameMismatchError
 from giskardpy.motion_statechart.goals.templates import Parallel
 from giskardpy.motion_statechart.graph_node import (
     NodeArtifacts,
@@ -234,9 +234,10 @@ class CartesianPositionTrajectory(CartesianTask):
         reference_frame = self.goal_points[0].reference_frame
         for point in self.goal_points[1:]:
             if point.reference_frame != reference_frame:
-                raise NodeInitializationError(
-                    self,
-                    f"All goal points must have the same reference frame, but got {point.reference_frame} and {reference_frame}.",
+                raise GoalPointsReferenceFrameMismatchError(
+                    node=self,
+                    reference_frame_a=point.reference_frame,
+                    reference_frame_b=reference_frame,
                 )
         return reference_frame
 
