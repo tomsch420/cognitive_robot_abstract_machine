@@ -41,12 +41,13 @@ class MotionStatechartError(DataclassException):
 class NodeInitializationError(MotionStatechartError):
     node: MotionStatechartNode
     reason: str
+    suggestion: str = field(default="", kw_only=True)
 
     def error_message(self) -> str:
         return f'Failed to initialize Goal "{self.node.unique_name}". Reason: {self.reason}'
 
     def suggest_correction(self) -> str:
-        return ""
+        return self.suggestion
 
 
 @dataclass
@@ -62,6 +63,10 @@ class EmptyMotionStatechartError(MotionStatechartError):
 class NodeAlreadyBelongsToDifferentNodeError(NodeInitializationError):
     new_node: MotionStatechartNode
     reason: str = field(init=False)
+    suggestion: str = field(
+        default="Create a copy of the node or remove it from its current parent first.",
+        kw_only=True,
+    )
 
     def __post_init__(self):
         if self.new_node.parent_node is not None:
@@ -79,6 +84,10 @@ class EndMotionInGoalError(NodeInitializationError):
     reason: str = field(
         default="Goals are not allowed to have EndMotion as a child.", init=False
     )
+    suggestion: str = field(
+        default="Use a different node type or move the EndMotion node outside the Goal.",
+        kw_only=True,
+    )
 
 
 @dataclass
@@ -90,7 +99,7 @@ class InvalidConstraintExpressionShapeError(MotionStatechartError):
         return f"Constraint expression must have shape (1, 1), has ({shape_str})."
 
     def suggest_correction(self) -> str:
-        return ""
+        return "Ensure the expression evaluates to a (1, 1) scalar."
 
 
 @dataclass
@@ -151,6 +160,9 @@ class NonObservationVariableError(InvalidConditionError):
 
     def reason(self) -> str:
         return f'Contains "{self.non_observation_variable}", which is not an observation variable.'
+
+    def suggest_correction(self) -> str:
+        return "Use an observation variable from a node instead, e.g. 'node.observation_variable'."
 
 
 @dataclass

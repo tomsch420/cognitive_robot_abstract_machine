@@ -70,7 +70,8 @@ class SetOdometry(MotionStatechartNode):
             else:
                 raise NodeInitializationError(
                     node=self,
-                    reason="Multiple drive joint found in world, please set 'group_name'",
+                    reason="Multiple drive joint found in world",
+                    suggestion="set 'odom_connection'",
                 )
         return NodeArtifacts(observation=sm.Scalar.const_true())
 
