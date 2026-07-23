@@ -720,7 +720,8 @@ class Articles(VocabEnum):
     Definite articles (THE, THE UNIQUE), the fused *another* / *the other* alternative
     determiners, and a static helper for indefinite articles.
     """
-
+    A = PlainWord("a")
+    AN = PlainWord("an")
     THE = PlainWord("the")
     THE_UNIQUE = PlainWord("the unique")
     ANOTHER = PlainWord("another")
@@ -732,8 +733,8 @@ class Articles(VocabEnum):
     """The definite alternative determiner — the same referent once the pair is discourse-old
     (:class:`NounPhrase.alternative` on repeat mention)."""
 
-    @staticmethod
-    def indefinite(following_word: str) -> WordFragment:
+    @classmethod
+    def indefinite(cls, following_word: str) -> WordFragment:
         """
         :param following_word: The word immediately following the article.
         :return: A word fragment containing *"a"* or *"an"* based on the phonological context of
@@ -744,7 +745,7 @@ class Articles(VocabEnum):
         >>> Articles.indefinite("robot").text
         'a'
         """
-        text = morphology.indefinite_article(following_word) if following_word else "a"
+        text = morphology.indefinite_article(following_word) if following_word else cls.A.text
         return WordFragment(text=text)
 
 
@@ -754,7 +755,7 @@ class ExistentialPhrase(VocabEnum):
     TypeNames"*).
     """
 
-    THERE_IS_A = SingularExistential("there's")
+    THERE_IS = SingularExistential("there's")
     THERE_ARE = PluralExistential("there are")
 
     @classmethod
@@ -766,7 +767,7 @@ class ExistentialPhrase(VocabEnum):
         >>> ExistentialPhrase.for_number(GrammaticalNumber.SINGULAR).text
         "there's"
         """
-        return cls.THERE_ARE if number is GrammaticalNumber.PLURAL else cls.THERE_IS_A
+        return cls.THERE_ARE if number is GrammaticalNumber.PLURAL else cls.THERE_IS
 
     def build_phrase(
         self, type_name: str, referent_id: Optional[uuid.UUID] = None
@@ -779,10 +780,10 @@ class ExistentialPhrase(VocabEnum):
         :return: Existential phrase fragment.
 
         >>> from krrood.entity_query_language.verbalization.fragments.base import flatten_fragment_to_plain_text
-        >>> flatten_fragment_to_plain_text(ExistentialPhrase.THERE_IS_A.build_phrase("Apple"))
+        >>> flatten_fragment_to_plain_text(ExistentialPhrase.THERE_IS.build_phrase("Apple"))
         "there's an Apple"
         """
-        if referent_id is not None and self is ExistentialPhrase.THERE_IS_A:
+        if referent_id is not None and self is ExistentialPhrase.THERE_IS:
             return self.value.build_phrase(type_name, referent_id=referent_id)
         return self.value.build_phrase(type_name)
 
