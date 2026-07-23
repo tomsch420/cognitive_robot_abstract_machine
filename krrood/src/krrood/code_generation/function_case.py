@@ -16,7 +16,10 @@ from krrood.code_generation.imports import (
     validate_annotations,
 )
 from krrood.code_generation.naming import to_camel_case
-from krrood.code_generation.type_hints import stringify_type_hint, get_types_to_import_from_function_type_hints
+from krrood.code_generation.type_hints import (
+    stringify_type_hint,
+    get_types_to_import_from_function_type_hints,
+)
 
 
 @dataclass
@@ -52,8 +55,7 @@ class FunctionParameter:
     """
 
     def to_dict(self) -> Dict[str, Any]:
-        return {"name": self.name,
-                "type_hint": stringify_type_hint(self.type_hint)}
+        return {"name": self.name, "type_hint": stringify_type_hint(self.type_hint)}
 
 
 @dataclass
@@ -85,7 +87,10 @@ class FunctionMetaData:
         # Build field data for the Jinja2 template.
         signature = inspect.signature(function)
         fields = [
-            FunctionParameter(name=parameter_name, type_hint=type_hints.get(parameter_name, parameter.annotation))
+            FunctionParameter(
+                name=parameter_name,
+                type_hint=type_hints.get(parameter_name, parameter.annotation),
+            )
             for parameter_name, parameter in signature.parameters.items()
             if parameter_name not in PythonBuiltinParameterNames
         ]
@@ -93,8 +98,12 @@ class FunctionMetaData:
         return cls(parameter_data=fields, return_type_hint=return_annotation_string)
 
     def to_dict(self) -> Dict[str, Any]:
-        return {"parameter_data": [parameter.to_dict() for parameter in self.parameter_data],
-                "return_type_hint": stringify_type_hint(self.return_type_hint)}
+        return {
+            "parameter_data": [
+                parameter.to_dict() for parameter in self.parameter_data
+            ],
+            "return_type_hint": stringify_type_hint(self.return_type_hint),
+        }
 
 
 @dataclass
