@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.resources
 import inspect
 from dataclasses import dataclass, field
+from functools import cached_property
 
 from typing_extensions import Callable, Dict, Optional, ClassVar, Type, Any, List, Self
 
@@ -54,7 +55,7 @@ class FunctionParameter:
     The type hint of the parameter.
     """
 
-    @property
+    @cached_property
     def string_type_hint(self) -> str:
         """
         :return: The string representation of the type hint.
@@ -90,7 +91,7 @@ class FunctionMetaData:
 
         # Build field data for the Jinja2 template.
         signature = inspect.signature(function)
-        fields = [
+        parameters = [
             FunctionParameter(
                 name=parameter_name,
                 type_hint=type_hints.get(parameter_name, parameter.annotation),
@@ -99,9 +100,9 @@ class FunctionMetaData:
             if parameter_name not in PythonBuiltinParameterNames
         ]
         return_annotation_string = type_hints.get("return", signature.return_annotation)
-        return cls(parameter_data=fields, return_type_hint=return_annotation_string)
+        return cls(parameter_data=parameters, return_type_hint=return_annotation_string)
 
-    @property
+    @cached_property
     def string_return_type_hint(self) -> str:
         """
         :return: The string representation of the return type hint.
@@ -166,6 +167,10 @@ class FunctionCaseGenerator:
 
         function_meta_data = FunctionMetaData.from_function(function)
 
+        function_attribute_setter_line = ""
+        if callable_import and callable_import.access_expression:
+            function_attribute_setter_line = f"{class_name}.function = {callable_import.access_expression}"
+
         return self.code_generator.render(
             self.template_file_name,
             class_name=class_name,
@@ -176,4 +181,5 @@ class FunctionCaseGenerator:
             access_expression=callable_import.access_expression,
             type_imports=type_import_lines,
             function_meta_data=function_meta_data,
+            function_attribute_setter_line=function_attribute_setter_line
         )
