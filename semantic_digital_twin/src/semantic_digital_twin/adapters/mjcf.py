@@ -670,7 +670,7 @@ class MJCFParser:
                 body=body,
                 name=mujoco_light.name,
                 mode=mujoco_light.mode,
-                directional=bool(mujoco_light.directional),
+                directional=mujoco_light.type == mujoco.mjtLightType.mjLIGHT_DIRECTIONAL,
                 active=bool(mujoco_light.active),
                 cast_shadow=bool(mujoco_light.castshadow),
                 position=mujoco_light.pos.tolist(),
