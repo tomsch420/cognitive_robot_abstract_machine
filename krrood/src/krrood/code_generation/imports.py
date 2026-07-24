@@ -82,12 +82,12 @@ def validate_annotations(function: Callable) -> None:
             continue
         if parameter.annotation is inspect.Parameter.empty:
             raise FunctionMissingAnnotationsError(
-                function_qualified_name=function.__qualname__,
+                function=function,
                 missing_parameter_name=parameter_name,
             )
     if signature.return_annotation is inspect.Parameter.empty:
         raise FunctionMissingAnnotationsError(
-            function_qualified_name=function.__qualname__,
+            function=function,
             missing_parameter_name=None,
         )
 
