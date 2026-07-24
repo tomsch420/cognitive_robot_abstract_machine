@@ -18,7 +18,7 @@ import math
 import random
 import statistics
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Callable
 
 import plotly.graph_objects as go
@@ -30,16 +30,11 @@ from experiments.experiment_definitions import (
     MeanAndStandardDeviation,
     TypstRenderer,
 )
-from random_events.interval import Interval, closed
+from random_events.interval import Bound, Interval, SimpleInterval, closed
 from random_events.product_algebra import Event, SimpleEvent
 from random_events.set import Set
 from random_events.sigma_algebra import AbstractCompositeSet
 from random_events.variable import Continuous, Symbolic, Variable
-
-CONTINUOUS_VARIABLE_BOUNDS = (0.0, 100.0)
-"""
-Lower and upper bound of the universe continuous variables are sampled from.
-"""
 
 
 class ProductAlgebraOperation(enum.Enum):
@@ -107,6 +102,15 @@ class RandomEventFactory:
     Number of simple events that are unioned to form an event.
     """
 
+    continuous_variable_bounds: SimpleInterval = field(
+        default_factory=lambda: SimpleInterval.from_data(
+            0.0, 100.0, Bound.CLOSED, Bound.CLOSED
+        )
+    )
+    """
+    Lower and upper bound of the universe continuous variables are sampled from.
+    """
+
     def make_variables(self) -> list[Variable]:
         """
         :return: Fresh variables, one per :attr:`number_of_variables`, alternating
@@ -164,14 +168,14 @@ class RandomEventFactory:
             list(variable.domain.all_elements), random.randint(1, self.domain_size)
         )
 
-    @staticmethod
-    def _make_continuous_value() -> Interval:
+    def _make_continuous_value(self) -> Interval:
         """
-        :return: A random bounded interval within :data:`CONTINUOUS_VARIABLE_BOUNDS`.
+        :return: A random bounded interval within :attr:`continuous_variable_bounds`.
         """
-        lower_bound, upper_bound = CONTINUOUS_VARIABLE_BOUNDS
-        lower = random.uniform(lower_bound, upper_bound)
-        upper = random.uniform(lower, upper_bound)
+        lower = random.uniform(
+            self.continuous_variable_bounds.lower, self.continuous_variable_bounds.upper
+        )
+        upper = random.uniform(lower, self.continuous_variable_bounds.upper)
         return closed(lower, upper)
 
 
@@ -384,19 +388,37 @@ class ProductAlgebraScalabilityAggregateResult(ExperimentResult):
     """
 
 
+@dataclass
+class CompositeSetOperationMeasurement:
+    """
+    Wall-clock duration and resulting simple set count of a single algebraic
+    operation.
+    """
+
+    duration: float
+    """
+    Time spent performing the operation, in seconds.
+    """
+
+    resulting_simple_sets: int
+    """
+    Number of simple sets in the operation's result.
+    """
+
+
 def time_composite_set_operation(
     operation: Callable[[], AbstractCompositeSet]
-) -> tuple[float, int]:
+) -> CompositeSetOperationMeasurement:
     """
     Measure the wall-clock duration and resulting simple set count of an operation.
 
     :param operation: A zero-argument callable that performs one algebraic operation.
-    :return: Tuple of (duration in seconds, number of simple sets in the result).
+    :return: The operation's duration and resulting simple set count.
     """
     begin = time.perf_counter()
     result = operation()
     duration = time.perf_counter() - begin
-    return round(duration, 6), len(result.simple_sets)
+    return CompositeSetOperationMeasurement(round(duration, 6), len(result.simple_sets))
 
 
 def product_algebra_scalability_experiment(
@@ -420,11 +442,13 @@ def product_algebra_scalability_experiment(
     measurements = {}
     for operation in ProductAlgebraOperation:
         arguments = (event_a, event_b) if operation.is_binary else (event_a,)
-        duration, resulting_simple_sets = time_composite_set_operation(
+        measurement = time_composite_set_operation(
             functools.partial(operation.value, *arguments)
         )
-        measurements[operation.duration_field] = duration
-        measurements[operation.resulting_simple_sets_field] = resulting_simple_sets
+        measurements[operation.duration_field] = measurement.duration
+        measurements[operation.resulting_simple_sets_field] = (
+            measurement.resulting_simple_sets
+        )
 
     return ProductAlgebraScalabilityExperimentResult(
         number_of_variables=number_of_variables,
@@ -458,7 +482,12 @@ def run_scalability_experiment(
         for _ in range(iterations)
     ]
 
-    def stats(attribute: str) -> MeanAndStandardDeviation:
+    def mean_and_standard_deviation_of(attribute: str) -> MeanAndStandardDeviation:
+        """
+        :param attribute: Name of the :class:`ProductAlgebraScalabilityExperimentResult`
+            field to aggregate.
+        :return: Mean and standard deviation of that field across :data:`results`.
+        """
         return MeanAndStandardDeviation.from_measurements(
             [getattr(result, attribute) for result in results]
         )
@@ -472,16 +501,44 @@ def run_scalability_experiment(
             result.total_resulting_simple_sets for result in results
         ),
         **{
-            operation.duration_field: stats(operation.duration_field)
+            operation.duration_field: mean_and_standard_deviation_of(
+                operation.duration_field
+            )
             for operation in ProductAlgebraOperation
         },
         **{
-            operation.resulting_simple_sets_field: stats(
+            operation.resulting_simple_sets_field: mean_and_standard_deviation_of(
                 operation.resulting_simple_sets_field
             )
             for operation in ProductAlgebraOperation
         },
     )
+
+
+class ScalabilityFactor(enum.Enum):
+    """
+    The independent factors that the scalability experiment sweeps, one per
+    :class:`ScalabilitySweep`.
+
+    Every member carries the configuration field it varies, its legend label and its
+    plot color, so a sweep never needs to look either up by a separate string key.
+    """
+
+    NUMBER_OF_VARIABLES = ("number_of_variables", "Number of Variables", "#2a78d6")
+    DOMAIN_SIZE = ("domain_size", "Domain Size", "#eb6834")
+    NUMBER_OF_SIMPLE_SETS = (
+        "number_of_simple_sets",
+        "Number of Simple Sets",
+        "#1baf7a",
+    )
+
+    def __init__(self, x_attribute: str, label: str, color: str):
+        self.x_attribute = x_attribute
+        """Name of the configuration field that this factor varies."""
+        self.label = label
+        """Human-readable name of this factor, used as its legend entry."""
+        self.color = color
+        """Plot color used for this factor's line and markers."""
 
 
 @dataclass
@@ -491,19 +548,14 @@ class ScalabilitySweep:
     alongside sweeps of the other factors.
     """
 
-    label: str
+    factor: ScalabilityFactor
     """
-    Human-readable name of the varied factor, used as its legend entry.
+    The factor that was varied across the table's rows.
     """
 
     table: ExperimentsTable
     """
     Aggregate results, one row per value the factor was swept over.
-    """
-
-    x_attribute: str
-    """
-    Name of the configuration field that was varied across the table's rows.
     """
 
     @property
@@ -514,7 +566,7 @@ class ScalabilitySweep:
     @property
     def swept_values(self) -> list[int]:
         """:return: The actual configuration values the factor was swept over."""
-        return [getattr(row, self.x_attribute) for row in self.rows]
+        return [getattr(row, self.factor.x_attribute) for row in self.rows]
 
     @property
     def total_durations(self) -> list[float]:
@@ -528,87 +580,85 @@ class ScalabilitySweep:
         return [row.total_resulting_simple_sets for row in self.rows]
 
 
-SCALABILITY_SWEEP_COLORS = {
-    "Number of Variables": "#2a78d6",
-    "Domain Size": "#eb6834",
-    "Number of Simple Sets": "#1baf7a",
-}
-"""
-Fixed categorical color per sweep label, in the palette's slot order.
-"""
-
-MARKER_SIZE_RANGE = (8, 40)
-"""
-Minimum and maximum marker diameter (px) used to encode resulting simple set counts.
-"""
-
-
-def plot_scalability_summary(sweeps: list[ScalabilitySweep]) -> go.Figure:
+@dataclass
+class ScalabilitySummaryPlot:
     """
-    Summarize every scalability sweep in a single figure.
-
-    Each sweep's swept values are normalised to a shared ``[0, 1]`` "fraction of range"
-    x-axis, so factors with very different natural ranges (a handful of variables vs. up
-    to a hundred simple sets) can be compared directly. The y-axis is the total duration
-    summed over every :class:`ProductAlgebraOperation`, on a log scale since durations
-    span microseconds to seconds. Marker size encodes the total resulting simple set
-    count, so structural growth stays visible without a second axis.
-
-    :param sweeps: The scalability sweeps to summarize, one per varied factor.
-    :return: A single Plotly figure summarizing all sweeps.
+    Renders every scalability sweep into a single summary figure.
     """
-    max_resulting_simple_sets = max(
-        size for sweep in sweeps for size in sweep.total_resulting_simple_sets
+
+    marker_size_range: SimpleInterval = field(
+        default_factory=lambda: SimpleInterval.from_data(8, 40, Bound.CLOSED, Bound.CLOSED)
     )
-    min_marker_size, max_marker_size = MARKER_SIZE_RANGE
+    """
+    Minimum and maximum marker diameter (px) used to encode resulting simple set counts.
+    """
 
-    fig = go.Figure()
-    for sweep in sweeps:
-        values = sweep.swept_values
-        x = (
-            [index / (len(values) - 1) for index in range(len(values))]
-            if len(values) > 1
-            else [0.0]
+    def render(self, sweeps: list[ScalabilitySweep]) -> go.Figure:
+        """
+        Summarize every scalability sweep in a single figure.
+
+        Each sweep's swept values are normalised to a shared ``[0, 1]`` "fraction of
+        range" x-axis, so factors with very different natural ranges (a handful of
+        variables vs. up to a hundred simple sets) can be compared directly. The y-axis
+        is the total duration summed over every :class:`ProductAlgebraOperation`, on a
+        log scale since durations span microseconds to seconds. Marker size encodes the
+        total resulting simple set count, so structural growth stays visible without a
+        second axis.
+
+        :param sweeps: The scalability sweeps to summarize, one per varied factor.
+        :return: A single Plotly figure summarizing all sweeps.
+        """
+        max_resulting_simple_sets = max(
+            size for sweep in sweeps for size in sweep.total_resulting_simple_sets
         )
-        durations = [max(duration, 1e-7) for duration in sweep.total_durations]
-        sizes = sweep.total_resulting_simple_sets
-        marker_sizes = [
-            min_marker_size
-            + (max_marker_size - min_marker_size)
-            * math.sqrt(size / max_resulting_simple_sets)
-            for size in sizes
-        ]
 
-        fig.add_trace(
-            go.Scatter(
-                x=x,
-                y=durations,
-                mode="lines+markers",
-                name=sweep.label,
-                line=dict(color=SCALABILITY_SWEEP_COLORS[sweep.label], width=2),
-                marker=dict(size=marker_sizes, color=SCALABILITY_SWEEP_COLORS[sweep.label]),
-                customdata=list(zip(values, sizes)),
-                hovertemplate=(
-                    f"{sweep.label}: %{{customdata[0]}}<br>"
-                    "Total duration: %{y:.6f} s<br>"
-                    "Total resulting simple sets: %{customdata[1]:.1f}"
-                    "<extra></extra>"
-                ),
+        fig = go.Figure()
+        for sweep in sweeps:
+            values = sweep.swept_values
+            x = (
+                [index / (len(values) - 1) for index in range(len(values))]
+                if len(values) > 1
+                else [0.0]
             )
-        )
+            durations = [max(duration, 1e-7) for duration in sweep.total_durations]
+            sizes = sweep.total_resulting_simple_sets
+            marker_sizes = [
+                self.marker_size_range.lower
+                + (self.marker_size_range.upper - self.marker_size_range.lower)
+                * math.sqrt(size / max_resulting_simple_sets)
+                for size in sizes
+            ]
 
-    fig.update_layout(
-        title="Product Algebra Scalability Summary",
-        xaxis_title="Fraction of Swept Range",
-        yaxis_title="Total Duration Across All Operations (s)",
-        yaxis_type="log",
-        plot_bgcolor="#fcfcfb",
-        paper_bgcolor="#fcfcfb",
-        font=dict(color="#0b0b0b"),
-    )
-    fig.update_xaxes(gridcolor="#e1e0d9", zerolinecolor="#c3c2b7")
-    fig.update_yaxes(gridcolor="#e1e0d9", zerolinecolor="#c3c2b7")
-    return fig
+            fig.add_trace(
+                go.Scatter(
+                    x=x,
+                    y=durations,
+                    mode="lines+markers",
+                    name=sweep.factor.label,
+                    line=dict(color=sweep.factor.color, width=2),
+                    marker=dict(size=marker_sizes, color=sweep.factor.color),
+                    customdata=list(zip(values, sizes)),
+                    hovertemplate=(
+                        f"{sweep.factor.label}: %{{customdata[0]}}<br>"
+                        "Total duration: %{y:.6f} s<br>"
+                        "Total resulting simple sets: %{customdata[1]:.1f}"
+                        "<extra></extra>"
+                    ),
+                )
+            )
+
+        fig.update_layout(
+            title="Product Algebra Scalability Summary",
+            xaxis_title="Fraction of Swept Range",
+            yaxis_title="Total Duration Across All Operations (s)",
+            yaxis_type="log",
+            plot_bgcolor="#fcfcfb",
+            paper_bgcolor="#fcfcfb",
+            font=dict(color="#0b0b0b"),
+        )
+        fig.update_xaxes(gridcolor="#e1e0d9", zerolinecolor="#c3c2b7")
+        fig.update_yaxes(gridcolor="#e1e0d9", zerolinecolor="#c3c2b7")
+        return fig
 
 
 def main():
@@ -680,13 +730,11 @@ def main():
     )
 
     sweeps = [
-        ScalabilitySweep("Number of Variables", variable_table, "number_of_variables"),
-        ScalabilitySweep("Domain Size", domain_size_table, "domain_size"),
-        ScalabilitySweep(
-            "Number of Simple Sets", simple_set_table, "number_of_simple_sets"
-        ),
+        ScalabilitySweep(ScalabilityFactor.NUMBER_OF_VARIABLES, variable_table),
+        ScalabilitySweep(ScalabilityFactor.DOMAIN_SIZE, domain_size_table),
+        ScalabilitySweep(ScalabilityFactor.NUMBER_OF_SIMPLE_SETS, simple_set_table),
     ]
-    plot_scalability_summary(sweeps).show()
+    ScalabilitySummaryPlot().render(sweeps).show()
 
 
 if __name__ == "__main__":

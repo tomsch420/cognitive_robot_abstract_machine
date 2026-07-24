@@ -51,7 +51,7 @@ from random_events.set import Set
 from random_events.variable import Symbolic
 
 
-class ComplementWorstCaseConstruction(enum.Enum):
+class ComplementWorstCaseConstruction(enum.StrEnum):
     """
     The two event constructions compared by this experiment.
     """
@@ -169,13 +169,13 @@ def measure_complement(
     :param event: The event to complement.
     :return: The measurement, including the resulting complement's simple set count.
     """
-    duration, complement_simple_sets = time_composite_set_operation(event.complement)
+    measurement = time_composite_set_operation(event.complement)
     return ComplementWorstCaseExperimentResult(
         construction=construction,
         number_of_clauses=len(event.simple_sets),
         number_of_dimensions=len(event.variables),
-        complement_simple_sets=complement_simple_sets,
-        duration=duration,
+        complement_simple_sets=measurement.resulting_simple_sets,
+        duration=measurement.duration,
     )
 
 
