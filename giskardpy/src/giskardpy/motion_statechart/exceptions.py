@@ -218,6 +218,11 @@ class ConditionScopeError(InvalidConditionError):
 
     @staticmethod
     def _scope_name(node: MotionStatechartNode) -> str:
+        """
+        Returns the name of the scope level that a node belongs to.
+
+        Top-level nodes are called "top level".
+        """
         parent_node = node.parent_node
         if parent_node is None:
             return "top level"
