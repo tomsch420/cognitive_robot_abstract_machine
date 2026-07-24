@@ -71,7 +71,7 @@ def test_placement_sampler_regions_are_annotated_and_attached_at_their_resolved_
         world_position = region.global_pose.to_position().to_np()[:3]
         assert np.allclose(
             world_position,
-            region_data.world_pose.to_position().to_np()[:3],
+            region_data.world_T_sampler.to_position().to_np()[:3],
             atol=1e-6,
         )
 

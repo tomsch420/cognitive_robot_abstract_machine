@@ -58,7 +58,7 @@ class PlacementSamplerRegion:
     translation are applied.
     """
 
-    world_pose: HomogeneousTransformationMatrix
+    world_T_sampler: HomogeneousTransformationMatrix
     """
     Pose of the sampler's frame in world coordinates.
     """
@@ -103,7 +103,7 @@ class PlacementSamplerRegion:
             parent=world.root,
             child=region,
             parent_T_connection_expression=HomogeneousTransformationMatrix(
-                self.world_pose.to_np()
+                self.world_T_sampler.to_np()
             ),
         )
         annotation = PlacementArea(
@@ -180,7 +180,7 @@ class PlacementSamplerRegionReader:
                 (x_minimum + x_maximum) / 2.0,
                 (y_minimum + y_maximum) / 2.0,
             ),
-            world_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+            world_T_sampler=HomogeneousTransformationMatrix.from_xyz_rpy(
                 x=world_x,
                 y=world_y,
                 z=world_z,
