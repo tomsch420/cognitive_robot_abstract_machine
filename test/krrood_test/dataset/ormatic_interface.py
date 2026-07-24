@@ -4077,13 +4077,13 @@ class WorldEntityDAO(
     )
 
     world_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
-        ForeignKey("WorldDAO.database_id", use_alter=True),
+        ForeignKey("WorldMappingDAO.database_id", use_alter=True),
         nullable=True,
         use_existing_column=True,
     )
 
-    world: Mapped[WorldDAO] = relationship(
-        "WorldDAO", uselist=False, foreign_keys=[world_id], post_update=True
+    world: Mapped[WorldMappingDAO] = relationship(
+        "WorldMappingDAO", uselist=False, foreign_keys=[world_id], post_update=True
     )
 
     __mapper_args__ = {
