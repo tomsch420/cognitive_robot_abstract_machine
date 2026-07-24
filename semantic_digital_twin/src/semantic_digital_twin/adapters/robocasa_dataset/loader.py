@@ -56,9 +56,14 @@ logger = logging.getLogger(__name__)
 try:
     import robosuite
     import yaml
-    from robocasa.environments.kitchen.kitchen import Kitchen
-    from robocasa.models.scenes.kitchen_arena import KitchenArena
-    from robocasa.models.scenes import scene_builder, scene_registry
+    from semantic_digital_twin.adapters.robocasa_dataset.mujoco_compat import (
+        robocasa_version_assertions_relaxed,
+    )
+
+    with robocasa_version_assertions_relaxed():
+        from robocasa.environments.kitchen.kitchen import Kitchen
+        from robocasa.models.scenes.kitchen_arena import KitchenArena
+        from robocasa.models.scenes import scene_builder, scene_registry
     from robosuite.environments.base import REGISTERED_ENVS
     from robosuite.models.tasks import ManipulationTask
 except ImportError:
