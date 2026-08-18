@@ -1,0 +1,152 @@
+schema_version: 1
+id: eql-relational-rule-mining
+title: "Relational rule mining with EQL for PartNet-Mobility semantic annotation"
+description: >
+  Build a generic, data-driven relational rule-mining engine on top of krrood's
+  Entity Query Language (EQL), then use it to bridge PartNet-Mobility's flat
+  per-part labels into semantic_digital_twin's structured Drawer/Cabinet/Door
+  semantic annotations, validated against the existing RDR-based ground truth
+  for the same domain shape.
+default_repository: tomsch420/cognitive_robot_abstract_machine
+
+waves:
+  - id: engine
+    name: "Generic EQL Rule-Mining Engine"
+    description: >
+      A domain-agnostic, AMIE-style relational rule miner built natively on
+      EQL queries, self-contained inside krrood, with no knowledge of
+      drawers, cabinets, or PartNet-Mobility.
+  - id: partnet_bridge
+    name: "PartNet-Mobility to SemDT Bridge"
+    description: >
+      Apply the mining engine to the real PartNet-Mobility corpus (already
+      downloaded on neem-4) to mine candidate Drawer/Cabinet/Door
+      annotations, feeding them into RDR as proposals for human review.
+  - id: evaluation
+    name: "Supervised Refinement & Evaluation"
+    description: >
+      Use RDR-confirmed cases as labels for a supervised ILP-style pass, and
+      evaluate the final mined annotations against real ground truth.
+
+tracks:
+  - id: engine-track
+    name: "Mining engine"
+    wave: engine
+  - id: bridge-track
+    name: "PartNet-Mobility bridge"
+    wave: partnet_bridge
+  - id: evaluation-track
+    name: "Evaluation"
+    wave: evaluation
+
+items:
+  - id: engine-atom-refinement
+    title: "Design the EQL atom/refinement-operator abstraction for incremental rule bodies"
+    branch: feature/eql-relational-rule-mining
+    track: engine-track
+    depends_on: []
+    status: not_started
+    notes: >
+      Dangling-atom / instantiated-atom / closing-atom refinement operators
+      (AMIE/WARMR lineage), expressed as incremental EQL .where() clauses
+      rather than flat triples, so attribute paths and collection traversal
+      are first-class. Lives in a new krrood subpackage
+      (krrood/entity_query_language/rule_mining or similar) - must stay
+      self-contained per AGENTS.md, no import of semantic_digital_twin.
+
+  - id: engine-support-confidence
+    title: "Implement support/confidence scoring and pruning over candidate rule bodies"
+    track: engine-track
+    depends_on: ["engine-atom-refinement"]
+    status: not_started
+    notes: >
+      Support/confidence computed by evaluating the candidate rule-body EQL
+      query itself (query.evaluate() counts satisfying bindings) - no
+      separate inference engine. Absolute-count thresholds as well as
+      percentage confidence, since small EQL domains make percentage-only
+      confidence unreliable.
+
+  - id: engine-tests-synthetic
+    title: "Validate the mining engine against a synthetic EQL fixture with a planted rule"
+    track: engine-track
+    depends_on: ["engine-support-confidence"]
+    status: not_started
+    notes: >
+      A small, self-contained krrood test dataset with a deliberately
+      planted ground-truth relational rule; the miner must recover it.
+      Follows AGENTS.md TDD rules - the planted-rule test is written before
+      the miner is judged complete.
+
+  - id: partnet-remote-access
+    title: "Establish an SSH-based workflow to run mining jobs against the neem-4 PartNet-Mobility corpus"
+    track: bridge-track
+    depends_on: ["engine-tests-synthetic"]
+    status: not_started
+    notes: >
+      Dataset already downloaded on neem-4.informatik.uni-bremen.de
+      (/raid/users/tom_sch/datasets/partnet-mobility-dataset, 2218 models,
+      345 StorageFurniture) - not copied locally. Local development/tests
+      use small synthetic fixtures; real corpus runs are invoked over SSH on
+      neem-4. CI-facing tests keep the existing SAPIEN_ACCESS_TOKEN
+      skipif pattern from test_partnet_mobility.py; no dataset committed to
+      git.
+
+  - id: partnet-eql-domain-model
+    title: "Build the semantic_digital_twin EQL domain model over PartNet-Mobility StorageFurniture worlds"
+    track: bridge-track
+    depends_on: ["partnet-remote-access"]
+    status: not_started
+    notes: >
+      EQL variables/domains over a loaded World's bodies, connections
+      (joint types), and flat semantics.txt labels, scoped to the
+      StorageFurniture category as the minimal first slice. Lives in
+      semantic_digital_twin (depends on krrood's new rule_mining package),
+      not in krrood.
+
+  - id: partnet-mine-drawer-cabinet
+    title: "Mine candidate Drawer/Cabinet/Door rules from StorageFurniture, unsupervised"
+    track: bridge-track
+    depends_on: ["partnet-eql-domain-model"]
+    status: not_started
+    notes: >
+      Unsupervised AMIE-style pass over bodies/joints/kinematic-tree
+      structure, no labels. Target: rediscover the handle/mechanical_joint/
+      drawers/doors relational structure that the krrood RDR test fixture
+      (test/krrood_test/test_ripple_down_rules) already hand-encodes for a
+      toy world, now over real data.
+
+  - id: partnet-rdr-bridge
+    title: "Feed mined candidate rules into RDR as proposed conclusions"
+    track: bridge-track
+    depends_on: ["partnet-mine-drawer-cabinet"]
+    status: not_started
+    notes: >
+      Mined rules (with confidence scores) become candidate conclusions in
+      RDR's fit_case flow for human accept/reject/refine - the automatic
+      "propose" half paired with RDR's existing human-driven "correct" half.
+      This is the piece that would eventually replace
+      PartNetMobilityDatasetLoader._apply_semantics_to_world's flat label
+      copy, though that replacement is a later integration decision, not
+      an assumed outcome of this item.
+
+  - id: supervised-ilp-pass
+    title: "Run a supervised Popper/TILDE-style ILP pass over RDR-confirmed cases"
+    track: evaluation-track
+    depends_on: ["partnet-rdr-bridge"]
+    status: not_started
+    notes: >
+      Once RDR accumulates expert-confirmed positive/negative cases from the
+      propose/correct loop, use them as labeled examples for an exact,
+      provably-covering ILP pass, and compare against the unsupervised
+      phase-1 rules.
+
+  - id: evaluate-against-ground-truth
+    title: "Evaluate mined annotations against real ground truth and decide on integration"
+    track: evaluation-track
+    depends_on: ["supervised-ilp-pass"]
+    status: not_started
+    notes: >
+      Compare final mined Drawer/Cabinet/Door annotations against
+      hand-verified StorageFurniture models; decide whether/how this
+      replaces or augments the current flat label-copy in
+      PartNetMobilityDatasetLoader._apply_semantics_to_world.
