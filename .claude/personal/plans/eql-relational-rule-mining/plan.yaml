@@ -45,7 +45,9 @@ items:
     branch: feature/eql-relational-rule-mining
     track: engine-track
     depends_on: []
-    status: not_started
+    status: in_progress
+    pull_request_number: 26
+    session: https://claude.ai/code/session_014xj6tyzg2JymexJQokZqK6
     notes: >
       Dangling-atom / instantiated-atom / closing-atom refinement operators
       (AMIE/WARMR lineage), expressed as incremental EQL .where() clauses
