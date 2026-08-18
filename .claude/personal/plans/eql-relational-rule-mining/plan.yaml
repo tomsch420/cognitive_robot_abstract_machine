@@ -56,6 +56,7 @@ items:
 
   - id: engine-support-confidence
     title: "Implement support/confidence scoring and pruning over candidate rule bodies"
+    branch: engine-support-confidence
     track: engine-track
     depends_on: ["engine-atom-refinement"]
     status: not_started
@@ -68,6 +69,7 @@ items:
 
   - id: engine-tests-synthetic
     title: "Validate the mining engine against a synthetic EQL fixture with a planted rule"
+    branch: engine-tests-synthetic
     track: engine-track
     depends_on: ["engine-support-confidence"]
     status: not_started
@@ -79,6 +81,7 @@ items:
 
   - id: partnet-remote-access
     title: "Establish an SSH-based workflow to run mining jobs against the neem-4 PartNet-Mobility corpus"
+    branch: partnet-remote-access
     track: bridge-track
     depends_on: ["engine-tests-synthetic"]
     status: not_started
@@ -93,6 +96,7 @@ items:
 
   - id: partnet-eql-domain-model
     title: "Build the semantic_digital_twin EQL domain model over PartNet-Mobility StorageFurniture worlds"
+    branch: partnet-eql-domain-model
     track: bridge-track
     depends_on: ["partnet-remote-access"]
     status: not_started
@@ -105,6 +109,7 @@ items:
 
   - id: partnet-mine-drawer-cabinet
     title: "Mine candidate Drawer/Cabinet/Door rules from StorageFurniture, unsupervised"
+    branch: partnet-mine-drawer-cabinet
     track: bridge-track
     depends_on: ["partnet-eql-domain-model"]
     status: not_started
@@ -117,6 +122,7 @@ items:
 
   - id: partnet-rdr-bridge
     title: "Feed mined candidate rules into RDR as proposed conclusions"
+    branch: partnet-rdr-bridge
     track: bridge-track
     depends_on: ["partnet-mine-drawer-cabinet"]
     status: not_started
@@ -131,6 +137,7 @@ items:
 
   - id: supervised-ilp-pass
     title: "Run a supervised Popper/TILDE-style ILP pass over RDR-confirmed cases"
+    branch: supervised-ilp-pass
     track: evaluation-track
     depends_on: ["partnet-rdr-bridge"]
     status: not_started
@@ -142,6 +149,7 @@ items:
 
   - id: evaluate-against-ground-truth
     title: "Evaluate mined annotations against real ground truth and decide on integration"
+    branch: evaluate-against-ground-truth
     track: evaluation-track
     depends_on: ["supervised-ilp-pass"]
     status: not_started
