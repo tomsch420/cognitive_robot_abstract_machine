@@ -49,12 +49,19 @@ items:
     pull_request_number: 26
     session: https://claude.ai/code/session_014xj6tyzg2JymexJQokZqK6
     notes: >
-      Dangling-atom / instantiated-atom / closing-atom refinement operators
-      (AMIE/WARMR lineage), expressed as incremental EQL .where() clauses
-      rather than flat triples, so attribute paths and collection traversal
-      are first-class. Lives in a new krrood subpackage
-      (krrood/entity_query_language/rule_mining or similar) - must stay
-      self-contained per AGENTS.md, no import of semantic_digital_twin.
+      Implemented and pushed (commit 0f144e47e on PR #26, still draft):
+      CandidateRuleBody in krrood/entity_query_language/rule_mining with
+      extend_with_related_variable (dangling atom), constrain_variable_to_value
+      (instantiated atom), close_by_equating_variables (closing atom), and
+      to_query, plus candidate_attribute_names and two new exceptions
+      (UnknownAttributeError, IncompatibleVariableTypesError). All 8 TDD
+      tests pass, full krrood suite green, self-containment verified.
+      Status intentionally left in_progress here - only the dashboard's
+      automatic merged-PR correction should flip it to done. See
+      .claude/personal/pr-progress/feature/eql-relational-rule-mining.md
+      for the full done/next breakdown, including an open design note for
+      the next item (engine-support-confidence) about how joined pairs are
+      recovered from to_query() results.
 
   - id: engine-support-confidence
     title: "Implement support/confidence scoring and pruning over candidate rule bodies"
