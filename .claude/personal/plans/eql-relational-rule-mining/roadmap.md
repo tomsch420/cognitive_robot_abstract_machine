@@ -151,3 +151,64 @@ Whether the finished pipeline *replaces*
 `_apply_semantics_to_world`'s flat label copy, or runs alongside it as an
 opt-in richer-annotation path, is left to wave 3's evaluation item
 (`evaluate-against-ground-truth`) rather than decided up front.
+
+## `engine-atom-refinement` — implementation plan (approved)
+
+New subpackage: `krrood/entity_query_language/rule_mining/`
+(`__init__.py`, `candidate_rule.py`, `exceptions.py`) — self-contained,
+no import outside krrood + random_events/probabilistic_model.
+
+**`CandidateRuleBody`** (dataclass, `candidate_rule.py`): the rule body
+under construction — `head_variable`, `open_variables` (dangling, not yet
+connected to another variable in the body), `conditions` (accumulated
+`.where()` conditions). Three immutable-update extension methods, each
+returning a new `CandidateRuleBody`:
+
+- `extend_with_related_variable(source_variable, attribute_name)` — the
+  *dangling-atom* operator. Resolves the attribute's static type via
+  `get_field_type_endpoint` (`krrood/symbol_graph/helpers.py`, the same
+  helper `Attribute._update_type_` already uses in
+  `core/mapped_variable.py`); flattens collection-valued attributes via
+  `flat_variable()`. Raises `UnknownAttributeError` for an attribute not
+  declared on the type.
+- `constrain_variable_to_value(variable, value)` — the *instantiated-atom*
+  operator: adds `variable == value` to `conditions`.
+- `close_by_equating_variables(variable_a, variable_b)` — the
+  *closing-atom* operator: adds `variable_a == variable_b`, removes both
+  from `open_variables`. Raises `IncompatibleVariableTypesError` if the
+  two variables' static types share no common subtype.
+- `to_query()` — `entity(self.head_variable).where(*self.conditions)`; the
+  query graph *is* the rule, no separate rule representation.
+
+Plus `candidate_attribute_names(type_)` — lists a dataclass type's
+declared field names, for later use by item 3's mining loop (not wired
+into a search loop by this item).
+
+**Naming note**: deliberately avoids the word "Refinement" —
+`krrood.entity_query_language.rules.conclusion_selector.Refinement`
+already names an unrelated concept (an RDR tree branch).
+
+**Tests first** (TDD): new fixture
+`test/krrood_test/dataset/rule_mining_fixture.py` (a `Container` with a
+`handles: List[Handle]` collection field, `Handle.container: Container`
+scalar back-reference — following `department_and_employee.py`'s style,
+adding a collection-valued field to exercise flattening). New tests under
+`test/krrood_test/test_eql/test_rule_mining/test_candidate_rule.py`
+covering: scalar and collection-valued `extend_with_related_variable`,
+the unknown-attribute exception, `constrain_variable_to_value`,
+`close_by_equating_variables` (success and incompatible-types exception),
+`candidate_attribute_names`, and the immutable-update property (original
+body unaffected by an extension). All assertions against concrete
+expected values, not not-None/not-empty checks.
+
+**Verification**: `pytest test/krrood_test/test_eql/test_rule_mining/ -v`,
+full krrood suite still green, self-containment verified by import
+inspection, `scripts/format_docstrings.py` run on new files.
+
+**Open items flagged at approval time, not yet resolved**:
+- The three method names above are this session's proposal (roadmap/item
+  notes named the operator *kinds*, not exact method names) — worth a
+  sanity check if a later session finds them awkward to use.
+- No explicit backtracking/undo method on `CandidateRuleBody` — the
+  immutable-update design means an earlier reference already serves that
+  purpose; flagged in case item 3's mining loop finds it insufficient.
