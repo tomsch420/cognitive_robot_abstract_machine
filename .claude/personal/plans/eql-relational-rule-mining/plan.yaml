@@ -83,7 +83,9 @@ items:
     branch: engine-tests-synthetic
     track: engine-track
     depends_on: ["engine-support-confidence"]
-    status: not_started
+    status: in_progress
+    pull_request_number: 28
+    session: https://claude.ai/code/session_018wDeDCgF1keGFJCzjyncXQ
     notes: >
       A small, self-contained krrood test dataset with a deliberately
       planted ground-truth relational rule; the miner must recover it.
