@@ -4,10 +4,11 @@ Incremental construction of relational candidate rule bodies as EQL query graphs
 
 from __future__ import annotations
 
-from dataclasses import dataclass, fields, replace
+from dataclasses import dataclass, replace
 
 from typing_extensions import Any, List, Tuple, Type
 
+from krrood.class_diagrams.attribute_introspector import DataclassOnlyIntrospector
 from krrood.entity_query_language.core.mapped_variable import CanBehaveLikeAVariable
 from krrood.entity_query_language.core.variable import Variable
 from krrood.entity_query_language.factories import ConditionType, entity, flat_variable
@@ -25,17 +26,17 @@ def candidate_attribute_names(type_: Type) -> List[str]:
     """
     List the public attribute names declared on a dataclass type.
 
-    Private fields (leading underscore, such as :class:`~krrood.symbol_graph.symbol_graph.Symbol`'s
-    bookkeeping fields) are excluded, since they are never a meaningful relational atom
-    to traverse.
+    Delegates to :class:`~krrood.class_diagrams.attribute_introspector.DataclassOnlyIntrospector`,
+    which already excludes private fields (leading underscore, such as
+    :class:`~krrood.symbol_graph.symbol_graph.Symbol`'s bookkeeping fields) under the same
+    assumption this needs: they are never a meaningful relational atom to traverse.
 
     :param type_: The dataclass type to inspect.
-    :return: The names of the type's declared public dataclass fields.
+    :return: The names of the type's discovered public dataclass fields.
     """
     return [
-        declared_field.name
-        for declared_field in fields(type_)
-        if not declared_field.name.startswith("_")
+        attribute.public_name
+        for attribute in DataclassOnlyIntrospector().discover(type_)
     ]
 
 
