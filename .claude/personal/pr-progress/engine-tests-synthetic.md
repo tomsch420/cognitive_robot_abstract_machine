@@ -39,17 +39,42 @@ verified against the real engine: support=9, confidence=0.36.
   `claude/eql-relational-rule-mining-next-z575k9`, bootstrap commit
   pushed, draft PR #28 created.
 - `plan.yaml` item flipped to `in_progress`, plan recorded in `roadmap.md`.
-
-## Next
-- TDD: write `test/krrood_test/test_eql/test_rule_mining/test_miner.py`
-  first (build the sibling-handle world, run `RuleMiner(...).mine(...)`,
-  assert a returned body's evaluated result matches
+- TDD: wrote `test/krrood_test/test_eql/test_rule_mining/test_miner.py`
+  first (builds the sibling-handle world, runs `RuleMiner(...).mine(...)`,
+  asserts a returned body's evaluated result matches
   `['H1','H1','H2','H2','H3','H3','H4','H4','H5']` and its `score()`
   equals `RuleScore(support=9, confidence=0.36)`).
-- Implement `RuleMiner` in `miner.py`.
-- Run full krrood suite, `scripts/format_docstrings.py`, push, republish
-  the plan dashboard.
-- After this item: continue autonomously through the plan per the user's
-  "finish it all!" — next up is `partnet-remote-access`, which needs SSH
-  access to neem-4.informatik.uni-bremen.de this session doesn't have;
-  flag that clearly rather than faking it when reached.
+- Implemented `RuleMiner` in `miner.py`, plan-replay based (see Design).
+- Discovered mid-implementation, empirically (not assumed):
+  `copy.deepcopy` on a `CandidateRuleBody` recurses indefinitely — the EQL
+  variable objects' dynamic `__getattr__`/mapped-attribute machinery
+  breaks `copy`'s dict-key hashing during traversal. Redesigned branching
+  around replayable plans (`SelfJoinSeedStep`/`ExtendStep`/`CloseStep`,
+  addressed by plan-step index) instead of copying live bodies, before
+  writing any of the actual search loop.
+- Landed on the final "is_closed" definition (every introduced variable is
+  either closed or used as an extend-source) only after the first
+  definition (every introduced variable individually closed) proved
+  unsatisfiable for the self-join pattern — the seed variable itself is
+  never directly closed, only used as a traversal source. Verified the
+  final definition finds the planted rule before finalizing it.
+- Verified `Handle` also collides by name across 3 test-dataset modules
+  (same shape as the `Container` collision found in #27), which is why the
+  search deliberately never chains a second dangling-atom hop — confirmed
+  by testing the full search end-to-end and getting a clean pass on the
+  first real run, no crash from that bug.
+- Verified: `pytest test/krrood_test/test_eql/test_rule_mining/ -v` (14
+  passed), full krrood suite (1792 passed, 6 skipped, same 2 pre-existing
+  `dot`/Graphviz-binary failures as #27, unrelated),
+  `scripts/format_docstrings.py` run clean (no manual fixes needed this
+  time).
+- Pushed, PR #28 description updated to match, dashboard republished.
+
+## Next
+- Nothing planned for this item; functionally complete pending review.
+  `status` intentionally left `in_progress` — only the dashboard's
+  automatic merged-PR correction should flip it to `done`.
+- Continuing autonomously through the plan per the user's "finish it
+  all!" — next up is `partnet-remote-access`, which needs SSH access to
+  neem-4.informatik.uni-bremen.de this session doesn't have; flag that
+  clearly rather than faking it when reached.
