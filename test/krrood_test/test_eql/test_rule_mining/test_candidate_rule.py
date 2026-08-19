@@ -6,10 +6,7 @@ Tests for the dangling-atom, instantiated-atom, and closing-atom refinement oper
 import pytest
 
 from krrood.entity_query_language.factories import variable
-from krrood.entity_query_language.rule_mining.candidate_rule import (
-    CandidateRuleBody,
-    candidate_attribute_names,
-)
+from krrood.entity_query_language.rule_mining.candidate_rule import CandidateRuleBody
 from krrood.entity_query_language.rule_mining.exceptions import (
     IncompatibleVariableTypesError,
     UnknownAttributeError,
@@ -127,14 +124,14 @@ def test_close_by_equating_variables_restricts_to_matching_bindings_and_closes_b
     variable_a = variable(Handle, domain=[world["handle_1"], world["handle_2"]])
     variable_b = variable(Handle, domain=[world["handle_1"], world["handle_3"]])
     body = CandidateRuleBody(
-        head_variable=variable_a, open_variables=(variable_a, variable_b)
+        head_variable=variable_a, open_variables=[variable_a, variable_b]
     )
 
     closed = body.close_by_equating_variables(variable_a, variable_b)
     results = list(closed.to_query().evaluate())
 
     assert results == [world["handle_1"]]
-    assert closed.open_variables == ()
+    assert closed.open_variables == []
 
 
 def test_close_by_equating_variables_raises_on_incompatible_types():
@@ -143,30 +140,23 @@ def test_close_by_equating_variables_raises_on_incompatible_types():
     handle_variable = variable(Handle, domain=[world["handle_1"]])
     body = CandidateRuleBody(
         head_variable=container_variable,
-        open_variables=(container_variable, handle_variable),
+        open_variables=[container_variable, handle_variable],
     )
 
     with pytest.raises(IncompatibleVariableTypesError):
         body.close_by_equating_variables(container_variable, handle_variable)
 
 
-# %% candidate_attribute_names
+# %% mutate-and-return-self
 
 
-def test_candidate_attribute_names_lists_declared_fields():
-    assert candidate_attribute_names(Container) == ["name", "handles"]
-
-
-# %% immutability
-
-
-def test_extension_methods_return_new_body_leaving_original_unaffected():
+def test_extension_methods_mutate_body_in_place_and_return_it():
     world = containers_and_handles()
     head = variable(Handle, domain=[world["handle_1"], world["handle_2"]])
-    original = CandidateRuleBody(head_variable=head, open_variables=(head,))
+    body = CandidateRuleBody(head_variable=head, open_variables=[head])
 
-    original.extend_with_related_variable(head, "container")
-    original.constrain_variable_to_value(head, world["handle_1"])
+    returned = body.extend_with_related_variable(head, "container")
 
-    assert original.open_variables == (head,)
-    assert original.conditions == ()
+    assert returned is body
+    assert body.open_variables[-1] is not head
+    assert len(body.conditions) == 1
