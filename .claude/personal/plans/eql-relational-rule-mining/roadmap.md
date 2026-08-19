@@ -212,3 +212,69 @@ inspection, `scripts/format_docstrings.py` run on new files.
 - No explicit backtracking/undo method on `CandidateRuleBody` — the
   immutable-update design means an earlier reference already serves that
   purpose; flagged in case item 3's mining loop finds it insufficient.
+
+## `engine-support-confidence` — implementation plan (approved)
+
+Depends on `engine-atom-refinement`'s `CandidateRuleBody` (PR #26, feature
+branch `feature/eql-relational-rule-mining` — functionally complete, still
+open/draft). This item stacks directly on that branch rather than waiting
+for it to merge, per this repo's normal stacked-PR workflow;
+`check_dependency_readiness.py` correctly flags it as not yet `is_ready`
+(a draft PR hasn't had its author review), noted here rather than silently
+proceeding as if it were.
+
+New file `krrood/entity_query_language/rule_mining/scoring.py`:
+
+```python
+@dataclass
+class ScoreThresholds:
+    minimum_support: int
+    minimum_confidence: float
+
+@dataclass
+class RuleScore:
+    support: int
+    confidence: float
+
+    def meets(self, thresholds: ScoreThresholds) -> bool: ...
+```
+
+`CandidateRuleBody.score() -> RuleScore` (new method in `candidate_rule.py`,
+next to `to_query()` — scoring is the body's own behaviour):
+
+- **Support** = `len(list(self.to_query().evaluate()))` — the count of
+  bindings satisfying the full body, per `plan.yaml`'s note ("evaluating
+  the candidate rule-body EQL query itself... no separate inference
+  engine"). Each row already reflects one join binding, so no
+  `set_of(head_variable, *open_variables)` multi-select is needed for a
+  plain count — this resolves `engine-atom-refinement`'s open note about
+  recovering joined pairs from `to_query()` results: recovery is only
+  needed if a *value*, not just a count, is wanted, which is out of this
+  item's scope.
+- **Confidence** = `support / prior_support`, where `prior_support` is
+  `entity(self.head_variable).where(*self.conditions[:-1]).evaluate()`'s
+  count — the body with its most-recently-added atom removed, reconstructed
+  directly from `self.conditions` rather than a stored "previous body"
+  reference. This also resolves `engine-atom-refinement`'s other open
+  note (no undo/backtracking method on the now-mutating `CandidateRuleBody`)
+  for this use: `conditions[:-1]` doesn't need one.
+- `prior_support == 0` → confidence `0.0` (not an error: both counts being
+  0 is a normal empty-candidate outcome during search, filtered out by
+  `minimum_support` later).
+- `self.conditions` empty when `score()` is called → raises new
+  `EmptyRuleBodyError` (`exceptions.py`, following the existing
+  `DataclassException` convention) — a genuine precondition violation, not
+  a search-time edge case.
+
+Tests first (TDD): `test/krrood_test/test_eql/test_rule_mining/test_scoring.py`,
+reusing `containers_and_handles()` from `test_candidate_rule.py` via a
+relative import. Cases: support/confidence after one
+`extend_with_related_variable`; after a `close_by_equating_variables` on
+top of two prior atoms (exercises `conditions[:-1]` against more than one
+prior atom); the `prior_support == 0` → confidence `0.0` case;
+`EmptyRuleBodyError` on a fresh body; `RuleScore.meets(thresholds)` (both
+clearing thresholds, and either one not).
+
+Verification: `pytest test/krrood_test/test_eql/test_rule_mining/ -v`, full
+krrood suite green, self-containment verified, `scripts/format_docstrings.py`
+run on new/changed files.
