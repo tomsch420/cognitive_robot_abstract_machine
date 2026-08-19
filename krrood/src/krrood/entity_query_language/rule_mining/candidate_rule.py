@@ -14,9 +14,11 @@ from krrood.entity_query_language.core.variable import Variable
 from krrood.entity_query_language.factories import ConditionType, entity, flat_variable
 from krrood.entity_query_language.query.query import Entity
 from krrood.entity_query_language.rule_mining.exceptions import (
+    EmptyRuleBodyError,
     IncompatibleVariableTypesError,
     UnknownAttributeError,
 )
+from krrood.entity_query_language.rule_mining.scoring import RuleScore
 from krrood.symbol_graph.helpers import get_wrapped_field
 
 # %% candidate rule body
@@ -157,3 +159,31 @@ class CandidateRuleBody:
             representation.
         """
         return entity(self.head_variable).where(*self.conditions)
+
+    def score(self) -> RuleScore:
+        """
+        Compute this rule body's support and confidence by evaluating its query.
+
+        Support is the number of bindings satisfying the full body. Confidence is
+        support relative to the body with its most-recently-added atom removed, so it
+        reads as "of the bindings that satisfied the rule up to its last atom, what
+        fraction also satisfy that atom" — standard AMIE confidence, needing no stored
+        history beyond :attr:`conditions` itself.
+
+        :return: This body's :class:`RuleScore`.
+        :raises EmptyRuleBodyError: If :attr:`conditions` is empty, so there is no most-
+            recently-added atom to compute confidence against.
+        """
+        if not self.conditions:
+            raise EmptyRuleBodyError()
+
+        support = len(list(self.to_query().evaluate()))
+
+        prior_conditions = self.conditions[:-1]
+        prior_query = entity(self.head_variable)
+        if prior_conditions:
+            prior_query = prior_query.where(*prior_conditions)
+        prior_support = len(list(prior_query.evaluate()))
+
+        confidence = support / prior_support if prior_support else 0.0
+        return RuleScore(support=support, confidence=confidence)

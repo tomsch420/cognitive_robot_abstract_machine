@@ -1,5 +1,5 @@
 """
-Exceptions raised while incrementally constructing a candidate rule body.
+Exceptions raised while incrementally constructing or scoring a candidate rule body.
 """
 
 from __future__ import annotations
@@ -63,3 +63,17 @@ class IncompatibleVariableTypesError(DataclassException):
 
     def suggest_correction(self) -> str:
         return "Equate variables whose static types are related by subclassing."
+
+
+@dataclass
+class EmptyRuleBodyError(DataclassException):
+    """
+    Raised when scoring a candidate rule body that has no conditions yet, so there is no
+    most-recently-added atom to compute confidence against.
+    """
+
+    def error_message(self) -> str:
+        return "Cannot score a candidate rule body with no conditions."
+
+    def suggest_correction(self) -> str:
+        return "Apply at least one refinement operator before scoring the rule body."
