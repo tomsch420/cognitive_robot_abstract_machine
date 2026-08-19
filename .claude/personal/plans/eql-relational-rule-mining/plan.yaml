@@ -65,10 +65,12 @@ items:
 
   - id: engine-support-confidence
     title: "Implement support/confidence scoring and pruning over candidate rule bodies"
-    branch: engine-support-confidence
+    branch: claude/eql-relational-rule-mining-next-z575k9
     track: engine-track
     depends_on: ["engine-atom-refinement"]
-    status: not_started
+    status: in_progress
+    pull_request_number: 27
+    session: https://claude.ai/code/session_018wDeDCgF1keGFJCzjyncXQ
     notes: >
       Support/confidence computed by evaluating the candidate rule-body EQL
       query itself (query.evaluate() counts satisfying bindings) - no

@@ -1,5 +1,5 @@
 feature/eql-relational-rule-mining	eql-relational-rule-mining
-engine-support-confidence	eql-relational-rule-mining
+claude/eql-relational-rule-mining-next-z575k9	eql-relational-rule-mining
 engine-tests-synthetic	eql-relational-rule-mining
 partnet-remote-access	eql-relational-rule-mining
 partnet-eql-domain-model	eql-relational-rule-mining
