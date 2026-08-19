@@ -278,3 +278,110 @@ clearing thresholds, and either one not).
 Verification: `pytest test/krrood_test/test_eql/test_rule_mining/ -v`, full
 krrood suite green, self-containment verified, `scripts/format_docstrings.py`
 run on new/changed files.
+
+## `engine-tests-synthetic` — implementation plan (approved)
+
+Items 1–2 (`engine-atom-refinement` PR #26, `engine-support-confidence`
+PR #27, both still open/draft) built only the pieces: `CandidateRuleBody`'s
+three refinement operators and `score()`. Neither built anything that
+actually searches — nothing enumerates candidate atoms, extends bodies,
+prunes by score, or decides when a body is a finished rule. This item's own
+note ("the miner must recover [a planted rule]") assumes a miner exists;
+it doesn't, so this item builds the search loop itself, not just a test
+for one.
+
+**Design gap found empirically, and how it's resolved**:
+`CandidateRuleBody.open_variables`'s docstring says it tracks variables
+"not yet connected... by a closing atom", but this is narrower in the
+merged code than it sounds: only `close_by_equating_variables` ever
+removes an entry. Using a variable as the source of a further
+`extend_with_related_variable` hop does not remove it, and a
+manually-seeded second variable (the pattern
+`test_close_by_equating_variables_...` already uses) only clears once
+*it itself* is passed to a closing call. Verified directly:
+
+```python
+head = variable(Handle, domain=handles)
+other = variable(Handle, domain=handles)
+body = CandidateRuleBody(head_variable=head, open_variables=[other])
+body.extend_with_related_variable(head, "container")
+body.extend_with_related_variable(other, "container")
+body.close_by_equating_variables(<container-of-head>, <container-of-other>)
+# open_variables ends as [Handle]  <- `other` never clears, permanently "open"
+```
+
+So `open_variables` alone can't tell a miner "is this body a finished,
+closed rule" whenever a self-join-style auxiliary variable is involved.
+Rather than touch `CandidateRuleBody` (out of scope; still mid-review on
+an open PR), the miner tracks its own "still needs a closing partner" set,
+seeded from every variable it itself introduces, independent of
+`CandidateRuleBody.open_variables` (which is still used for what it's
+clearly built for: the frontier of variables available to extend or close
+from).
+
+**The planted rule**: reuses the existing
+`test/krrood_test/dataset/rule_mining_fixture.py` (`Container`/`Handle`) —
+no new fixture file. This also sidesteps a pre-existing, unrelated bug
+found while building item 2 (a same-named-class type-resolution collision
+in `krrood/class_diagrams`, triggered by a *second*
+`extend_with_related_variable` hop off a variable introduced by a first
+one): this rule only ever does one hop per variable.
+
+World: `c1` holds `{h1, h2}`, `c2` holds `{h3, h4}`, `c3` holds `{h5}`
+alone. Rule: two `Handle`s are "siblings" iff they share a container — a
+self-join pattern (AMIE's third refinement family, not one of items 1–2's
+three operators, but expressible today purely as miner-side search: seed
+a second, independently-domained `Handle` variable at depth 0, then let
+ordinary dangling + closing atoms take it from there). Verified against
+the real engine (not hand math): support=9, confidence=0.36, result set
+`['H1','H1','H2','H2','H3','H3','H4','H4','H5']`.
+
+**New file** `krrood/entity_query_language/rule_mining/miner.py`:
+
+```python
+@dataclass
+class RuleMiner:
+    thresholds: ScoreThresholds
+    maximum_atoms: int
+
+    def mine(self, head_type: type, domain: Sequence) -> List[CandidateRuleBody]: ...
+```
+
+Breadth-first, level by level, up to `maximum_atoms`:
+- Frontier seeding (depth 0): the empty body over `head_type`/`domain`,
+  plus one self-join-seeded body — self-join seeding is scoped to only the
+  head's own type, at depth 0 only, a deliberate wave-1 limit called out
+  rather than generalized now.
+- Refinement per body: for every variable the miner has introduced so far,
+  `deepcopy` the body (operators mutate in place) and try every declared
+  attribute name (via `DataclassOnlyIntrospector().discover(...)`, the
+  same introspector `extend_with_related_variable` already uses
+  internally — no probing via exceptions, per AGENTS.md) as a dangling-atom
+  extension; also try `close_by_equating_variables` on every pair of
+  currently-open, type-compatible variables.
+- Scoring/pruning: skip scoring a body with empty `conditions`; otherwise
+  drop the whole branch if `support < thresholds.minimum_support` (support
+  is monotonically non-increasing as atoms are added — standard, safe
+  AMIE pruning).
+- Collecting results: a body counts as a finished rule once every variable
+  the miner is tracking as needing closure has been closed and its score
+  meets both thresholds.
+- Deliberately not deduplicating semantically-equivalent rules reached via
+  different atom orders — out of scope for a wave-1 validation pass.
+
+Intentionally the minimum needed to recover the one planted rule — not the
+production miner wave 2 will run against PartNet-Mobility.
+
+Tests first (TDD): `test/krrood_test/test_eql/test_rule_mining/test_miner.py`
+builds the world above, runs `RuleMiner(ScoreThresholds(minimum_support=2,
+minimum_confidence=0.1), maximum_atoms=3).mine(Handle, [h1..h5])`, and
+asserts against concrete values: at least one returned body's
+`to_query().evaluate()` result, sorted by name, equals
+`['H1','H1','H2','H2','H3','H3','H4','H4','H5']` exactly, and that
+candidate's `score()` equals `RuleScore(support=9, confidence=0.36)`.
+
+Verification: `pytest test/krrood_test/test_eql/test_rule_mining/ -v`, full
+krrood suite green (same pre-existing environment-only gaps excluded as
+item 2: `dot`/Graphviz binary, `jpt`, mypy's `librt`,
+`semantic_digital_twin` — none touch `rule_mining`), self-containment
+verified, `scripts/format_docstrings.py` run on new/changed files.
