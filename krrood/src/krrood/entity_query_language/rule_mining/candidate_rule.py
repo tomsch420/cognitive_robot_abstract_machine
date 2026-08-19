@@ -33,6 +33,10 @@ class CandidateRuleBody:
     matching :meth:`~krrood.entity_query_language.query.query.Query.where`'s own
     mutate-and-return-self convention.
 
+    Reference: :cite:t:`galarraga2013amie` — the dangling/instantiated/closing atom
+    refinement operators; :cite:t:`dehaspe1997warmr` — their earlier, schema-agnostic
+    relational association-rule mining origin.
+
     >>> from dataclasses import dataclass
     >>> from typing_extensions import List
     >>> from krrood.entity_query_language.factories import variable
