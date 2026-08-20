@@ -8,12 +8,13 @@ from pathlib import Path
 from xml.etree import ElementTree as ET
 
 import jinja2
-from typing_extensions import List
+from typing_extensions import List, Optional
 
 from krrood.utils import recursive_subclasses
 from semantic_digital_twin.adapters.package_resolver import FileUriResolver
 from semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations import *  # type: ignore
 from semantic_digital_twin.adapters.urdf import URDFParser
+from semantic_digital_twin.exceptions import MissingSapienAccessTokenError
 from semantic_digital_twin.world import World
 
 logger = logging.getLogger(__name__)
@@ -34,21 +35,24 @@ class PartNetMobilityDatasetLoader:
     """
     Loader for articulated assets from the PartNet-Mobility dataset (https://sapien.ucsd.edu/browse).
 
-    For this to work out of the box, the environment variable SAPIEN_ACCESS_TOKEN must be set,
-    and you have to install sapien.
+    Downloading a model needs the environment variable SAPIEN_ACCESS_TOKEN set and sapien
+    installed. A corpus that is already on disk is read by `load_from_directory`, which
+    needs neither.
 
     The URDF files provided by sapien are missing some information. This loader also adds the missing information.
     The semantics are also added to the world, utilizing the PartNet-Mobility dataset semantics and the subclasses of
     PartNetLabel.
     """
 
-    token: str = field(
-        default_factory=lambda: os.environ[
+    token: Optional[str] = field(
+        default_factory=lambda: os.environ.get(
             SAPIEN_ACCESS_TOKEN_ENVIRONMENT_VARIABLE_NAME
-        ]
+        )
     )
     """
     The token to use for communication with the partnet server.
+
+    Only downloading needs one; an already-downloaded corpus is read without it.
     """
 
     directory: Path = field(
@@ -81,16 +85,34 @@ class PartNetMobilityDatasetLoader:
         :param model_id: The id of the model to load.
         :return: The loaded world.
         """
-        urdf_file = sapien.asset.download_partnet_mobility(
+        if self.token is None:
+            raise MissingSapienAccessTokenError(
+                model_id=model_id,
+                environment_variable_name=SAPIEN_ACCESS_TOKEN_ENVIRONMENT_VARIABLE_NAME,
+            )
+        sapien.asset.download_partnet_mobility(
             model_id=model_id, token=self.token, directory=self.directory
         )
-        self._add_missing_information_to_limit_tags(file_path=urdf_file)
-        world = URDFParser.from_file(
-            file_path=urdf_file,
-            path_resolver=FileUriResolver(
-                base_directory=self.directory / str(model_id)
+        return self.load_from_directory(model_id)
+
+    def load_from_directory(self, model_id: int) -> World:
+        """
+        Load a world from a model that is already present in the directory.
+
+        Nothing is downloaded and nothing in the directory is written to, so this works
+        against a read-only corpus and without an access token.
+
+        :param model_id: The id of the model to load.
+        :return: The loaded world.
+        """
+        model_directory = self.directory / str(model_id)
+        urdf_parser = URDFParser(
+            urdf=self._urdf_with_completed_limit_tags(
+                file_path=model_directory / "mobility.urdf"
             ),
-        ).parse()
+            path_resolver=FileUriResolver(base_directory=str(model_directory)),
+        )
+        world = urdf_parser.parse()
         self._apply_semantics_to_world(world, model_id)
         return world
 
@@ -122,18 +144,21 @@ class PartNetMobilityDatasetLoader:
             with world.modify_world():
                 world.add_semantic_annotation(semantic_annotation)
 
-    def _add_missing_information_to_limit_tags(self, file_path: str):
+    def _urdf_with_completed_limit_tags(self, file_path: Path) -> str:
         """
-        Add the missing information to all limit tags in a URDF file.
+        Read a URDF file, filling in the effort and velocity its limit tags omit.
+
+        The file itself is left untouched, so a read-only corpus stays readable.
 
         :param file_path: Path to the URDF file.
+        :return: The completed URDF.
         """
         tree = ET.parse(file_path)
         root = tree.getroot()
         for limit in root.findall(".//limit"):
             limit.set("effort", str(self.default_effort_for_limit_tags))
             limit.set("velocity", str(self.default_velocity_for_limit_tags))
-        tree.write(file_path)
+        return ET.tostring(root, encoding="unicode")
 
     def _create_python_file_with_semantic_annotations_from_dataset(self):
         """

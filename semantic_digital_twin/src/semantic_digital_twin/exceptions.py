@@ -1244,6 +1244,33 @@ class UnresolvedNameError(ValueError):
 
 
 @dataclass
+class MissingSapienAccessTokenError(DataclassException):
+    """
+    Raised when a PartNet-Mobility model would have to be downloaded but no access token
+    is available.
+    """
+
+    model_id: int
+    """
+    The model that would have been downloaded.
+    """
+
+    environment_variable_name: str
+    """
+    The variable the token is read from.
+    """
+
+    def error_message(self) -> str:
+        return f"Downloading model {self.model_id} needs an access token."
+
+    def suggest_correction(self) -> str:
+        return (
+            f"Set {self.environment_variable_name}, or read an already-downloaded "
+            f"corpus with load_from_directory, which needs no token."
+        )
+
+
+@dataclass
 class RootNodeNotFoundError(DataclassException):
     """
     Raised when the root node cannot be found or is ambiguous in a scene graph.
