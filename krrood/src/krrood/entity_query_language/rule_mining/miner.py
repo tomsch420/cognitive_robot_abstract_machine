@@ -162,8 +162,12 @@ class RuleMiner:
         :param auxiliary_domains: Further pools the search may seed a variable over, so
             rules relating the head to another type are reachable. The head's own pool
             is always seedable, which is what makes a self-join reachable.
+        :param candidate_values: The values each attribute may be pinned to, keyed by
+            attribute name. Attributes absent from it are never pinned, so supplying
+            nothing searches for structural joins alone.
         :return: Every closed candidate rule body found that meets :attr:`thresholds`.
         """
+        values_by_attribute = candidate_values or {}
         head_variable = variable(head_type, domain=domain)
         seed_domains = [
             SeedDomain(entity_type=head_type, instances=domain),
