@@ -3,12 +3,14 @@ from pathlib import Path
 
 import pytest
 
+from krrood.class_diagrams.attribute_introspector import DataclassOnlyIntrospector
 from semantic_digital_twin.adapters.partnet_mobility_dataset.domain_model import (
     HANDLE_PART_NAME,
     PartNetLink,
     PartNetModel,
     PartNetMotionKind,
     StorageFurnitureLabel,
+    UrdfJointType,
 )
 from semantic_digital_twin.adapters.partnet_mobility_dataset.loader import (
     PartNetMobilityDatasetLoader,
@@ -131,3 +133,58 @@ def test_real_drawer_link_has_a_handle_and_a_prismatic_connection():
     assert drawer.motion_kind == PartNetMotionKind.SLIDER
     assert drawer.has_handle
     assert isinstance(drawer.connection, PrismaticConnection)
+
+
+# %% the mesh-free path
+
+
+def test_from_dataset_matches_from_world_without_reading_meshes(
+    synthetic_model: PartNetModel,
+):
+    """
+    Mining over many models cannot afford world loading, so the two paths must agree on
+    everything that is not the world itself.
+    """
+    dataset_model = PartNetModel.from_dataset(
+        model_directory=SYNTHETIC_MODEL_DIRECTORY / str(SYNTHETIC_MODEL_ID),
+        model_id=SYNTHETIC_MODEL_ID,
+    )
+
+    def comparable(model: PartNetModel):
+        return [
+            (
+                link.index,
+                link.semantic_label,
+                link.motion_kind,
+                link.part_name,
+                link.joint_type,
+                [(part.identifier, part.name) for part in link.parts],
+            )
+            for link in model.links
+        ]
+
+    assert comparable(dataset_model) == comparable(synthetic_model)
+    assert all(link.body is None for link in dataset_model.links)
+    assert all(link.connection is None for link in dataset_model.links)
+
+
+def test_joint_type_comes_from_the_urdf(synthetic_model: PartNetModel):
+    by_index = {link.index: link for link in synthetic_model.links}
+
+    assert by_index[0].joint_type == UrdfJointType.REVOLUTE
+    assert by_index[1].joint_type == UrdfJointType.FIXED
+
+
+def test_world_references_are_hidden_from_attribute_discovery():
+    """
+    A body reaches whole mesh collections, so a miner walking declared fields must not
+    find one.
+    """
+    discovered = {
+        attribute.public_name
+        for attribute in DataclassOnlyIntrospector().discover(PartNetLink)
+    }
+
+    assert "body" not in discovered
+    assert "connection" not in discovered
+    assert {"semantic_label", "motion_kind", "joint_type", "parts"} <= discovered

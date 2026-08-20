@@ -14,6 +14,7 @@ import json
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
+from xml.etree import ElementTree
 
 from typing_extensions import Dict, List, Optional
 
@@ -31,6 +32,11 @@ The part name PartNet uses for a graspable handle.
 MOBILITY_FILE_NAME = "mobility_v2.json"
 """
 The per-model file describing each link's parts and motion.
+"""
+
+URDF_FILE_NAME = "mobility.urdf"
+"""
+The per-model URDF, which declares each joint's type.
 """
 
 SEMANTICS_FILE_NAME = "semantics.txt"
@@ -60,6 +66,19 @@ class PartNetMotionKind(StrEnum):
     FREE = "free"
     HEAVY = "heavy"
     STATIC = "static"
+
+
+class UrdfJointType(StrEnum):
+    """
+    The joint types a URDF may declare.
+    """
+
+    REVOLUTE = "revolute"
+    CONTINUOUS = "continuous"
+    PRISMATIC = "prismatic"
+    FIXED = "fixed"
+    FLOATING = "floating"
+    PLANAR = "planar"
 
 
 class StorageFurnitureLabel(StrEnum):
@@ -133,14 +152,27 @@ class PartNetLink:
     The fine-grained parts composing the link.
     """
 
-    body: Optional[Body] = None
+    joint_type: Optional[UrdfJointType] = None
     """
-    The loaded world's body for this link.
+    The type of the joint attaching the link to its parent, absent for a root link.
     """
 
-    connection: Optional[Connection] = None
+    body: Optional[Body] = field(default=None, init=False)
     """
-    The connection joining the link to its parent, which carries the joint type.
+    The loaded world's body for this link, absent when the model was read without one.
+
+    Declared ``init=False`` so attribute discovery skips it: a body reaches whole mesh
+    collections, and a rule miner walking declared fields would search through geometry
+    that says nothing about annotation.
+    """
+
+    connection: Optional[Connection] = field(default=None, init=False)
+    """
+    The connection joining the link to its parent, absent when the model was read
+    without a world.
+
+    Excluded from attribute discovery for the same reason as
+    :attr:`body`, which it reaches through its own endpoints.
     """
 
     parent_link: Optional[PartNetLink] = None
@@ -173,6 +205,23 @@ class PartNetModel:
     """
 
     @classmethod
+    def from_dataset(cls, model_directory: Path, model_id: int) -> PartNetModel:
+        """
+        Build a model from the dataset files alone.
+
+        No meshes are read, so this is the path to use when mining over many models:
+        loading a world runs convex decomposition over every mesh, which dominates the
+        runtime and contributes nothing a rule can be about.
+
+        :param model_directory: The model's own directory in the dataset.
+        :param model_id: The model's id.
+        :return: The model, without bodies or connections.
+        """
+        return cls(
+            model_id=model_id, links=cls._build_links(model_directory, world=None)
+        )
+
+    @classmethod
     def from_world(
         cls, world: World, model_directory: Path, model_id: int
     ) -> PartNetModel:
@@ -182,9 +231,21 @@ class PartNetModel:
         :param world: The world the model's URDF was parsed into.
         :param model_directory: The model's own directory in the dataset.
         :param model_id: The model's id.
-        :return: The model, with every link wired to its body and parent.
+        :return: The model, with every link wired to its body and connection.
+        """
+        return cls(model_id=model_id, links=cls._build_links(model_directory, world))
+
+    @classmethod
+    def _build_links(
+        cls, model_directory: Path, world: Optional[World]
+    ) -> List[PartNetLink]:
+        """
+        :param model_directory: The model's own directory in the dataset.
+        :param world: The loaded world, when there is one.
+        :return: The model's links, wired to each other and to ``world`` if given.
         """
         labels = cls._read_labels(model_directory / SEMANTICS_FILE_NAME)
+        joint_types = cls._read_joint_types(model_directory / URDF_FILE_NAME)
         entries = json.loads((model_directory / MOBILITY_FILE_NAME).read_text())
 
         links_by_index: Dict[int, PartNetLink] = {}
@@ -199,7 +260,7 @@ class PartNetModel:
                     PartNetPart(identifier=part["id"], name=part["name"])
                     for part in entry["parts"]
                 ],
-                body=world.get_body_by_name(f"{LINK_NAME_PREFIX}{index}"),
+                joint_type=joint_types.get(index),
             )
 
         for entry in entries:
@@ -207,9 +268,26 @@ class PartNetModel:
             parent_index = entry["parent"]
             if parent_index != NO_PARENT_LINK_INDEX:
                 link.parent_link = links_by_index[parent_index]
-            link.connection = cls._parent_connection(world, link.body)
+            if world is not None:
+                link.body = world.get_body_by_name(f"{LINK_NAME_PREFIX}{link.index}")
+                link.connection = cls._parent_connection(world, link.body)
 
-        return cls(model_id=model_id, links=list(links_by_index.values()))
+        return list(links_by_index.values())
+
+    @staticmethod
+    def _read_joint_types(urdf_file: Path) -> Dict[int, UrdfJointType]:
+        """
+        :param urdf_file: The model's URDF.
+        :return: The joint type attaching each link to its parent, by link index.
+        """
+        joint_types: Dict[int, UrdfJointType] = {}
+        for joint in ElementTree.parse(urdf_file).getroot().findall("joint"):
+            child_name = joint.find("child").get("link")
+            if not child_name.startswith(LINK_NAME_PREFIX):
+                continue
+            index = int(child_name.removeprefix(LINK_NAME_PREFIX))
+            joint_types[index] = UrdfJointType(joint.get("type"))
+        return joint_types
 
     @staticmethod
     def _read_labels(semantics_file: Path) -> Dict[int, str]:

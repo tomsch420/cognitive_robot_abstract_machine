@@ -35,9 +35,7 @@ from semantic_digital_twin.adapters.partnet_mobility_dataset.domain_model import
     PartNetMotionKind,
     PartNetPart,
     StorageFurnitureLabel,
-)
-from semantic_digital_twin.adapters.partnet_mobility_dataset.loader import (
-    PartNetMobilityDatasetLoader,
+    UrdfJointType,
 )
 
 DATASET_DIRECTORY_VARIABLE_NAME = "PARTNET_MOBILITY_DATASET_DIRECTORY"
@@ -96,19 +94,18 @@ def load_models(
     :param dataset_directory: The corpus location.
     :param model_ids: The models to load.
     :return: One :class:`PartNetModel` per id.
+
+    .. note::
+        Read straight from the dataset files rather than from a loaded world: building
+        a world runs convex decomposition over every mesh, which dominates the runtime
+        and contributes nothing a mined rule can be about.
     """
-    loader = PartNetMobilityDatasetLoader(directory=dataset_directory)
-    models = []
-    for model_id in model_ids:
-        world = loader.load_from_directory(model_id)
-        models.append(
-            PartNetModel.from_world(
-                world=world,
-                model_directory=dataset_directory / str(model_id),
-                model_id=model_id,
-            )
+    return [
+        PartNetModel.from_dataset(
+            model_directory=dataset_directory / str(model_id), model_id=model_id
         )
-    return models
+        for model_id in model_ids
+    ]
 
 
 # %% reporting what a mined pattern says about the labels
@@ -191,6 +188,7 @@ def mine_over(models: Sequence[PartNetModel]) -> List[CandidateRuleBody]:
         auxiliary_domains=[SeedDomain(entity_type=PartNetPart, instances=parts)],
         candidate_values={
             "motion_kind": list(PartNetMotionKind),
+            "joint_type": list(UrdfJointType),
             "name": [HANDLE_PART_NAME],
             "part_name": [
                 StorageFurnitureLabel.DRAWER.value,
@@ -251,7 +249,7 @@ def main(argument_values: Sequence[str]) -> int:
 
     directory = Path(dataset_directory)
     model_ids = storage_furniture_model_ids(directory, arguments.model_count)
-    print(f"loading {len(model_ids)} {CATEGORY} models ...")
+    print(f"loading {len(model_ids)} {CATEGORY} models ...", flush=True)
     models = load_models(directory, model_ids)
     links = [link for model in models for link in model.links]
 
