@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from typing_extensions import Dict, List, Sequence, Tuple, Union
+from typing_extensions import Any, Dict, List, Mapping, Optional, Sequence, Tuple, Union
 
 from krrood.class_diagrams.attribute_introspector import DataclassOnlyIntrospector
 from krrood.entity_query_language.core.mapped_variable import CanBehaveLikeAVariable
@@ -19,10 +19,35 @@ from krrood.entity_query_language.rule_mining.scoring import ScoreThresholds
 
 
 @dataclass(frozen=True)
-class SelfJoinSeedStep:
+class SeedDomain:
     """
-    Introduces a second, independently-domained variable of the head's own type, so a
-    self-join pattern (two separate entities of the same type) can be searched for.
+    A pool of entities the search may introduce a fresh variable over.
+    """
+
+    entity_type: type
+    """
+    The static type of the entities in the pool.
+    """
+
+    instances: Sequence
+    """
+    The entities the seeded variable ranges over.
+    """
+
+
+@dataclass(frozen=True)
+class SeedStep:
+    """
+    Introduces a second, independently-domained variable, so a pattern relating two
+    separate entities can be searched for.
+
+    Seeding the head's own pool searches for a self-join; seeding another pool searches
+    for a rule relating the head to a different type.
+    """
+
+    seed_index: int
+    """
+    The index, within the search's seed domains, of the pool the variable is drawn from.
     """
 
 
@@ -63,10 +88,72 @@ class CloseStep:
     """
 
 
-RefinementStep = Union[SelfJoinSeedStep, ExtendStep, CloseStep]
+@dataclass(frozen=True)
+class ConstrainStep:
+    """
+    The instantiated-atom operator, pinning a variable a previous step introduced to one
+    concrete value.
+    """
+
+    source_step: int
+    """
+    The index, within the same plan, of the step that introduced the variable.
+    """
+
+    value: Any
+    """
+    The value the variable is pinned to.
+    """
+
+
+RefinementStep = Union[SeedStep, ExtendStep, CloseStep, ConstrainStep]
 """
 One step of a candidate rule body's construction plan.
 """
+
+# %% a mined rule
+
+
+@dataclass
+class MinedRule:
+    """
+    A rule the search found, together with the steps that built it.
+
+    The body alone cannot be read back: an EQL comparator renders as its operator and
+    its literal operand does not expose the value it wraps, so the plan is what makes a
+    rule describable.
+    """
+
+    body: CandidateRuleBody
+    """
+    The rule body, ready to be scored or evaluated.
+    """
+
+    plan: List[RefinementStep]
+    """
+    The steps that built the body, in order.
+    """
+
+    def describe(self) -> str:
+        """
+        :return: The rule as a conjunction of its atoms.
+        """
+        names: Dict[int, str] = {-1: self.body.head_variable._type_.__name__}
+        atoms: List[str] = []
+        for index, step in enumerate(self.plan):
+            if isinstance(step, SeedStep):
+                names[index] = f"other_{index}"
+                atoms.append(f"exists {names[index]}")
+            elif isinstance(step, ExtendStep):
+                names[index] = f"{names[step.source_step]}.{step.attribute_name}"
+            elif isinstance(step, ConstrainStep):
+                atoms.append(f"{names[step.source_step]} == {step.value}")
+            else:
+                atoms.append(
+                    f"{names[step.variable_a_step]} == {names[step.variable_b_step]}"
+                )
+        return " and ".join(atoms) if atoms else "(no atoms)"
+
 
 # %% rule miner
 
@@ -75,7 +162,7 @@ One step of a candidate rule body's construction plan.
 class RuleMiner:
     """
     Breadth-first, AMIE-style search over :class:`CandidateRuleBody`, built entirely on
-    its three refinement operators plus a depth-0 self-join seed, pruning by support.
+    its three refinement operators plus depth-0 seeding, pruning by support.
 
     A candidate under search is represented as a plan (a list of :data:`RefinementStep`)
     rather than a live :class:`CandidateRuleBody`: the operators mutate a body in place,
@@ -87,8 +174,8 @@ class RuleMiner:
     Deliberately minimal, sufficient to recover a hand-planted rule from a small
     synthetic domain, not the production miner a later item will run against real data:
     a dangling atom is only ever extended once from any given source (never chained a
-    second hop deeper) and self-join seeding only tries the head's own type, both at
-    depth 0 only. Rules reached via different atom orders are not deduplicated.
+    second hop deeper) and seeding happens at depth 0 only. Rules reached via different
+    atom orders are not deduplicated.
 
     Reference: :cite:t:`galarraga2013amie`.
     """
@@ -104,32 +191,51 @@ class RuleMiner:
     before its branch stops being refined further.
     """
 
-    def mine(self, head_type: type, domain: Sequence) -> List[CandidateRuleBody]:
+    def mine(
+        self,
+        head_type: type,
+        domain: Sequence,
+        auxiliary_domains: Sequence[SeedDomain] = (),
+        candidate_values: Optional[Mapping[str, Sequence[Any]]] = None,
+    ) -> List[MinedRule]:
         """
         Search for closed rule bodies over ``head_type`` that meet :attr:`thresholds`.
 
         :param head_type: The static type of the entities the mined rules are about.
         :param domain: The instances ``head_type``'s variable ranges over.
-        :return: Every closed candidate rule body found that meets :attr:`thresholds`.
+        :param auxiliary_domains: Further pools the search may seed a variable over, so
+            rules relating the head to another type are reachable. The head's own pool
+            is always seedable, which is what makes a self-join reachable.
+        :param candidate_values: The values each attribute may be pinned to, keyed by
+            attribute name. Attributes absent from it are never pinned, so supplying
+            nothing searches for structural joins alone.
+        :return: Every closed rule found that meets :attr:`thresholds`.
         """
+        values_by_attribute = candidate_values or {}
         head_variable = variable(head_type, domain=domain)
-        results: List[CandidateRuleBody] = []
-        frontier: List[List[RefinementStep]] = [[], [SelfJoinSeedStep()]]
+        seed_domains = [
+            SeedDomain(entity_type=head_type, instances=domain),
+            *auxiliary_domains,
+        ]
+        results: List[MinedRule] = []
+        frontier: List[List[RefinementStep]] = [[]] + [
+            [SeedStep(index)] for index in range(len(seed_domains))
+        ]
 
         for _ in range(self.maximum_atoms):
             next_frontier: List[List[RefinementStep]] = []
             for plan in frontier:
                 for refined_plan in self._refine(
-                    head_variable, head_type, domain, plan
+                    head_variable, seed_domains, values_by_attribute, plan
                 ):
                     body, _ = self._materialize(
-                        head_variable, head_type, domain, refined_plan
+                        head_variable, seed_domains, refined_plan
                     )
                     score = body.score()
                     if score.support < self.thresholds.minimum_support:
                         continue
                     if self._is_closed(refined_plan) and score.meets(self.thresholds):
-                        results.append(body)
+                        results.append(MinedRule(body=body, plan=refined_plan))
                     next_frontier.append(refined_plan)
             frontier = next_frontier
 
@@ -138,24 +244,22 @@ class RuleMiner:
     def _refine(
         self,
         head_variable: CanBehaveLikeAVariable,
-        head_type: type,
-        domain: Sequence,
+        seed_domains: Sequence[SeedDomain],
+        values_by_attribute: Mapping[str, Sequence[Any]],
         plan: List[RefinementStep],
     ) -> List[List[RefinementStep]]:
         """
         Generate every single-atom extension of ``plan``.
 
         :return: One dangling-atom extend per declared attribute of the head variable
-            and of any self-join seed, plus one closing atom per pair of currently-open,
-            type-compatible variables.
+            and of any seeded variable, plus one closing atom per pair of currently-
+            open, type-compatible variables.
         """
-        body, introduced = self._materialize(head_variable, head_type, domain, plan)
+        body, introduced = self._materialize(head_variable, seed_domains, plan)
         refinements: List[List[RefinementStep]] = []
 
         extendable_steps = [-1] + [
-            index
-            for index, step in enumerate(plan)
-            if isinstance(step, SelfJoinSeedStep)
+            index for index, step in enumerate(plan) if isinstance(step, SeedStep)
         ]
         for source_step in extendable_steps:
             source_variable = (
@@ -170,21 +274,25 @@ class RuleMiner:
         live_steps = [
             index
             for index, step in enumerate(plan)
-            if isinstance(step, (ExtendStep, SelfJoinSeedStep))
-            and self._is_live(index, plan)
+            if isinstance(step, (ExtendStep, SeedStep)) and self._is_live(index, plan)
         ]
         for position, step_a in enumerate(live_steps):
             for step_b in live_steps[position + 1 :]:
                 if self._types_are_compatible(introduced[step_a], introduced[step_b]):
                     refinements.append([*plan, CloseStep(step_a, step_b)])
 
+        for index, step in enumerate(plan):
+            if not isinstance(step, ExtendStep) or not self._is_live(index, plan):
+                continue
+            for value in values_by_attribute.get(step.attribute_name, ()):
+                refinements.append([*plan, ConstrainStep(index, value)])
+
         return refinements
 
     def _materialize(
         self,
         head_variable: CanBehaveLikeAVariable,
-        head_type: type,
-        domain: Sequence,
+        seed_domains: Sequence[SeedDomain],
         plan: List[RefinementStep],
     ) -> Tuple[CandidateRuleBody, Dict[int, CanBehaveLikeAVariable]]:
         """
@@ -196,10 +304,13 @@ class RuleMiner:
         body = CandidateRuleBody(head_variable=head_variable)
         introduced: Dict[int, CanBehaveLikeAVariable] = {}
         for index, step in enumerate(plan):
-            if isinstance(step, SelfJoinSeedStep):
-                self_join_variable = variable(head_type, domain=domain)
-                body.open_variables.append(self_join_variable)
-                introduced[index] = self_join_variable
+            if isinstance(step, SeedStep):
+                seed_domain = seed_domains[step.seed_index]
+                seeded_variable = variable(
+                    seed_domain.entity_type, domain=seed_domain.instances
+                )
+                body.open_variables.append(seeded_variable)
+                introduced[index] = seeded_variable
             elif isinstance(step, ExtendStep):
                 source = (
                     head_variable
@@ -208,9 +319,13 @@ class RuleMiner:
                 )
                 body.extend_with_related_variable(source, step.attribute_name)
                 introduced[index] = body.open_variables[-1]
-            else:
+            elif isinstance(step, CloseStep):
                 body.close_by_equating_variables(
                     introduced[step.variable_a_step], introduced[step.variable_b_step]
+                )
+            else:
+                body.constrain_variable_to_value(
+                    introduced[step.source_step], step.value
                 )
         return body, introduced
 
@@ -236,18 +351,22 @@ class RuleMiner:
         introduced_steps = {
             index
             for index, step in enumerate(plan)
-            if isinstance(step, (ExtendStep, SelfJoinSeedStep))
+            if isinstance(step, (ExtendStep, SeedStep))
         }
-        connected_steps = {
-            step_index
-            for step in plan
-            if isinstance(step, CloseStep)
-            for step_index in (step.variable_a_step, step.variable_b_step)
-        } | {
-            step.source_step
-            for step in plan
-            if isinstance(step, ExtendStep) and step.source_step != -1
-        }
+        connected_steps = (
+            {
+                step_index
+                for step in plan
+                if isinstance(step, CloseStep)
+                for step_index in (step.variable_a_step, step.variable_b_step)
+            }
+            | {
+                step.source_step
+                for step in plan
+                if isinstance(step, ExtendStep) and step.source_step != -1
+            }
+            | {step.source_step for step in plan if isinstance(step, ConstrainStep)}
+        )
         return introduced_steps <= connected_steps
 
     @staticmethod

@@ -1,0 +1,279 @@
+"""
+Mine relational rules from real PartNet-Mobility models and report what they say about
+the dataset's own annotations.
+
+PartNet labels a link twice and the two labels disagree: ``semantics.txt`` calls a link
+``drawer`` or ``rotation_door``, while ``mobility_v2.json``'s part hierarchy calls it
+``drawer``, ``drawer_box``, ``cabinet_door`` or even ``handle``. This run mines patterns
+over links and reports, for each, how the ``semantics.txt`` labels of the links it
+matches are distributed — which is what makes a pattern readable as evidence about the
+alignment rather than an opaque score.
+
+Run it through the neem-4 container, which mounts the corpus read-only::
+
+    RemoteMiningJob(configuration=..., module=__name__, arguments=["--model-count", "40"])
+"""
+
+from __future__ import annotations
+
+import argparse
+import collections
+import os
+import sys
+from dataclasses import dataclass, field
+from pathlib import Path
+
+from typing_extensions import Dict, List, Sequence
+
+from krrood.entity_query_language._monitoring import MonitoredRegistry
+from krrood.entity_query_language.rule_mining.miner import MinedRule, RuleMiner
+from krrood.entity_query_language.rule_mining.scoring import ScoreThresholds
+from semantic_digital_twin.adapters.partnet_mobility_dataset.domain_model import (
+    HANDLE_PART_NAME,
+    PartNetLink,
+    PartNetModel,
+    PartNetMotionKind,
+    StorageFurnitureLabel,
+    UrdfJointType,
+)
+
+DATASET_DIRECTORY_VARIABLE_NAME = "PARTNET_MOBILITY_DATASET_DIRECTORY"
+"""
+Environment variable naming the corpus location.
+"""
+
+CATEGORY = "StorageFurniture"
+"""
+The category this run is scoped to.
+"""
+
+METADATA_DIRECTORY_NAME = "partnet_meta"
+"""
+The sibling directory holding the dataset's own id and category index.
+"""
+
+CATEGORY_INDEX_FILE_NAME = "all_ids.txt"
+"""
+The ``id,category`` index inside the metadata directory.
+"""
+
+CANDIDATE_VALUES = {
+    "joint_type": [UrdfJointType.PRISMATIC, UrdfJointType.REVOLUTE],
+    "motion_kind": [PartNetMotionKind.SLIDER, PartNetMotionKind.HINGE],
+    "has_handle": [True, False],
+    "part_name": [StorageFurnitureLabel.DRAWER.value, "cabinet_door"],
+}
+"""
+The values a mined atom may pin an attribute to.
+
+Kept to the handful that bear on the drawer/door question: every extra value multiplies
+the search, and a value no rule turns out to need only costs time.
+"""
+
+# %% loading a slice of the corpus
+
+
+def storage_furniture_model_ids(dataset_directory: Path, limit: int) -> List[int]:
+    """
+    :param dataset_directory: The corpus location.
+    :param limit: The greatest number of ids to return.
+    :return: Ids of models in :data:`CATEGORY` that are actually present on disk.
+
+    .. note::
+        The index lists more ids than the corpus holds — it covers models that are not
+        well formed and were never unpacked — so presence on disk is checked here.
+    """
+    index_file = (
+        dataset_directory.parent / METADATA_DIRECTORY_NAME / CATEGORY_INDEX_FILE_NAME
+    )
+    model_ids = []
+    for line in index_file.read_text().splitlines():
+        identifier, _, category = line.partition(",")
+        if category != CATEGORY:
+            continue
+        if not (dataset_directory / identifier).is_dir():
+            continue
+        model_ids.append(int(identifier))
+        if len(model_ids) >= limit:
+            break
+    return model_ids
+
+
+def load_models(
+    dataset_directory: Path, model_ids: Sequence[int]
+) -> List[PartNetModel]:
+    """
+    :param dataset_directory: The corpus location.
+    :param model_ids: The models to load.
+    :return: One :class:`PartNetModel` per id.
+
+    .. note::
+        Read straight from the dataset files rather than from a loaded world: building
+        a world runs convex decomposition over every mesh, which dominates the runtime
+        and contributes nothing a mined rule can be about.
+    """
+    return [
+        PartNetModel.from_dataset(
+            model_directory=dataset_directory / str(model_id), model_id=model_id
+        )
+        for model_id in model_ids
+    ]
+
+
+# %% reporting what a mined pattern says about the labels
+
+
+@dataclass
+class LabelDistribution:
+    """
+    How the links a pattern matches are labelled by ``semantics.txt``.
+
+    The miner scores rule bodies, not implications, so this is what turns a scored
+    pattern into a statement about the dataset's own annotations.
+    """
+
+    counts: Dict[str, int] = field(default_factory=dict)
+    """
+    Number of matched links per label.
+    """
+
+    @classmethod
+    def of(cls, links: Sequence[PartNetLink]) -> LabelDistribution:
+        """
+        :param links: The links a pattern matched.
+        :return: Their label distribution.
+        """
+        return cls(
+            counts=dict(collections.Counter(link.semantic_label for link in links))
+        )
+
+    @property
+    def total(self) -> int:
+        """
+        :return: How many links were matched.
+        """
+        return sum(self.counts.values())
+
+    def share_of(self, label: str) -> float:
+        """
+        :param label: The label to measure.
+        :return: The fraction of matched links carrying it, zero when nothing matched.
+        """
+        if not self.total:
+            return 0.0
+        return self.counts.get(label, 0) / self.total
+
+    def describe(self) -> str:
+        """
+        :return: The distribution, most common label first.
+        """
+        ordered = sorted(self.counts.items(), key=lambda item: -item[1])
+        return ", ".join(
+            f"{label} {100 * count / self.total:.0f}%" for label, count in ordered
+        )
+
+
+# %% the run
+
+
+def mine_over(models: Sequence[PartNetModel]) -> List[MinedRule]:
+    """
+    :param models: The models to mine over.
+    :return: Rules over :class:`PartNetLink` meeting the thresholds.
+
+    .. note::
+        Run with EQL's call-stack monitoring disabled: it captures a stack trace on every
+        variable construction, and the search constructs one per atom of every candidate
+        it considers.
+    """
+    links = [link for model in models for link in model.links]
+    with MonitoredRegistry().disabled():
+        return _search(links)
+
+
+def _search(links: Sequence[PartNetLink]) -> List[MinedRule]:
+    """
+    :param links: The links to mine over.
+    :return: Rules meeting the thresholds.
+    """
+    return RuleMiner(
+        thresholds=ScoreThresholds(minimum_support=5, minimum_confidence=0.05),
+        maximum_atoms=2,
+    ).mine(
+        PartNetLink,
+        links,
+        candidate_values=CANDIDATE_VALUES,
+    )
+
+
+def report(rules: Sequence[MinedRule], link_count: int) -> None:
+    """
+    Print each mined pattern with its score and label distribution, most drawer-like
+    first.
+
+    :param rules: The mined rules.
+    :param link_count: How many links were mined over.
+
+    .. note::
+        Rules that constrain only a seeded companion variable are dropped: they leave the
+        head unconstrained, so they match every link and their label distribution is just
+        the corpus-wide one.
+    """
+    rows = []
+    seen_descriptions = set()
+    head_name = PartNetLink.__name__
+    for rule in rules:
+        description = rule.describe()
+        if head_name not in description:
+            continue
+        if description in seen_descriptions:
+            continue
+        seen_descriptions.add(description)
+        distribution = LabelDistribution.of(list(rule.body.to_query().evaluate()))
+        rows.append(
+            (distribution.share_of(StorageFurnitureLabel.DRAWER), rule, distribution)
+        )
+    rows.sort(key=lambda row: -row[0])
+
+    print(f"\nmined {len(rows)} distinct rule(s) over {link_count} links\n")
+    for drawer_share, rule, distribution in rows:
+        score = rule.body.score()
+        print(f"  support={score.support:<5d} confidence={score.confidence:.2f}")
+        print(f"    rule:   {rule.describe()}")
+        print(f"    labels: {distribution.describe()}")
+        print(
+            f"    -> {100 * drawer_share:.0f}% of matched links are PartNet drawers\n"
+        )
+
+
+def main(argument_values: Sequence[str]) -> int:
+    """
+    :param argument_values: Command line arguments.
+    :return: The process exit code.
+    """
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--model-count",
+        type=int,
+        default=40,
+        help="how many StorageFurniture models to mine over",
+    )
+    arguments = parser.parse_args(argument_values)
+
+    dataset_directory = os.environ.get(DATASET_DIRECTORY_VARIABLE_NAME)
+    if dataset_directory is None:
+        print(f"{DATASET_DIRECTORY_VARIABLE_NAME} is not set", file=sys.stderr)
+        return 2
+
+    directory = Path(dataset_directory)
+    model_ids = storage_furniture_model_ids(directory, arguments.model_count)
+    print(f"loading {len(model_ids)} {CATEGORY} models ...", flush=True)
+    models = load_models(directory, model_ids)
+    links = [link for model in models for link in model.links]
+
+    report(mine_over(models), len(links))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

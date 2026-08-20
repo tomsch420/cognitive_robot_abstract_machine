@@ -21,7 +21,7 @@ git clone --depth 1 --single-branch \
 
 # semantic_digital_twin imports giskardpy, which is a workspace package rather
 # than a published one, so it comes from the same checkout.
-export PYTHONPATH="${REPOSITORY_DIRECTORY}/krrood/src:${REPOSITORY_DIRECTORY}/semantic_digital_twin/src:${REPOSITORY_DIRECTORY}/giskardpy/src"
+export PYTHONPATH="${REPOSITORY_DIRECTORY}/krrood/src:${REPOSITORY_DIRECTORY}/semantic_digital_twin/src:${REPOSITORY_DIRECTORY}/giskardpy/src:${REPOSITORY_DIRECTORY}/experiments/src"
 export PARTNET_MOBILITY_DATASET_DIRECTORY="${PARTNET_MINING_DATASET_DIRECTORY}"
 
 cd "${REPOSITORY_DIRECTORY}"
