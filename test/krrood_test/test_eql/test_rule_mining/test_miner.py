@@ -93,3 +93,41 @@ def test_mine_without_auxiliary_domains_seeds_only_the_head_type():
         variable._type_ for body in results for variable in body.open_variables
     }
     assert Container not in seeded_types
+
+
+# %% instantiated atoms
+
+
+def test_mine_constrains_an_attribute_to_a_supplied_candidate_value():
+    """
+    Without instantiated atoms the search can only find structural joins, never a rule
+    about a particular value.
+    """
+    handles = siblings_sharing_a_container_world()
+
+    results = RuleMiner(
+        thresholds=ScoreThresholds(minimum_support=1, minimum_confidence=0.1),
+        maximum_atoms=2,
+    ).mine(Handle, handles, candidate_values={"name": ["H1"]})
+
+    matches = [
+        body
+        for body in results
+        if sorted(handle.name for handle in body.to_query().evaluate()) == ["H1"]
+    ]
+    assert len(matches) >= 1
+    assert matches[0].score().support == 1
+
+
+def test_mine_without_candidate_values_produces_no_instantiated_atoms():
+    handles = siblings_sharing_a_container_world()
+
+    results = RuleMiner(
+        thresholds=ScoreThresholds(minimum_support=1, minimum_confidence=0.1),
+        maximum_atoms=2,
+    ).mine(Handle, handles)
+
+    assert all(
+        sorted(handle.name for handle in body.to_query().evaluate()) != ["H1"]
+        for body in results
+    )

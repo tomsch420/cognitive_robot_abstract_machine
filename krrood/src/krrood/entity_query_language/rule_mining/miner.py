@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from typing_extensions import Dict, List, Sequence, Tuple, Union
+from typing_extensions import Any, Dict, List, Mapping, Optional, Sequence, Tuple, Union
 
 from krrood.class_diagrams.attribute_introspector import DataclassOnlyIntrospector
 from krrood.entity_query_language.core.mapped_variable import CanBehaveLikeAVariable
@@ -88,7 +88,25 @@ class CloseStep:
     """
 
 
-RefinementStep = Union[SeedStep, ExtendStep, CloseStep]
+@dataclass(frozen=True)
+class ConstrainStep:
+    """
+    The instantiated-atom operator, pinning a variable a previous step introduced to one
+    concrete value.
+    """
+
+    source_step: int
+    """
+    The index, within the same plan, of the step that introduced the variable.
+    """
+
+    value: Any
+    """
+    The value the variable is pinned to.
+    """
+
+
+RefinementStep = Union[SeedStep, ExtendStep, CloseStep, ConstrainStep]
 """
 One step of a candidate rule body's construction plan.
 """
@@ -134,6 +152,7 @@ class RuleMiner:
         head_type: type,
         domain: Sequence,
         auxiliary_domains: Sequence[SeedDomain] = (),
+        candidate_values: Optional[Mapping[str, Sequence[Any]]] = None,
     ) -> List[CandidateRuleBody]:
         """
         Search for closed rule bodies over ``head_type`` that meet :attr:`thresholds`.
@@ -158,7 +177,9 @@ class RuleMiner:
         for _ in range(self.maximum_atoms):
             next_frontier: List[List[RefinementStep]] = []
             for plan in frontier:
-                for refined_plan in self._refine(head_variable, seed_domains, plan):
+                for refined_plan in self._refine(
+                    head_variable, seed_domains, values_by_attribute, plan
+                ):
                     body, _ = self._materialize(
                         head_variable, seed_domains, refined_plan
                     )
@@ -176,6 +197,7 @@ class RuleMiner:
         self,
         head_variable: CanBehaveLikeAVariable,
         seed_domains: Sequence[SeedDomain],
+        values_by_attribute: Mapping[str, Sequence[Any]],
         plan: List[RefinementStep],
     ) -> List[List[RefinementStep]]:
         """
@@ -211,6 +233,12 @@ class RuleMiner:
                 if self._types_are_compatible(introduced[step_a], introduced[step_b]):
                     refinements.append([*plan, CloseStep(step_a, step_b)])
 
+        for index, step in enumerate(plan):
+            if not isinstance(step, ExtendStep) or not self._is_live(index, plan):
+                continue
+            for value in values_by_attribute.get(step.attribute_name, ()):
+                refinements.append([*plan, ConstrainStep(index, value)])
+
         return refinements
 
     def _materialize(
@@ -243,9 +271,13 @@ class RuleMiner:
                 )
                 body.extend_with_related_variable(source, step.attribute_name)
                 introduced[index] = body.open_variables[-1]
-            else:
+            elif isinstance(step, CloseStep):
                 body.close_by_equating_variables(
                     introduced[step.variable_a_step], introduced[step.variable_b_step]
+                )
+            else:
+                body.constrain_variable_to_value(
+                    introduced[step.source_step], step.value
                 )
         return body, introduced
 
@@ -273,16 +305,20 @@ class RuleMiner:
             for index, step in enumerate(plan)
             if isinstance(step, (ExtendStep, SeedStep))
         }
-        connected_steps = {
-            step_index
-            for step in plan
-            if isinstance(step, CloseStep)
-            for step_index in (step.variable_a_step, step.variable_b_step)
-        } | {
-            step.source_step
-            for step in plan
-            if isinstance(step, ExtendStep) and step.source_step != -1
-        }
+        connected_steps = (
+            {
+                step_index
+                for step in plan
+                if isinstance(step, CloseStep)
+                for step_index in (step.variable_a_step, step.variable_b_step)
+            }
+            | {
+                step.source_step
+                for step in plan
+                if isinstance(step, ExtendStep) and step.source_step != -1
+            }
+            | {step.source_step for step in plan if isinstance(step, ConstrainStep)}
+        )
         return introduced_steps <= connected_steps
 
     @staticmethod
