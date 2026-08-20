@@ -59,7 +59,7 @@ The ``id,category`` index inside the metadata directory.
 CANDIDATE_VALUES = {
     "joint_type": [UrdfJointType.PRISMATIC, UrdfJointType.REVOLUTE],
     "motion_kind": [PartNetMotionKind.SLIDER, PartNetMotionKind.HINGE],
-    "name": [HANDLE_PART_NAME],
+    "has_handle": [True, False],
     "part_name": [StorageFurnitureLabel.DRAWER.value, "cabinet_door"],
 }
 """
@@ -183,7 +183,7 @@ def mine_over(models: Sequence[PartNetModel]) -> List[MinedRule]:
     links = [link for model in models for link in model.links]
     return RuleMiner(
         thresholds=ScoreThresholds(minimum_support=10, minimum_confidence=0.05),
-        maximum_atoms=4,
+        maximum_atoms=3,
     ).mine(
         PartNetLink,
         links,

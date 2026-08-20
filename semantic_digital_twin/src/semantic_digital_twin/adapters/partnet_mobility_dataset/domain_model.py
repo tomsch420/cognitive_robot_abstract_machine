@@ -175,6 +175,15 @@ class PartNetLink:
     :attr:`body`, which it reaches through its own endpoints.
     """
 
+    has_handle: bool = False
+    """
+    Whether any of the link's parts is a handle.
+
+    Stored rather than derived so a miner walking declared fields can reach it: the
+    presence of a handle is the fact that separates a drawer or door from the case, and
+    a rule about it must be expressible without hopping into the parts collection.
+    """
+
     parent_semantic_label: Optional[str] = None
     """
     The ``semantics.txt`` label of the link this one hangs from, absent for a root link.
@@ -194,13 +203,6 @@ class PartNetLink:
     facts :attr:`parent_semantic_label` and :attr:`parent_part_name` already state
     flatly.
     """
-
-    @property
-    def has_handle(self) -> bool:
-        """
-        :return: Whether any of the link's parts is a handle.
-        """
-        return any(part.name == HANDLE_PART_NAME for part in self.parts)
 
 
 @dataclass
@@ -276,6 +278,9 @@ class PartNetModel:
                     for part in entry["parts"]
                 ],
                 joint_type=joint_types.get(index),
+                has_handle=any(
+                    part["name"] == HANDLE_PART_NAME for part in entry["parts"]
+                ),
             )
 
         for entry in entries:
