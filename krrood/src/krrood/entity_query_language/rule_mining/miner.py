@@ -111,6 +111,50 @@ RefinementStep = Union[SeedStep, ExtendStep, CloseStep, ConstrainStep]
 One step of a candidate rule body's construction plan.
 """
 
+# %% a mined rule
+
+
+@dataclass
+class MinedRule:
+    """
+    A rule the search found, together with the steps that built it.
+
+    The body alone cannot be read back: an EQL comparator renders as its operator and
+    its literal operand does not expose the value it wraps, so the plan is what makes a
+    rule describable.
+    """
+
+    body: CandidateRuleBody
+    """
+    The rule body, ready to be scored or evaluated.
+    """
+
+    plan: List[RefinementStep]
+    """
+    The steps that built the body, in order.
+    """
+
+    def describe(self) -> str:
+        """
+        :return: The rule as a conjunction of its atoms.
+        """
+        names: Dict[int, str] = {-1: self.body.head_variable._type_.__name__}
+        atoms: List[str] = []
+        for index, step in enumerate(self.plan):
+            if isinstance(step, SeedStep):
+                names[index] = f"other_{index}"
+                atoms.append(f"exists {names[index]}")
+            elif isinstance(step, ExtendStep):
+                names[index] = f"{names[step.source_step]}.{step.attribute_name}"
+            elif isinstance(step, ConstrainStep):
+                atoms.append(f"{names[step.source_step]} == {step.value}")
+            else:
+                atoms.append(
+                    f"{names[step.variable_a_step]} == {names[step.variable_b_step]}"
+                )
+        return " and ".join(atoms) if atoms else "(no atoms)"
+
+
 # %% rule miner
 
 
@@ -153,7 +197,7 @@ class RuleMiner:
         domain: Sequence,
         auxiliary_domains: Sequence[SeedDomain] = (),
         candidate_values: Optional[Mapping[str, Sequence[Any]]] = None,
-    ) -> List[CandidateRuleBody]:
+    ) -> List[MinedRule]:
         """
         Search for closed rule bodies over ``head_type`` that meet :attr:`thresholds`.
 
@@ -165,7 +209,7 @@ class RuleMiner:
         :param candidate_values: The values each attribute may be pinned to, keyed by
             attribute name. Attributes absent from it are never pinned, so supplying
             nothing searches for structural joins alone.
-        :return: Every closed candidate rule body found that meets :attr:`thresholds`.
+        :return: Every closed rule found that meets :attr:`thresholds`.
         """
         values_by_attribute = candidate_values or {}
         head_variable = variable(head_type, domain=domain)
@@ -173,7 +217,7 @@ class RuleMiner:
             SeedDomain(entity_type=head_type, instances=domain),
             *auxiliary_domains,
         ]
-        results: List[CandidateRuleBody] = []
+        results: List[MinedRule] = []
         frontier: List[List[RefinementStep]] = [[]] + [
             [SeedStep(index)] for index in range(len(seed_domains))
         ]
@@ -191,7 +235,7 @@ class RuleMiner:
                     if score.support < self.thresholds.minimum_support:
                         continue
                     if self._is_closed(refined_plan) and score.meets(self.thresholds):
-                        results.append(body)
+                        results.append(MinedRule(body=body, plan=refined_plan))
                     next_frontier.append(refined_plan)
             frontier = next_frontier
 

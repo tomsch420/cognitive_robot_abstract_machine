@@ -25,15 +25,13 @@ from pathlib import Path
 
 from typing_extensions import Dict, List, Sequence
 
-from krrood.entity_query_language.rule_mining.candidate_rule import CandidateRuleBody
-from krrood.entity_query_language.rule_mining.miner import RuleMiner, SeedDomain
+from krrood.entity_query_language.rule_mining.miner import MinedRule, RuleMiner
 from krrood.entity_query_language.rule_mining.scoring import ScoreThresholds
 from semantic_digital_twin.adapters.partnet_mobility_dataset.domain_model import (
     HANDLE_PART_NAME,
     PartNetLink,
     PartNetModel,
     PartNetMotionKind,
-    PartNetPart,
     StorageFurnitureLabel,
     UrdfJointType,
 )
@@ -161,31 +159,21 @@ class LabelDistribution:
         )
 
 
-def describe_rule(body: CandidateRuleBody) -> str:
-    """
-    :param body: A mined rule body.
-    :return: Its conditions, as EQL renders them.
-    """
-    return " AND ".join(str(condition) for condition in body.conditions)
-
-
 # %% the run
 
 
-def mine_over(models: Sequence[PartNetModel]) -> List[CandidateRuleBody]:
+def mine_over(models: Sequence[PartNetModel]) -> List[MinedRule]:
     """
     :param models: The models to mine over.
-    :return: Rule bodies over :class:`PartNetLink` meeting the thresholds.
+    :return: Rules over :class:`PartNetLink` meeting the thresholds.
     """
     links = [link for model in models for link in model.links]
-    parts = [part for link in links for part in link.parts]
     return RuleMiner(
         thresholds=ScoreThresholds(minimum_support=5, minimum_confidence=0.05),
         maximum_atoms=3,
     ).mine(
         PartNetLink,
         links,
-        auxiliary_domains=[SeedDomain(entity_type=PartNetPart, instances=parts)],
         candidate_values={
             "motion_kind": list(PartNetMotionKind),
             "joint_type": list(UrdfJointType),
@@ -200,28 +188,32 @@ def mine_over(models: Sequence[PartNetModel]) -> List[CandidateRuleBody]:
     )
 
 
-def report(bodies: Sequence[CandidateRuleBody], link_count: int) -> None:
+def report(rules: Sequence[MinedRule], link_count: int) -> None:
     """
     Print each mined pattern with its score and label distribution, most drawer-like
     first.
 
-    :param bodies: The mined rule bodies.
+    :param rules: The mined rules.
     :param link_count: How many links were mined over.
     """
     rows = []
-    for body in bodies:
-        matched = list(body.to_query().evaluate())
-        distribution = LabelDistribution.of(matched)
+    seen_descriptions = set()
+    for rule in rules:
+        description = rule.describe()
+        if description in seen_descriptions:
+            continue
+        seen_descriptions.add(description)
+        distribution = LabelDistribution.of(list(rule.body.to_query().evaluate()))
         rows.append(
-            (distribution.share_of(StorageFurnitureLabel.DRAWER), body, distribution)
+            (distribution.share_of(StorageFurnitureLabel.DRAWER), rule, distribution)
         )
     rows.sort(key=lambda row: -row[0])
 
-    print(f"\nmined {len(bodies)} rule(s) over {link_count} links\n")
-    for drawer_share, body, distribution in rows:
-        score = body.score()
+    print(f"\nmined {len(rows)} distinct rule(s) over {link_count} links\n")
+    for drawer_share, rule, distribution in rows:
+        score = rule.body.score()
         print(f"  support={score.support:<5d} confidence={score.confidence:.2f}")
-        print(f"    rule:   {describe_rule(body)}")
+        print(f"    rule:   {rule.describe()}")
         print(f"    labels: {distribution.describe()}")
         print(
             f"    -> {100 * drawer_share:.0f}% of matched links are PartNet drawers\n"

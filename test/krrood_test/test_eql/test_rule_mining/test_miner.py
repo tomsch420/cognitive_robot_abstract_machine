@@ -39,13 +39,13 @@ def test_mine_recovers_the_planted_sibling_handle_rule():
     ).mine(Handle, handles)
 
     matches = [
-        body
-        for body in results
-        if sorted(handle.name for handle in body.to_query().evaluate())
+        rule
+        for rule in results
+        if sorted(handle.name for handle in rule.body.to_query().evaluate())
         == ["H1", "H1", "H2", "H2", "H3", "H3", "H4", "H4", "H5"]
     ]
     assert len(matches) >= 1
-    assert matches[0].score() == RuleScore(support=9, confidence=0.36)
+    assert matches[0].body.score() == RuleScore(support=9, confidence=0.36)
 
 
 # %% mining across two entity types
@@ -72,13 +72,13 @@ def test_mine_recovers_a_rule_joining_the_head_to_an_auxiliary_type():
     )
 
     matches = [
-        body
-        for body in results
-        if sorted(handle.name for handle in body.to_query().evaluate())
+        rule
+        for rule in results
+        if sorted(handle.name for handle in rule.body.to_query().evaluate())
         == ["H1", "H2", "H3", "H4", "H5"]
     ]
     assert len(matches) >= 1
-    assert matches[0].score() == RuleScore(support=5, confidence=1.0)
+    assert matches[0].body.score() == RuleScore(support=5, confidence=1.0)
 
 
 def test_mine_without_auxiliary_domains_seeds_only_the_head_type():
@@ -90,7 +90,7 @@ def test_mine_without_auxiliary_domains_seeds_only_the_head_type():
     ).mine(Handle, handles)
 
     seeded_types = {
-        variable._type_ for body in results for variable in body.open_variables
+        variable._type_ for rule in results for variable in rule.body.open_variables
     }
     assert Container not in seeded_types
 
@@ -111,12 +111,13 @@ def test_mine_constrains_an_attribute_to_a_supplied_candidate_value():
     ).mine(Handle, handles, candidate_values={"name": ["H1"]})
 
     matches = [
-        body
-        for body in results
-        if sorted(handle.name for handle in body.to_query().evaluate()) == ["H1"]
+        rule
+        for rule in results
+        if sorted(handle.name for handle in rule.body.to_query().evaluate()) == ["H1"]
     ]
     assert len(matches) >= 1
-    assert matches[0].score().support == 1
+    assert matches[0].body.score().support == 1
+    assert "H1" in matches[0].describe()
 
 
 def test_mine_without_candidate_values_produces_no_instantiated_atoms():
@@ -128,6 +129,6 @@ def test_mine_without_candidate_values_produces_no_instantiated_atoms():
     ).mine(Handle, handles)
 
     assert all(
-        sorted(handle.name for handle in body.to_query().evaluate()) != ["H1"]
-        for body in results
+        sorted(handle.name for handle in rule.body.to_query().evaluate()) != ["H1"]
+        for rule in results
     )
