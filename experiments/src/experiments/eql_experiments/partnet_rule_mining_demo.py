@@ -56,6 +56,19 @@ CATEGORY_INDEX_FILE_NAME = "all_ids.txt"
 The ``id,category`` index inside the metadata directory.
 """
 
+CANDIDATE_VALUES = {
+    "joint_type": [UrdfJointType.PRISMATIC, UrdfJointType.REVOLUTE],
+    "motion_kind": [PartNetMotionKind.SLIDER, PartNetMotionKind.HINGE],
+    "name": [HANDLE_PART_NAME],
+    "part_name": [StorageFurnitureLabel.DRAWER.value, "cabinet_door"],
+}
+"""
+The values a mined atom may pin an attribute to.
+
+Kept to the handful that bear on the drawer/door question: every extra value multiplies
+the search, and a value no rule turns out to need only costs time.
+"""
+
 # %% loading a slice of the corpus
 
 
@@ -169,22 +182,12 @@ def mine_over(models: Sequence[PartNetModel]) -> List[MinedRule]:
     """
     links = [link for model in models for link in model.links]
     return RuleMiner(
-        thresholds=ScoreThresholds(minimum_support=5, minimum_confidence=0.05),
-        maximum_atoms=3,
+        thresholds=ScoreThresholds(minimum_support=10, minimum_confidence=0.05),
+        maximum_atoms=4,
     ).mine(
         PartNetLink,
         links,
-        candidate_values={
-            "motion_kind": list(PartNetMotionKind),
-            "joint_type": list(UrdfJointType),
-            "name": [HANDLE_PART_NAME],
-            "part_name": [
-                StorageFurnitureLabel.DRAWER.value,
-                "drawer_box",
-                "drawer_front",
-                "cabinet_door",
-            ],
-        },
+        candidate_values=CANDIDATE_VALUES,
     )
 
 

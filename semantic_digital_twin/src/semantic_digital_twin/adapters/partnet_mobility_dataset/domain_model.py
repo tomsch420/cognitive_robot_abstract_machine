@@ -175,9 +175,24 @@ class PartNetLink:
     :attr:`body`, which it reaches through its own endpoints.
     """
 
-    parent_link: Optional[PartNetLink] = None
+    parent_semantic_label: Optional[str] = None
+    """
+    The ``semantics.txt`` label of the link this one hangs from, absent for a root link.
+    """
+
+    parent_part_name: Optional[str] = None
+    """
+    The part-hierarchy name of the link this one hangs from, absent for a root link.
+    """
+
+    parent_link: Optional[PartNetLink] = field(default=None, init=False)
     """
     The link this one hangs from, absent for a root link.
+
+    Declared ``init=False`` so attribute discovery skips it: a miner walking declared
+    fields would otherwise recurse through link after link, multiplying the search for
+    facts :attr:`parent_semantic_label` and :attr:`parent_part_name` already state
+    flatly.
     """
 
     @property
@@ -267,7 +282,10 @@ class PartNetModel:
             link = links_by_index[entry["id"]]
             parent_index = entry["parent"]
             if parent_index != NO_PARENT_LINK_INDEX:
-                link.parent_link = links_by_index[parent_index]
+                parent = links_by_index[parent_index]
+                link.parent_link = parent
+                link.parent_semantic_label = parent.semantic_label
+                link.parent_part_name = parent.part_name
             if world is not None:
                 link.body = world.get_body_by_name(f"{LINK_NAME_PREFIX}{link.index}")
                 link.connection = cls._parent_connection(world, link.body)
