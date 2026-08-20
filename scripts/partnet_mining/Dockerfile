@@ -18,17 +18,17 @@ RUN apt-get update \
 
 COPY krrood/requirements.txt /requirements/krrood.txt
 COPY semantic_digital_twin/requirements.txt /requirements/semantic_digital_twin.txt
+COPY giskardpy/requirements.txt /requirements/giskardpy.txt
 
-# semantic_digital_twin imports three packages that neither requirements file
-# declares: mujoco and giskardpy_bullet_bindings belong to physics_simulators and
-# giskardpy, and objgraph to the root project's dev extra, yet
-# semantic_digital_twin.exceptions, its collision checking and test/conftest.py
-# import them directly.
+# semantic_digital_twin's collision checking imports giskardpy, so that package's
+# requirements are needed too. Two more are imported directly but declared by
+# neither file: mujoco, which only physics_simulators declares, and objgraph,
+# which only the root project's dev extra declares.
 RUN pip install --no-cache-dir \
         -r /requirements/krrood.txt \
         -r /requirements/semantic_digital_twin.txt \
+        -r /requirements/giskardpy.txt \
         mujoco==3.9.0 \
-        giskardpy_bullet_bindings==1.0.1 \
         objgraph
 
 COPY scripts/partnet_mining/entrypoint.sh /usr/local/bin/entrypoint.sh
