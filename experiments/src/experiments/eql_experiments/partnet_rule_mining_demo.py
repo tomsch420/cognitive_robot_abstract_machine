@@ -198,7 +198,7 @@ def _search(links: Sequence[PartNetLink]) -> List[MinedRule]:
     """
     return RuleMiner(
         thresholds=ScoreThresholds(minimum_support=10, minimum_confidence=0.05),
-        maximum_atoms=3,
+        maximum_atoms=2,
     ).mine(
         PartNetLink,
         links,
