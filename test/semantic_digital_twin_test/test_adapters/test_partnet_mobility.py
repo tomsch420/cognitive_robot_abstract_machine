@@ -105,7 +105,7 @@ def test_load_applies_the_limit_defaults_without_writing_them_to_disk(monkeypatc
         for connection in world.connections
         if isinstance(connection, RevoluteConnection)
     ]
-    assert revolute_connection.upper_limits.velocity == 7.0
+    assert revolute_connection.raw_dof.limits.upper.velocity == 7.0
 
 
 def test_load_without_a_token_explains_that_downloading_needs_one(monkeypatch):

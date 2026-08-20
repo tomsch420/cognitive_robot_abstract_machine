@@ -1261,10 +1261,12 @@ class MissingSapienAccessTokenError(DataclassException):
     """
 
     def error_message(self) -> str:
+        return f"Downloading model {self.model_id} needs an access token."
+
+    def suggest_correction(self) -> str:
         return (
-            f"Downloading model {self.model_id} needs an access token; set "
-            f"{self.environment_variable_name}. An already-downloaded corpus can be "
-            f"read with load_from_directory instead."
+            f"Set {self.environment_variable_name}, or read an already-downloaded "
+            f"corpus with load_from_directory, which needs no token."
         )
 
 
