@@ -1,0 +1,22 @@
+[
+  {
+    "id": 0,
+    "parent": 1,
+    "joint": "hinge",
+    "name": "cabinet_door",
+    "parts": [
+      {"id": 10, "name": "cabinet_door_surface"},
+      {"id": 11, "name": "handle"}
+    ]
+  },
+  {
+    "id": 1,
+    "parent": -1,
+    "joint": "heavy",
+    "name": "cabinet_frame",
+    "parts": [
+      {"id": 20, "name": "vertical_side_panel"},
+      {"id": 21, "name": "back_panel"}
+    ]
+  }
+]

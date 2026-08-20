@@ -141,8 +141,8 @@ class RuleMiner:
         :param head_type: The static type of the entities the mined rules are about.
         :param domain: The instances ``head_type``'s variable ranges over.
         :param auxiliary_domains: Further pools the search may seed a variable over, so
-            rules relating the head to another type are reachable. The head's own pool is
-            always seedable, which is what makes a self-join reachable.
+            rules relating the head to another type are reachable. The head's own pool
+            is always seedable, which is what makes a self-join reachable.
         :return: Every closed candidate rule body found that meets :attr:`thresholds`.
         """
         head_variable = variable(head_type, domain=domain)
@@ -182,16 +182,14 @@ class RuleMiner:
         Generate every single-atom extension of ``plan``.
 
         :return: One dangling-atom extend per declared attribute of the head variable
-            and of any seeded variable, plus one closing atom per pair of currently-open,
-            type-compatible variables.
+            and of any seeded variable, plus one closing atom per pair of currently-
+            open, type-compatible variables.
         """
         body, introduced = self._materialize(head_variable, seed_domains, plan)
         refinements: List[List[RefinementStep]] = []
 
         extendable_steps = [-1] + [
-            index
-            for index, step in enumerate(plan)
-            if isinstance(step, SeedStep)
+            index for index, step in enumerate(plan) if isinstance(step, SeedStep)
         ]
         for source_step in extendable_steps:
             source_variable = (
@@ -206,8 +204,7 @@ class RuleMiner:
         live_steps = [
             index
             for index, step in enumerate(plan)
-            if isinstance(step, (ExtendStep, SeedStep))
-            and self._is_live(index, plan)
+            if isinstance(step, (ExtendStep, SeedStep)) and self._is_live(index, plan)
         ]
         for position, step_a in enumerate(live_steps):
             for step_b in live_steps[position + 1 :]:
