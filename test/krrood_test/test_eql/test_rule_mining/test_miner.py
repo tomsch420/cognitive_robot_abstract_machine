@@ -2,7 +2,7 @@
 Tests validating ``RuleMiner`` recovers a deliberately planted relational rule.
 """
 
-from krrood.entity_query_language.rule_mining.miner import RuleMiner
+from krrood.entity_query_language.rule_mining.miner import RuleMiner, SeedDomain
 from krrood.entity_query_language.rule_mining.scoring import RuleScore, ScoreThresholds
 
 from ...dataset.rule_mining_fixture import Container, Handle
@@ -46,3 +46,50 @@ def test_mine_recovers_the_planted_sibling_handle_rule():
     ]
     assert len(matches) >= 1
     assert matches[0].score() == RuleScore(support=9, confidence=0.36)
+
+
+# %% mining across two entity types
+
+
+def test_mine_recovers_a_rule_joining_the_head_to_an_auxiliary_type():
+    """
+    A rule relating two different types is only reachable if the search may seed a
+    variable of a type other than the head's own.
+    """
+    handles = siblings_sharing_a_container_world()
+    containers = []
+    for handle in handles:
+        if handle.container not in containers:
+            containers.append(handle.container)
+
+    results = RuleMiner(
+        thresholds=ScoreThresholds(minimum_support=2, minimum_confidence=0.1),
+        maximum_atoms=3,
+    ).mine(
+        Handle,
+        handles,
+        auxiliary_domains=[SeedDomain(entity_type=Container, instances=containers)],
+    )
+
+    matches = [
+        body
+        for body in results
+        if sorted(handle.name for handle in body.to_query().evaluate())
+        == ["H1", "H2", "H3", "H4", "H5"]
+    ]
+    assert len(matches) >= 1
+    assert matches[0].score() == RuleScore(support=5, confidence=1.0)
+
+
+def test_mine_without_auxiliary_domains_seeds_only_the_head_type():
+    handles = siblings_sharing_a_container_world()
+
+    results = RuleMiner(
+        thresholds=ScoreThresholds(minimum_support=2, minimum_confidence=0.1),
+        maximum_atoms=2,
+    ).mine(Handle, handles)
+
+    seeded_types = {
+        variable._type_ for body in results for variable in body.open_variables
+    }
+    assert Container not in seeded_types
