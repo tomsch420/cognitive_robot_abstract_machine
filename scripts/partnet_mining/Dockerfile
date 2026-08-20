@@ -19,12 +19,14 @@ RUN apt-get update \
 COPY krrood/requirements.txt /requirements/krrood.txt
 COPY semantic_digital_twin/requirements.txt /requirements/semantic_digital_twin.txt
 
-# semantic_digital_twin.exceptions imports mujoco, which only physics_simulators
-# declares, so it is not covered by either requirements file.
+# Neither requirements file covers these two: semantic_digital_twin.exceptions
+# imports mujoco, which only physics_simulators declares, and test/conftest.py
+# imports objgraph, which only the root project's dev extra declares.
 RUN pip install --no-cache-dir \
         -r /requirements/krrood.txt \
         -r /requirements/semantic_digital_twin.txt \
-        mujoco==3.9.0
+        mujoco==3.9.0 \
+        objgraph
 
 COPY scripts/partnet_mining/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
