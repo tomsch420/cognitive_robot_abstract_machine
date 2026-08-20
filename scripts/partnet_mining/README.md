@@ -63,3 +63,8 @@ runs the real-corpus test inside the container and skips it everywhere else.
 `sapien` is absent from the image, and no `SAPIEN_ACCESS_TOKEN` is passed. Both
 are only needed to *download* models; the corpus is already on disk and is read
 by `PartNetMobilityDatasetLoader.load_from_directory`, which touches neither.
+
+There is no ROS and no `physics_simulators`, so the parts of the test suite that
+resolve `package://` URIs or drive a simulator do not run here — they fail the
+same way on any branch. The image covers the corpus and mining path, not the
+whole workspace.
