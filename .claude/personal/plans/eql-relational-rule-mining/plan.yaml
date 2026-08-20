@@ -114,7 +114,9 @@ items:
     branch: partnet-eql-domain-model
     track: bridge-track
     depends_on: ["partnet-remote-access"]
-    status: not_started
+    status: in_progress
+    pull_request_number: 30
+    session: https://claude.ai/code/session_01LkCm5fMxZT4u49YWZncMDu
     notes: >
       EQL variables/domains over a loaded World's bodies, connections
       (joint types), and flat semantics.txt labels, scoped to the
