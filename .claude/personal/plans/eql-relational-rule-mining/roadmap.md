@@ -497,3 +497,95 @@ is where.
 one real end-to-end run reproducing the 35059 numbers through `RemoteMiningJob`;
 `scripts/format_docstrings.py` on new/changed files; `krrood` untouched, so
 self-containment is unaffected.
+
+## `partnet-eql-domain-model` — implementation plan (approved)
+
+Depends on `partnet-remote-access` (PR #29), still open/draft;
+`check_dependency_readiness.py` reports `"is_ready": false`. Stacked on it
+anyway, the same call every prior item in this plan recorded. PR #30.
+
+**Correction to the `partnet-remote-access` section above.** That section states
+there is no `handle` label anywhere and concludes `HasHandle.handle` must be
+mined from geometry or the kinematic tree. That was true of `semantics.txt`
+alone and was wrongly generalised to the dataset. `mobility_v2.json` and
+`result.json` carry a much richer part vocabulary: **318 of 345**
+StorageFurniture models contain a `handle` part, and **326 of 384** `drawer`
+parts have a `handle` child. The earlier claim is struck.
+
+**`mobility_v2.json` is the join key nobody had used**, and nothing in the
+repository reads it. Per URDF link it gives the link index, the motion kind, a
+part-level name, the fine-grained parts and the parent link — for example
+`link=1 joint=slider name='drawer'` with parts `drawer_front`, `drawer_side`,
+`drawer_back`, `drawer_bottom` and `handle`.
+
+**PartNet carries two disagreeing vocabularies**, which is the misalignment this
+item exists to characterise. `semantics.txt`'s label against `mobility_v2.json`'s
+name over all 345 StorageFurniture models: `rotation_door`->`cabinet_door` 414;
+`drawer`->`drawer` 269; `furniture_body`->`shelf` 159; `furniture_body`->
+`cabinet_frame` 151; `drawer`->`drawer_box` 47; **`drawer`->`handle` 32**;
+**`furniture_body`->`drawer_front` 26**; `rotation_door`->`cabinet_door_surface`
+24. The last two bolded rows are genuine annotation inconsistencies.
+
+**Handle availability tracks the SemDT classes that need one:** `rotation_door`
+410/445 (92%), `drawer` 299/349 (86%), `translation_door` 20/28 (71%),
+`furniture_body` 1/345 (0%). So `Drawer(HasHandle, HasMechanicalJoint)` is
+populatable for most PartNet drawers and `Door(...)` for most rotation doors,
+while the case correctly has none — partial alignment, worth mining rather than
+hard-coding.
+
+**What the miner could already do, verified on real data rather than assumed.**
+`DataclassOnlyIntrospector` discovers only declared dataclass fields, so a
+`Body` is a dead end for mining: its `parent_connection` and
+`child_kinematic_structure_entities` are properties over `self._world`.
+`Connection` exposes `parent`/`child` and an annotation exposes `root`, so both
+point *at* bodies. Heterogeneous joins already work — `PartNetRotationDoor` and
+`Connection` closed on a shared body scored support=6, confidence=0.11 over
+three models — and multi-hop works too (`annotation.root.visual`), so #28's
+noted same-named-class collision in `krrood/class_diagrams` did not reproduce on
+these types.
+
+Exactly one capability was missing: `RuleMiner.mine()` seeded a second variable
+only of the head's own type, while this domain needs one of a *different* type.
+
+**krrood change (deliberate, and the user's call over driving search from the
+bridge):** `rule_mining/miner.py` gains auxiliary seed domains keyed by type,
+generalising `SelfJoinSeedStep` into a seed step naming the domain it draws
+from. Head-type self-join stays the default, so #28's planted-rule test is
+unchanged and acts as the regression guard. The capability is domain-agnostic,
+so krrood stays self-contained.
+
+**semantic_digital_twin change:** new
+`adapters/partnet_mobility_dataset/domain_model.py` — a `mobility_v2.json`
+parser plus flat, fully-minable dataclasses, every relation a declared field so
+one hop reaches it: `PartNetMotionKind`/`PartNetSemanticLabel` as `StrEnum`s
+over the real vocabularies, `PartNetPart`, `PartNetLink` (semantic label, motion
+kind, part name, parts, the `World` body, its parent `Connection`, parent link)
+and `PartNetModel`.
+
+**Demo:** an entry point runnable through #29's `RemoteMiningJob`, mining over a
+configurable number of StorageFurniture models and printing each pattern's
+support/confidence together with the distribution of `semantic_label` among
+matching links.
+
+**Flagged at approval time.** Wave 1's miner scores rule *bodies*, not
+implications — it has no notion of a consequent. The label distribution is
+therefore a thin reporting layer added on the SemDT side, the minimum that makes
+a mined pattern interpretable as PartNet-drawer versus SemDT-`Drawer`. A proper
+conclusion-scoring abstraction probably belongs in krrood later; it is not built
+here, and `partnet-rdr-bridge` is the item that turns conclusions into RDR
+proposals.
+
+**Open risks.** The seeding change amends wave-1 code while #26-#28 are still in
+review. World-loading cost is unmeasured — each model runs convex decomposition
+over its meshes; three were fine in a probe, 345 may not be, so the model count
+is a parameter and a mesh-free path built straight from `mobility_v2.json` plus
+the URDF is the fallback. Some mined patterns will restate the projection; if
+everything comes back trivial that is a finding to report rather than hide.
+
+**Tests first:** an auxiliary-domain mining case over the existing synthetic
+fixture with #28's planted-rule test unchanged; domain-model parsing against a
+`mobility_v2.json` added to #29's synthetic model fixture, so it runs in CI with
+no corpus; a corpus-gated test asserting model 45162's drawer link carries a
+handle part and a prismatic connection; and a demo assertion that the mined
+`slider`-plus-handle pattern recovers a `drawer` share matching the measured 86%
+within a stated tolerance.
