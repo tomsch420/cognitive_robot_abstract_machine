@@ -385,3 +385,115 @@ krrood suite green (same pre-existing environment-only gaps excluded as
 item 2: `dot`/Graphviz binary, `jpt`, mypy's `librt`,
 `semantic_digital_twin` — none touch `rule_mining`), self-containment
 verified, `scripts/format_docstrings.py` run on new/changed files.
+
+## `partnet-remote-access` — implementation plan (approved)
+
+Depends on `engine-tests-synthetic` (PR #28, branch `engine-tests-synthetic`,
+still open/draft). `check_dependency_readiness.py` reports `"is_ready": false`;
+this item stacks on it anyway, per this repo's normal stacked-PR workflow and
+the same call `engine-support-confidence` and `engine-tests-synthetic` each
+recorded. PR #29.
+
+**Ground truth verified on neem-4, since nobody with SSH access had confirmed
+it before.** Access needs the `Uni Bremen` NetworkManager VPN
+(`nmcli con up "Uni Bremen"`); without it SSH to port 22 times out.
+
+The roadmap's category counts are *exactly* right — 345 `StorageFurniture`, 95
+`Table`, 84 `Faucet` — verified by reading `model_cat` out of all 2218
+`meta.json` files. 2218 models, 8.1GB, 46 distinct categories.
+
+`partnet_meta` holds `all_ids.txt` (2347 `id,category` rows) and
+`well_formed.txt` (2218 rows, exactly the on-disk model count) — so the on-disk
+corpus *is* the well-formed subset. `StorageFurniture` appears 346 times in
+`all_ids.txt` but 345 on disk: one model is not well-formed and is absent, so
+sizing a run off `all_ids.txt` is off by one on this category.
+
+`semantics.txt` is three columns (link name, motion kind, semantic label).
+Across `StorageFurniture`: `rotation_door` 445 / `drawer` 349 /
+`furniture_body` 345 / `translation_door` 28 / `wheel` 4 / `caster` 4 /
+`board` 1; motion kinds `hinge` 454 / `slider` 377 / `heavy` 342 / `static` 3;
+URDF joint types `revolute` 446 / `prismatic` 377 / `fixed` 345 /
+`continuous` 8. One `furniture_body` per model — exactly one case/root body
+each. `drawer`↔`slider`/`prismatic` and `rotation_door`↔`hinge`/`revolute` map
+cleanly onto `Drawer(HasMechanicalJoint)` and `Door(HasHandle,
+HasMechanicalJoint)`.
+
+**A constraint this puts on `partnet-eql-domain-model`:** there is no `handle`
+label anywhere in `semantics.txt`, so `HasHandle.handle` cannot be populated
+from the flat labels at all — it has to be mined from geometry or the
+kinematic tree.
+
+**Why the loader had to change.** `sapien` is installed nowhere on neem-4 and
+no `SAPIEN_ACCESS_TOKEN` exists in that environment, but `load()`
+unconditionally calls `sapien.asset.download_partnet_mobility(...)`, and
+`token` is an eager `field(default_factory=lambda: os.environ[...])` raising
+`KeyError` at *construction* even when the corpus is already on disk. So the
+loader could not read neem-4's corpus at all. This answers the plan's standing
+question about `SAPIEN_ACCESS_TOKEN`: the token is not genuinely needed to read
+an on-disk corpus, but the code demanded one regardless.
+
+Verified token-free and sapien-free on model 35059: `URDFParser.from_file` with
+`FileUriResolver(base_directory=...)` yields 3 bodies and 2 connections
+(`FixedConnection`, `RevoluteConnection`), and `_apply_semantics_to_world`
+yields 2 annotations (`PartNetFurniture`, `PartNetRotationDoor`) — the latter
+being exactly the flat 1:1 rename this plan exists to replace. Incidentally:
+`FileUriResolver(base_directory=...)` is load-bearing (without it mesh paths
+resolve against the current working directory and `URDFParser` dies on
+`textured_objs/original-21.obj`), and `available_model_ids` is a `@property`,
+not a method.
+
+**Mechanism: a Docker image on neem-4** (the user's call, over an
+rsync-the-working-tree alternative). The image carries the *environment* only —
+`python:3.12-slim` plus `git` plus `krrood/requirements.txt` and
+`semantic_digital_twin/requirements.txt`, deliberately not `sapien`. The repo
+is shallow-cloned at container start, so the branch is a run-time parameter and
+a code change needs no rebuild (clone measured at 4s / 155M). The corpus is
+bind-mounted read-only, so a run can never corrupt it.
+
+```
+ssh tom_sch@neem-4 docker run --rm \
+  -v /raid/users/tom_sch/datasets/partnet-mobility-dataset:/data/partnet-mobility-dataset:ro \
+  partnet-mining:latest <branch> <module> [args...]
+```
+
+Verified on the host: Docker 28.5.1, `tom_sch` in the `docker` group, 784G free
+on `/`, container reaches the network, dataset mounts read-only (2218 models
+visible, `touch` denied).
+
+**New files.** `scripts/partnet_mining/{Dockerfile,entrypoint.sh,README.md}`;
+`semantic_digital_twin/src/semantic_digital_twin/adapters/partnet_mobility_dataset/remote_execution.py`
+with `RemoteExecutionConfiguration`, a `CommandRunner` protocol,
+`SubprocessCommandRunner`, and `RemoteMiningJob` — dataclasses throughout, the
+command runner injected so the tests assert on the constructed argument vector
+and need neither SSH, VPN, nor Docker.
+
+**Changed.** `loader.py`: `token` becomes `Optional[str]` defaulting via
+`os.environ.get(...)`; the post-download half of `load()` is extracted into
+`load_from_directory(model_id)`, which `load()` then delegates to; `load()`
+raises an explicit error when the token is absent or `sapien` is not
+importable, instead of today's `KeyError`/`NameError`. Behaviour-preserving for
+the existing token-holding path.
+
+**Tests first** (AGENTS.md): the argument vector `RemoteMiningJob` builds,
+asserted against concrete expected values with a fake `CommandRunner` (runs in
+CI); constructing `PartNetMobilityDatasetLoader` with `SAPIEN_ACCESS_TOKEN`
+deleted no longer raises (runs in CI — the regression test for the eager
+`default_factory`); and an end-to-end `load_from_directory` test asserting the
+concrete 35059 values above, skipped unless the corpus is reachable.
+
+**Deviation flagged at approval time.** The standing convention says CI-facing
+tests keep the `SAPIEN_ACCESS_TOKEN`-gated `skipif` pattern. The corpus test
+keeps that *shape* (env-var-gated `skipif`) but gates on a corpus/host variable
+instead, because the remote path provably does not need that token — gating on
+it would be a skip condition that no longer means what it says.
+
+**Open risk, unverified at approval time.** The two requirements files were not
+actually installed inside a container during planning (a multi-minute build).
+`venv-sage` on the same host already resolves this dependency set under Python
+3.12, so the set is known-good on this machine; if the image build fails, that
+is where.
+
+**Verification.** `pytest test/semantic_digital_twin_test/test_adapters/ -v`;
+one real end-to-end run reproducing the 35059 numbers through `RemoteMiningJob`;
+`scripts/format_docstrings.py` on new/changed files; `krrood` untouched, so
+self-containment is unaffected.
