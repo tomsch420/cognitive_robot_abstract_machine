@@ -197,7 +197,7 @@ def _search(links: Sequence[PartNetLink]) -> List[MinedRule]:
     :return: Rules meeting the thresholds.
     """
     return RuleMiner(
-        thresholds=ScoreThresholds(minimum_support=10, minimum_confidence=0.05),
+        thresholds=ScoreThresholds(minimum_support=5, minimum_confidence=0.05),
         maximum_atoms=2,
     ).mine(
         PartNetLink,
@@ -213,11 +213,19 @@ def report(rules: Sequence[MinedRule], link_count: int) -> None:
 
     :param rules: The mined rules.
     :param link_count: How many links were mined over.
+
+    .. note::
+        Rules that constrain only a seeded companion variable are dropped: they leave the
+        head unconstrained, so they match every link and their label distribution is just
+        the corpus-wide one.
     """
     rows = []
     seen_descriptions = set()
+    head_name = PartNetLink.__name__
     for rule in rules:
         description = rule.describe()
+        if head_name not in description:
+            continue
         if description in seen_descriptions:
             continue
         seen_descriptions.add(description)
