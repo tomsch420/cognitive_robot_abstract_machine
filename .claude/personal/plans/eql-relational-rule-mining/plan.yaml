@@ -97,7 +97,9 @@ items:
     branch: partnet-remote-access
     track: bridge-track
     depends_on: ["engine-tests-synthetic"]
-    status: not_started
+    status: in_progress
+    pull_request_number: 29
+    session: https://claude.ai/code/session_01LkCm5fMxZT4u49YWZncMDu
     notes: >
       Dataset already downloaded on neem-4.informatik.uni-bremen.de
       (/raid/users/tom_sch/datasets/partnet-mobility-dataset, 2218 models,
