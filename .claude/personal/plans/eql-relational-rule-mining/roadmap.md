@@ -420,8 +420,16 @@ HasMechanicalJoint)`.
 
 **A constraint this puts on `partnet-eql-domain-model`:** there is no `handle`
 label anywhere in `semantics.txt`, so `HasHandle.handle` cannot be populated
-from the flat labels at all — it has to be mined from geometry or the
-kinematic tree.
+from *these* labels.
+
+.. note::
+   Corrected while planning `partnet-eql-domain-model`: the conclusion
+   originally drawn here — that handles must therefore be mined from geometry or
+   the kinematic tree — was wrong. It generalised a fact about `semantics.txt`
+   to the whole dataset. `mobility_v2.json` and `result.json` carry a richer
+   part vocabulary in which handles are richly annotated: 318 of 345
+   StorageFurniture models contain a `handle` part, and 326 of 384 `drawer`
+   parts have a `handle` child. See that item's own section below.
 
 **Why the loader had to change.** `sapien` is installed nowhere on neem-4 and
 no `SAPIEN_ACCESS_TOKEN` exists in that environment, but `load()`
