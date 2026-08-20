@@ -25,6 +25,7 @@ from pathlib import Path
 
 from typing_extensions import Dict, List, Sequence
 
+from krrood.entity_query_language._monitoring import MonitoredRegistry
 from krrood.entity_query_language.rule_mining.miner import MinedRule, RuleMiner
 from krrood.entity_query_language.rule_mining.scoring import ScoreThresholds
 from semantic_digital_twin.adapters.partnet_mobility_dataset.domain_model import (
@@ -179,8 +180,22 @@ def mine_over(models: Sequence[PartNetModel]) -> List[MinedRule]:
     """
     :param models: The models to mine over.
     :return: Rules over :class:`PartNetLink` meeting the thresholds.
+
+    .. note::
+        Run with EQL's call-stack monitoring disabled: it captures a stack trace on every
+        variable construction, and the search constructs one per atom of every candidate
+        it considers.
     """
     links = [link for model in models for link in model.links]
+    with MonitoredRegistry().disabled():
+        return _search(links)
+
+
+def _search(links: Sequence[PartNetLink]) -> List[MinedRule]:
+    """
+    :param links: The links to mine over.
+    :return: Rules meeting the thresholds.
+    """
     return RuleMiner(
         thresholds=ScoreThresholds(minimum_support=10, minimum_confidence=0.05),
         maximum_atoms=3,
