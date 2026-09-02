@@ -3,11 +3,46 @@ from __future__ import annotations
 import rustworkx
 from sortedcontainers import SortedSet
 
+from krrood.utils import get_class_and_attribute_name
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit,
     ProductUnit,
 )
 from random_events.variable import Variable
+
+
+def rename_variables_with_part_prefix(
+    circuit: ProbabilisticCircuit,
+    prefix: str,
+    excluded_variables: list[Variable],
+) -> None:
+    """
+    Rename each variable in the circuit to include ``prefix`` as a namespace.
+
+    Produces names of the form ``"{prefix}.{variable.name}"``.
+    Variables listed in ``excluded_variables`` are left unchanged. ``prefix`` is
+    a full match-tree path (e.g. ``"EGShelf.layers[0]"``, from ``str(part.variable)``),
+    not a single namespace segment. At nesting depth >= 2, a variable arriving here
+    may already have been fully qualified by a deeper part's own prefixing (e.g. an
+    "objects" part mounted into this "layers" part already carries a name like
+    ``"EGShelf.layers[0].objects[0].scale.height"``); such variables are left
+    unchanged too, since prefixing them again would duplicate the path
+    (``"EGShelf.layers[0].EGShelf.layers[0].objects[0].scale.height"``) and produce a
+    name nothing downstream looks up, silently leaving that field unresolved.
+
+    :param circuit: The circuit whose variables are renamed in-place.
+    :param prefix: String prefix to prepend to every variable name.
+    :param excluded_variables: Variables that should keep their current names.
+    """
+    variable_renames = {
+        variable: type(variable)(
+            get_class_and_attribute_name(prefix, variable.name), domain=variable.domain
+        )
+        for variable in circuit.variables
+        if variable not in excluded_variables
+        and not variable.name.startswith(f"{prefix}.")
+    }
+    circuit.update_variables(variable_renames)
 
 
 def find_lowest_product_nodes_that_model_variables(
