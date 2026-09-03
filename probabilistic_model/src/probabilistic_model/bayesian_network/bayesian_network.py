@@ -248,7 +248,27 @@ class BayesianNetwork:
         """
         import graphviz
 
-        dot = graphviz.Digraph(format="png", graph_attr={"rankdir": "TB"})
+        dot = graphviz.Digraph(
+            format="png",
+            graph_attr={
+                "rankdir": "TB",
+                "nodesep": "0.4",
+                "ranksep": "0.4",
+                "fontname": "Helvetica",
+            },
+            node_attr={
+                "style": "filled,rounded",
+                "fontname": "Helvetica",
+                "fontsize": "10",
+                "penwidth": "1.2",
+            },
+            edge_attr={
+                "fontname": "Helvetica",
+                "fontsize": "8",
+                "color": "#455A64",
+                "arrowsize": "0.6",
+            },
+        )
 
         latent_counter = 0
         node_to_id = {}
@@ -262,25 +282,21 @@ class BayesianNetwork:
             var = node.variables[0]
             name = var.name
             label = name
-            shape = "ellipse"
-            style = "filled"
-            fillcolor = "white"
+            shape = "box"
+            fillcolor = "#E1F5FE"  # Light Blue for normal variables
 
             # Check if it's a latent variable from a SumUnit
             if ".latent" in name:
                 latent_counter += 1
                 label = f"λ{get_subscript(latent_counter)}"
-                shape = "rect"
-                fillcolor = "lightyellow"
-
+                fillcolor = "#FFF9C4"  # Light Yellow
             # Check if it's an aggregation statistic
             elif "Aggregation" in name or "Aggregations" in name:
                 shape = "hexagon"
-                fillcolor = "lightblue"
+                fillcolor = "#B3E5FC"  # Muted Blue for aggregations
                 # Strip owner class from label if present
                 if "." in label:
                     label = ".".join(label.split(".")[1:])
-
             # Check if it's an aggregation statistic (MappedVariable check)
             elif hasattr(var, "_chain_root_"):
                 try:
@@ -290,12 +306,11 @@ class BayesianNetwork:
                         for base in root._type_.mro()
                     ):
                         shape = "hexagon"
-                        fillcolor = "lightblue"
+                        fillcolor = "#B3E5FC"  # Muted Blue for aggregations
                         if "." in label:
                             label = ".".join(label.split(".")[1:])
                 except:
                     pass
-
             else:
                 # For normal variables, strip the owner class name (first component)
                 if "." in label:
@@ -304,7 +319,6 @@ class BayesianNetwork:
             return {
                 "label": label,
                 "shape": shape,
-                "style": style,
                 "fillcolor": fillcolor,
             }
 

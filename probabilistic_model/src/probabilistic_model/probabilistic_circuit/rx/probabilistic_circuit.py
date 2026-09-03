@@ -1723,40 +1723,57 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
         import graphviz
         from probabilistic_model.utils import get_subscript
 
-        dot = graphviz.Digraph(format="png", graph_attr={"rankdir": "TB"})
+        dot = graphviz.Digraph(
+            format="png",
+            graph_attr={
+                "rankdir": "TB",
+                "nodesep": "0.4",
+                "ranksep": "0.4",
+                "fontname": "Helvetica",
+            },
+            node_attr={
+                "style": "filled,rounded",
+                "fontname": "Helvetica",
+                "fontsize": "10",
+                "penwidth": "1.2",
+            },
+            edge_attr={
+                "fontname": "Helvetica",
+                "fontsize": "8",
+                "color": "#455A64",
+                "arrowsize": "0.6",
+            },
+        )
 
         latent_counter = 0
         node_to_id = {}
 
-        # get the layers for topological ordering if needed, 
+        # get the layers for topological ordering if needed,
         # but Graphviz handles layout automatically
         nodes = self.graph.nodes()
 
         def get_node_attributes(node: Unit) -> dict:
             nonlocal latent_counter
             label = ""
-            shape = "ellipse"
-            style = "filled"
+            shape = "box"
             fillcolor = "white"
 
             if isinstance(node, SumUnit):
                 latent_counter += 1
                 label = f"λ{get_subscript(latent_counter)}"
-                shape = "rect"
-                fillcolor = "lightyellow"
+                fillcolor = "#FFF9C4"  # Light Yellow
             elif isinstance(node, ProductUnit):
                 label = "×"
                 shape = "circle"
-                fillcolor = "lightgrey"
+                fillcolor = "#E8F5E9"  # Light Green
             elif isinstance(node, LeafUnit):
                 label = str(node.distribution)
-                shape = "box"
-                fillcolor = "white"
+                fillcolor = "#E1F5FE"  # Light Blue
 
             if node_colors and node in node_colors:
                 fillcolor = node_colors[node]
 
-            return {"label": label, "shape": shape, "style": style, "fillcolor": fillcolor}
+            return {"label": label, "shape": shape, "fillcolor": fillcolor}
 
         for node in nodes:
             node_id = f"node_{node.index}"

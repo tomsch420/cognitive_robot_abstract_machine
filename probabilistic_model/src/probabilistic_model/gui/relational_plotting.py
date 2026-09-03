@@ -130,7 +130,27 @@ class RSPNUMLPlotter:
     def __init__(self, rspn: RelationalProbabilisticCircuit):
         self.rspn = rspn
         self.dot = graphviz.Digraph(
-            format="png", graph_attr={"compound": "true", "rankdir": "TB"}
+            format="png",
+            graph_attr={
+                "compound": "true",
+                "rankdir": "TB",
+                "nodesep": "0.4",
+                "ranksep": "0.4",
+                "fontname": "Helvetica",
+                "fontsize": "12",
+            },
+            node_attr={
+                "style": "filled,rounded",
+                "fontname": "Helvetica",
+                "fontsize": "10",
+                "penwidth": "1.2",
+            },
+            edge_attr={
+                "fontname": "Helvetica",
+                "fontsize": "8",
+                "color": "#455A64",
+                "arrowsize": "0.6",
+            },
         )
         self.node_to_id = {}
         self.cluster_counter = 0
@@ -155,7 +175,14 @@ class RSPNUMLPlotter:
         cluster_id = self._get_cluster_id()
 
         with parent_graph.subgraph(name=cluster_id) as c:
-            c.attr(label=class_name, style="filled", color="lightgrey")
+            c.attr(
+                label=class_name,
+                style="filled,rounded",
+                fillcolor="#F5F5F5",
+                color="#BDBDBD",
+                penwidth="2.0",
+                fontname="Helvetica",
+            )
 
             # Anchor node for connections to/from this cluster
             anchor_id = f"anchor_{cluster_id}"
@@ -236,16 +263,16 @@ class RSPNUMLPlotter:
             for node in nodes_by_path[current_path]:
                 var = node.variables[0]
                 name = var.name
-                shape = "ellipse"
-                color = "white"
+                shape = "box"
+                color = "#E1F5FE"  # Light Blue
 
                 if is_aggregation_variable(var, rspn):
                     shape = "hexagon"
-                    color = "lightblue"
+                    color = "#B3E5FC"  # Muted Blue
                     label = name.split(".")[-1]
                 elif ".latent" in name:
-                    shape = "rect"
-                    color = "lightyellow"
+                    shape = "box"
+                    color = "#FFF9C4"  # Light Yellow
                     latent_counter += 1
                     label = f"λ{get_subscript(latent_counter)}"
                 else:
@@ -253,9 +280,7 @@ class RSPNUMLPlotter:
                     label = name.split(".")[-1]
 
                 node_id = f"node_{id(node)}"
-                current_graph.node(
-                    node_id, label, shape=shape, style="filled", fillcolor=color
-                )
+                current_graph.node(node_id, label, shape=shape, fillcolor=color)
                 self.node_to_id[node] = node_id
                 self.node_to_id[var] = node_id
                 self.node_to_id[name] = node_id
@@ -273,7 +298,12 @@ class RSPNUMLPlotter:
             for child_path in sorted(immediate_children):
                 child_cluster_id = self._get_cluster_id()
                 with current_graph.subgraph(name=child_cluster_id) as sub:
-                    sub.attr(label=child_path[-1], style="dashed")
+                    sub.attr(
+                        label=child_path[-1],
+                        style="dashed,rounded",
+                        color="#90A4AE",
+                        fontname="Helvetica",
+                    )
                     add_nodes_to_clusters(child_path, sub)
 
         add_nodes_to_clusters((), parent_cluster)
