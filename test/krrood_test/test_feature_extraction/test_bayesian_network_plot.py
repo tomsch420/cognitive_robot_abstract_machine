@@ -8,6 +8,8 @@ from krrood.ormatic.data_access_objects.helper import to_dao
 from probabilistic_model.probabilistic_circuit.relational.bayesian_network_plot import (
     LatentNode,
     RealVariableNode,
+    _assign_layers,
+    _group_variables_by_single_relationship,
     build_bayesian_network,
     plot_circuit_as_bayesian_network,
     plot_relational_bayesian_network,
@@ -106,6 +108,37 @@ def test_aggregation_statistics_are_identifiable_as_bridges(rpc):
     assert aggregation_names, "fixture must actually exercise an exchangeable relation"
     circuit_variable_names = {variable.name for variable in rpc.class_probabilistic_circuit.variables}
     assert aggregation_names.issubset(circuit_variable_names)
+
+
+def test_single_relationships_group_all_their_subfields_into_one_box(rpc):
+    circuit = rpc.class_probabilistic_circuit
+    bn = build_bayesian_network(circuit)
+    layer = _assign_layers(bn)
+    grouping = _group_variables_by_single_relationship(rpc, bn, layer)
+
+    relationship_keys = {
+        relationship.key for relationship in rpc.schema_information.single_relationships
+    }
+    assert relationship_keys == {"position", "orientation"}
+    assert set(grouping.members_of_prefix) == {
+        "SceneRoom.position.",
+        "SceneRoom.orientation.",
+    }
+
+    position_subfields = {
+        node.variable.name for node in grouping.members_of_prefix["SceneRoom.position."]
+    }
+    assert position_subfields == {
+        "SceneRoom.position.x",
+        "SceneRoom.position.y",
+        "SceneRoom.position.z",
+    }
+    assert grouping.label_of_prefix["SceneRoom.position."] == "KRROODPosition"
+
+    # every grouped variable's node.index resolves back to its own prefix
+    for prefix, members in grouping.members_of_prefix.items():
+        for node in members:
+            assert grouping.prefix_of_variable_index[node.index] == prefix
 
 
 def test_plot_relational_bayesian_network_renders_scene_room_and_scene_object(rpc, tmp_path):

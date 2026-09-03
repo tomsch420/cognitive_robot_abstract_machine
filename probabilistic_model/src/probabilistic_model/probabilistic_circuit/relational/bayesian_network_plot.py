@@ -23,7 +23,7 @@ as a bridge into the child panel, not an ordinary per-instance feature.
 from __future__ import annotations
 
 from collections import defaultdict, deque
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
@@ -325,6 +325,92 @@ class _BNPanelResult:
     height: float
 
 
+@dataclass
+class _LayoutSlot:
+    """
+    One occupant of a layer's row: either a single BN node (``"latent"``/``"variable"``)
+    or a ``"group"`` — every real variable that a 1-to-1 relationship on this class
+    flattened from one nested value object, collapsed into a single box instead of one
+    box per subfield.
+    """
+
+    kind: str
+    node: Optional[Node] = None
+    group_label: str = ""
+    group_prefix: str = ""
+    group_nodes: List[RealVariableNode] = field(default_factory=list)
+
+
+@dataclass
+class _RelationshipGrouping:
+    """
+    Which real variables a class's 1-to-1 relationships flattened from a nested value
+    object, and where the merged box for each should be placed.
+    """
+
+    prefix_of_variable_index: Dict[int, str]
+    members_of_prefix: Dict[str, List[RealVariableNode]]
+    label_of_prefix: Dict[str, str]
+    layer_of_prefix: Dict[str, int]
+
+
+def _group_variables_by_single_relationship(
+    rpc: RelationalProbabilisticCircuit, bn: BayesianNetwork, layer: Dict[int, int]
+) -> _RelationshipGrouping:
+    """
+    Group every real variable of ``bn`` that a 1-to-1 relationship on ``rpc.class_``
+    flattened from one nested value object (e.g. all of ``"SceneRoom.position.{x,y,z}"``
+    from a ``position: KRROODPosition`` field), so it can be rendered as a single
+    encapsulating box instead of one box per subfield — even when its subfields don't
+    share a layer, because one sum unit might model one subfield directly while others
+    are modeled through their own, deeper mixtures.
+
+    :param rpc: The relational circuit whose schema names the 1-to-1 relationships.
+    :param bn: The Bayesian network reduced from ``rpc.class_probabilistic_circuit``.
+    :param layer: Each node's layer, as returned by :func:`_assign_layers`.
+    :return: The grouping, empty if the class has no 1-to-1 relationships.
+    """
+    class_name = rpc.class_.__name__
+    prefixes: List[Tuple[str, str]] = [
+        (f"{class_name}.{relationship.key}.", relationship.domain_type.__name__)
+        for relationship in (
+            rpc.schema_information.single_relationships if rpc.schema_information else ()
+        )
+    ]
+
+    def matching_group(variable_name: str) -> Optional[Tuple[str, str]]:
+        for prefix, label in prefixes:
+            if variable_name.startswith(prefix):
+                return prefix, label
+        return None
+
+    prefix_of_variable_index: Dict[int, str] = {}
+    members_of_prefix: Dict[str, List[RealVariableNode]] = defaultdict(list)
+    label_of_prefix: Dict[str, str] = {}
+    for node in bn.nodes():
+        if isinstance(node, RealVariableNode):
+            match = matching_group(node.variable.name)
+            if match is not None:
+                prefix, label = match
+                prefix_of_variable_index[node.index] = prefix
+                members_of_prefix[prefix].append(node)
+                label_of_prefix[prefix] = label
+
+    # Placed at its deepest constituent's layer, so every contributing latent's edge
+    # keeps pointing downward into it rather than sideways or back up.
+    layer_of_prefix = {
+        prefix: max(layer[node.index] for node in members)
+        for prefix, members in members_of_prefix.items()
+    }
+
+    return _RelationshipGrouping(
+        prefix_of_variable_index=prefix_of_variable_index,
+        members_of_prefix=dict(members_of_prefix),
+        label_of_prefix=label_of_prefix,
+        layer_of_prefix=layer_of_prefix,
+    )
+
+
 def _render_class_bn_panel(
     ax,
     rpc: RelationalProbabilisticCircuit,
@@ -352,11 +438,32 @@ def _render_class_bn_panel(
     bn = build_bayesian_network(circuit)
     layer = _assign_layers(bn)
 
-    nodes_by_layer: Dict[int, List[Node]] = defaultdict(list)
+    grouping = _group_variables_by_single_relationship(rpc, bn, layer)
+
+    slots_by_layer: Dict[int, List[_LayoutSlot]] = defaultdict(list)
+    group_slots: Dict[str, _LayoutSlot] = {}
     for node in bn.nodes():
-        nodes_by_layer[layer[node.index]].append(node)
-    max_layer_count = max(len(nodes) for nodes in nodes_by_layer.values())
-    tree_depth = max(nodes_by_layer)
+        depth_index = layer[node.index]
+        prefix = grouping.prefix_of_variable_index.get(node.index) if isinstance(
+            node, RealVariableNode
+        ) else None
+        if prefix is not None:
+            slot = group_slots.get(prefix)
+            if slot is None:
+                slot = _LayoutSlot(
+                    kind="group",
+                    group_label=grouping.label_of_prefix[prefix],
+                    group_prefix=prefix,
+                    group_nodes=grouping.members_of_prefix[prefix],
+                )
+                group_slots[prefix] = slot
+                slots_by_layer[grouping.layer_of_prefix[prefix]].append(slot)
+            continue
+        kind = "latent" if isinstance(node, LatentNode) else "variable"
+        slots_by_layer[depth_index].append(_LayoutSlot(kind=kind, node=node))
+
+    max_layer_count = max(len(slots) for slots in slots_by_layer.values())
+    tree_depth = max(slots_by_layer)
 
     class_color = CLASS_PALETTE[depth % len(CLASS_PALETTE)]
 
@@ -402,15 +509,28 @@ def _render_class_bn_panel(
     )
 
     positions: Dict[int, Tuple[float, float]] = {}
-    for layer_index, nodes in nodes_by_layer.items():
-        count = len(nodes)
-        for position_in_layer, node in enumerate(nodes):
-            positions[node.index] = to_world(layer_index, position_in_layer, count)
+    for layer_index, slots in slots_by_layer.items():
+        count = len(slots)
+        for position_in_layer, slot in enumerate(slots):
+            position_key = slot.node.index if slot.kind != "group" else id(slot)
+            positions[position_key] = to_world(layer_index, position_in_layer, count)
 
-    # edges, drawn before nodes so glyphs sit on top
+    # edges, drawn before nodes so glyphs sit on top. An edge whose child was folded
+    # into a group slot is redirected to that slot, and duplicate edges into the same
+    # group (one per original subfield) are collapsed into a single arrow.
+    drawn_edges = set()
     for parent, child in bn.edges():
+        target_key = child.index
+        if isinstance(child, RealVariableNode):
+            prefix = grouping.prefix_of_variable_index.get(child.index)
+            if prefix is not None:
+                target_key = id(group_slots[prefix])
+        edge_key = (parent.index, target_key)
+        if edge_key in drawn_edges:
+            continue
+        drawn_edges.add(edge_key)
         x0, y0 = positions[parent.index]
-        x1, y1 = positions[child.index]
+        x1, y1 = positions[target_key]
         ax.add_patch(
             FancyArrowPatch(
                 (x0, y0 + 0.06), (x1, y1 - 0.06),
@@ -427,60 +547,91 @@ def _render_class_bn_panel(
     }
 
     bridge_positions: Dict[str, List[Tuple[float, float]]] = {}
+    # Adjacent aggregation diamonds keep their full name, which runs wide — alternate
+    # their label band so two neighbors' labels stack diagonally instead of colliding.
     diamond_sequence = 0
-    """Adjacent aggregation diamonds keep their full name, which runs wide — alternate
-    their label band so two neighbors' labels stack diagonally instead of colliding."""
 
-    for node in bn.nodes():
-        x, y = positions[node.index]
-        if isinstance(node, LatentNode):
-            ax.add_patch(
-                Circle(
-                    (x, y), 0.11,
-                    facecolor=mcolors.to_rgba(LATENT_COLOR, alpha=0.15),
-                    edgecolor=LATENT_COLOR, linewidth=1.3, zorder=3,
+    for slots in slots_by_layer.values():
+        for slot in slots:
+            if slot.kind == "latent":
+                node = slot.node
+                x, y = positions[node.index]
+                ax.add_patch(
+                    Circle(
+                        (x, y), 0.11,
+                        facecolor=mcolors.to_rgba(LATENT_COLOR, alpha=0.15),
+                        edgecolor=LATENT_COLOR, linewidth=1.3, zorder=3,
+                    )
                 )
-            )
-            ax.text(
-                x, y, f"{latent_display_names[node.index]}\nc={node.cardinality}",
-                ha="center", va="center", fontsize=5.6, family="monospace",
-                fontweight="bold", color=LATENT_COLOR, zorder=3,
-            )
-        elif node.variable in latent_to_field:
-            field_name = latent_to_field[node.variable]
-            wrapped = _wrap_label(node.variable.name, max_chars=16)
-            size = 0.11
-            ax.add_patch(
-                Polygon(
-                    [(x, y - size), (x + size, y), (x, y + size), (x - size, y)],
-                    closed=True, facecolor="white", edgecolor=LATENT_COLOR,
-                    linewidth=1.4, zorder=3,
+                ax.text(
+                    x, y, f"{latent_display_names[node.index]}\nc={node.cardinality}",
+                    ha="center", va="center", fontsize=5.6, family="monospace",
+                    fontweight="bold", color=LATENT_COLOR, zorder=3,
                 )
-            )
-            label_y = y + (0.2, 0.44, 0.68)[diamond_sequence % 3]
-            diamond_sequence += 1
-            ax.text(
-                x, label_y, wrapped, ha="center", va="center",
-                fontsize=5.8 if "\n" in wrapped else 6.6,
-                family="monospace", color=LATENT_COLOR, zorder=3,
-            )
-            bridge_positions.setdefault(field_name, []).append((x, y))
-        else:
-            label = _wrap_label(_short_label(node.variable.name))
-            is_wrapped = "\n" in label
-            box_h = VARIABLE_BOX_HEIGHT * 1.4 if is_wrapped else VARIABLE_BOX_HEIGHT
-            ax.add_patch(
-                FancyBboxPatch(
-                    (x - VARIABLE_BOX_WIDTH / 2, y - box_h / 2),
-                    VARIABLE_BOX_WIDTH, box_h,
-                    boxstyle="round,pad=0,rounding_size=0.05",
-                    facecolor="white", edgecolor=class_color, linewidth=1.0, zorder=3,
+            elif slot.kind == "group":
+                x, y = positions[id(slot)]
+                subfields = sorted(
+                    variable_node.variable.name[len(slot.group_prefix) :]
+                    for variable_node in slot.group_nodes
                 )
-            )
-            ax.text(
-                x, y, label, ha="center", va="center",
-                fontsize=5.6 if is_wrapped else 6.6, family="monospace", zorder=3,
-            )
+                field_list = ", ".join(subfields)
+                box_w = max(VARIABLE_BOX_WIDTH, 0.5 + 0.1 * max(len(slot.group_label), len(field_list)))
+                box_h = VARIABLE_BOX_HEIGHT * 1.9
+                ax.add_patch(
+                    FancyBboxPatch(
+                        (x - box_w / 2, y - box_h / 2), box_w, box_h,
+                        boxstyle="round,pad=0,rounding_size=0.06",
+                        facecolor=mcolors.to_rgba(class_color, alpha=0.1),
+                        edgecolor=class_color, linewidth=1.4, zorder=3,
+                    )
+                )
+                ax.text(
+                    x, y - box_h * 0.22, slot.group_label, ha="center", va="center",
+                    fontsize=6.2, fontweight="bold", family="monospace",
+                    color=class_color, zorder=3,
+                )
+                ax.text(
+                    x, y + box_h * 0.22, field_list, ha="center", va="center",
+                    fontsize=5.6, family="monospace", color="0.3", zorder=3,
+                )
+            else:
+                node = slot.node
+                x, y = positions[node.index]
+                if node.variable in latent_to_field:
+                    field_name = latent_to_field[node.variable]
+                    wrapped = _wrap_label(node.variable.name, max_chars=16)
+                    size = 0.11
+                    ax.add_patch(
+                        Polygon(
+                            [(x, y - size), (x + size, y), (x, y + size), (x - size, y)],
+                            closed=True, facecolor="white", edgecolor=LATENT_COLOR,
+                            linewidth=1.4, zorder=3,
+                        )
+                    )
+                    label_y = y + (0.2, 0.44, 0.68)[diamond_sequence % 3]
+                    diamond_sequence += 1
+                    ax.text(
+                        x, label_y, wrapped, ha="center", va="center",
+                        fontsize=5.8 if "\n" in wrapped else 6.6,
+                        family="monospace", color=LATENT_COLOR, zorder=3,
+                    )
+                    bridge_positions.setdefault(field_name, []).append((x, y))
+                else:
+                    label = _wrap_label(_short_label(node.variable.name))
+                    is_wrapped = "\n" in label
+                    box_h = VARIABLE_BOX_HEIGHT * 1.4 if is_wrapped else VARIABLE_BOX_HEIGHT
+                    ax.add_patch(
+                        FancyBboxPatch(
+                            (x - VARIABLE_BOX_WIDTH / 2, y - box_h / 2),
+                            VARIABLE_BOX_WIDTH, box_h,
+                            boxstyle="round,pad=0,rounding_size=0.05",
+                            facecolor="white", edgecolor=class_color, linewidth=1.0, zorder=3,
+                        )
+                    )
+                    ax.text(
+                        x, y, label, ha="center", va="center",
+                        fontsize=5.6 if is_wrapped else 6.6, family="monospace", zorder=3,
+                    )
 
     if depth < max_depth:
         child_x = x_offset + width + PANEL_GAP
