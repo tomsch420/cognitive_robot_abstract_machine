@@ -33,6 +33,7 @@ import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from matplotlib.patches import Circle, FancyArrowPatch, FancyBboxPatch, Polygon
+from matplotlib.path import Path
 from random_events.variable import Symbolic, Variable
 from typing_extensions import Dict, List, Optional, Tuple
 
@@ -252,7 +253,7 @@ def plot_circuit_as_bayesian_network(
                 arrowstyle="-|>",
                 mutation_scale=9,
                 color=LATENT_COLOR,
-                alpha=0.55,
+                alpha=0.7,
                 linewidth=1.0,
                 zorder=1,
             )
@@ -592,8 +593,8 @@ def _render_class_bn_panel(
         ax.add_patch(
             FancyArrowPatch(
                 (x0, y0 + 0.06), (x1, y1 - 0.06),
-                arrowstyle="-|>", mutation_scale=6,
-                color=LATENT_COLOR, alpha=0.55, linewidth=0.9, zorder=1,
+                arrowstyle="-|>", mutation_scale=9,
+                color=LATENT_COLOR, alpha=0.7, linewidth=1.0, zorder=1,
             )
         )
 
@@ -678,17 +679,33 @@ def _render_class_bn_panel(
         ) -> None:
             nonlocal child_y
             entry_top = child_y + PANEL_HEADER_HEIGHT + 0.15
-            for index, (source_x, source_y) in enumerate(sources):
+            # Sorting by source height keeps the elbow bends stacked in the same order
+            # they leave the source panel, so they run in clean parallel bands instead
+            # of crossing each other on the way to the child.
+            for index, (source_x, source_y) in enumerate(
+                sorted(sources, key=lambda point: point[1])
+            ):
                 target_y = entry_top + index * 0.22
-                # Curvature spreads per source, so bridges from adjacent origins fan
-                # apart instead of bunching along near-identical paths.
-                rad = 0.08 + 0.07 * (index - (len(sources) - 1) / 2)
+                # A manually built elbow (source -> mid -> mid -> child) instead of a
+                # connectionstyle: it leaves the source horizontally, drops straight
+                # down/up to the target's height, then arrives horizontally — and,
+                # being three explicit line segments, never hits the "parallel tangent"
+                # degenerate case an automatic angle connector can when a source and
+                # target land at the same height.
+                elbow = Path(
+                    [
+                        (source_x, source_y),
+                        (label_x, source_y),
+                        (label_x, target_y),
+                        (child_x, target_y),
+                    ],
+                    [Path.MOVETO, Path.LINETO, Path.LINETO, Path.LINETO],
+                )
                 ax.add_patch(
                     FancyArrowPatch(
-                        (source_x, source_y), (child_x, target_y),
-                        connectionstyle=f"arc3,rad={rad}", arrowstyle="-|>",
-                        mutation_scale=8, linestyle=(0, (4, 3)) if dashed else "solid",
-                        color=LATENT_COLOR, linewidth=1.0, zorder=2,
+                        path=elbow, arrowstyle="-|>", mutation_scale=9,
+                        linestyle=(0, (4, 3)) if dashed else "solid",
+                        color=LATENT_COLOR, linewidth=1.1, zorder=2,
                     )
                 )
             ax.text(
@@ -696,7 +713,7 @@ def _render_class_bn_panel(
                 ha="center", va="center", fontsize=6.8, family="monospace",
                 color=LATENT_COLOR,
             )
-            child_y = child_y + child_result.height + PANEL_GAP * 0.6
+            child_y = child_y + child_result.height + PANEL_GAP * 0.4
 
         # Exchangeable (1-to-many) children: dashed bridges, "×N" — several instances
         # ground under this class per parent.
