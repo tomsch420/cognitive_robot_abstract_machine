@@ -1730,18 +1730,22 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
                 "nodesep": "0.4",
                 "ranksep": "0.4",
                 "fontname": "Helvetica",
+                "ratio": "compress",
+                "compound": "true",
             },
             node_attr={
                 "style": "filled,rounded",
                 "fontname": "Helvetica",
                 "fontsize": "10",
-                "penwidth": "1.2",
+                "penwidth": "2.0",
+                "margin": "0.05",
             },
             edge_attr={
                 "fontname": "Helvetica",
                 "fontsize": "8",
                 "color": "#455A64",
                 "arrowsize": "0.6",
+                "penwidth": "1.2",
             },
         )
 
@@ -1760,15 +1764,19 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
 
             if isinstance(node, SumUnit):
                 latent_counter += 1
-                label = f"λ{get_subscript(latent_counter)}"
+                name = f"λ{get_subscript(latent_counter)}"
                 fillcolor = "#FFF9C4"  # Light Yellow
+                label = f'<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="4"><TR><TD><B>{name}</B></TD></TR><TR><TD><FONT POINT-SIZE="8">Sum</FONT></TD></TR></TABLE>>'
             elif isinstance(node, ProductUnit):
-                label = "×"
-                shape = "circle"
                 fillcolor = "#E8F5E9"  # Light Green
+                label = f'<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="4"><TR><TD><B>×</B></TD></TR><TR><TD><FONT POINT-SIZE="8">Product</FONT></TD></TR></TABLE>>'
             elif isinstance(node, LeafUnit):
-                label = str(node.distribution)
                 fillcolor = "#E1F5FE"  # Light Blue
+                dist_str = str(node.distribution)
+                # Truncate if too long
+                if len(dist_str) > 20:
+                    dist_str = dist_str[:17] + "..."
+                label = f'<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="4"><TR><TD><B>{node.variables[0].name}</B></TD></TR><TR><TD><FONT POINT-SIZE="8">{dist_str}</FONT></TD></TR></TABLE>>'
 
             if node_colors and node in node_colors:
                 fillcolor = node_colors[node]

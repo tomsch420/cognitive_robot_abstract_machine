@@ -255,18 +255,22 @@ class BayesianNetwork:
                 "nodesep": "0.4",
                 "ranksep": "0.4",
                 "fontname": "Helvetica",
+                "ratio": "compress",
+                "compound": "true",
             },
             node_attr={
                 "style": "filled,rounded",
                 "fontname": "Helvetica",
                 "fontsize": "10",
-                "penwidth": "1.2",
+                "penwidth": "2.0",
+                "margin": "0.05",
             },
             edge_attr={
                 "fontname": "Helvetica",
                 "fontsize": "8",
                 "color": "#455A64",
                 "arrowsize": "0.6",
+                "penwidth": "1.2",
             },
         )
 
@@ -284,16 +288,19 @@ class BayesianNetwork:
             label = name
             shape = "box"
             fillcolor = "#E1F5FE"  # Light Blue for normal variables
+            type_label = "Observable"
 
             # Check if it's a latent variable from a SumUnit
             if ".latent" in name:
                 latent_counter += 1
                 label = f"λ{get_subscript(latent_counter)}"
                 fillcolor = "#FFF9C4"  # Light Yellow
+                type_label = "Latent"
             # Check if it's an aggregation statistic
             elif "Aggregation" in name or "Aggregations" in name:
                 shape = "hexagon"
                 fillcolor = "#B3E5FC"  # Muted Blue for aggregations
+                type_label = "Aggregation"
                 # Strip owner class from label if present
                 if "." in label:
                     label = ".".join(label.split(".")[1:])
@@ -307,6 +314,7 @@ class BayesianNetwork:
                     ):
                         shape = "hexagon"
                         fillcolor = "#B3E5FC"  # Muted Blue for aggregations
+                        type_label = "Aggregation"
                         if "." in label:
                             label = ".".join(label.split(".")[1:])
                 except:
@@ -316,8 +324,10 @@ class BayesianNetwork:
                 if "." in label:
                     label = ".".join(label.split(".")[1:])
 
+            html_label = f'<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="4"><TR><TD><B>{label}</B></TD></TR><TR><TD><FONT POINT-SIZE="8">{type_label}</FONT></TD></TR></TABLE>>'
+
             return {
-                "label": label,
+                "label": html_label,
                 "shape": shape,
                 "fillcolor": fillcolor,
             }

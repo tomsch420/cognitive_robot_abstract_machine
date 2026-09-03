@@ -138,18 +138,21 @@ class RSPNUMLPlotter:
                 "ranksep": "0.4",
                 "fontname": "Helvetica",
                 "fontsize": "12",
+                "ratio": "compress",
             },
             node_attr={
                 "style": "filled,rounded",
                 "fontname": "Helvetica",
                 "fontsize": "10",
-                "penwidth": "1.2",
+                "penwidth": "2.0",
+                "margin": "0.05",
             },
             edge_attr={
                 "fontname": "Helvetica",
                 "fontsize": "8",
                 "color": "#455A64",
                 "arrowsize": "0.6",
+                "penwidth": "1.2",
             },
         )
         self.node_to_id = {}
@@ -299,22 +302,26 @@ class RSPNUMLPlotter:
                 name = var.name
                 shape = "box"
                 color = "#E1F5FE"  # Light Blue
+                type_label = "Observable"
 
                 if is_aggregation_variable(var, rspn):
                     shape = "hexagon"
                     color = "#B3E5FC"  # Muted Blue
                     label = name.split(".")[-1]
+                    type_label = "Aggregation"
                 elif ".latent" in name:
                     shape = "box"
                     color = "#FFF9C4"  # Light Yellow
                     latent_counter += 1
                     label = f"λ{get_subscript(latent_counter)}"
+                    type_label = "Latent"
                 else:
-                    # For normal variables, use the last part of the name
                     label = name.split(".")[-1]
 
+                html_label = f'<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="4"><TR><TD><B>{label}</B></TD></TR><TR><TD><FONT POINT-SIZE="8">{type_label}</FONT></TD></TR></TABLE>>'
+
                 node_id = f"node_{id(node)}"
-                current_graph.node(node_id, label, shape=shape, fillcolor=color)
+                current_graph.node(node_id, html_label, shape=shape, fillcolor=color)
                 self.node_to_id[node] = node_id
                 self.node_to_id[var] = node_id
                 self.node_to_id[name] = node_id
