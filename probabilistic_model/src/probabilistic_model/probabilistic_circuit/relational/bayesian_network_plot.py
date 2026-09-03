@@ -195,6 +195,62 @@ def _assign_layers(bn: BayesianNetwork) -> Dict[int, int]:
     return layer
 
 
+def _tree_aligned_positions(
+    bn: BayesianNetwork, layer: Dict[int, int], ordered_nodes: List[Node], x_step: float
+) -> Dict[int, float]:
+    """
+    Give each node an x-coordinate via bottom-up centroid alignment: a node with
+    children sits above the mean of their x-coordinates, the same way a PCB places a
+    driving component directly above the center of the pin group it fans out to,
+    instead of wherever an even, layer-wide spacing would happen to put it. This is
+    what actually eliminates same-layer overlap, not just the routing style: once a
+    parent sits centered over its own children, its trunk line runs straight down and
+    a sibling parent's disjoint block of children can never cross it.
+
+    Left-to-right order within a layer follows ``ordered_nodes`` (already grouped by
+    common ancestor via the circuit's own DFS traversal), so alignment can only shrink
+    lateral reach — it never introduces a crossing that order didn't already imply.
+
+    :param bn: The Bayesian network whose edges define each node's children.
+    :param layer: Each node's layer, as returned by :func:`_assign_layers`.
+    :param ordered_nodes: The nodes to place, fixing each layer's left-to-right order.
+    :param x_step: Minimum horizontal spacing enforced between adjacent siblings.
+    :return: Each node's x-coordinate, by index. The overall span is centered on 0.
+    """
+    slots_by_layer: Dict[int, List[int]] = defaultdict(list)
+    for node in ordered_nodes:
+        slots_by_layer[layer[node.index]].append(node.index)
+
+    node_indices = {node.index for node in ordered_nodes}
+    children_of: Dict[int, List[int]] = defaultdict(list)
+    for parent, child in bn.edges():
+        if parent.index in node_indices and child.index in node_indices:
+            children_of[parent.index].append(child.index)
+
+    x: Dict[int, float] = {}
+    deepest = max(slots_by_layer)
+    for position, index in enumerate(slots_by_layer[deepest]):
+        x[index] = position * x_step
+
+    for depth in range(deepest - 1, -1, -1):
+        indices = slots_by_layer[depth]
+        raw_x: Dict[int, float] = {}
+        for position, index in enumerate(indices):
+            child_xs = [x[child_index] for child_index in children_of[index] if child_index in x]
+            raw_x[index] = sum(child_xs) / len(child_xs) if child_xs else position * x_step
+        previous_x: Optional[float] = None
+        for index in indices:
+            candidate = raw_x[index]
+            if previous_x is not None and candidate < previous_x + x_step:
+                candidate = previous_x + x_step
+            x[index] = candidate
+            previous_x = candidate
+
+    values = list(x.values())
+    shift = -(min(values) + max(values)) / 2 if values else 0.0
+    return {index: value + shift for index, value in x.items()}
+
+
 def _wrap_label(label: str, max_chars: int = 14) -> str:
     if len(label) <= max_chars:
         return label
@@ -221,17 +277,12 @@ def plot_circuit_as_bayesian_network(
     bn = build_bayesian_network(circuit)
     layer = _assign_layers(bn)
 
-    nodes_by_layer: Dict[int, List[Node]] = defaultdict(list)
-    for node in bn.nodes():
-        nodes_by_layer[layer[node.index]].append(node)
-
-    positions: Dict[int, Tuple[float, float]] = {}
-    for depth, nodes in nodes_by_layer.items():
-        count = len(nodes)
-        y = -depth * LEVEL_SPACING
-        for index, node in enumerate(nodes):
-            x = (index - (count - 1) / 2) * NODE_SPACING
-            positions[node.index] = (x, y)
+    ordered_nodes = list(bn.nodes())
+    x_by_index = _tree_aligned_positions(bn, layer, ordered_nodes, NODE_SPACING)
+    positions: Dict[int, Tuple[float, float]] = {
+        node.index: (x_by_index[node.index], -layer[node.index] * LEVEL_SPACING)
+        for node in ordered_nodes
+    }
 
     latent_display_names: Dict[int, str] = {
         node.index: f"Z{sequence}"
@@ -266,7 +317,13 @@ def plot_circuit_as_bayesian_network(
             [min(bus_span), max(bus_span)], [bus_y, bus_y],
             color=LATENT_COLOR, alpha=0.7, linewidth=1.0, zorder=1,
         )
+        ax.add_patch(
+            Circle((px, bus_y), 0.045, facecolor=LATENT_COLOR, edgecolor="none", zorder=2)
+        )
         for cx, cy, target_gap in children:
+            ax.add_patch(
+                Circle((cx, bus_y), 0.035, facecolor=LATENT_COLOR, edgecolor="none", zorder=2)
+            )
             ax.add_patch(
                 FancyArrowPatch(
                     (cx, bus_y), (cx, cy + target_gap),
@@ -529,19 +586,28 @@ def _render_class_bn_panel(
     # panel below, the same as an exchangeable child does, instead of a box nested
     # inside this one.
     slots_by_layer: Dict[int, List[_LayoutSlot]] = defaultdict(list)
+    ordered_nodes: List[Node] = []
     for node in bn.nodes():
         if isinstance(node, RealVariableNode) and node.index in grouping.prefix_of_variable_index:
             continue
         depth_index = layer[node.index]
         kind = "latent" if isinstance(node, LatentNode) else "variable"
         slots_by_layer[depth_index].append(_LayoutSlot(kind=kind, node=node))
+        ordered_nodes.append(node)
 
-    max_layer_count = max(len(slots) for slots in slots_by_layer.values())
     tree_depth = max(slots_by_layer)
 
     class_color = CLASS_PALETTE[depth % len(CLASS_PALETTE)]
 
-    width = max(max_layer_count * NODE_SPACING, MIN_PANEL_WIDTH) + 2 * PANEL_MARGIN
+    # A parent centered above the mean of its own children, not wherever an even,
+    # layer-wide spacing would land it, so its trunk line runs straight down and can
+    # never cross a sibling parent's disjoint block of children.
+    x_by_index = _tree_aligned_positions(bn, layer, ordered_nodes, NODE_SPACING)
+    x_values = list(x_by_index.values())
+    x_center = (min(x_values) + max(x_values)) / 2
+    content_width = max(x_values) - min(x_values)
+
+    width = max(content_width + NODE_SPACING, MIN_PANEL_WIDTH) + 2 * PANEL_MARGIN
     # +0.3 leaves room for a staggered aggregation-diamond label band below the
     # deepest layer, in case bridges land there.
     height = PANEL_HEADER_HEIGHT + (tree_depth + 1) * LEVEL_SPACING + PANEL_MARGIN + 0.55
@@ -551,13 +617,6 @@ def _render_class_bn_panel(
         for field_name, template in rpc.exchangeable_distribution_templates.items()
         for latent in template.latent_variables
     }
-
-    def to_world(layer_index: int, position_in_layer: int, layer_count: int) -> Tuple[float, float]:
-        local_x = (
-            x_offset + width / 2 + (position_in_layer - (layer_count - 1) / 2) * NODE_SPACING
-        )
-        local_y = y_offset + PANEL_HEADER_HEIGHT + layer_index * LEVEL_SPACING
-        return local_x, local_y
 
     ax.add_patch(
         FancyBboxPatch(
@@ -582,11 +641,13 @@ def _render_class_bn_panel(
         ha="center", va="center", fontsize=7.5, color="0.45", family="monospace",
     )
 
-    positions: Dict[int, Tuple[float, float]] = {}
-    for layer_index, slots in slots_by_layer.items():
-        count = len(slots)
-        for position_in_layer, slot in enumerate(slots):
-            positions[slot.node.index] = to_world(layer_index, position_in_layer, count)
+    positions: Dict[int, Tuple[float, float]] = {
+        node.index: (
+            x_offset + width / 2 + (x_by_index[node.index] - x_center),
+            y_offset + PANEL_HEADER_HEIGHT + layer[node.index] * LEVEL_SPACING,
+        )
+        for node in ordered_nodes
+    }
 
     # edges, drawn before nodes so glyphs sit on top. An edge whose child moved into a
     # 1-to-1 sibling panel is not drawn here at all — its source position and which
@@ -630,7 +691,13 @@ def _render_class_bn_panel(
             [min(bus_span), max(bus_span)], [bus_y, bus_y],
             color=LATENT_COLOR, alpha=0.7, linewidth=1.0, zorder=1,
         )
+        ax.add_patch(
+            Circle((px, bus_y), 0.045, facecolor=LATENT_COLOR, edgecolor="none", zorder=2)
+        )
         for cx, cy in child_positions:
+            ax.add_patch(
+                Circle((cx, bus_y), 0.035, facecolor=LATENT_COLOR, edgecolor="none", zorder=2)
+            )
             ax.add_patch(
                 FancyArrowPatch(
                     (cx, bus_y), (cx, cy - 0.06),
@@ -747,10 +814,17 @@ def _render_class_bn_panel(
             ordered = sorted(pairs, key=lambda pair: pair[1][1])
             for index, ((source_x, source_y), (target_x, target_y)) in enumerate(ordered):
                 source_lane_x = lane_x + (index - (count - 1) / 2) * 0.12
+                # Sources that share a BN layer (e.g. several aggregation diamonds on
+                # one row) start at nearly the same height — without its own stub each
+                # one's horizontal run to the lane would sit right on top of the next
+                # one's for its whole length. A short vertical stub right at the
+                # source, staggered per index, separates them immediately instead.
+                source_row_y = source_y + (index - (count - 1) / 2) * 0.16
                 if approach == "left":
                     vertices = [
                         (source_x, source_y),
-                        (source_lane_x, source_y),
+                        (source_x, source_row_y),
+                        (source_lane_x, source_row_y),
                         (source_lane_x, target_y),
                         (target_x, target_y),
                     ]
@@ -758,7 +832,8 @@ def _render_class_bn_panel(
                     approach_y = target_y - VARIABLE_BOX_HEIGHT / 2 - 0.15
                     vertices = [
                         (source_x, source_y),
-                        (source_lane_x, source_y),
+                        (source_x, source_row_y),
+                        (source_lane_x, source_row_y),
                         (source_lane_x, approach_y),
                         (target_x, approach_y),
                         (target_x, target_y - VARIABLE_BOX_HEIGHT / 2),
