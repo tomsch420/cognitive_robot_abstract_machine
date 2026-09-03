@@ -1,0 +1,274 @@
+from __future__ import annotations
+import graphviz
+from collections import defaultdict
+from typing import TYPE_CHECKING, Optional, Dict, List, Any, Tuple
+import rustworkx as rx
+
+from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
+    SumUnit,
+    LeafUnit,
+    ProductUnit,
+)
+from probabilistic_model.bayesian_network.bayesian_network import (
+    BayesianNetwork,
+    StructureOnlyNode,
+)
+from krrood.entity_query_language.core.mapped_variable import MappedVariable, Attribute
+from krrood.parametrization.feature_extraction.aggregations import AggregationStatistic
+from krrood.ormatic.data_access_objects.dao import get_dao_schema
+
+if TYPE_CHECKING:
+    from probabilistic_model.probabilistic_circuit.relational.rspn import (
+        RelationalProbabilisticCircuit,
+        ExchangeableDistributionTemplate,
+    )
+
+
+def is_aggregation_variable(
+    variable: Any, rspn: Optional[RelationalProbabilisticCircuit] = None
+) -> bool:
+    """
+    Check if a variable is an aggregation statistic.
+    """
+    # If it is a MappedVariable, we can check its root type
+    if isinstance(variable, MappedVariable):
+        root = variable._chain_root_
+        if (
+            hasattr(root, "_type_")
+            and isinstance(root._type_, type)
+            and issubclass(root._type_, AggregationStatistic)
+        ):
+            return True
+        return False
+
+    # If it is a random_events Variable, check its name
+    name = getattr(variable, "name", str(variable))
+    if "Aggregation" in name or "Aggregations" in name:
+        return True
+
+    if rspn is not None and rspn.feature_extractor is not None:
+        all_aggregations = {
+            f._name_
+            for features in rspn.feature_extractor.exchangeable_features.values()
+            for f in features
+        }
+        if name in all_aggregations:
+            return True
+
+    return False
+
+
+def get_unique_part_path(variable: Any, root_class: Type) -> List[str]:
+    """
+    Get the path of unique parts for a variable.
+
+    Example: person.arm.hand.finger_count -> ['arm', 'hand']
+    """
+    if isinstance(variable, MappedVariable):
+        path = []
+        for step in variable._access_path_:
+            if not isinstance(step, Attribute):
+                continue
+
+            owner = step._owner_class_
+            if owner is None:
+                continue
+
+            try:
+                schema = get_dao_schema(owner)
+                if any(
+                    r.key == step._attribute_name_ for r in schema.single_relationships
+                ):
+                    path.append(step._attribute_name_)
+                else:
+                    # Once we hit a non-relationship attribute, we are at the end of the part path
+                    break
+            except:
+                break
+        return path
+
+    # If it is a random_events Variable, we use its name to deduce the path
+    name = getattr(variable, "name", str(variable))
+    parts = name.split(".")
+    # The first part is usually the root class name, skip it
+    current_class = root_class
+    path = []
+    for part in parts[1:]:
+        try:
+            from krrood.symbol_graph.helpers import get_field_type_endpoint
+
+            schema = get_dao_schema(current_class)
+            if any(r.key == part for r in schema.single_relationships):
+                path.append(part)
+                current_class = get_field_type_endpoint(current_class, part)
+            else:
+                break
+        except:
+            break
+    return path
+
+
+from probabilistic_model.utils import get_subscript
+
+
+class RSPNUMLPlotter:
+    """
+    Plotter for Relational Probabilistic Circuits in UML style.
+    """
+
+    def __init__(self, rspn: RelationalProbabilisticCircuit):
+        self.rspn = rspn
+        self.dot = graphviz.Digraph(
+            format="png", graph_attr={"compound": "true", "rankdir": "TB"}
+        )
+        self.node_to_id = {}
+        self.cluster_counter = 0
+
+    def _get_cluster_id(self) -> str:
+        self.cluster_counter += 1
+        return f"cluster_{self.cluster_counter}"
+
+    def plot(self, filename: str):
+        self._add_rspn(self.rspn, self.dot)
+        if filename.endswith(".png"):
+            filename = filename[:-4]
+        self.dot.render(filename, cleanup=True)
+
+    def _add_rspn(
+        self,
+        rspn: RelationalProbabilisticCircuit,
+        parent_graph: graphviz.Digraph,
+        prefix: str = "",
+    ) -> str:
+        class_name = rspn.class_.__name__
+        cluster_id = self._get_cluster_id()
+
+        with parent_graph.subgraph(name=cluster_id) as c:
+            c.attr(label=class_name, style="filled", color="lightgrey")
+
+            # Anchor node for connections to/from this cluster
+            anchor_id = f"anchor_{cluster_id}"
+            c.node(anchor_id, "", shape="none", width="0", height="0")
+
+            if rspn.class_probabilistic_circuit is not None:
+                self._add_bn(rspn, c, cluster_id)
+            else:
+                c.node(f"not_fitted_{cluster_id}", "Not Fitted", shape="none")
+
+            # Exchangeable parts
+            for (
+                field_name,
+                template,
+            ) in rspn.exchangeable_distribution_templates.items():
+                child_rspn = template.template_distribution
+                child_cluster_id = self._add_rspn(
+                    child_rspn, self.dot, prefix=f"{prefix}_{field_name}"
+                )
+
+                # Connect aggregation nodes to this cluster
+                # We need to find nodes that represent aggregation statistics for this field
+                for var in rspn.feature_extractor.exchangeable_features.get(
+                    field_name, []
+                ):
+                    # Find the node for this variable in the BN
+                    node_id = self.node_to_id.get(var)
+                    if node_id:
+                        child_anchor_id = f"anchor_{child_cluster_id}"
+                        self.dot.edge(
+                            node_id,
+                            child_anchor_id,
+                            style="dashed",
+                            lhead=child_cluster_id,
+                        )
+
+        return cluster_id
+
+    def _add_bn(
+        self,
+        rspn: RelationalProbabilisticCircuit,
+        parent_cluster: graphviz.Digraph,
+        cluster_id: str,
+    ):
+        circuit = rspn.class_probabilistic_circuit
+        bn = BayesianNetwork.from_probabilistic_circuit(circuit)
+
+        # Group nodes by their unique part path
+        nodes_by_path = defaultdict(list)
+
+        for node in bn.nodes():
+            var = node.variables[0]
+            if is_aggregation_variable(var, rspn):
+                nodes_by_path[()].append(node)
+            elif ".latent" in var.name:
+                nodes_by_path[()].append(node)
+            else:
+                path = tuple(get_unique_part_path(var, rspn.class_))
+                nodes_by_path[path].append(node)
+
+        latent_counter = 0
+
+        # Function to recursively add clusters and nodes
+        def add_nodes_to_clusters(
+            current_path: Tuple[str, ...], current_graph: graphviz.Digraph
+        ):
+            nonlocal latent_counter
+            # Add nodes for this path
+            for node in nodes_by_path[current_path]:
+                var = node.variables[0]
+                name = var.name
+                shape = "ellipse"
+                color = "white"
+
+                if is_aggregation_variable(var, rspn):
+                    shape = "hexagon"
+                    color = "lightblue"
+                    # Remove owner class from label
+                    label = name
+                    class_name = rspn.class_.__name__
+                    if label.startswith(class_name):
+                        label = label[len(class_name) :].lstrip(".")
+                    if label.startswith("Aggregations"):
+                        label = label[len("Aggregations") :].lstrip(".")
+                    if label.startswith("AggregationStatistic"):
+                        label = label[len("AggregationStatistic") :].lstrip(".")
+                elif ".latent" in name:
+                    shape = "rect"
+                    color = "lightyellow"
+                    latent_counter += 1
+                    label = f"λ{get_subscript(latent_counter)}"
+                else:
+                    # For normal variables, use the last part of the name
+                    label = name.split(".")[-1]
+
+                node_id = f"node_{id(node)}"
+                current_graph.node(
+                    node_id, label, shape=shape, style="filled", fillcolor=color
+                )
+                self.node_to_id[node] = node_id
+                self.node_to_id[var] = node_id
+
+            # Find sub-paths
+            sub_paths = {
+                path
+                for path in nodes_by_path
+                if len(path) > len(current_path)
+                and path[: len(current_path)] == current_path
+            }
+            # Only immediate children
+            immediate_children = {path[: len(current_path) + 1] for path in sub_paths}
+
+            for child_path in sorted(immediate_children):
+                child_cluster_id = self._get_cluster_id()
+                with current_graph.subgraph(name=child_cluster_id) as sub:
+                    sub.attr(label=child_path[-1], style="dashed")
+                    add_nodes_to_clusters(child_path, sub)
+
+        add_nodes_to_clusters((), parent_cluster)
+
+        # Add edges (BN edges are within the BN)
+        for parent, child in bn.edges():
+            parent_id = self.node_to_id.get(parent)
+            child_id = self.node_to_id.get(child)
+            if parent_id and child_id:
+                # Add edges to the top-level RSPN cluster to ensure they can cross sub-clusters
+                parent_cluster.edge(parent_id, child_id)

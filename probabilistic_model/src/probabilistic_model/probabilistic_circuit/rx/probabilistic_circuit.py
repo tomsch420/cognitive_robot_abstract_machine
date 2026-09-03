@@ -14,6 +14,7 @@ import numpy as np
 import rustworkx as rx
 import rustworkx.visualization
 import tqdm
+from matplotlib import pyplot as plt
 from sortedcontainers import SortedSet
 from typing_extensions import (
     List,
@@ -52,8 +53,7 @@ from random_events.variable import Variable, Symbolic, Continuous, Integer
 
 def invalidates_topology_cache(method):
     """
-    Decorator for :class:`ProbabilisticCircuit` methods that change the graph
-    topology.
+    Decorator for :class:`ProbabilisticCircuit` methods that change the graph topology.
 
     After the wrapped method has run, the circuit's cached root and layers are
     invalidated so that they are recomputed on the next access. Use this only for
@@ -329,8 +329,7 @@ class LeafUnit(Unit):
 
     def sample(self, samples: npt.NDArray, variable_to_index_map: Dict[Variable, int]):
         """
-        Sample from the distribution and write the samples into the samples
-        array.
+        Sample from the distribution and write the samples into the samples array.
 
         During sampling each node accumulates, in ``result_of_current_query``, the
         indices of the rows in ``samples`` that are routed to it (as a list of index
@@ -525,8 +524,7 @@ class SumUnit(InnerUnit):
 
     def sample(self, *args, **kwargs):
         """
-        Route the sample rows accumulated from this unit's parents to its
-        subcircuits.
+        Route the sample rows accumulated from this unit's parents to its subcircuits.
 
         Every row routed to a mixture is assigned to exactly one subcircuit, drawn
         according to the subcircuit weights. The rows are partitioned in a single
@@ -716,8 +714,7 @@ class SumUnit(InnerUnit):
 
     def normalize(self):
         """
-        Normalize the log_weights of the subcircuits such that they sum up to 1
-        inplace.
+        Normalize the log_weights of the subcircuits such that they sum up to 1 inplace.
         """
         total_weight = logsumexp(self.log_weights)
         for log_weight, subcircuit in self.log_weighted_subcircuits:
@@ -867,8 +864,7 @@ class ProductUnit(InnerUnit):
 
     def sample(self, *args, **kwargs):
         """
-        Route the sample rows accumulated from this unit's parents to its
-        subcircuits.
+        Route the sample rows accumulated from this unit's parents to its subcircuits.
 
         A decomposable product factorizes over disjoint variables, so every sample row
         is forwarded unchanged to each subcircuit; the subcircuits then fill in their
@@ -1582,10 +1578,10 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
         """
         Update the variables of this unit and its descendants.
 
-        Every leaf in the graph is visited rather than only the root's
-        descendants, because a leaf reports no descendants of its own. Delegating
-        to the root would therefore leave a circuit that *is* a single leaf
-        untouched, silently keeping the old names.
+        Every leaf in the graph is visited rather than only the root's descendants,
+        because a leaf reports no descendants of its own. Delegating to the root would
+        therefore leave a circuit that *is* a single leaf untouched, silently keeping
+        the old names.
 
         :param new_variables: The new variables to set.
         """
@@ -1716,61 +1712,86 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
     def plot_structure(
         self,
         node_colors: Optional[Dict[Unit, str]] = None,
-        variable_name_offset=0.2,
-        plot_inference=False,
-        inference_representation: Callable = lambda node: str(
-            node.result_of_current_query
-        ),
-        inference_result_offset: float = -0.25,
+        filename: Optional[str] = None,
     ):
         """
-        Plot the structure of the circuit using matplotlib.
+        Plot the structure of the circuit using Graphviz.
 
-        :param node_colors: Optionally specified colors of the node. If nodes are not
-            specified in the dictionary, they will be black.
-        :param node_size: The size of the nodes
-        :param variable_name_offset: The offset to the right of the variable names.
-        :param plot_inference: If the results of the inference should be plotted.
-        :param inference_representation: The representation of the inference results as
-            a function from node to string.
-        :param inference_result_offset: The vertical offset of the inference results.
+        :param node_colors: Optionally specified colors of the node.
+        :param filename: The filename to save the plot to.
         """
-        # fill the colors for the nodes
-        node_colors = self.fill_node_colors(node_colors)
-        scale = 1.0
-        layers = self.layers
+        import graphviz
+        from probabilistic_model.utils import get_subscript
 
-        # get the positions of the nodes
-        positions = self.breadth_first_search_layout(
-            scale=scale, align=PlotAlignment.VERTICAL
-        )
-        position_for_variable_name = {
-            node: (x + variable_name_offset, y) for node, (x, y) in positions.items()
-        }
+        dot = graphviz.Digraph(format="png", graph_attr={"rankdir": "TB"})
 
-        def node_labels(node: Unit) -> str:
+        latent_counter = 0
+        node_to_id = {}
+
+        # get the layers for topological ordering if needed, 
+        # but Graphviz handles layout automatically
+        nodes = self.graph.nodes()
+
+        def get_node_attributes(node: Unit) -> dict:
+            nonlocal latent_counter
+            label = ""
+            shape = "ellipse"
+            style = "filled"
+            fillcolor = "white"
+
             if isinstance(node, SumUnit):
-                return "+"
+                latent_counter += 1
+                label = f"λ{get_subscript(latent_counter)}"
+                shape = "rect"
+                fillcolor = "lightyellow"
             elif isinstance(node, ProductUnit):
-                return "×"
+                label = "×"
+                shape = "circle"
+                fillcolor = "lightgrey"
             elif isinstance(node, LeafUnit):
-                return str(node.distribution)
-            else:
-                raise NotImplementedError
+                label = str(node.distribution)
+                shape = "box"
+                fillcolor = "white"
 
-        def edge_labels(data) -> str:
-            if data is None:
-                return ""
-            else:
-                return str(np.round(data, decimals=2))
+            if node_colors and node in node_colors:
+                fillcolor = node_colors[node]
 
-        rustworkx.visualization.mpl_draw(
-            self.graph,
-            pos=positions,
-            labels=node_labels,
-            with_labels=True,
-            edge_labels=edge_labels,
+            return {"label": label, "shape": shape, "style": style, "fillcolor": fillcolor}
+
+        for node in nodes:
+            node_id = f"node_{node.index}"
+            dot.node(node_id, **get_node_attributes(node))
+            node_to_id[node] = node_id
+
+        for parent in nodes:
+            for child in self.graph.successors(parent.index):
+                edge_data = self.graph.get_edge_data(parent.index, child.index)
+                label = ""
+                if edge_data is not None:
+                    if isinstance(edge_data, dict) and "weight" in edge_data:
+                        label = str(np.round(edge_data["weight"], decimals=2))
+                    elif not isinstance(edge_data, dict):
+                        label = str(np.round(edge_data, decimals=2))
+                dot.edge(node_to_id[parent], node_to_id[child], label=label)
+
+        if filename is not None:
+            if filename.endswith(".png"):
+                filename = filename[:-4]
+            dot.render(filename, cleanup=True)
+        return dot
+
+    def plot_as_bayesian_network(self, filename: Optional[str] = None):
+        """
+        Plot the circuit as a Bayesian Network.
+
+        :param filename: The filename to save the plot to.
+        """
+        from probabilistic_model.bayesian_network.bayesian_network import (
+            BayesianNetwork,
         )
+
+        bn = BayesianNetwork.from_probabilistic_circuit(self)
+        bn.plot(filename=filename)
 
     def nodes_weights(self) -> dict:
         """

@@ -346,6 +346,28 @@ class RelationalProbabilisticCircuit:
             )
         return self
 
+    def plot_as_bayesian_network(self, filename: Optional[str] = None):
+        """
+        Plot the class-level circuit as a Bayesian Network.
+
+        :param filename: The filename to save the plot to.
+        """
+        if self.class_probabilistic_circuit is None:
+            raise CircuitNotFittedError(self.class_)
+
+        self.class_probabilistic_circuit.plot_as_bayesian_network(filename=filename)
+
+    def plot_as_uml(self, filename: str):
+        """
+        Plot the Relational Probabilistic Circuit as a UML-style diagram.
+
+        :param filename: The filename to save the plot to.
+        """
+        from probabilistic_model.gui.relational_plotting import RSPNUMLPlotter
+
+        plotter = RSPNUMLPlotter(self)
+        plotter.plot(filename)
+
     def _condition_class_circuit(
         self,
         circuit: ProbabilisticCircuit,

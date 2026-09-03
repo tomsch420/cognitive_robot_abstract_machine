@@ -254,8 +254,34 @@ class BayesianNetworkWithCircuitTestCase(unittest.TestCase):
         )
 
     def test_plot(self):
-        ...
-        # self.bayesian_network.plot()
+        self.bayesian_network.plot()
+
+
+class BayesianNetworkFromCircuitTestCase(unittest.TestCase):
+    def test_from_probabilistic_circuit(self):
+        model = ProbabilisticCircuit()
+        x = Continuous("x")
+        y = Continuous("y")
+
+        sum1 = SumUnit(probabilistic_circuit=model)
+        prod1 = ProductUnit(probabilistic_circuit=model)
+        sum1.add_subcircuit(prod1, np.log(1.0))
+
+        d_x = leaf(
+            UniformDistribution(variable=x, interval=closed(0, 1)),
+            probabilistic_circuit=model,
+        )
+        d_y = leaf(
+            UniformDistribution(variable=y, interval=closed(0, 1)),
+            probabilistic_circuit=model,
+        )
+        prod1.add_subcircuit(d_x)
+        prod1.add_subcircuit(d_y)
+
+        bn = BayesianNetwork.from_probabilistic_circuit(model)
+        self.assertEqual(len(bn.nodes()), 3)  # Sum1, x, y
+        self.assertEqual(len(bn.edges()), 2)  # Sum1 -> x, Sum1 -> y
+        bn.plot()
 
 
 if __name__ == "__main__":

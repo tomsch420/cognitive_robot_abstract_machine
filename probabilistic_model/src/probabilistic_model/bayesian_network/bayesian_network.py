@@ -14,6 +14,7 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit,
     ProductUnit,
     SumUnit,
+    LeafUnit,
     leaf,
 )
 
@@ -75,6 +76,9 @@ class Node:
         :param result: The probabilistic circuit to add the nodes to.
         """
         raise NotImplementedError
+
+
+from probabilistic_model.utils import get_subscript
 
 
 @dataclass
@@ -236,15 +240,162 @@ class BayesianNetwork:
 
         return result
 
-    def plot(self):
-        import rustworkx.visualization
+    def plot(self, filename: Optional[str] = None):
+        """
+        Plot the Bayesian Network using Graphviz.
 
-        rustworkx.visualization.mpl_draw(
-            self.graph,
-            with_labels=True,
-            labels=lambda node: ", ".join(v.name for v in node.variables),
-        )
-        plt.show()
+        :param filename: The filename to save the plot to.
+        """
+        import graphviz
+
+        dot = graphviz.Digraph(format="png", graph_attr={"rankdir": "TB"})
+
+        latent_counter = 0
+        node_to_id = {}
+
+        # Sort nodes to have deterministic λ numbering if they are latents
+        nodes = self.nodes()
+
+        # Helper to identify and style nodes
+        def get_node_attributes(node: Node) -> dict:
+            nonlocal latent_counter
+            var = node.variables[0]
+            name = var.name
+            label = name
+            shape = "ellipse"
+            style = "filled"
+            fillcolor = "white"
+
+            # Check if it's a latent variable from a SumUnit
+            if ".latent" in name:
+                latent_counter += 1
+                label = f"λ{get_subscript(latent_counter)}"
+                shape = "rect"
+                fillcolor = "lightyellow"
+
+            # Check if it's an aggregation statistic
+            elif "Aggregation" in name or "Aggregations" in name:
+                shape = "hexagon"
+                fillcolor = "lightblue"
+                # Strip owner class from label if present
+                if "." in label:
+                    label = ".".join(label.split(".")[1:])
+
+            # Check if it's an aggregation statistic (MappedVariable check)
+            elif hasattr(var, "_chain_root_"):
+                try:
+                    root = var._chain_root_
+                    if hasattr(root, "_type_") and any(
+                        base.__name__ == "AggregationStatistic"
+                        for base in root._type_.mro()
+                    ):
+                        shape = "hexagon"
+                        fillcolor = "lightblue"
+                        if "." in label:
+                            label = ".".join(label.split(".")[1:])
+                except:
+                    pass
+
+            else:
+                # For normal variables, strip the owner class name (first component)
+                if "." in label:
+                    label = ".".join(label.split(".")[1:])
+
+            return {
+                "label": label,
+                "shape": shape,
+                "style": style,
+                "fillcolor": fillcolor,
+            }
+
+        for node in nodes:
+            node_id = f"node_{id(node)}"
+            dot.node(node_id, **get_node_attributes(node))
+            node_to_id[node] = node_id
+
+        for parent, child in self.edges():
+            dot.edge(node_to_id[parent], node_to_id[child])
+
+        if filename is not None:
+            # strip .png if present as dot appends it
+            if filename.endswith(".png"):
+                filename = filename[:-4]
+            dot.render(filename, cleanup=True)
+        return dot
+
+    @classmethod
+    def from_probabilistic_circuit(
+        cls, circuit: ProbabilisticCircuit
+    ) -> BayesianNetwork:
+        """
+        Create a Bayesian Network from a Probabilistic Circuit's structure.
+
+        Each SumUnit in the circuit is represented as a latent variable, and all real
+        variables from the circuit's leaves are also included as nodes. Edges represent
+        the dependency structure of the circuit.
+
+        :param circuit: The probabilistic circuit to convert.
+        :return: A Bayesian Network representing the circuit's structure.
+        """
+        bn = cls()
+        sum_unit_to_node = {}
+        variable_to_node = {}
+
+        # 1. Create nodes for SumUnits (latent variables)
+        for node in circuit.graph.nodes():
+            if isinstance(node, SumUnit):
+                latent_var = node.latent_variable
+                bn_node = StructureOnlyNode(variable=latent_var)
+                bn.add_node(bn_node)
+                sum_unit_to_node[node] = bn_node
+
+        # 2. Create nodes for real Variables
+        for variable in circuit.variables:
+            bn_node = StructureOnlyNode(variable=variable)
+            bn.add_node(bn_node)
+            variable_to_node[variable] = bn_node
+
+        # 3. Extract edges
+        for sum_unit, bn_node in sum_unit_to_node.items():
+            # Find direct descendants that are SumUnits or Variables
+            visited = set()
+            to_visit = list(circuit.graph.successors(sum_unit.index))
+            while to_visit:
+                current = to_visit.pop()
+                if current.index in visited:
+                    continue
+                visited.add(current.index)
+
+                if isinstance(current, SumUnit):
+                    bn.add_edge(bn_node, sum_unit_to_node[current])
+                elif isinstance(current, LeafUnit):
+                    for var in current.variables:
+                        bn.add_edge(bn_node, variable_to_node[var])
+                elif isinstance(current, ProductUnit):
+                    to_visit.extend(circuit.graph.successors(current.index))
+
+        return bn
+
+
+@dataclass
+class StructureOnlyNode(Node):
+    """
+    A node that only represents the structure of a variable, without any distribution or
+    conversion logic.
+
+    Used for visualization.
+    """
+
+    variable: Variable
+
+    __hash__ = Node.__hash__
+
+    @property
+    def variables(self) -> Tuple[Variable, ...]:
+        return (self.variable,)
+
+    def as_probabilistic_circuit(self, result: ProbabilisticCircuit):
+        raise NotImplementedError("This node is only for visualization.")
 
 
 @dataclass

@@ -126,6 +126,14 @@ def neighbouring_points(point: float) -> np.array:
     return np.array([np.nextafter(point, -np.inf), point, np.nextafter(point, np.inf)])
 
 
+def get_subscript(n: int) -> str:
+    """
+    Get the unicode subscript for a number.
+    """
+    subscripts = "₀₁₂₃₄₅₆₇₈₉"
+    return "".join(subscripts[int(d)] for d in str(n))
+
+
 def event_compatible_for_truncation_with_singletons(event: Event):
     """
     Check if the event is compatible for truncation with singletons.
