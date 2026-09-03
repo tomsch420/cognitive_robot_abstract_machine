@@ -14,16 +14,20 @@ variable's own domain, not a hand-computed count.
 
 :func:`plot_relational_bayesian_network` extends this across the relational structure,
 Proposal-E style: one bordered panel per class, connected the same way the vtree view's
-panels are. A real variable that also serves as an exchangeable child template's latent
-(an aggregation statistic, e.g. ``chair_count()``) is drawn as a diamond rather than a
-plain box — the same convention the vtree view uses for the same concept — so it reads
-as a bridge into the child panel, not an ordinary per-instance feature.
+panels are. Every class a field references gets its own sibling panel rather than a box
+nested inside another — an exchangeable (1-to-many) child bridges in with a dashed
+"×N" arrow, and a 1-to-1 nested value class (e.g. a ``position: KRROODPosition`` field)
+bridges in with a solid arrow instead, since it is exactly one instance and never has
+Bayesian-network structure of its own to reduce. A real variable that also serves as an
+exchangeable child template's latent (an aggregation statistic, e.g. ``chair_count()``)
+is drawn as a diamond rather than a plain box — the same convention the vtree view uses
+for the same concept — so it reads as a bridge, not an ordinary per-instance feature.
 """
 
 from __future__ import annotations
 
 from collections import defaultdict, deque
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
@@ -327,31 +331,24 @@ class _BNPanelResult:
 
 @dataclass
 class _LayoutSlot:
-    """
-    One occupant of a layer's row: either a single BN node (``"latent"``/``"variable"``)
-    or a ``"group"`` — every real variable that a 1-to-1 relationship on this class
-    flattened from one nested value object, collapsed into a single box instead of one
-    box per subfield.
-    """
+    """One occupant of a layer's row: a single BN node, ``"latent"`` or ``"variable"``."""
 
     kind: str
-    node: Optional[Node] = None
-    group_label: str = ""
-    group_prefix: str = ""
-    group_nodes: List[RealVariableNode] = field(default_factory=list)
+    node: Node
 
 
 @dataclass
 class _RelationshipGrouping:
     """
     Which real variables a class's 1-to-1 relationships flattened from a nested value
-    object, and where the merged box for each should be placed.
+    object. These variables are excluded from their owner's own panel entirely — they
+    get their own sibling panel instead, the same as an exchangeable child does.
     """
 
     prefix_of_variable_index: Dict[int, str]
     members_of_prefix: Dict[str, List[RealVariableNode]]
     label_of_prefix: Dict[str, str]
-    layer_of_prefix: Dict[str, int]
+    key_of_prefix: Dict[str, str]
 
 
 def _group_variables_by_single_relationship(
@@ -360,55 +357,121 @@ def _group_variables_by_single_relationship(
     """
     Group every real variable of ``bn`` that a 1-to-1 relationship on ``rpc.class_``
     flattened from one nested value object (e.g. all of ``"SceneRoom.position.{x,y,z}"``
-    from a ``position: KRROODPosition`` field), so it can be rendered as a single
-    encapsulating box instead of one box per subfield — even when its subfields don't
-    share a layer, because one sum unit might model one subfield directly while others
-    are modeled through their own, deeper mixtures.
+    from a ``position: KRROODPosition`` field), so its own panel can be excised from the
+    owner's layout and rendered as a sibling panel instead.
 
     :param rpc: The relational circuit whose schema names the 1-to-1 relationships.
     :param bn: The Bayesian network reduced from ``rpc.class_probabilistic_circuit``.
-    :param layer: Each node's layer, as returned by :func:`_assign_layers`.
+    :param layer: Each node's layer, as returned by :func:`_assign_layers`. Unused by
+        the grouping itself, kept for callers that need it alongside this result.
     :return: The grouping, empty if the class has no 1-to-1 relationships.
     """
     class_name = rpc.class_.__name__
-    prefixes: List[Tuple[str, str]] = [
-        (f"{class_name}.{relationship.key}.", relationship.domain_type.__name__)
+    prefixes: List[Tuple[str, str, str]] = [
+        (
+            f"{class_name}.{relationship.key}.",
+            relationship.domain_type.__name__,
+            relationship.key,
+        )
         for relationship in (
             rpc.schema_information.single_relationships if rpc.schema_information else ()
         )
     ]
 
-    def matching_group(variable_name: str) -> Optional[Tuple[str, str]]:
-        for prefix, label in prefixes:
+    def matching_group(variable_name: str) -> Optional[Tuple[str, str, str]]:
+        for prefix, label, key in prefixes:
             if variable_name.startswith(prefix):
-                return prefix, label
+                return prefix, label, key
         return None
 
     prefix_of_variable_index: Dict[int, str] = {}
     members_of_prefix: Dict[str, List[RealVariableNode]] = defaultdict(list)
     label_of_prefix: Dict[str, str] = {}
+    key_of_prefix: Dict[str, str] = {}
     for node in bn.nodes():
         if isinstance(node, RealVariableNode):
             match = matching_group(node.variable.name)
             if match is not None:
-                prefix, label = match
+                prefix, label, key = match
                 prefix_of_variable_index[node.index] = prefix
                 members_of_prefix[prefix].append(node)
                 label_of_prefix[prefix] = label
-
-    # Placed at its deepest constituent's layer, so every contributing latent's edge
-    # keeps pointing downward into it rather than sideways or back up.
-    layer_of_prefix = {
-        prefix: max(layer[node.index] for node in members)
-        for prefix, members in members_of_prefix.items()
-    }
+                key_of_prefix[prefix] = key
 
     return _RelationshipGrouping(
         prefix_of_variable_index=prefix_of_variable_index,
         members_of_prefix=dict(members_of_prefix),
         label_of_prefix=label_of_prefix,
-        layer_of_prefix=layer_of_prefix,
+        key_of_prefix=key_of_prefix,
     )
+
+
+def _render_value_class_panel(
+    ax,
+    class_label: str,
+    subfield_labels: List[str],
+    x_offset: float,
+    y_offset: float,
+    depth: int,
+) -> _BNPanelResult:
+    """
+    Draw a plain panel for a 1-to-1 nested value class, e.g. the ``KRROODPosition``
+    that a ``position`` field flattened into its owner's own circuit.
+
+    Unlike :func:`_render_class_bn_panel`, there is no Bayesian network to reduce here
+    — a value object like a position or orientation is never separately fit; it is only
+    ever a handful of scalar columns living inside its owner's circuit. This still gets
+    the same panel weight (border, header) as a real class panel, so a viewer reads it
+    as its own encapsulated class rather than a special case.
+
+    :param ax: The axes to draw on.
+    :param class_label: The nested value class's name, for the panel header.
+    :param subfield_labels: The bare subfield names (e.g. ``"x"``, ``"y"``, ``"z"``).
+    :param x_offset: Left edge of this panel in data coordinates.
+    :param y_offset: Top edge of this panel in data coordinates.
+    :param depth: Current relational nesting depth, for its border color.
+    :return: This panel's geometry, for the caller to stack sibling panels under.
+    """
+    class_color = CLASS_PALETTE[depth % len(CLASS_PALETTE)]
+    count = len(subfield_labels)
+
+    width = max(count * NODE_SPACING, MIN_PANEL_WIDTH) + 2 * PANEL_MARGIN
+    height = PANEL_HEADER_HEIGHT + LEVEL_SPACING + PANEL_MARGIN
+
+    ax.add_patch(
+        FancyBboxPatch(
+            (x_offset, y_offset), width, height,
+            boxstyle="round,pad=0,rounding_size=0.08",
+            facecolor=mcolors.to_rgba(class_color, alpha=0.05),
+            edgecolor=class_color, linewidth=1.3,
+        )
+    )
+    ax.text(
+        x_offset + width / 2, y_offset + 0.2, class_label,
+        ha="center", va="center", fontsize=10.5, fontweight="bold", color=class_color,
+    )
+    ax.text(
+        x_offset + width / 2, y_offset + 0.47, f"{class_label} · {count} vars",
+        ha="center", va="center", fontsize=7.5, color="0.45", family="monospace",
+    )
+
+    row_y = y_offset + PANEL_HEADER_HEIGHT + LEVEL_SPACING / 2
+    for index, label in enumerate(sorted(subfield_labels)):
+        x = x_offset + width / 2 + (index - (count - 1) / 2) * NODE_SPACING
+        ax.add_patch(
+            FancyBboxPatch(
+                (x - VARIABLE_BOX_WIDTH / 2, row_y - VARIABLE_BOX_HEIGHT / 2),
+                VARIABLE_BOX_WIDTH, VARIABLE_BOX_HEIGHT,
+                boxstyle="round,pad=0,rounding_size=0.05",
+                facecolor="white", edgecolor=class_color, linewidth=1.0, zorder=3,
+            )
+        )
+        ax.text(
+            x, row_y, label, ha="center", va="center",
+            fontsize=6.6, family="monospace", zorder=3,
+        )
+
+    return _BNPanelResult(width=width, height=height)
 
 
 def _render_class_bn_panel(
@@ -440,25 +503,15 @@ def _render_class_bn_panel(
 
     grouping = _group_variables_by_single_relationship(rpc, bn, layer)
 
+    # Variables that a 1-to-1 relationship flattened from a nested value object are
+    # excluded from this panel's own layout entirely — they get their own sibling
+    # panel below, the same as an exchangeable child does, instead of a box nested
+    # inside this one.
     slots_by_layer: Dict[int, List[_LayoutSlot]] = defaultdict(list)
-    group_slots: Dict[str, _LayoutSlot] = {}
     for node in bn.nodes():
-        depth_index = layer[node.index]
-        prefix = grouping.prefix_of_variable_index.get(node.index) if isinstance(
-            node, RealVariableNode
-        ) else None
-        if prefix is not None:
-            slot = group_slots.get(prefix)
-            if slot is None:
-                slot = _LayoutSlot(
-                    kind="group",
-                    group_label=grouping.label_of_prefix[prefix],
-                    group_prefix=prefix,
-                    group_nodes=grouping.members_of_prefix[prefix],
-                )
-                group_slots[prefix] = slot
-                slots_by_layer[grouping.layer_of_prefix[prefix]].append(slot)
+        if isinstance(node, RealVariableNode) and node.index in grouping.prefix_of_variable_index:
             continue
+        depth_index = layer[node.index]
         kind = "latent" if isinstance(node, LatentNode) else "variable"
         slots_by_layer[depth_index].append(_LayoutSlot(kind=kind, node=node))
 
@@ -512,25 +565,30 @@ def _render_class_bn_panel(
     for layer_index, slots in slots_by_layer.items():
         count = len(slots)
         for position_in_layer, slot in enumerate(slots):
-            position_key = slot.node.index if slot.kind != "group" else id(slot)
-            positions[position_key] = to_world(layer_index, position_in_layer, count)
+            positions[slot.node.index] = to_world(layer_index, position_in_layer, count)
 
-    # edges, drawn before nodes so glyphs sit on top. An edge whose child was folded
-    # into a group slot is redirected to that slot, and duplicate edges into the same
-    # group (one per original subfield) are collapsed into a single arrow.
+    # edges, drawn before nodes so glyphs sit on top. An edge whose child moved into a
+    # 1-to-1 sibling panel is not drawn here at all — its source position is collected
+    # instead, so the caller can bridge straight into that panel — and is collected once
+    # per contributing latent even when several of its subfields share that latent.
+    value_bridge_positions: Dict[str, List[Tuple[float, float]]] = defaultdict(list)
+    value_bridge_seen = set()
     drawn_edges = set()
     for parent, child in bn.edges():
-        target_key = child.index
         if isinstance(child, RealVariableNode):
             prefix = grouping.prefix_of_variable_index.get(child.index)
             if prefix is not None:
-                target_key = id(group_slots[prefix])
-        edge_key = (parent.index, target_key)
+                bridge_key = (prefix, parent.index)
+                if bridge_key not in value_bridge_seen:
+                    value_bridge_seen.add(bridge_key)
+                    value_bridge_positions[prefix].append(positions[parent.index])
+                continue
+        edge_key = (parent.index, child.index)
         if edge_key in drawn_edges:
             continue
         drawn_edges.add(edge_key)
         x0, y0 = positions[parent.index]
-        x1, y1 = positions[target_key]
+        x1, y1 = positions[child.index]
         ax.add_patch(
             FancyArrowPatch(
                 (x0, y0 + 0.06), (x1, y1 - 0.06),
@@ -567,32 +625,6 @@ def _render_class_bn_panel(
                     x, y, f"{latent_display_names[node.index]}\nc={node.cardinality}",
                     ha="center", va="center", fontsize=5.6, family="monospace",
                     fontweight="bold", color=LATENT_COLOR, zorder=3,
-                )
-            elif slot.kind == "group":
-                x, y = positions[id(slot)]
-                subfields = sorted(
-                    variable_node.variable.name[len(slot.group_prefix) :]
-                    for variable_node in slot.group_nodes
-                )
-                field_list = ", ".join(subfields)
-                box_w = max(VARIABLE_BOX_WIDTH, 0.5 + 0.1 * max(len(slot.group_label), len(field_list)))
-                box_h = VARIABLE_BOX_HEIGHT * 1.9
-                ax.add_patch(
-                    FancyBboxPatch(
-                        (x - box_w / 2, y - box_h / 2), box_w, box_h,
-                        boxstyle="round,pad=0,rounding_size=0.06",
-                        facecolor=mcolors.to_rgba(class_color, alpha=0.1),
-                        edgecolor=class_color, linewidth=1.4, zorder=3,
-                    )
-                )
-                ax.text(
-                    x, y - box_h * 0.22, slot.group_label, ha="center", va="center",
-                    fontsize=6.2, fontweight="bold", family="monospace",
-                    color=class_color, zorder=3,
-                )
-                ax.text(
-                    x, y + box_h * 0.22, field_list, ha="center", va="center",
-                    fontsize=5.6, family="monospace", color="0.3", zorder=3,
                 )
             else:
                 node = slot.node
@@ -635,44 +667,65 @@ def _render_class_bn_panel(
 
     if depth < max_depth:
         child_x = x_offset + width + PANEL_GAP
+        label_x = x_offset + width + PANEL_GAP / 2
         child_y = y_offset
+
+        def bridge_into_child(
+            sources: List[Tuple[float, float]],
+            child_result: _BNPanelResult,
+            label: str,
+            dashed: bool,
+        ) -> None:
+            nonlocal child_y
+            entry_top = child_y + PANEL_HEADER_HEIGHT + 0.15
+            for index, (source_x, source_y) in enumerate(sources):
+                target_y = entry_top + index * 0.22
+                # Curvature spreads per source, so bridges from adjacent origins fan
+                # apart instead of bunching along near-identical paths.
+                rad = 0.08 + 0.07 * (index - (len(sources) - 1) / 2)
+                ax.add_patch(
+                    FancyArrowPatch(
+                        (source_x, source_y), (child_x, target_y),
+                        connectionstyle=f"arc3,rad={rad}", arrowstyle="-|>",
+                        mutation_scale=8, linestyle=(0, (4, 3)) if dashed else "solid",
+                        color=LATENT_COLOR, linewidth=1.0, zorder=2,
+                    )
+                )
+            ax.text(
+                label_x, child_y + PANEL_HEADER_HEIGHT, label,
+                ha="center", va="center", fontsize=6.8, family="monospace",
+                color=LATENT_COLOR,
+            )
+            child_y = child_y + child_result.height + PANEL_GAP * 0.6
+
+        # Exchangeable (1-to-many) children: dashed bridges, "×N" — several instances
+        # ground under this class per parent.
         for field_name in bridge_positions:
             template = rpc.exchangeable_distribution_templates[field_name]
             child_class_name = template.template_distribution.class_.__name__.removesuffix(
                 "DAO"
             )
             child_result = _render_class_bn_panel(
-                ax,
-                template.template_distribution,
-                child_class_name,
-                child_x,
-                child_y,
-                depth + 1,
-                max_depth,
+                ax, template.template_distribution, child_class_name,
+                child_x, child_y, depth + 1, max_depth,
             )
-            sources = bridge_positions[field_name]
-            entry_top = child_y + PANEL_HEADER_HEIGHT + 0.15
-            for index, (source_x, source_y) in enumerate(sources):
-                target_y = entry_top + index * 0.22
-                # Curvature spreads per source, so bridges from adjacent diamonds
-                # fan apart instead of bunching along near-identical paths.
-                rad = 0.08 + 0.07 * (index - (len(sources) - 1) / 2)
-                ax.add_patch(
-                    FancyArrowPatch(
-                        (source_x, source_y), (child_x, target_y),
-                        connectionstyle=f"arc3,rad={rad}", arrowstyle="-|>",
-                        mutation_scale=8, linestyle=(0, (4, 3)),
-                        color=LATENT_COLOR, linewidth=1.0, zorder=2,
-                    )
-                )
-            label_x = x_offset + width + PANEL_GAP / 2
-            label_y = y_offset + PANEL_HEADER_HEIGHT
-            ax.text(
-                label_x, label_y, f"{field_name}\n×N",
-                ha="center", va="center", fontsize=6.8, family="monospace",
-                color=LATENT_COLOR,
+            bridge_into_child(
+                bridge_positions[field_name], child_result, f"{field_name}\n×N", dashed=True
             )
-            child_y = child_y + child_result.height + PANEL_GAP * 0.6
+
+        # 1-to-1 nested value classes: solid bridges, no "×N" — exactly one instance
+        # per parent, and no Bayesian-network structure of its own to reduce.
+        for prefix, sources in value_bridge_positions.items():
+            subfield_labels = [
+                node.variable.name[len(prefix) :] for node in grouping.members_of_prefix[prefix]
+            ]
+            child_result = _render_value_class_panel(
+                ax, grouping.label_of_prefix[prefix], subfield_labels,
+                child_x, child_y, depth + 1,
+            )
+            bridge_into_child(
+                sources, child_result, grouping.key_of_prefix[prefix], dashed=False
+            )
 
     return _BNPanelResult(width=width, height=height)
 

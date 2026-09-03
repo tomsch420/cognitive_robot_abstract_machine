@@ -110,7 +110,7 @@ def test_aggregation_statistics_are_identifiable_as_bridges(rpc):
     assert aggregation_names.issubset(circuit_variable_names)
 
 
-def test_single_relationships_group_all_their_subfields_into_one_box(rpc):
+def test_single_relationships_group_all_their_subfields_for_their_own_panel(rpc):
     circuit = rpc.class_probabilistic_circuit
     bn = build_bayesian_network(circuit)
     layer = _assign_layers(bn)
@@ -134,6 +134,7 @@ def test_single_relationships_group_all_their_subfields_into_one_box(rpc):
         "SceneRoom.position.z",
     }
     assert grouping.label_of_prefix["SceneRoom.position."] == "KRROODPosition"
+    assert grouping.key_of_prefix["SceneRoom.position."] == "position"
 
     # every grouped variable's node.index resolves back to its own prefix
     for prefix, members in grouping.members_of_prefix.items():
