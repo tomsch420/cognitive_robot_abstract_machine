@@ -414,7 +414,7 @@ def _render_value_class_panel(
     x_offset: float,
     y_offset: float,
     depth: int,
-) -> _BNPanelResult:
+) -> Tuple[_BNPanelResult, Dict[str, Tuple[float, float]]]:
     """
     Draw a plain panel for a 1-to-1 nested value class, e.g. the ``KRROODPosition``
     that a ``position`` field flattened into its owner's own circuit.
@@ -431,7 +431,9 @@ def _render_value_class_panel(
     :param x_offset: Left edge of this panel in data coordinates.
     :param y_offset: Top edge of this panel in data coordinates.
     :param depth: Current relational nesting depth, for its border color.
-    :return: This panel's geometry, for the caller to stack sibling panels under.
+    :return: This panel's geometry, and each subfield's own box center — so a caller
+        can bridge a source straight to the specific field it describes, not just to
+        "the class" generically.
     """
     class_color = CLASS_PALETTE[depth % len(CLASS_PALETTE)]
     count = len(subfield_labels)
@@ -457,8 +459,10 @@ def _render_value_class_panel(
     )
 
     row_y = y_offset + PANEL_HEADER_HEIGHT + LEVEL_SPACING / 2
+    subfield_positions: Dict[str, Tuple[float, float]] = {}
     for index, label in enumerate(sorted(subfield_labels)):
         x = x_offset + width / 2 + (index - (count - 1) / 2) * NODE_SPACING
+        subfield_positions[label] = (x, row_y)
         ax.add_patch(
             FancyBboxPatch(
                 (x - VARIABLE_BOX_WIDTH / 2, row_y - VARIABLE_BOX_HEIGHT / 2),
@@ -472,7 +476,7 @@ def _render_value_class_panel(
             fontsize=6.6, family="monospace", zorder=3,
         )
 
-    return _BNPanelResult(width=width, height=height)
+    return _BNPanelResult(width=width, height=height), subfield_positions
 
 
 def _render_class_bn_panel(
@@ -569,20 +573,18 @@ def _render_class_bn_panel(
             positions[slot.node.index] = to_world(layer_index, position_in_layer, count)
 
     # edges, drawn before nodes so glyphs sit on top. An edge whose child moved into a
-    # 1-to-1 sibling panel is not drawn here at all — its source position is collected
-    # instead, so the caller can bridge straight into that panel — and is collected once
-    # per contributing latent even when several of its subfields share that latent.
-    value_bridge_positions: Dict[str, List[Tuple[float, float]]] = defaultdict(list)
-    value_bridge_seen = set()
+    # 1-to-1 sibling panel is not drawn here at all — its source position and which
+    # subfield it feeds are collected instead, so the caller can bridge straight to
+    # that specific field's box rather than to the child panel generically. Every real
+    # variable has exactly one incoming edge in this reduction, so no dedup is needed.
+    value_bridge_positions: Dict[str, List[Tuple[Tuple[float, float], str]]] = defaultdict(list)
     drawn_edges = set()
     for parent, child in bn.edges():
         if isinstance(child, RealVariableNode):
             prefix = grouping.prefix_of_variable_index.get(child.index)
             if prefix is not None:
-                bridge_key = (prefix, parent.index)
-                if bridge_key not in value_bridge_seen:
-                    value_bridge_seen.add(bridge_key)
-                    value_bridge_positions[prefix].append(positions[parent.index])
+                subfield = child.variable.name[len(prefix) :]
+                value_bridge_positions[prefix].append((positions[parent.index], subfield))
                 continue
         edge_key = (parent.index, child.index)
         if edge_key in drawn_edges:
@@ -678,37 +680,55 @@ def _render_class_bn_panel(
         lane_index = 0
 
         def bridge_into_child(
-            sources: List[Tuple[float, float]],
+            pairs: List[Tuple[Tuple[float, float], Tuple[float, float]]],
             child_result: _BNPanelResult,
             label: str,
             dashed: bool,
+            approach: str,
         ) -> None:
+            """
+            Draw one elbow per ``(source, target)`` pair into a lane of its own.
+
+            :param pairs: Each bridged edge's exact source and target point — a
+                specific subfield's box for a 1-to-1 value class, or a generic row on
+                the child panel's edge for an exchangeable child (there is no single
+                variable an aggregation statistic maps to inside the grounded child).
+            :param approach: ``"left"`` arrives horizontally at the target (an
+                exchangeable child's generic edge); ``"top"`` drops down into the
+                target from above (a specific subfield box).
+            """
             nonlocal child_y, lane_index
             lane_x = x_offset + width + PANEL_GAP * (lane_index + 1) / (total_lanes + 1)
             lane_index += 1
-            entry_top = child_y + PANEL_HEADER_HEIGHT + 0.15
-            # Sorting by source height keeps the elbow bends stacked in the same order
-            # they leave the source panel, so they run in clean parallel bands instead
-            # of crossing each other on the way to the child.
-            for index, (source_x, source_y) in enumerate(
-                sorted(sources, key=lambda point: point[1])
-            ):
-                target_y = entry_top + index * 0.22
-                # A manually built elbow (source -> mid -> mid -> child) instead of a
-                # connectionstyle: it leaves the source horizontally, drops straight
-                # down/up to the target's height, then arrives horizontally — and,
-                # being three explicit line segments, never hits the "parallel tangent"
-                # degenerate case an automatic angle connector can when a source and
-                # target land at the same height.
-                elbow = Path(
-                    [
+            count = len(pairs)
+            # Sorting by target height keeps the elbow bends stacked in a sensible
+            # order, and spreading each source's own turn across a small span of the
+            # lane keeps multiple bridges into the same child from running down a
+            # near-identical path for most of their length.
+            ordered = sorted(pairs, key=lambda pair: pair[1][1])
+            for index, ((source_x, source_y), (target_x, target_y)) in enumerate(ordered):
+                source_lane_x = lane_x + (index - (count - 1) / 2) * 0.12
+                if approach == "left":
+                    vertices = [
                         (source_x, source_y),
-                        (lane_x, source_y),
-                        (lane_x, target_y),
-                        (child_x, target_y),
-                    ],
-                    [Path.MOVETO, Path.LINETO, Path.LINETO, Path.LINETO],
-                )
+                        (source_lane_x, source_y),
+                        (source_lane_x, target_y),
+                        (target_x, target_y),
+                    ]
+                else:
+                    approach_y = target_y - VARIABLE_BOX_HEIGHT / 2 - 0.15
+                    vertices = [
+                        (source_x, source_y),
+                        (source_lane_x, source_y),
+                        (source_lane_x, approach_y),
+                        (target_x, approach_y),
+                        (target_x, target_y - VARIABLE_BOX_HEIGHT / 2),
+                    ]
+                # A manually built elbow instead of a connectionstyle: explicit line
+                # segments never hit the "parallel tangent" degenerate case an
+                # automatic angle connector can when a source and target land at the
+                # same height.
+                elbow = Path(vertices, [Path.MOVETO] + [Path.LINETO] * (len(vertices) - 1))
                 ax.add_patch(
                     FancyArrowPatch(
                         path=elbow, arrowstyle="-|>", mutation_scale=9,
@@ -725,7 +745,9 @@ def _render_class_bn_panel(
             child_y = child_y + child_result.height + PANEL_GAP * 0.4
 
         # Exchangeable (1-to-many) children: dashed bridges, "×N" — several instances
-        # ground under this class per parent.
+        # ground under this class per parent. There is no single variable inside the
+        # grounded child an aggregation statistic maps to, so these still land on
+        # generic rows along the child panel's left edge.
         for field_name in bridge_positions:
             template = rpc.exchangeable_distribution_templates[field_name]
             child_class_name = template.template_distribution.class_.__name__.removesuffix(
@@ -735,22 +757,33 @@ def _render_class_bn_panel(
                 ax, template.template_distribution, child_class_name,
                 child_x, child_y, depth + 1, max_depth,
             )
+            entry_top = child_y + PANEL_HEADER_HEIGHT + 0.15
+            sources = sorted(bridge_positions[field_name], key=lambda point: point[1])
+            pairs = [
+                (source, (child_x, entry_top + index * 0.22))
+                for index, source in enumerate(sources)
+            ]
             bridge_into_child(
-                bridge_positions[field_name], child_result, f"{field_name}\n×N", dashed=True
+                pairs, child_result, f"{field_name}\n×N", dashed=True, approach="left"
             )
 
         # 1-to-1 nested value classes: solid bridges, no "×N" — exactly one instance
-        # per parent, and no Bayesian-network structure of its own to reduce.
-        for prefix, sources in value_bridge_positions.items():
+        # per parent, no Bayesian-network structure of its own to reduce, and each
+        # source bridges straight to the specific subfield box it describes.
+        for prefix, sources_with_subfield in value_bridge_positions.items():
             subfield_labels = [
                 node.variable.name[len(prefix) :] for node in grouping.members_of_prefix[prefix]
             ]
-            child_result = _render_value_class_panel(
+            child_result, subfield_positions = _render_value_class_panel(
                 ax, grouping.label_of_prefix[prefix], subfield_labels,
                 child_x, child_y, depth + 1,
             )
+            pairs = [
+                (source, subfield_positions[subfield])
+                for source, subfield in sources_with_subfield
+            ]
             bridge_into_child(
-                sources, child_result, grouping.key_of_prefix[prefix], dashed=False
+                pairs, child_result, grouping.key_of_prefix[prefix], dashed=False, approach="top"
             )
 
     return _BNPanelResult(width=width, height=height)
