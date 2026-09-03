@@ -44,6 +44,8 @@ class Variable(CPPWrapper):
         return self.name.__hash__()
 
     def __eq__(self, other):
+        if not isinstance(other, Variable):
+            return False
         return self.cpp_object == other.cpp_object
 
     def __str__(self):

@@ -47,11 +47,13 @@ def is_aggregation_variable(
         return True
 
     if rspn is not None and rspn.feature_extractor is not None:
-        all_aggregations = {
-            f._name_
-            for features in rspn.feature_extractor.exchangeable_features.values()
-            for f in features
-        }
+        all_aggregations = set()
+        for features in rspn.feature_extractor.exchangeable_features.values():
+            for f in features:
+                if hasattr(f, "_name_"):
+                    all_aggregations.add(f._name_)
+                if hasattr(f, "get_clean_name_from_mapped_variable"):
+                    all_aggregations.add(f.get_clean_name_from_mapped_variable())
         if name in all_aggregations:
             return True
 
@@ -75,7 +77,12 @@ def get_unique_part_path(variable: Any, root_class: Type) -> List[str]:
                 continue
 
             try:
-                schema = get_dao_schema(owner)
+                from krrood.ormatic.data_access_objects.helper import get_dao_class
+
+                dao_class = get_dao_class(owner)
+                if dao_class is None:
+                    break
+                schema = get_dao_schema(dao_class)
                 if any(
                     r.key == step._attribute_name_ for r in schema.single_relationships
                 ):
@@ -96,8 +103,12 @@ def get_unique_part_path(variable: Any, root_class: Type) -> List[str]:
     for part in parts[1:]:
         try:
             from krrood.symbol_graph.helpers import get_field_type_endpoint
+            from krrood.ormatic.data_access_objects.helper import get_dao_class
 
-            schema = get_dao_schema(current_class)
+            dao_class = get_dao_class(current_class)
+            if dao_class is None:
+                break
+            schema = get_dao_schema(dao_class)
             if any(r.key == part for r in schema.single_relationships):
                 path.append(part)
                 current_class = get_field_type_endpoint(current_class, part)
@@ -171,7 +182,16 @@ class RSPNUMLPlotter:
                     field_name, []
                 ):
                     # Find the node for this variable in the BN
-                    node_id = self.node_to_id.get(var)
+                    node_id = None
+                    if hasattr(var, "_name_"):
+                        node_id = self.node_to_id.get(var._name_)
+                    if not node_id and hasattr(var, "get_clean_name_from_mapped_variable"):
+                        node_id = self.node_to_id.get(
+                            var.get_clean_name_from_mapped_variable()
+                        )
+                    if not node_id:
+                        node_id = self.node_to_id.get(getattr(var, "name", str(var)))
+
                     if node_id:
                         child_anchor_id = f"anchor_{child_cluster_id}"
                         self.dot.edge(
@@ -222,15 +242,7 @@ class RSPNUMLPlotter:
                 if is_aggregation_variable(var, rspn):
                     shape = "hexagon"
                     color = "lightblue"
-                    # Remove owner class from label
-                    label = name
-                    class_name = rspn.class_.__name__
-                    if label.startswith(class_name):
-                        label = label[len(class_name) :].lstrip(".")
-                    if label.startswith("Aggregations"):
-                        label = label[len("Aggregations") :].lstrip(".")
-                    if label.startswith("AggregationStatistic"):
-                        label = label[len("AggregationStatistic") :].lstrip(".")
+                    label = name.split(".")[-1]
                 elif ".latent" in name:
                     shape = "rect"
                     color = "lightyellow"
@@ -246,6 +258,7 @@ class RSPNUMLPlotter:
                 )
                 self.node_to_id[node] = node_id
                 self.node_to_id[var] = node_id
+                self.node_to_id[name] = node_id
 
             # Find sub-paths
             sub_paths = {
