@@ -668,8 +668,14 @@ def _render_class_bn_panel(
 
     if depth < max_depth:
         child_x = x_offset + width + PANEL_GAP
-        label_x = x_offset + width + PANEL_GAP / 2
         child_y = y_offset
+
+        # Every bridged child gets its own vertical lane through the gap, rather than
+        # all of them sharing one trunk column — otherwise their vertical runs are
+        # literally the same line wherever their y-ranges overlap, which is most of
+        # the way given they all originate near the top of this panel.
+        total_lanes = len(bridge_positions) + len(value_bridge_positions)
+        lane_index = 0
 
         def bridge_into_child(
             sources: List[Tuple[float, float]],
@@ -677,7 +683,9 @@ def _render_class_bn_panel(
             label: str,
             dashed: bool,
         ) -> None:
-            nonlocal child_y
+            nonlocal child_y, lane_index
+            lane_x = x_offset + width + PANEL_GAP * (lane_index + 1) / (total_lanes + 1)
+            lane_index += 1
             entry_top = child_y + PANEL_HEADER_HEIGHT + 0.15
             # Sorting by source height keeps the elbow bends stacked in the same order
             # they leave the source panel, so they run in clean parallel bands instead
@@ -695,8 +703,8 @@ def _render_class_bn_panel(
                 elbow = Path(
                     [
                         (source_x, source_y),
-                        (label_x, source_y),
-                        (label_x, target_y),
+                        (lane_x, source_y),
+                        (lane_x, target_y),
                         (child_x, target_y),
                     ],
                     [Path.MOVETO, Path.LINETO, Path.LINETO, Path.LINETO],
@@ -709,9 +717,10 @@ def _render_class_bn_panel(
                     )
                 )
             ax.text(
-                label_x, child_y + PANEL_HEADER_HEIGHT, label,
+                lane_x, child_y + PANEL_HEADER_HEIGHT, label,
                 ha="center", va="center", fontsize=6.8, family="monospace",
                 color=LATENT_COLOR,
+                bbox={"facecolor": "white", "edgecolor": "none", "pad": 1.0, "alpha": 0.85},
             )
             child_y = child_y + child_result.height + PANEL_GAP * 0.4
 
