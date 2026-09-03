@@ -5,14 +5,17 @@ Renders one bordered panel per class: a recursive binary partition of that class
 circuit variables, with each split annotated by how many fitted circuit nodes collapse
 under it. Panel size is bounded by variable count rather than node count, so it stays
 small even when ``class_probabilistic_circuit`` itself runs to thousands of nodes.
-Latent variables that bridge into an exchangeable child's template are drawn as diamonds
-whose edges cross into that child class's own panel, recursively.
+Latent variables that bridge into an exchangeable child's template are drawn as diamonds,
+labeled with their full name, whose edges cross into that child class's own panel,
+recursively. Each panel is colored by its relational depth; within a panel, a split's
+fill darkens with how much of the fit collapses under it.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from matplotlib.patches import Circle, FancyArrowPatch, FancyBboxPatch, Polygon
@@ -26,7 +29,7 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit,
 )
 
-LEAF_SPACING = 1.55
+LEAF_SPACING = 1.75
 LEVEL_SPACING = 0.85
 PANEL_HEADER_HEIGHT = 0.85
 PANEL_MARGIN = 0.4
@@ -35,12 +38,19 @@ MIN_PANEL_WIDTH = 1.6
 LEAF_BOX_WIDTH = LEAF_SPACING * 0.8
 LEAF_BOX_HEIGHT = 0.24
 HOT_COMPLEXITY_FRACTION = 0.5
-"""A split is drawn as an accent-colored hotspot once its complexity reaches this
-fraction of its panel root's complexity."""
+"""A split's ``k`` label is drawn bold once its complexity reaches this fraction of
+its panel root's complexity, on top of the continuous color-by-complexity fill."""
 INCHES_PER_UNIT_X = 0.72
 INCHES_PER_UNIT_Y = 0.95
 """Figure size scales with layout extent at this ratio, so a fixed point size never
 has to fit into a box that shrinks as more variables are added."""
+
+CLASS_PALETTE = ["#3b6ea5", "#4f8f6b", "#8a5fb0", "#b0793f", "#4592a1"]
+"""Color assigned to each panel by its relational depth (root, then one hop out, two
+hops out, ...), cycled if a relational structure recurses deeper than the palette."""
+LATENT_COLOR = "#bf6a2e"
+"""Color reserved for latent/bridge variables and the edges that cross panels — kept
+separate from the per-depth class colors so a bridge always reads as a bridge."""
 
 
 @dataclass
@@ -200,6 +210,7 @@ def _render_class_panel(
     annotate_complexity(vtree, circuit)
     positioned, by_depth, leaf_count = _layout(vtree)
     tree_depth = max(entry.y for entry in positioned)
+    class_color = CLASS_PALETTE[depth % len(CLASS_PALETTE)]
 
     width = max(leaf_count * LEAF_SPACING, MIN_PANEL_WIDTH) + 2 * PANEL_MARGIN
     height = (
@@ -228,9 +239,9 @@ def _render_class_panel(
             width,
             height,
             boxstyle="round,pad=0,rounding_size=0.08",
-            facecolor="none",
-            edgecolor="0.25",
-            linewidth=1.1,
+            facecolor=mcolors.to_rgba(class_color, alpha=0.05),
+            edgecolor=class_color,
+            linewidth=1.3,
         )
     )
     ax.text(
@@ -241,6 +252,7 @@ def _render_class_panel(
         va="center",
         fontsize=10.5,
         fontweight="bold",
+        color=class_color,
     )
     ax.text(
         x_offset + width / 2,
@@ -260,7 +272,10 @@ def _render_class_panel(
         for child in current.children:
             x0, y0 = positions[id(current)]
             x1, y1 = positions[id(child)]
-            ax.plot([x0, x1], [y0 + 0.06, y1 - 0.06], color="0.55", linewidth=0.9, zorder=1)
+            ax.plot(
+                [x0, x1], [y0 + 0.06, y1 - 0.06],
+                color=class_color, alpha=0.55, linewidth=0.9, zorder=1,
+            )
             draw_edges(child)
 
     draw_edges(vtree)
@@ -272,26 +287,28 @@ def _render_class_panel(
         x, y = positions[id(entry.node)]
         if entry.node.is_leaf:
             variable = entry.node.variables[0]
-            label = _short_label(variable.name)
             if variable in latent_to_field:
                 field_name = latent_to_field[variable]
+                wrapped = _wrap_label(variable.name, max_chars=16)
                 size = 0.11
                 ax.add_patch(
                     Polygon(
                         [(x, y - size), (x + size, y), (x, y + size), (x - size, y)],
                         closed=True,
                         facecolor="white",
-                        edgecolor="#bf6a2e",
+                        edgecolor=LATENT_COLOR,
                         linewidth=1.4,
                         zorder=3,
                     )
                 )
                 ax.text(
-                    x, y + 0.2, label, ha="center", va="center", fontsize=6.6,
-                    family="monospace", color="0.35", zorder=3,
+                    x, y + 0.2, wrapped, ha="center", va="center",
+                    fontsize=5.8 if "\n" in wrapped else 6.6,
+                    family="monospace", color=LATENT_COLOR, zorder=3,
                 )
                 bridge_positions.setdefault(field_name, []).append((x, y))
             else:
+                label = _short_label(variable.name)
                 wrapped = _wrap_label(label)
                 is_wrapped = "\n" in wrapped
                 box_h = LEAF_BOX_HEIGHT * 1.7 if is_wrapped else LEAF_BOX_HEIGHT
@@ -302,7 +319,7 @@ def _render_class_panel(
                         box_h,
                         boxstyle="round,pad=0,rounding_size=0.05",
                         facecolor="white",
-                        edgecolor="0.25",
+                        edgecolor=class_color,
                         linewidth=1.0,
                         zorder=3,
                     )
@@ -313,15 +330,16 @@ def _render_class_panel(
                     family="monospace", zorder=3,
                 )
         else:
-            is_hot = (
-                root_complexity > 0
-                and entry.node.complexity >= HOT_COMPLEXITY_FRACTION * root_complexity
+            complexity_fraction = (
+                entry.node.complexity / root_complexity if root_complexity > 0 else 0.0
             )
+            fill_alpha = 0.12 + 0.65 * complexity_fraction
+            is_hot = complexity_fraction >= HOT_COMPLEXITY_FRACTION
             ax.add_patch(
                 Circle(
                     (x, y), 0.075,
-                    facecolor="white",
-                    edgecolor="#bf6a2e" if is_hot else "0.25",
+                    facecolor=mcolors.to_rgba(class_color, alpha=fill_alpha),
+                    edgecolor=class_color,
                     linewidth=1.3,
                     zorder=3,
                 )
@@ -329,7 +347,8 @@ def _render_class_panel(
             ax.text(
                 x, y - 0.16, f"k = {entry.node.complexity:,}",
                 ha="center", va="center", fontsize=6.8, family="monospace",
-                color="#bf6a2e" if is_hot else "0.5", zorder=3,
+                fontweight="bold" if is_hot else "normal",
+                color=class_color, zorder=3,
             )
 
     root_anchor = positions[id(vtree)]
@@ -363,7 +382,7 @@ def _render_class_panel(
                         arrowstyle="-|>",
                         mutation_scale=8,
                         linestyle=(0, (4, 3)),
-                        color="#bf6a2e",
+                        color=LATENT_COLOR,
                         linewidth=1.0,
                         zorder=2,
                     )
@@ -373,7 +392,7 @@ def _render_class_panel(
             ax.text(
                 label_x, label_y, f"{field_name}\n×N",
                 ha="center", va="center", fontsize=6.8, family="monospace",
-                color="#bf6a2e",
+                color=LATENT_COLOR,
             )
             child_y = child_y + child_result.height + PANEL_GAP * 0.6
 
