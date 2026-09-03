@@ -6,6 +6,8 @@ import pytest
 
 from krrood.ormatic.data_access_objects.helper import to_dao
 from probabilistic_model.probabilistic_circuit.relational.bayesian_network_plot import (
+    LatentNode,
+    RealVariableNode,
     build_bayesian_network,
     plot_circuit_as_bayesian_network,
 )
@@ -47,30 +49,41 @@ def rpc() -> RelationalProbabilisticCircuit:
 
 def test_bayesian_network_has_one_node_per_real_variable(rpc):
     circuit = rpc.class_probabilistic_circuit
-    structure = build_bayesian_network(circuit)
-    variable_ids = {node.id for node in structure.nodes.values() if node.kind == "variable"}
-    expected_ids = {f"variable::{variable.name}" for variable in circuit.variables}
-    assert variable_ids == expected_ids
+    bn = build_bayesian_network(circuit)
+    variable_names = {
+        node.variable.name for node in bn.nodes() if isinstance(node, RealVariableNode)
+    }
+    expected_names = {variable.name for variable in circuit.variables}
+    assert variable_names == expected_names
 
 
 def test_bayesian_network_latent_cardinality_matches_sum_unit_children(rpc):
     circuit = rpc.class_probabilistic_circuit
-    structure = build_bayesian_network(circuit)
+    bn = build_bayesian_network(circuit)
     sum_unit_child_counts = sorted(
         len(node.subcircuits) for node in circuit.nodes() if node.__class__.__name__ == "SumUnit"
     )
     latent_cardinalities = sorted(
-        node.cardinality for node in structure.nodes.values() if node.kind == "latent"
+        node.cardinality for node in bn.nodes() if isinstance(node, LatentNode)
     )
     assert latent_cardinalities == sum_unit_child_counts
 
 
+def test_bayesian_network_latent_reuses_sum_unit_latent_variable(rpc):
+    circuit = rpc.class_probabilistic_circuit
+    bn = build_bayesian_network(circuit)
+    sum_units = [node for node in circuit.nodes() if node.__class__.__name__ == "SumUnit"]
+    latent_variable_names = {node.latent_variable.name for node in sum_units}
+    bn_latent_names = {node.variable.name for node in bn.nodes() if isinstance(node, LatentNode)}
+    assert bn_latent_names == latent_variable_names
+
+
 def test_bayesian_network_every_variable_has_a_parent(rpc):
     circuit = rpc.class_probabilistic_circuit
-    structure = build_bayesian_network(circuit)
-    children_with_parent = {child_id for _, child_id in structure.edges}
-    variable_ids = {node.id for node in structure.nodes.values() if node.kind == "variable"}
-    assert variable_ids.issubset(children_with_parent)
+    bn = build_bayesian_network(circuit)
+    children_with_parent = {child.index for _, child in bn.edges()}
+    variable_indices = {node.index for node in bn.nodes() if isinstance(node, RealVariableNode)}
+    assert variable_indices.issubset(children_with_parent)
 
 
 def test_plot_circuit_as_bayesian_network_renders_scene_room(rpc, tmp_path):
