@@ -10,6 +10,7 @@ from probabilistic_model.probabilistic_circuit.relational.bayesian_network_plot 
     RealVariableNode,
     build_bayesian_network,
     plot_circuit_as_bayesian_network,
+    plot_relational_bayesian_network,
 )
 from probabilistic_model.probabilistic_circuit.relational.rspn import (
     RelationalProbabilisticCircuit,
@@ -90,6 +91,26 @@ def test_plot_circuit_as_bayesian_network_renders_scene_room(rpc, tmp_path):
     circuit = rpc.class_probabilistic_circuit
     figure = plot_circuit_as_bayesian_network(circuit, class_label="SceneRoom")
     output_path = tmp_path / "scene_room_bn.png"
+    figure.savefig(output_path, dpi=200)
+    plt.close(figure)
+    assert output_path.exists()
+    assert output_path.stat().st_size > 0
+
+
+def test_aggregation_statistics_are_identifiable_as_bridges(rpc):
+    aggregation_names = {
+        latent.name
+        for template in rpc.exchangeable_distribution_templates.values()
+        for latent in template.latent_variables
+    }
+    assert aggregation_names, "fixture must actually exercise an exchangeable relation"
+    circuit_variable_names = {variable.name for variable in rpc.class_probabilistic_circuit.variables}
+    assert aggregation_names.issubset(circuit_variable_names)
+
+
+def test_plot_relational_bayesian_network_renders_scene_room_and_scene_object(rpc, tmp_path):
+    figure = plot_relational_bayesian_network(rpc)
+    output_path = tmp_path / "relational_bn.png"
     figure.savefig(output_path, dpi=200)
     plt.close(figure)
     assert output_path.exists()

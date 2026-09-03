@@ -1,16 +1,23 @@
 """
-Bayesian-network structure view of a single :class:`ProbabilisticCircuit`.
+Bayesian-network structure view of :class:`RelationalProbabilisticCircuit`.
 
-Reduces the circuit to the classical sum-product-network-to-Bayesian-network
-correspondence: every sum unit becomes a latent categorical variable, every product
-unit disappears and instead passes its own parent straight through to each of its
-children, and every leaf becomes a node for the real variable it models, wired to the
-nearest enclosing latent. No parameters (weights, distribution parameters) are exported
-— only the dependency structure this recursion induces, built directly on the
+Reduces a single class's own circuit to the classical sum-product-network-to-Bayesian-
+network correspondence: every sum unit becomes a latent categorical variable, every
+product unit disappears and instead passes its own parent straight through to each of
+its children, and every leaf becomes a node for the real variable it models, wired to
+the nearest enclosing latent. No parameters (weights, distribution parameters) are
+exported — only the dependency structure this recursion induces, built directly on the
 framework's own :class:`~probabilistic_model.bayesian_network.bayesian_network.BayesianNetwork`
 graph rather than a bespoke structure: a latent's node reuses
 :attr:`SumUnit.latent_variable` as-is, so its cardinality is the size of that
 variable's own domain, not a hand-computed count.
+
+:func:`plot_relational_bayesian_network` extends this across the relational structure,
+Proposal-E style: one bordered panel per class, connected the same way the vtree view's
+panels are. A real variable that also serves as an exchangeable child template's latent
+(an aggregation statistic, e.g. ``chair_count()``) is drawn as a diamond rather than a
+plain box — the same convention the vtree view uses for the same concept — so it reads
+as a bridge into the child panel, not an ordinary per-instance feature.
 """
 
 from __future__ import annotations
@@ -21,11 +28,18 @@ from dataclasses import dataclass
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
-from matplotlib.patches import Circle, FancyArrowPatch, FancyBboxPatch
+from matplotlib.patches import Circle, FancyArrowPatch, FancyBboxPatch, Polygon
 from random_events.variable import Symbolic, Variable
 from typing_extensions import Dict, List, Optional, Tuple
 
 from probabilistic_model.bayesian_network.bayesian_network import BayesianNetwork, Node
+from probabilistic_model.probabilistic_circuit.relational.rspn import (
+    RelationalProbabilisticCircuit,
+)
+from probabilistic_model.probabilistic_circuit.relational.vtree_plot import (
+    CLASS_PALETTE,
+    _short_label,
+)
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit,
     ProductUnit,
@@ -43,6 +57,13 @@ INCHES_PER_UNIT_Y = 0.95
 """Figure size scales with layout extent at this ratio, matching the vtree renderer's
 approach: a fixed point size never has to fit into a box that shrinks as the diagram
 grows."""
+
+PANEL_HEADER_HEIGHT = 0.85
+PANEL_MARGIN = 0.4
+PANEL_GAP = 1.3
+MIN_PANEL_WIDTH = 1.6
+"""Panel geometry, matching the vtree view's constants so the two diagrams read as one
+visual family."""
 
 LATENT_COLOR = "#bf6a2e"
 """Same accent used for latent/bridge variables in the vtree view, reused here since
@@ -294,5 +315,254 @@ def plot_circuit_as_bayesian_network(
     width = min(max((max(xs) - min(xs) + 2 * x_margin) * INCHES_PER_UNIT_X, 6.0), 22.0)
     height = min(max((max(ys) - min(ys) + 2 * y_margin) * INCHES_PER_UNIT_Y, 3.5), 14.0)
     fig.set_size_inches(width, height)
+    fig.tight_layout()
+    return fig
+
+
+@dataclass
+class _BNPanelResult:
+    width: float
+    height: float
+
+
+def _render_class_bn_panel(
+    ax,
+    rpc: RelationalProbabilisticCircuit,
+    class_label: str,
+    x_offset: float,
+    y_offset: float,
+    depth: int,
+    max_depth: int,
+) -> _BNPanelResult:
+    """
+    Draw one class's Bayesian-network panel and recurse into its exchangeable child
+    templates.
+
+    :param ax: The axes to draw on.
+    :param rpc: The relational circuit whose ``class_probabilistic_circuit`` is reduced
+        for this panel, and whose exchangeable templates its children come from.
+    :param class_label: Display name for the panel header.
+    :param x_offset: Left edge of this panel in data coordinates.
+    :param y_offset: Top edge of this panel in data coordinates.
+    :param depth: Current relational nesting depth, for the recursion cutoff.
+    :param max_depth: Maximum relational nesting depth to render.
+    :return: This panel's geometry, for the caller to stack sibling panels under.
+    """
+    circuit = rpc.class_probabilistic_circuit
+    bn = build_bayesian_network(circuit)
+    layer = _assign_layers(bn)
+
+    nodes_by_layer: Dict[int, List[Node]] = defaultdict(list)
+    for node in bn.nodes():
+        nodes_by_layer[layer[node.index]].append(node)
+    max_layer_count = max(len(nodes) for nodes in nodes_by_layer.values())
+    tree_depth = max(nodes_by_layer)
+
+    class_color = CLASS_PALETTE[depth % len(CLASS_PALETTE)]
+
+    width = max(max_layer_count * NODE_SPACING, MIN_PANEL_WIDTH) + 2 * PANEL_MARGIN
+    # +0.3 leaves room for a staggered aggregation-diamond label band below the
+    # deepest layer, in case bridges land there.
+    height = PANEL_HEADER_HEIGHT + (tree_depth + 1) * LEVEL_SPACING + PANEL_MARGIN + 0.55
+
+    latent_to_field: Dict[Variable, str] = {
+        latent: field_name
+        for field_name, template in rpc.exchangeable_distribution_templates.items()
+        for latent in template.latent_variables
+    }
+
+    def to_world(layer_index: int, position_in_layer: int, layer_count: int) -> Tuple[float, float]:
+        local_x = (
+            x_offset + width / 2 + (position_in_layer - (layer_count - 1) / 2) * NODE_SPACING
+        )
+        local_y = y_offset + PANEL_HEADER_HEIGHT + layer_index * LEVEL_SPACING
+        return local_x, local_y
+
+    ax.add_patch(
+        FancyBboxPatch(
+            (x_offset, y_offset),
+            width,
+            height,
+            boxstyle="round,pad=0,rounding_size=0.08",
+            facecolor=mcolors.to_rgba(class_color, alpha=0.05),
+            edgecolor=class_color,
+            linewidth=1.3,
+        )
+    )
+    ax.text(
+        x_offset + width / 2, y_offset + 0.2, class_label,
+        ha="center", va="center", fontsize=10.5, fontweight="bold", color=class_color,
+    )
+    latent_total = sum(1 for node in bn.nodes() if isinstance(node, LatentNode))
+    variable_total = len(bn.nodes()) - latent_total
+    ax.text(
+        x_offset + width / 2, y_offset + 0.47,
+        f"BN({class_label}) · {variable_total} vars, {latent_total} latent",
+        ha="center", va="center", fontsize=7.5, color="0.45", family="monospace",
+    )
+
+    positions: Dict[int, Tuple[float, float]] = {}
+    for layer_index, nodes in nodes_by_layer.items():
+        count = len(nodes)
+        for position_in_layer, node in enumerate(nodes):
+            positions[node.index] = to_world(layer_index, position_in_layer, count)
+
+    # edges, drawn before nodes so glyphs sit on top
+    for parent, child in bn.edges():
+        x0, y0 = positions[parent.index]
+        x1, y1 = positions[child.index]
+        ax.add_patch(
+            FancyArrowPatch(
+                (x0, y0 + 0.06), (x1, y1 - 0.06),
+                arrowstyle="-|>", mutation_scale=6,
+                color=LATENT_COLOR, alpha=0.55, linewidth=0.9, zorder=1,
+            )
+        )
+
+    latent_display_names: Dict[int, str] = {
+        node.index: f"Z{sequence}"
+        for sequence, node in enumerate(
+            (node for node in bn.nodes() if isinstance(node, LatentNode)), start=1
+        )
+    }
+
+    bridge_positions: Dict[str, List[Tuple[float, float]]] = {}
+    diamond_sequence = 0
+    """Adjacent aggregation diamonds keep their full name, which runs wide — alternate
+    their label band so two neighbors' labels stack diagonally instead of colliding."""
+
+    for node in bn.nodes():
+        x, y = positions[node.index]
+        if isinstance(node, LatentNode):
+            ax.add_patch(
+                Circle(
+                    (x, y), 0.11,
+                    facecolor=mcolors.to_rgba(LATENT_COLOR, alpha=0.15),
+                    edgecolor=LATENT_COLOR, linewidth=1.3, zorder=3,
+                )
+            )
+            ax.text(
+                x, y, f"{latent_display_names[node.index]}\nc={node.cardinality}",
+                ha="center", va="center", fontsize=5.6, family="monospace",
+                fontweight="bold", color=LATENT_COLOR, zorder=3,
+            )
+        elif node.variable in latent_to_field:
+            field_name = latent_to_field[node.variable]
+            wrapped = _wrap_label(node.variable.name, max_chars=16)
+            size = 0.11
+            ax.add_patch(
+                Polygon(
+                    [(x, y - size), (x + size, y), (x, y + size), (x - size, y)],
+                    closed=True, facecolor="white", edgecolor=LATENT_COLOR,
+                    linewidth=1.4, zorder=3,
+                )
+            )
+            label_y = y + (0.2, 0.44, 0.68)[diamond_sequence % 3]
+            diamond_sequence += 1
+            ax.text(
+                x, label_y, wrapped, ha="center", va="center",
+                fontsize=5.8 if "\n" in wrapped else 6.6,
+                family="monospace", color=LATENT_COLOR, zorder=3,
+            )
+            bridge_positions.setdefault(field_name, []).append((x, y))
+        else:
+            label = _wrap_label(_short_label(node.variable.name))
+            is_wrapped = "\n" in label
+            box_h = VARIABLE_BOX_HEIGHT * 1.4 if is_wrapped else VARIABLE_BOX_HEIGHT
+            ax.add_patch(
+                FancyBboxPatch(
+                    (x - VARIABLE_BOX_WIDTH / 2, y - box_h / 2),
+                    VARIABLE_BOX_WIDTH, box_h,
+                    boxstyle="round,pad=0,rounding_size=0.05",
+                    facecolor="white", edgecolor=class_color, linewidth=1.0, zorder=3,
+                )
+            )
+            ax.text(
+                x, y, label, ha="center", va="center",
+                fontsize=5.6 if is_wrapped else 6.6, family="monospace", zorder=3,
+            )
+
+    if depth < max_depth:
+        child_x = x_offset + width + PANEL_GAP
+        child_y = y_offset
+        for field_name in bridge_positions:
+            template = rpc.exchangeable_distribution_templates[field_name]
+            child_class_name = template.template_distribution.class_.__name__.removesuffix(
+                "DAO"
+            )
+            child_result = _render_class_bn_panel(
+                ax,
+                template.template_distribution,
+                child_class_name,
+                child_x,
+                child_y,
+                depth + 1,
+                max_depth,
+            )
+            sources = bridge_positions[field_name]
+            entry_top = child_y + PANEL_HEADER_HEIGHT + 0.15
+            for index, (source_x, source_y) in enumerate(sources):
+                target_y = entry_top + index * 0.22
+                # Curvature spreads per source, so bridges from adjacent diamonds
+                # fan apart instead of bunching along near-identical paths.
+                rad = 0.08 + 0.07 * (index - (len(sources) - 1) / 2)
+                ax.add_patch(
+                    FancyArrowPatch(
+                        (source_x, source_y), (child_x, target_y),
+                        connectionstyle=f"arc3,rad={rad}", arrowstyle="-|>",
+                        mutation_scale=8, linestyle=(0, (4, 3)),
+                        color=LATENT_COLOR, linewidth=1.0, zorder=2,
+                    )
+                )
+            label_x = x_offset + width + PANEL_GAP / 2
+            label_y = y_offset + PANEL_HEADER_HEIGHT
+            ax.text(
+                label_x, label_y, f"{field_name}\n×N",
+                ha="center", va="center", fontsize=6.8, family="monospace",
+                color=LATENT_COLOR,
+            )
+            child_y = child_y + child_result.height + PANEL_GAP * 0.6
+
+    return _BNPanelResult(width=width, height=height)
+
+
+def plot_relational_bayesian_network(
+    rpc: RelationalProbabilisticCircuit, max_depth: int = 3
+) -> Figure:
+    """
+    Plot a :class:`RelationalProbabilisticCircuit` as Bayesian-network panels,
+    Proposal-E style: one bordered panel per class in the relational structure, each
+    holding that class's own circuit reduced to its induced Bayesian network. An
+    aggregation statistic — a real variable that also serves as an exchangeable child
+    template's latent variable — is drawn as a diamond, the same convention the vtree
+    view uses, with edges crossing into that child's own panel, recursed up to
+    ``max_depth`` relational hops.
+
+    :param rpc: A fitted relational circuit (``class_probabilistic_circuit`` must not
+        be ``None``).
+    :param max_depth: How many levels of exchangeable relations to recurse into.
+    :return: The matplotlib figure. Caller owns saving/closing it.
+    """
+    if rpc.class_probabilistic_circuit is None:
+        raise ValueError("rpc must be fitted before it can be plotted.")
+
+    fig, ax = plt.subplots()
+    _render_class_bn_panel(
+        ax, rpc, rpc.class_.__name__, x_offset=0.0, y_offset=0.0, depth=0, max_depth=max_depth
+    )
+    ax.relim()
+    x_min, x_max = ax.dataLim.xmin, ax.dataLim.xmax
+    y_min, y_max = ax.dataLim.ymin, ax.dataLim.ymax
+    margin = 0.3
+    ax.set_xlim(x_min - margin, x_max + margin)
+    ax.set_ylim(y_max + margin, y_min - margin)
+    ax.axis("off")
+
+    width_units = (x_max - x_min) + 2 * margin
+    height_units = (y_max - y_min) + 2 * margin
+    fig.set_size_inches(
+        min(max(width_units * INCHES_PER_UNIT_X, 6.0), 26.0),
+        min(max(height_units * INCHES_PER_UNIT_Y, 3.5), 16.0),
+    )
     fig.tight_layout()
     return fig
