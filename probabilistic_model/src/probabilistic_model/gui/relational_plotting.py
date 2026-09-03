@@ -153,6 +153,7 @@ class RSPNUMLPlotter:
             },
         )
         self.node_to_id = {}
+        self.cluster_id_by_path = {}
         self.cluster_counter = 0
 
     def _get_cluster_id(self) -> str:
@@ -173,6 +174,7 @@ class RSPNUMLPlotter:
     ) -> str:
         class_name = rspn.class_.__name__
         cluster_id = self._get_cluster_id()
+        self.cluster_id_by_path[(prefix, ())] = cluster_id
 
         with parent_graph.subgraph(name=cluster_id) as c:
             c.attr(
@@ -189,7 +191,7 @@ class RSPNUMLPlotter:
             c.node(anchor_id, "", shape="none", width="0", height="0")
 
             if rspn.class_probabilistic_circuit is not None:
-                self._add_bn(rspn, c, cluster_id)
+                self._add_bn(rspn, c, cluster_id, prefix=prefix)
             else:
                 c.node(f"not_fitted_{cluster_id}", "Not Fitted", shape="none")
 
@@ -205,9 +207,13 @@ class RSPNUMLPlotter:
 
                 # Connect aggregation nodes to this cluster
                 # We need to find nodes that represent aggregation statistics for this field
+                drawn_edge = False
                 for var in rspn.feature_extractor.exchangeable_features.get(
                     field_name, []
                 ):
+                    if drawn_edge:
+                        break
+
                     # Find the node for this variable in the BN
                     node_id = None
                     if hasattr(var, "_name_"):
@@ -221,12 +227,28 @@ class RSPNUMLPlotter:
 
                     if node_id:
                         child_anchor_id = f"anchor_{child_cluster_id}"
-                        self.dot.edge(
-                            child_anchor_id,
-                            node_id,
-                            style="dashed",
-                            ltail=child_cluster_id,
+                        parent_agg_cluster_id = self.cluster_id_by_path.get(
+                            (prefix, ("Aggregations",))
                         )
+
+                        if parent_agg_cluster_id:
+                            # Use an anchor node in the aggregations cluster if available
+                            target_node_id = f"anchor_{parent_agg_cluster_id}"
+                            self.dot.edge(
+                                child_anchor_id,
+                                target_node_id,
+                                style="dashed",
+                                ltail=child_cluster_id,
+                                lhead=parent_agg_cluster_id,
+                            )
+                        else:
+                            self.dot.edge(
+                                child_anchor_id,
+                                node_id,
+                                style="dashed",
+                                ltail=child_cluster_id,
+                            )
+                        drawn_edge = True
 
         return cluster_id
 
@@ -235,6 +257,7 @@ class RSPNUMLPlotter:
         rspn: RelationalProbabilisticCircuit,
         parent_cluster: graphviz.Digraph,
         cluster_id: str,
+        prefix: str = "",
     ):
         circuit = rspn.class_probabilistic_circuit
         bn = BayesianNetwork.from_probabilistic_circuit(circuit)
@@ -259,6 +282,17 @@ class RSPNUMLPlotter:
             current_path: Tuple[str, ...], current_graph: graphviz.Digraph
         ):
             nonlocal latent_counter
+
+            # Add anchor for this cluster if it's the Aggregations cluster
+            if current_path == ("Aggregations",):
+                current_graph.node(
+                    f"anchor_{current_graph.name}",
+                    "",
+                    shape="none",
+                    width="0",
+                    height="0",
+                )
+
             # Add nodes for this path
             for node in nodes_by_path[current_path]:
                 var = node.variables[0]
@@ -297,6 +331,7 @@ class RSPNUMLPlotter:
 
             for child_path in sorted(immediate_children):
                 child_cluster_id = self._get_cluster_id()
+                self.cluster_id_by_path[(prefix, child_path)] = child_cluster_id
                 with current_graph.subgraph(name=child_cluster_id) as sub:
                     sub.attr(
                         label=child_path[-1],
