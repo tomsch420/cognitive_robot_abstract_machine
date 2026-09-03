@@ -1726,12 +1726,13 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
         dot = graphviz.Digraph(
             format="png",
             graph_attr={
-                "rankdir": "TB",
-                "nodesep": "0.4",
-                "ranksep": "0.4",
+                "rankdir": "LR",
+                "nodesep": "0.8",
+                "ranksep": "0.8",
                 "fontname": "Helvetica",
                 "ratio": "compress",
                 "compound": "true",
+                "newrank": "true",
             },
             node_attr={
                 "style": "filled,rounded",

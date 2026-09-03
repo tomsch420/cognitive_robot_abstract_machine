@@ -133,12 +133,13 @@ class RSPNUMLPlotter:
             format="png",
             graph_attr={
                 "compound": "true",
-                "rankdir": "TB",
-                "nodesep": "0.4",
-                "ranksep": "0.4",
+                "rankdir": "LR",
+                "nodesep": "0.8",
+                "ranksep": "0.8",
                 "fontname": "Helvetica",
                 "fontsize": "12",
                 "ratio": "compress",
+                "newrank": "true",
             },
             node_attr={
                 "style": "filled,rounded",
