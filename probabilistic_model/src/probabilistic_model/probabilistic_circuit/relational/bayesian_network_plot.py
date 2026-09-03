@@ -242,22 +242,38 @@ def plot_circuit_as_bayesian_network(
 
     fig, ax = plt.subplots()
 
+    # PCB-style fan-out: every layer holds several nodes at the same height, so a
+    # direct diagonal from a parent to each child reads as a tangle once there are
+    # more than a couple. Route a vertical stub down to a shared bus half-way to the
+    # next layer, then one vertical stub from that bus into each child instead.
+    fanout: Dict[int, List[Tuple[float, float, float]]] = defaultdict(list)
+    parent_position: Dict[int, Tuple[float, float]] = {}
     for parent, child in bn.edges():
-        x0, y0 = positions[parent.index]
         x1, y1 = positions[child.index]
         target_gap = LATENT_RADIUS if isinstance(child, LatentNode) else VARIABLE_BOX_HEIGHT / 2
-        ax.add_patch(
-            FancyArrowPatch(
-                (x0, y0 - LATENT_RADIUS),
-                (x1, y1 + target_gap),
-                arrowstyle="-|>",
-                mutation_scale=9,
-                color=LATENT_COLOR,
-                alpha=0.7,
-                linewidth=1.0,
-                zorder=1,
-            )
+        fanout[parent.index].append((x1, y1, target_gap))
+        parent_position[parent.index] = positions[parent.index]
+
+    for parent_index, children in fanout.items():
+        px, py = parent_position[parent_index]
+        bus_y = py - LEVEL_SPACING * 0.5
+        bus_span = [px] + [cx for cx, _, _ in children]
+        ax.plot(
+            [px, px], [py - LATENT_RADIUS, bus_y],
+            color=LATENT_COLOR, alpha=0.7, linewidth=1.0, zorder=1,
         )
+        ax.plot(
+            [min(bus_span), max(bus_span)], [bus_y, bus_y],
+            color=LATENT_COLOR, alpha=0.7, linewidth=1.0, zorder=1,
+        )
+        for cx, cy, target_gap in children:
+            ax.add_patch(
+                FancyArrowPatch(
+                    (cx, bus_y), (cx, cy + target_gap),
+                    arrowstyle="-|>", mutation_scale=9,
+                    color=LATENT_COLOR, alpha=0.7, linewidth=1.0, zorder=1,
+                )
+            )
 
     for node in bn.nodes():
         x, y = positions[node.index]
@@ -578,6 +594,15 @@ def _render_class_bn_panel(
     # that specific field's box rather than to the child panel generically. Every real
     # variable has exactly one incoming edge in this reduction, so no dedup is needed.
     value_bridge_positions: Dict[str, List[Tuple[Tuple[float, float], str]]] = defaultdict(list)
+    # Every layer holds several nodes at the exact same height, so a direct diagonal
+    # line from a parent to each of its children fans out from one point and reads as
+    # a tangle once there are more than two or three. Route like a PCB fan-out instead:
+    # one vertical stub down from the parent to a shared horizontal bus half-way to the
+    # next layer, then one vertical stub from that bus into each child — parallel,
+    # axis-aligned, and each child's own drop is unambiguous regardless of how many
+    # siblings it has.
+    fanout: Dict[int, List[Tuple[float, float]]] = defaultdict(list)
+    parent_position: Dict[int, Tuple[float, float]] = {}
     drawn_edges = set()
     for parent, child in bn.edges():
         if isinstance(child, RealVariableNode):
@@ -590,15 +615,29 @@ def _render_class_bn_panel(
         if edge_key in drawn_edges:
             continue
         drawn_edges.add(edge_key)
-        x0, y0 = positions[parent.index]
-        x1, y1 = positions[child.index]
-        ax.add_patch(
-            FancyArrowPatch(
-                (x0, y0 + 0.06), (x1, y1 - 0.06),
-                arrowstyle="-|>", mutation_scale=9,
-                color=LATENT_COLOR, alpha=0.7, linewidth=1.0, zorder=1,
-            )
+        fanout[parent.index].append(positions[child.index])
+        parent_position[parent.index] = positions[parent.index]
+
+    for parent_index, child_positions in fanout.items():
+        px, py = parent_position[parent_index]
+        bus_y = py + LEVEL_SPACING * 0.5
+        bus_span = [px] + [cx for cx, _ in child_positions]
+        ax.plot(
+            [px, px], [py + 0.06, bus_y],
+            color=LATENT_COLOR, alpha=0.7, linewidth=1.0, zorder=1,
         )
+        ax.plot(
+            [min(bus_span), max(bus_span)], [bus_y, bus_y],
+            color=LATENT_COLOR, alpha=0.7, linewidth=1.0, zorder=1,
+        )
+        for cx, cy in child_positions:
+            ax.add_patch(
+                FancyArrowPatch(
+                    (cx, bus_y), (cx, cy - 0.06),
+                    arrowstyle="-|>", mutation_scale=9,
+                    color=LATENT_COLOR, alpha=0.7, linewidth=1.0, zorder=1,
+                )
+            )
 
     latent_display_names: Dict[int, str] = {
         node.index: f"Z{sequence}"
