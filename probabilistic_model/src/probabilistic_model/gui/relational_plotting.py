@@ -222,10 +222,10 @@ class RSPNUMLPlotter:
                     if node_id:
                         child_anchor_id = f"anchor_{child_cluster_id}"
                         self.dot.edge(
-                            node_id,
                             child_anchor_id,
+                            node_id,
                             style="dashed",
-                            lhead=child_cluster_id,
+                            ltail=child_cluster_id,
                         )
 
         return cluster_id
@@ -245,7 +245,7 @@ class RSPNUMLPlotter:
         for node in bn.nodes():
             var = node.variables[0]
             if is_aggregation_variable(var, rspn):
-                nodes_by_path[()].append(node)
+                nodes_by_path[("Aggregations",)].append(node)
             elif ".latent" in var.name:
                 nodes_by_path[()].append(node)
             else:
