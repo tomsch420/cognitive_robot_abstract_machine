@@ -1817,7 +1817,7 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
         )
 
         bn = BayesianNetwork.from_probabilistic_circuit(self)
-        bn.plot(filename=filename)
+        return bn.plot(filename=filename)
 
     def nodes_weights(self) -> dict:
         """

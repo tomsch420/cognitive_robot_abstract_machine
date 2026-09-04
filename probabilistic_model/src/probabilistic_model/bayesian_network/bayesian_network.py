@@ -291,6 +291,7 @@ class BayesianNetwork:
             fillcolor = "#E1F5FE"  # Light Blue for normal variables
             type_label = "Observable"
 
+            cardinality_row = ""
             # Check if it's a latent variable from a SumUnit
             if ".latent" in name:
                 latent_counter += 1
@@ -298,7 +299,7 @@ class BayesianNetwork:
                 fillcolor = "#FFF9C4"  # Light Yellow
                 type_label = "Latent"
                 if isinstance(node, StructureOnlyNode) and node.cardinality is not None:
-                    type_label = f"Latent (card={node.cardinality})"
+                    cardinality_row = f'<TR><TD><FONT POINT-SIZE="8">|{label}| = {node.cardinality}</FONT></TD></TR>'
             # Check if it's an aggregation statistic
             elif "Aggregation" in name or "Aggregations" in name:
                 shape = "hexagon"
@@ -327,7 +328,13 @@ class BayesianNetwork:
                 if "." in label:
                     label = ".".join(label.split(".")[1:])
 
-            html_label = f'<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="4"><TR><TD><B>{label}</B></TD></TR><TR><TD><FONT POINT-SIZE="8">{type_label}</FONT></TD></TR></TABLE>>'
+            html_label = (
+                f'<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="4">'
+                f"<TR><TD><B>{label}</B></TD></TR>"
+                f'<TR><TD><FONT POINT-SIZE="8">{type_label}</FONT></TD></TR>'
+                f"{cardinality_row}"
+                f"</TABLE>>"
+            )
 
             return {
                 "label": html_label,

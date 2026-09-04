@@ -314,6 +314,7 @@ class RSPNUMLPlotter:
                 shape = "box"
                 color = "#E1F5FE"  # Light Blue
                 type_label = "Observable"
+                cardinality_row = ""
 
                 if is_aggregation_variable(var, rspn):
                     shape = "hexagon"
@@ -337,11 +338,12 @@ class RSPNUMLPlotter:
                     latent_counter += 1
                     label = f"λ{get_subscript(latent_counter)}"
                     type_label = "Latent"
+                    cardinality_row = ""
                     if (
                         isinstance(node, StructureOnlyNode)
                         and node.cardinality is not None
                     ):
-                        type_label = f"Latent (card={node.cardinality})"
+                        cardinality_row = f'<TR><TD><FONT POINT-SIZE="8">|{label}| = {node.cardinality}</FONT></TD></TR>'
                 else:
                     label = name.split(".")[-1]
 
@@ -350,7 +352,7 @@ class RSPNUMLPlotter:
                     if type_label
                     else ""
                 )
-                html_label = f'<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="4"><TR><TD><B>{label}</B></TD></TR>{type_row}</TABLE>>'
+                html_label = f'<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="4"><TR><TD><B>{label}</B></TD></TR>{type_row}{cardinality_row}</TABLE>>'
 
                 node_id = f"node_{id(node)}"
                 current_graph.node(node_id, html_label, shape=shape, fillcolor=color)
