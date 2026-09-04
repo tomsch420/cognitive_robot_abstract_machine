@@ -97,21 +97,31 @@ def get_unique_part_path(variable: Any, root_class: Type) -> List[str]:
     # If it is a random_events Variable, we use its name to deduce the path
     name = getattr(variable, "name", str(variable))
     parts = name.split(".")
-    # The first part is usually the root class name, skip it
+
     current_class = root_class
     path = []
-    for part in parts[1:]:
+
+    # The first part is usually the root class name, skip it if so
+    start_index = 0
+    if parts:
+        first_part = parts[0]
+        class_name = getattr(root_class, "__name__", str(root_class))
+        if first_part == class_name or first_part == class_name.replace("DAO", ""):
+            start_index = 1
+
+    for part in parts[start_index:]:
         try:
-            from krrood.symbol_graph.helpers import get_field_type_endpoint
             from krrood.ormatic.data_access_objects.helper import get_dao_class
 
             dao_class = get_dao_class(current_class)
             if dao_class is None:
                 break
             schema = get_dao_schema(dao_class)
-            if any(r.key == part for r in schema.single_relationships):
+
+            rel = next((r for r in schema.single_relationships if r.key == part), None)
+            if rel:
                 path.append(part)
-                current_class = get_field_type_endpoint(current_class, part)
+                current_class = rel.target_dao_class or rel.domain_type
             else:
                 break
         except:
