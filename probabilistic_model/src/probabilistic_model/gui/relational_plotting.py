@@ -240,20 +240,20 @@ class RSPNUMLPlotter:
                             (prefix, ("Aggregations",))
                         )
 
-                        # Determine source and target
-                        if child_agg_cluster_id:
-                            source_node_id = f"anchor_{child_agg_cluster_id}"
-                            ltail = child_agg_cluster_id
-                        else:
-                            source_node_id = f"anchor_{child_cluster_id}"
-                            ltail = child_cluster_id
-
+                        # Determine source and target (reversed direction)
                         if parent_agg_cluster_id:
-                            target_node_id = f"anchor_{parent_agg_cluster_id}"
-                            lhead = parent_agg_cluster_id
+                            source_node_id = f"anchor_{parent_agg_cluster_id}"
+                            ltail = parent_agg_cluster_id
                         else:
-                            target_node_id = node_id
-                            lhead = None
+                            source_node_id = node_id
+                            ltail = None
+
+                        if child_agg_cluster_id:
+                            target_node_id = f"anchor_{child_agg_cluster_id}"
+                            lhead = child_agg_cluster_id
+                        else:
+                            target_node_id = f"anchor_{child_cluster_id}"
+                            lhead = child_cluster_id
 
                         self.dot.edge(
                             source_node_id,
@@ -337,6 +337,11 @@ class RSPNUMLPlotter:
                     latent_counter += 1
                     label = f"λ{get_subscript(latent_counter)}"
                     type_label = "Latent"
+                    if (
+                        isinstance(node, StructureOnlyNode)
+                        and node.cardinality is not None
+                    ):
+                        type_label = f"Latent (card={node.cardinality})"
                 else:
                     label = name.split(".")[-1]
 
@@ -378,8 +383,9 @@ class RSPNUMLPlotter:
                     else:
                         sub.attr(
                             label=child_path[-1],
-                            style="dashed,rounded",
-                            color="#90A4AE",
+                            style="filled,rounded",
+                            fillcolor="#E8F5E9",  # Light Green for unique parts
+                            color="#81C784",
                             fontname="Helvetica",
                         )
                     add_nodes_to_clusters(child_path, sub)

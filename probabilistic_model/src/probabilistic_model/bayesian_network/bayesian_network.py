@@ -297,6 +297,8 @@ class BayesianNetwork:
                 label = f"λ{get_subscript(latent_counter)}"
                 fillcolor = "#FFF9C4"  # Light Yellow
                 type_label = "Latent"
+                if isinstance(node, StructureOnlyNode) and node.cardinality is not None:
+                    type_label = f"Latent (card={node.cardinality})"
             # Check if it's an aggregation statistic
             elif "Aggregation" in name or "Aggregations" in name:
                 shape = "hexagon"
@@ -370,7 +372,9 @@ class BayesianNetwork:
         for node in circuit.graph.nodes():
             if isinstance(node, SumUnit):
                 latent_var = node.latent_variable
-                bn_node = StructureOnlyNode(variable=latent_var)
+                bn_node = StructureOnlyNode(
+                    variable=latent_var, cardinality=len(node.subcircuits)
+                )
                 bn.add_node(bn_node)
                 sum_unit_to_node[node] = bn_node
 
@@ -412,6 +416,12 @@ class StructureOnlyNode(Node):
     """
 
     variable: Variable
+
+    cardinality: Optional[int] = None
+    """
+    The cardinality of the variable (number of children in the circuit if it's a latent
+    variable).
+    """
 
     __hash__ = Node.__hash__
 
