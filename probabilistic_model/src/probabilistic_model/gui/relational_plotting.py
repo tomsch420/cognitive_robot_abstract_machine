@@ -1,7 +1,7 @@
 from __future__ import annotations
 import graphviz
 from collections import defaultdict
-from typing import TYPE_CHECKING, Optional, Dict, List, Any, Tuple
+from typing import TYPE_CHECKING, Optional, Dict, List, Any, Tuple, Type
 import rustworkx as rx
 
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
@@ -60,11 +60,11 @@ def is_aggregation_variable(
     return False
 
 
-def get_unique_part_path(variable: Any, root_class: Type) -> List[str]:
+def get_unique_part_path(variable: Any, root_class: Type) -> List[Tuple[str, Optional[str]]]:
     """
     Get the path of unique parts for a variable.
 
-    Example: person.arm.hand.finger_count -> ['arm', 'hand']
+    Example: person.arm.hand.finger_count -> [('arm', 'Arm'), ('hand', 'Hand')]
     """
     if isinstance(variable, MappedVariable):
         path = []
@@ -83,10 +83,16 @@ def get_unique_part_path(variable: Any, root_class: Type) -> List[str]:
                 if dao_class is None:
                     break
                 schema = get_dao_schema(dao_class)
-                if any(
-                    r.key == step._attribute_name_ for r in schema.single_relationships
-                ):
-                    path.append(step._attribute_name_)
+                rel = next(
+                    (r for r in schema.single_relationships if r.key == step._attribute_name_),
+                    None,
+                )
+                if rel:
+                    target_class = rel.target_dao_class or rel.domain_type
+                    type_name = getattr(target_class, "__name__", str(target_class))
+                    if type_name.endswith("DAO"):
+                        type_name = type_name[:-3]
+                    path.append((step._attribute_name_, type_name))
                 else:
                     # Once we hit a non-relationship attribute, we are at the end of the part path
                     break
@@ -120,8 +126,12 @@ def get_unique_part_path(variable: Any, root_class: Type) -> List[str]:
 
             rel = next((r for r in schema.single_relationships if r.key == part), None)
             if rel:
-                path.append(part)
-                current_class = rel.target_dao_class or rel.domain_type
+                target_class = rel.target_dao_class or rel.domain_type
+                type_name = getattr(target_class, "__name__", str(target_class))
+                if type_name.endswith("DAO"):
+                    type_name = type_name[:-3]
+                path.append((part, type_name))
+                current_class = target_class
             else:
                 break
         except:
@@ -244,10 +254,10 @@ class RSPNUMLPlotter:
                     if node_id:
                         child_prefix = f"{prefix}_{field_name}"
                         child_agg_cluster_id = self.cluster_id_by_path.get(
-                            (child_prefix, ("Aggregations",))
+                            (child_prefix, (("Aggregations", None),))
                         )
                         parent_agg_cluster_id = self.cluster_id_by_path.get(
-                            (prefix, ("Aggregations",))
+                            (prefix, (("Aggregations", None),))
                         )
 
                         # Determine source and target (reversed direction)
@@ -292,7 +302,7 @@ class RSPNUMLPlotter:
         for node in bn.nodes():
             var = node.variables[0]
             if is_aggregation_variable(var, rspn):
-                nodes_by_path[("Aggregations",)].append(node)
+                nodes_by_path[(("Aggregations", None),)].append(node)
             elif ".latent" in var.name:
                 nodes_by_path[()].append(node)
             else:
@@ -303,12 +313,13 @@ class RSPNUMLPlotter:
 
         # Function to recursively add clusters and nodes
         def add_nodes_to_clusters(
-            current_path: Tuple[str, ...], current_graph: graphviz.Digraph
+            current_path: Tuple[Tuple[str, Optional[str]], ...],
+            current_graph: graphviz.Digraph,
         ):
             nonlocal latent_counter
 
             # Add anchor for this cluster if it's the Aggregations cluster
-            if current_path == ("Aggregations",):
+            if current_path == (("Aggregations", None),):
                 current_graph.node(
                     f"anchor_{current_graph.name}",
                     "",
@@ -384,17 +395,19 @@ class RSPNUMLPlotter:
                 child_cluster_id = self._get_cluster_id()
                 self.cluster_id_by_path[(prefix, child_path)] = child_cluster_id
                 with current_graph.subgraph(name=child_cluster_id) as sub:
-                    if child_path == ("Aggregations",):
+                    name, type_name = child_path[-1]
+                    if name == "Aggregations":
                         sub.attr(
-                            label=child_path[-1],
+                            label=name,
                             style="filled,rounded",
                             fillcolor="#E1F5FE",
                             color="#90A4AE",
                             fontname="Helvetica",
                         )
                     else:
+                        label = f"{name}: {type_name}" if type_name else name
                         sub.attr(
-                            label=child_path[-1],
+                            label=label,
                             style="filled,rounded",
                             fillcolor="#E8F5E9",  # Light Green for unique parts
                             color="#81C784",
