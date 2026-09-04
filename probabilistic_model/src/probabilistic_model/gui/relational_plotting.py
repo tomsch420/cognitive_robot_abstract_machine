@@ -319,7 +319,18 @@ class RSPNUMLPlotter:
                     shape = "hexagon"
                     color = "#B3E5FC"  # Muted Blue
                     label = name.split(".")[-1]
-                    type_label = "Aggregation"
+                    # strip "aggregation" from label if present
+                    clean_label = label
+                    for word in [
+                        "_aggregation",
+                        "aggregation",
+                        "_Aggregation",
+                        "Aggregation",
+                    ]:
+                        clean_label = clean_label.replace(word, "")
+                    if clean_label:
+                        label = clean_label
+                    type_label = None
                 elif ".latent" in name:
                     shape = "box"
                     color = "#FFF9C4"  # Light Yellow
@@ -329,7 +340,12 @@ class RSPNUMLPlotter:
                 else:
                     label = name.split(".")[-1]
 
-                html_label = f'<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="4"><TR><TD><B>{label}</B></TD></TR><TR><TD><FONT POINT-SIZE="8">{type_label}</FONT></TD></TR></TABLE>>'
+                type_row = (
+                    f'<TR><TD><FONT POINT-SIZE="8">{type_label}</FONT></TD></TR>'
+                    if type_label
+                    else ""
+                )
+                html_label = f'<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="4"><TR><TD><B>{label}</B></TD></TR>{type_row}</TABLE>>'
 
                 node_id = f"node_{id(node)}"
                 current_graph.node(node_id, html_label, shape=shape, fillcolor=color)
@@ -351,12 +367,21 @@ class RSPNUMLPlotter:
                 child_cluster_id = self._get_cluster_id()
                 self.cluster_id_by_path[(prefix, child_path)] = child_cluster_id
                 with current_graph.subgraph(name=child_cluster_id) as sub:
-                    sub.attr(
-                        label=child_path[-1],
-                        style="dashed,rounded",
-                        color="#90A4AE",
-                        fontname="Helvetica",
-                    )
+                    if child_path == ("Aggregations",):
+                        sub.attr(
+                            label=child_path[-1],
+                            style="filled,rounded",
+                            fillcolor="#E1F5FE",
+                            color="#90A4AE",
+                            fontname="Helvetica",
+                        )
+                    else:
+                        sub.attr(
+                            label=child_path[-1],
+                            style="dashed,rounded",
+                            color="#90A4AE",
+                            fontname="Helvetica",
+                        )
                     add_nodes_to_clusters(child_path, sub)
 
         add_nodes_to_clusters((), parent_cluster)
