@@ -222,7 +222,9 @@ class RSPNUMLPlotter:
                     node_id = None
                     if hasattr(var, "_name_"):
                         node_id = self.node_to_id.get(var._name_)
-                    if not node_id and hasattr(var, "get_clean_name_from_mapped_variable"):
+                    if not node_id and hasattr(
+                        var, "get_clean_name_from_mapped_variable"
+                    ):
                         node_id = self.node_to_id.get(
                             var.get_clean_name_from_mapped_variable()
                         )
@@ -230,28 +232,36 @@ class RSPNUMLPlotter:
                         node_id = self.node_to_id.get(getattr(var, "name", str(var)))
 
                     if node_id:
-                        child_anchor_id = f"anchor_{child_cluster_id}"
+                        child_prefix = f"{prefix}_{field_name}"
+                        child_agg_cluster_id = self.cluster_id_by_path.get(
+                            (child_prefix, ("Aggregations",))
+                        )
                         parent_agg_cluster_id = self.cluster_id_by_path.get(
                             (prefix, ("Aggregations",))
                         )
 
-                        if parent_agg_cluster_id:
-                            # Use an anchor node in the aggregations cluster if available
-                            target_node_id = f"anchor_{parent_agg_cluster_id}"
-                            self.dot.edge(
-                                child_anchor_id,
-                                target_node_id,
-                                style="dashed",
-                                ltail=child_cluster_id,
-                                lhead=parent_agg_cluster_id,
-                            )
+                        # Determine source and target
+                        if child_agg_cluster_id:
+                            source_node_id = f"anchor_{child_agg_cluster_id}"
+                            ltail = child_agg_cluster_id
                         else:
-                            self.dot.edge(
-                                child_anchor_id,
-                                node_id,
-                                style="dashed",
-                                ltail=child_cluster_id,
-                            )
+                            source_node_id = f"anchor_{child_cluster_id}"
+                            ltail = child_cluster_id
+
+                        if parent_agg_cluster_id:
+                            target_node_id = f"anchor_{parent_agg_cluster_id}"
+                            lhead = parent_agg_cluster_id
+                        else:
+                            target_node_id = node_id
+                            lhead = None
+
+                        self.dot.edge(
+                            source_node_id,
+                            target_node_id,
+                            style="dashed",
+                            ltail=ltail,
+                            lhead=lhead,
+                        )
                         drawn_edge = True
 
         return cluster_id
