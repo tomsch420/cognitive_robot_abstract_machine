@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-
+import html
+from collections import defaultdict
 import numpy as np
 import rustworkx as rx
 from matplotlib import pyplot as plt
@@ -78,7 +79,7 @@ class Node:
         raise NotImplementedError
 
 
-from probabilistic_model.utils import get_subscript
+from probabilistic_model.utils import get_subscript, wrap_text, clean_type_name
 
 
 @dataclass
@@ -240,6 +241,22 @@ class BayesianNetwork:
 
         return result
 
+    @property
+    def layers(self) -> List[List[Node]]:
+        """
+        Return the layers of the graph.
+
+        :return: The layers of the graph.
+        """
+        roots = [
+            node.index
+            for node in self.nodes()
+            if not self.graph.predecessors(node.index)
+        ]
+        if not roots:
+            return []
+        return rx.layers(self.graph, roots, index_output=False)
+
     def plot(self, filename: Optional[str] = None):
         """
         Plot the Bayesian Network using Graphviz.
@@ -251,32 +268,39 @@ class BayesianNetwork:
         dot = graphviz.Digraph(
             format="png",
             graph_attr={
-                "rankdir": "LR",
-                "nodesep": "0.8",
-                "ranksep": "0.8",
-                "fontname": "Helvetica",
-                "ratio": "compress",
-                "compound": "true",
+                "rankdir": "TB",
+                "nodesep": "0.5",
+                "ranksep": "0.7",
+                "fontname": "Helvetica-Bold",
+                "fontsize": "12",
                 "newrank": "true",
+                "ordering": "out",
+                "concentrate": "true",
+                "bgcolor": "white",
+                "splines": "curved",
+                "pad": "0.3",
             },
             node_attr={
                 "style": "filled,rounded",
                 "fontname": "Helvetica",
                 "fontsize": "10",
-                "penwidth": "2.0",
-                "margin": "0.05",
+                "penwidth": "1.2",
+                "margin": "0.1",
+                "width": "1.4",
+                "height": "0.3",
             },
             edge_attr={
                 "fontname": "Helvetica",
                 "fontsize": "8",
-                "color": "#455A64",
-                "arrowsize": "0.6",
-                "penwidth": "1.2",
+                "color": "#78909C",
+                "arrowsize": "0.7",
+                "penwidth": "1.0",
             },
         )
 
         latent_counter = 0
         node_to_id = {}
+        nodes_by_rank = defaultdict(list)
 
         # Sort nodes to have deterministic λ numbering if they are latents
         nodes = self.nodes()
@@ -289,7 +313,7 @@ class BayesianNetwork:
             label = name
             shape = "box"
             fillcolor = "#E1F5FE"  # Light Blue for normal variables
-            type_label = "Observable"
+            type_label = None
 
             cardinality_row = ""
             # Check if it's a latent variable from a SumUnit
@@ -297,17 +321,16 @@ class BayesianNetwork:
                 latent_counter += 1
                 label = f"λ{get_subscript(latent_counter)}"
                 fillcolor = "#FFF9C4"  # Light Yellow
-                type_label = "Latent"
                 if isinstance(node, StructureOnlyNode) and node.cardinality is not None:
-                    cardinality_row = f'<TR><TD><FONT POINT-SIZE="8">|{label}| = {node.cardinality}</FONT></TD></TR>'
+                    cardinality_row = f'<TR><TD ALIGN="CENTER"><FONT POINT-SIZE="7">|{label}| = {node.cardinality}</FONT></TD></TR>'
             # Check if it's an aggregation statistic
             elif "Aggregation" in name or "Aggregations" in name:
                 shape = "hexagon"
                 fillcolor = "#B3E5FC"  # Muted Blue for aggregations
-                type_label = "Aggregation"
                 # Strip owner class from label if present
                 if "." in label:
                     label = ".".join(label.split(".")[1:])
+                label = wrap_text(label)
             # Check if it's an aggregation statistic (MappedVariable check)
             elif hasattr(var, "_chain_root_"):
                 try:
@@ -318,20 +341,28 @@ class BayesianNetwork:
                     ):
                         shape = "hexagon"
                         fillcolor = "#B3E5FC"  # Muted Blue for aggregations
-                        type_label = "Aggregation"
                         if "." in label:
                             label = ".".join(label.split(".")[1:])
+                        label = wrap_text(label)
                 except:
                     pass
             else:
                 # For normal variables, strip the owner class name (first component)
                 if "." in label:
                     label = ".".join(label.split(".")[1:])
+                label = wrap_text(label)
+
+                # Add type information if available (MappedVariable)
+                if hasattr(var, "_type_") and var._type_ is not None:
+                    type_label = clean_type_name(str(var._type_))
+
+            if type_label:
+                type_label = clean_type_name(type_label)
+                label = f'{label}: <FONT POINT-SIZE="7" COLOR="#555555">{html.escape(type_label)}</FONT>'
 
             html_label = (
-                f'<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="4">'
-                f"<TR><TD><B>{label}</B></TD></TR>"
-                f'<TR><TD><FONT POINT-SIZE="8">{type_label}</FONT></TD></TR>'
+                f'<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="2">'
+                f"<TR><TD ALIGN=\"CENTER\"><B>{label}</B></TD></TR>"
                 f"{cardinality_row}"
                 f"</TABLE>>"
             )
@@ -342,10 +373,29 @@ class BayesianNetwork:
                 "fillcolor": fillcolor,
             }
 
+        # Calculate ranks
+        layers = self.layers
+        node_ranks = {}
+        for i, layer in enumerate(layers):
+            for node in layer:
+                node_ranks[node] = i
+
         for node in nodes:
             node_id = f"node_{id(node)}"
             dot.node(node_id, **get_node_attributes(node))
             node_to_id[node] = node_id
+            
+            rank = node_ranks.get(node)
+            if rank is not None:
+                nodes_by_rank[rank].append(node_id)
+
+        # Add rank constraints
+        for rank, node_ids in nodes_by_rank.items():
+            if len(node_ids) > 1:
+                with dot.subgraph() as s:
+                    s.attr(rank="same")
+                    for nid in node_ids:
+                        s.node(nid)
 
         for parent, child in self.edges():
             dot.edge(node_to_id[parent], node_to_id[child])

@@ -187,11 +187,26 @@ class AggregationStatistic(Generic[T], SubClassSafeGeneric):
         :return: One :class:`~krrood.entity_query_language.core.mapped_variable.MappedVariable`
             per matching statistic method, in alphabetical order.
         """
+        import typing
+
         aggregation_variable = variable(cls, [])
-        return [
-            getattr(aggregation_variable, func.__name__)()
-            for func in cls.aggregation_features_of_field(field_name)
-        ]
+        result = []
+        for func in cls.aggregation_features_of_field(field_name):
+            symbolic_call = getattr(aggregation_variable, func.__name__)()
+            # Attach type hint from function annotations if available
+            try:
+                # Resolve type hints which might be strings due to __future__.annotations
+                hints = typing.get_type_hints(func)
+                return_type = hints.get("return")
+            except Exception:
+                # Fallback to raw annotations if resolution fails
+                annotations = getattr(func, "__annotations__", {})
+                return_type = annotations.get("return")
+
+            if return_type:
+                symbolic_call._type_ = return_type
+            result.append(symbolic_call)
+        return result
 
     @property
     def aggregation_features(self) -> list[Callable]:
@@ -224,8 +239,7 @@ class AggregationStatistic(Generic[T], SubClassSafeGeneric):
         """
         Evaluates every statistic for :attr:`field_name` against this instance.
 
-        :return: A mapping from each statistic method name to its
-            computed value.
+        :return: A mapping from each statistic method name to its computed value.
         """
         return {
             func.__name__: feature.apply_mapping_on_external_root(self)

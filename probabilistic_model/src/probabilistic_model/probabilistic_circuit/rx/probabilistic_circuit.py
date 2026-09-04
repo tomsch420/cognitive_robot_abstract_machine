@@ -6,6 +6,8 @@ import functools
 import itertools
 import math
 import queue
+import html
+from collections import defaultdict
 from abc import abstractmethod, ABC
 from dataclasses import dataclass, field
 from enum import IntEnum
@@ -1721,40 +1723,45 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
         :param filename: The filename to save the plot to.
         """
         import graphviz
-        from probabilistic_model.utils import get_subscript
+        from probabilistic_model.utils import get_subscript, wrap_text, clean_type_name
 
         dot = graphviz.Digraph(
             format="png",
             graph_attr={
-                "rankdir": "LR",
-                "nodesep": "0.8",
-                "ranksep": "0.8",
-                "fontname": "Helvetica",
-                "ratio": "compress",
-                "compound": "true",
+                "rankdir": "TB",
+                "nodesep": "0.5",
+                "ranksep": "0.7",
+                "fontname": "Helvetica-Bold",
+                "fontsize": "12",
                 "newrank": "true",
+                "ordering": "out",
+                "concentrate": "true",
+                "bgcolor": "white",
+                "splines": "curved",
+                "pad": "0.3",
             },
             node_attr={
                 "style": "filled,rounded",
                 "fontname": "Helvetica",
                 "fontsize": "10",
-                "penwidth": "2.0",
-                "margin": "0.05",
+                "penwidth": "1.2",
+                "margin": "0.1",
+                "width": "1.4",
+                "height": "0.3",
             },
             edge_attr={
                 "fontname": "Helvetica",
                 "fontsize": "8",
-                "color": "#455A64",
-                "arrowsize": "0.6",
-                "penwidth": "1.2",
+                "color": "#78909C",
+                "arrowsize": "0.7",
+                "penwidth": "1.0",
             },
         )
 
         latent_counter = 0
         node_to_id = {}
+        nodes_by_rank = defaultdict(list)
 
-        # get the layers for topological ordering if needed,
-        # but Graphviz handles layout automatically
         nodes = self.graph.nodes()
 
         def get_node_attributes(node: Unit) -> dict:
@@ -1767,27 +1774,52 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
                 latent_counter += 1
                 name = f"λ{get_subscript(latent_counter)}"
                 fillcolor = "#FFF9C4"  # Light Yellow
-                label = f'<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="4"><TR><TD><B>{name}</B></TD></TR><TR><TD><FONT POINT-SIZE="8">Sum</FONT></TD></TR></TABLE>>'
+                label = f'<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="2"><TR><TD ALIGN="CENTER"><B>{html.escape(name)}</B> <FONT POINT-SIZE="7" COLOR="#555555">(Sum)</FONT></TD></TR></TABLE>>'
             elif isinstance(node, ProductUnit):
                 fillcolor = "#E8F5E9"  # Light Green
-                label = f'<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="4"><TR><TD><B>×</B></TD></TR><TR><TD><FONT POINT-SIZE="8">Product</FONT></TD></TR></TABLE>>'
+                label = f'<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="2"><TR><TD ALIGN="CENTER"><B>×</B> <FONT POINT-SIZE="7" COLOR="#555555">(Product)</FONT></TD></TR></TABLE>>'
             elif isinstance(node, LeafUnit):
                 fillcolor = "#E1F5FE"  # Light Blue
                 dist_str = str(node.distribution)
                 # Truncate if too long
                 if len(dist_str) > 20:
                     dist_str = dist_str[:17] + "..."
-                label = f'<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="4"><TR><TD><B>{node.variables[0].name}</B></TD></TR><TR><TD><FONT POINT-SIZE="8">{dist_str}</FONT></TD></TR></TABLE>>'
+                
+                name = wrap_text(node.variables[0].name)
+                dist_str = clean_type_name(dist_str)
+                if dist_str:
+                    label = f'<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="2"><TR><TD ALIGN="CENTER"><B>{html.escape(name)}</B>: <FONT POINT-SIZE="7" COLOR="#555555">{html.escape(dist_str)}</FONT></TD></TR></TABLE>>'
+                else:
+                    label = f'<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="2"><TR><TD ALIGN="CENTER"><B>{html.escape(name)}</B></TD></TR></TABLE>>'
 
             if node_colors and node in node_colors:
                 fillcolor = node_colors[node]
 
             return {"label": label, "shape": shape, "fillcolor": fillcolor}
 
+        # Calculate ranks
+        layers = self.layers
+        node_ranks = {}
+        for i, layer in enumerate(layers):
+            for node in layer:
+                node_ranks[node] = i
+
         for node in nodes:
             node_id = f"node_{node.index}"
             dot.node(node_id, **get_node_attributes(node))
             node_to_id[node] = node_id
+            
+            rank = node_ranks.get(node)
+            if rank is not None:
+                nodes_by_rank[rank].append(node_id)
+
+        # Add rank constraints
+        for rank, node_ids in nodes_by_rank.items():
+            if len(node_ids) > 1:
+                with dot.subgraph() as s:
+                    s.attr(rank="same")
+                    for nid in node_ids:
+                        s.node(nid)
 
         for parent in nodes:
             for child in self.graph.successors(parent.index):
@@ -1798,7 +1830,7 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
                         label = str(np.round(edge_data["weight"], decimals=2))
                     elif not isinstance(edge_data, dict):
                         label = str(np.round(edge_data, decimals=2))
-                dot.edge(node_to_id[parent], node_to_id[child], label=label)
+                dot.edge(node_to_id[parent], node_to_id[child], xlabel=label)
 
         if filename is not None:
             if filename.endswith(".png"):
@@ -1808,7 +1840,7 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
 
     def plot_as_bayesian_network(self, filename: Optional[str] = None):
         """
-        Plot the circuit as a Bayesian Network.
+        Plot the structure of the circuit as a Bayesian Network.
 
         :param filename: The filename to save the plot to.
         """

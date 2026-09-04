@@ -186,6 +186,22 @@ class RelationalProbabilisticCircuit:
     Feature extractor built from the training instances.
     """
 
+    @property
+    def variables(self) -> tuple[Variable, ...]:
+        """
+        The variables of the class-level circuit.
+        """
+        if self.class_probabilistic_circuit is None:
+            return ()
+        return self.class_probabilistic_circuit.variables
+
+    @property
+    def observable_variables(self) -> tuple[Variable, ...]:
+        """
+        The observable variables of the class-level circuit.
+        """
+        return tuple(v for v in self.variables if not ".latent" in v.name)
+
     @staticmethod
     def _build_class_dataframe(
         feature_extractor: FeatureExtractor,
@@ -242,10 +258,7 @@ class RelationalProbabilisticCircuit:
                     association.target
                 )
                 rows.append(aggregation_row + child_features)
-        child_column_names = [
-            f.get_clean_name_from_mapped_variable()
-            for f in child_feature_extractor.features
-        ]
+        child_column_names = [f._name_ for f in child_feature_extractor.features]
         return pd.DataFrame(columns=aggregation_names + child_column_names, data=rows)
 
     def _fit_exchangeable_part(
@@ -307,6 +320,16 @@ class RelationalProbabilisticCircuit:
         template.template_distribution.fit(
             child_instances, dataframe_from_parent=child_dataframe
         )
+
+        # Propagate type information for latent variables from parent aggregations
+        type_by_name = {f._name_: f._type_ for f in aggregation_functions}
+        if template.template_distribution.class_probabilistic_circuit is not None:
+            for (
+                var
+            ) in template.template_distribution.class_probabilistic_circuit.variables:
+                if var.name in type_by_name:
+                    var._type_ = type_by_name[var.name]
+
         return template
 
     def fit(
@@ -333,9 +356,46 @@ class RelationalProbabilisticCircuit:
             self.feature_extractor, instances, dataframe_from_parent
         )
         variables = infer_variables_from_dataframe(class_dataframe)
+
+        # add type information to variables for plotting
+        feature_map = {f._name_: f for f in self.feature_extractor.features}
+        for annotated_var in variables:
+            var = annotated_var.variable
+            search_name = var.name
+
+            # Try exact match first
+            if search_name in feature_map:
+                var._type_ = feature_map[search_name]._type_
+                continue
+
+            # Fallback to suffix matching (ignoring parentheses)
+            clean_search_name = search_name.replace("()", "")
+            for feature_name, feature in feature_map.items():
+                clean_feature_name = feature_name.replace("()", "")
+                if clean_search_name.endswith(
+                    clean_feature_name
+                ) or clean_feature_name.endswith(clean_search_name):
+                    var._type_ = feature._type_
+                    break
+
         self.class_probabilistic_circuit = JointProbabilityTree(
             annotated_variables=variables
         ).fit(class_dataframe)
+
+        # tag all variables in the resulting circuit with their types
+        for node in self.class_probabilistic_circuit.nodes():
+            if not hasattr(node, "variables"):
+                continue
+            for var in node.variables:
+                search_name = var.name
+                if search_name.endswith("()"):
+                    search_name = search_name[:-2]
+
+                for clean_name, feature in feature_map.items():
+                    if search_name.endswith(clean_name):
+                        var._type_ = feature._type_
+                        break
+
         self.schema_information = get_dao_schema(type(instances[0]))
         for collection_relationship in self.schema_information.collection_relationships:
             exchangeable_part = collection_relationship.key
@@ -346,7 +406,9 @@ class RelationalProbabilisticCircuit:
             )
         return self
 
-    def plot_as_bayesian_network(self, filename: Optional[str] = None):
+    def plot_as_bayesian_network(
+        self, filename: Optional[str] = None
+    ) -> graphviz.Digraph:
         """
         Plot the class-level circuit as a Bayesian Network.
 
@@ -355,9 +417,11 @@ class RelationalProbabilisticCircuit:
         if self.class_probabilistic_circuit is None:
             raise CircuitNotFittedError(self.class_)
 
-        self.class_probabilistic_circuit.plot_as_bayesian_network(filename=filename)
+        return self.class_probabilistic_circuit.plot_as_bayesian_network(
+            filename=filename
+        )
 
-    def plot_as_uml(self, filename: str):
+    def plot_as_uml(self, filename: str) -> graphviz.Digraph:
         """
         Plot the Relational Probabilistic Circuit as a UML-style diagram.
 
@@ -366,7 +430,7 @@ class RelationalProbabilisticCircuit:
         from probabilistic_model.gui.relational_plotting import RSPNUMLPlotter
 
         plotter = RSPNUMLPlotter(self)
-        plotter.plot(filename)
+        return plotter.plot(filename)
 
     def _condition_class_circuit(
         self,

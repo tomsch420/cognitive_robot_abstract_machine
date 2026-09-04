@@ -38,7 +38,7 @@ class FurnitureType(Enum):
 
 
 @dataclass
-class Drawer(Symbol):
+class CampusDrawer(Symbol):
     items_count: int
     label: str
 
@@ -47,7 +47,7 @@ class Drawer(Symbol):
 class Furniture(Symbol):
     type: FurnitureType
     position: Position
-    drawers: List[Drawer] = field(default_factory=list)
+    drawers: List[CampusDrawer] = field(default_factory=list)
 
 
 class RoomType(Enum):
@@ -81,10 +81,12 @@ class Campus(Symbol):
 class FurnitureAggregations(AggregationStatistic[Furniture]):
     @aggregation_statistic("drawers")
     def total_items(self) -> int:
-        [cou] = (
-            entity(variable(Drawer, self.instance.drawers).items_count).sum().tolist()
+        res = (
+            entity(variable(CampusDrawer, self.instance.drawers).items_count)
+            .sum()
+            .tolist()
         )
-        return cou
+        return res[0] if res else 0
 
 
 @dataclass
@@ -92,22 +94,22 @@ class RoomAggregations(AggregationStatistic[Room]):
     @aggregation_statistic("furniture")
     def chair_count(self) -> int:
         type_var = variable(Furniture, self.instance.furniture).type
-        [cou] = (
+        res = (
             entity(count_range(type_var))
             .where(type_var == FurnitureType.CHAIR)
             .tolist()
         )
-        return cou
+        return res[0] if res else 0
 
     @aggregation_statistic("furniture")
     def table_count(self) -> int:
         type_var = variable(Furniture, self.instance.furniture).type
-        [cou] = (
+        res = (
             entity(count_range(type_var))
             .where(type_var == FurnitureType.TABLE)
             .tolist()
         )
-        return cou
+        return res[0] if res else 0
 
 
 @dataclass
@@ -115,23 +117,23 @@ class BuildingAggregations(AggregationStatistic[Building]):
     @aggregation_statistic("rooms")
     def office_count(self) -> int:
         type_var = variable(Room, self.instance.rooms).purpose
-        [cou] = (
+        res = (
             entity(count_range(type_var)).where(type_var == RoomType.OFFICE).tolist()
         )
-        return cou
+        return res[0] if res else 0
 
     @aggregation_statistic("rooms")
     def bedroom_count(self) -> int:
         type_var = variable(Room, self.instance.rooms).purpose
-        [cou] = (
+        res = (
             entity(count_range(type_var)).where(type_var == RoomType.BEDROOM).tolist()
         )
-        return cou
+        return res[0] if res else 0
 
 
 @dataclass
 class CampusAggregations(AggregationStatistic[Campus]):
     @aggregation_statistic("buildings")
     def building_count(self) -> int:
-        [cou] = count(variable(Building, self.instance.buildings)).tolist()
-        return cou
+        res = count(variable(Building, self.instance.buildings)).tolist()
+        return res[0] if res else 0

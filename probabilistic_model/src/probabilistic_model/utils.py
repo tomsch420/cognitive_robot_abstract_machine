@@ -134,6 +134,40 @@ def get_subscript(n: int) -> str:
     return "".join(subscripts[int(d)] for d in str(n))
 
 
+def wrap_text(text: str, max_width: int = 30) -> str:
+    """
+    Wrap text by inserting <BR/> at underscores if it's too long.
+    """
+    if len(text) <= max_width:
+        return text
+    if "_" in text:
+        parts = text.split("_")
+        # Find the best split point (closest to middle)
+        best_split = len(parts) // 2
+        if best_split == 0:
+            best_split = 1
+        return "_".join(parts[:best_split]) + "_<BR/>" + "_".join(parts[best_split:])
+    return text
+
+
+def clean_type_name(type_name: str) -> str:
+    """
+    Clean type name by taking the last part of a dot-separated string and removing DAO
+    suffix.
+    """
+    if not type_name:
+        return ""
+    if "'" in type_name:
+        type_name = type_name.split("'")[1]
+    if type_name.endswith("DAO"):
+        type_name = type_name[:-3]
+    if "Optional[" in type_name:
+        type_name = type_name.replace("Optional[", "").replace("]", "")
+    if "." in type_name:
+        type_name = type_name.split(".")[-1]
+    return type_name
+
+
 def event_compatible_for_truncation_with_singletons(event: Event):
     """
     Check if the event is compatible for truncation with singletons.
