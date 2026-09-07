@@ -15,6 +15,7 @@ import enum
 import functools
 import inspect
 import math
+import pathlib
 import random
 import statistics
 import time
@@ -29,6 +30,7 @@ from experiments.experiment_definitions import (
     ExperimentsTable,
     MeanAndStandardDeviation,
     TypstRenderer,
+    Unit,
 )
 from random_events.interval import Bound, Interval, SimpleInterval, closed
 from random_events.product_algebra import Event, SimpleEvent
@@ -324,7 +326,7 @@ class ProductAlgebraScalabilityAggregateResult(ExperimentResult):
 
     union_duration: MeanAndStandardDeviation
     """
-    Statistics over union duration (s) across iterations.
+    Statistics over union duration (ms) across iterations.
     """
 
     union_resulting_simple_sets: MeanAndStandardDeviation
@@ -334,7 +336,7 @@ class ProductAlgebraScalabilityAggregateResult(ExperimentResult):
 
     intersection_duration: MeanAndStandardDeviation
     """
-    Statistics over intersection duration (s) across iterations.
+    Statistics over intersection duration (ms) across iterations.
     """
 
     intersection_resulting_simple_sets: MeanAndStandardDeviation
@@ -345,7 +347,7 @@ class ProductAlgebraScalabilityAggregateResult(ExperimentResult):
 
     difference_duration: MeanAndStandardDeviation
     """
-    Statistics over difference duration (s) across iterations.
+    Statistics over difference duration (ms) across iterations.
     """
 
     difference_resulting_simple_sets: MeanAndStandardDeviation
@@ -356,7 +358,7 @@ class ProductAlgebraScalabilityAggregateResult(ExperimentResult):
 
     complement_duration: MeanAndStandardDeviation
     """
-    Statistics over complement duration (s) across iterations.
+    Statistics over complement duration (ms) across iterations.
     """
 
     complement_resulting_simple_sets: MeanAndStandardDeviation
@@ -367,7 +369,7 @@ class ProductAlgebraScalabilityAggregateResult(ExperimentResult):
 
     simplify_duration: MeanAndStandardDeviation
     """
-    Statistics over simplification duration (s) across iterations.
+    Statistics over simplification duration (ms) across iterations.
     """
 
     simplify_resulting_simple_sets: MeanAndStandardDeviation
@@ -378,7 +380,7 @@ class ProductAlgebraScalabilityAggregateResult(ExperimentResult):
 
     make_disjoint_duration: MeanAndStandardDeviation
     """
-    Statistics over make-disjoint duration (s) across iterations.
+    Statistics over make-disjoint duration (ms) across iterations.
     """
 
     make_disjoint_resulting_simple_sets: MeanAndStandardDeviation
@@ -487,10 +489,19 @@ def run_scalability_experiment(
         :param attribute: Name of the :class:`ProductAlgebraScalabilityExperimentResult`
             field to aggregate.
         :return: Mean and standard deviation of that field across :data:`results`.
+
+        ..note:: Duration fields are scaled to milliseconds before aggregation, not
+            after, since :meth:`MeanAndStandardDeviation.from_measurements` rounds to
+            two decimals in the unit it is given. Rounding sub-millisecond seconds
+            values to two decimals first, then converting, would discard exactly the
+            precision millisecond reporting is meant to recover.
         """
-        return MeanAndStandardDeviation.from_measurements(
-            [getattr(result, attribute) for result in results]
-        )
+        values = [getattr(result, attribute) for result in results]
+        if attribute.endswith("_duration"):
+            return MeanAndStandardDeviation.from_measurements(
+                [value * 1000 for value in values], unit=Unit.MILLISECONDS
+            )
+        return MeanAndStandardDeviation.from_measurements(values)
 
     return ProductAlgebraScalabilityAggregateResult(
         number_of_variables=number_of_variables,
@@ -700,7 +711,7 @@ def main():
     )
 
     print(
-        TypstRenderer(variable_table).render_figure(
+        TypstRenderer(variable_table, reported_decimals=4).render_figure(
             "Product algebra operation timings and resulting simple set counts as "
             "the number of variables varies, with domain size and simple sets per "
             "event held fixed at their baseline values. Each row aggregates several "
@@ -710,7 +721,7 @@ def main():
     )
     print()
     print(
-        TypstRenderer(domain_size_table).render_figure(
+        TypstRenderer(domain_size_table, reported_decimals=4).render_figure(
             "Product algebra operation timings and resulting simple set counts as "
             "the symbolic domain size varies, with the number of variables and "
             "simple sets per event held fixed at their baseline values. Each row "
@@ -720,7 +731,7 @@ def main():
     )
     print()
     print(
-        TypstRenderer(simple_set_table).render_figure(
+        TypstRenderer(simple_set_table, reported_decimals=4).render_figure(
             "Product algebra operation timings and resulting simple set counts as "
             "the number of simple sets per event varies, with the number of "
             "variables and domain size held fixed at their baseline values. Each "
@@ -734,7 +745,10 @@ def main():
         ScalabilitySweep(ScalabilityFactor.DOMAIN_SIZE, domain_size_table),
         ScalabilitySweep(ScalabilityFactor.NUMBER_OF_SIMPLE_SETS, simple_set_table),
     ]
-    ScalabilitySummaryPlot().render(sweeps).show()
+    summary_figure = ScalabilitySummaryPlot().render(sweeps)
+    output_path = pathlib.Path.home() / "phd-thesis" / "images" / "scalability_summary.png"
+    summary_figure.write_image(str(output_path), width=2000, height=1300, scale=1)
+    print(f"\nWrote summary figure to {output_path}")
 
 
 if __name__ == "__main__":
