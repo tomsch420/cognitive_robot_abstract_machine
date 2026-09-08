@@ -287,7 +287,7 @@ class LeafUnit(Unit):
 
     @property
     def leaves(self) -> List[LeafUnit]:
-        return []
+        return [self]
 
     def log_likelihood(self, events: npt.NDArray):
         self.result_of_current_query = self.distribution.log_likelihood(events)
@@ -563,7 +563,7 @@ class SumUnit(InnerUnit):
     def mount_with_interaction_terms(
         self, other: Self, interaction_model: ProbabilisticModel
     ):
-        """
+        r"""
         Create a distribution that factorizes as follows:
 
         .. math::
@@ -861,9 +861,12 @@ class ProductUnit(InnerUnit):
                 # type hinting
                 subcircuit: Self
 
-                # mount the children of that circuit directly
+                # mount the children of that circuit directly onto this one
                 for sub_subcircuit in subcircuit.subcircuits:
-                    subcircuit.add_subcircuit(sub_subcircuit)
+                    self.add_subcircuit(sub_subcircuit)
+
+                # remove the now-redundant nested product unit
+                self.probabilistic_circuit.remove_node(subcircuit)
 
     def sample(self, *args, **kwargs):
         """
