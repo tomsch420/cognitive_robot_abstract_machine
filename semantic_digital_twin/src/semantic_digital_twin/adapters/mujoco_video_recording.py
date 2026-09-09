@@ -204,6 +204,23 @@ class MujocoVideoRecorder:
         )
         self._on_world_state_change()
 
+    @property
+    def multi_sim(self) -> MujocoSim:
+        """
+        The live MuJoCo mirror this recorder is drawing frames from, while
+        :meth:`start` has been called.
+
+        Named to match :class:`~experiments.tracy_experiments.real_time_simulation.
+        RealTimeSimulation`'s own attribute of the same name, so a caller that drives
+        actuators through one can drive whichever is actually running the physics for
+        a filmed world, without building a second mirror of it.
+
+        :raises VideoRecordingNotStartedError: If :meth:`start` has not been called.
+        """
+        if self._multi_sim is None:
+            raise VideoRecordingNotStartedError(world=self.world)
+        return self._multi_sim
+
     def stop(self) -> RecordedVideo:
         """
         Stops capturing frames and tears down the MuJoCo mirror.

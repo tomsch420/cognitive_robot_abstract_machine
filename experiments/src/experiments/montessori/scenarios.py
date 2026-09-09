@@ -1152,14 +1152,18 @@ class SimulatedScene:
     @property
     def multi_sim(self) -> MujocoSim:
         """
-        The MuJoCo mirror this scene's own physics runs through, built if there is none
-        yet.
+        The MuJoCo mirror this scene's own physics currently runs through, built if
+        there is none yet: the recorder's own mirror while :attr:`recording` is set, so
+        filming never runs a second mirror of the same world alongside it, or a plain
+        physics-only mirror otherwise.
 
         Named to match :class:`~experiments.tracy_experiments.real_time_simulation.
         RealTimeSimulation`'s own attribute of the same name, so code written to drive
         one can drive either without a second mirror of the same world ever being
         built.
         """
+        if self.recording is not None:
+            return self.recording.film().multi_sim
         return self._mirror_of_the_world()
 
     def command(self, actuator: Actuator, set_point: float) -> None:
