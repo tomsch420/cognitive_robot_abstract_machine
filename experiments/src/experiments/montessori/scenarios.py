@@ -910,10 +910,11 @@ class SceneRecording:
     How many frames one second of the video plays back as.
     """
 
-    camera: MujocoCamera = field(init=False, repr=False)
+    camera: Optional[MujocoCamera] = None
     """
     Where the run is watched from, attached to the world once so that a cut between two
-    takes does not also move the camera.
+    takes does not also move the camera. A fixed overview framing the table is attached
+    automatically if none is given.
     """
 
     frames: List[numpy.ndarray] = field(init=False, default_factory=list, repr=False)
@@ -927,7 +928,8 @@ class SceneRecording:
     """
 
     def __post_init__(self):
-        self.camera = self._camera_watching_the_scene()
+        if self.camera is None:
+            self.camera = self._camera_watching_the_scene()
 
     def film(self) -> MujocoVideoRecorder:
         """
