@@ -64,6 +64,7 @@ from coraplex.plans.factories import sequential
 from coraplex.robot_plans.actions.base import ActionDescription
 from coraplex.robot_plans.actions.core.pick_up import PickUpAction
 from coraplex.robot_plans.actions.core.placing import PlaceAction
+from coraplex.view_manager import ViewManager
 
 from experiments.montessori.exceptions import (
     HoleHasNoLandingRegionError,
@@ -129,7 +130,7 @@ from semantic_digital_twin.world_description.degree_of_freedom import (
 )
 from semantic_digital_twin.world_description.geometry import Box, Scale
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
-from semantic_digital_twin.world_description.world_entity import Body, Region
+from semantic_digital_twin.world_description.world_entity import Actuator, Body, Region
 
 if TYPE_CHECKING:
     from krrood.entity_query_language.predicate import RenderedFields
@@ -148,13 +149,13 @@ Every height in this module is measured against it rather than against the table
 placement's own height and a viewpoint's are in one frame and can be subtracted.
 """
 
-THE_ARM_THAT_SORTS = Arms.LEFT
+THE_ARM_THAT_SORTS = Arms.RIGHT
 """
 The arm a scripted run sorts with.
 
-Every robot these scenarios run on has one arm, and an arm is named by which side it is
-on rather than by how many there are, so a side has to be picked; which one is picked
-does not matter while there is only one.
+Tracy's left arm is the one that broke on the physical robot, so every scripted run
+here sorts with the right one; the test dataset's own robot has only one arm, so which
+side is named does not matter there.
 """
 
 SCENE_LIGHT_NAME = "scene light"
@@ -176,6 +177,7 @@ class SortingStep(StepName):
     The steps every scripted run in this module is divided into.
     """
 
+    PARK = "park"
     SETTLE = "settle"
     PICK_UP = "pick up"
     PUT_DOWN = "put down"
@@ -571,8 +573,9 @@ class SortingScene:
         """
         The frame the robot grasps with, which a held piece hangs from.
         """
-        [end_effector] = self.robot.get_end_effectors()
-        return end_effector.tool_frame
+        return ViewManager.get_end_effector_view(
+            THE_ARM_THAT_SORTS, self.robot
+        ).tool_frame
 
     @property
     def categories(self) -> Set[MontessoriShapeCategory]:
@@ -691,9 +694,10 @@ class SortingScene:
         How the robot takes hold of a piece: from above, since every piece here stands
         on a table and is posted down through a hole.
         """
-        [end_effector] = self.robot.get_end_effectors()
         return GraspDescription(
-            ApproachDirection.FRONT, VerticalAlignment.TOP, end_effector
+            ApproachDirection.FRONT,
+            VerticalAlignment.TOP,
+            ViewManager.get_end_effector_view(THE_ARM_THAT_SORTS, self.robot),
         )
 
     def stand_the_piece_at(
@@ -1145,6 +1149,30 @@ class SimulatedScene:
         self.physics.simulator.start(simulate_in_thread=False)
         return self.physics
 
+    @property
+    def multi_sim(self) -> MujocoSim:
+        """
+        The MuJoCo mirror this scene's own physics runs through, built if there is none
+        yet.
+
+        Named to match :class:`~experiments.tracy_experiments.real_time_simulation.
+        RealTimeSimulation`'s own attribute of the same name, so code written to drive
+        one can drive either without a second mirror of the same world ever being
+        built.
+        """
+        return self._mirror_of_the_world()
+
+    def command(self, actuator: Actuator, set_point: float) -> None:
+        """
+        Hand an actuator a new set point, on this scene's own MuJoCo mirror.
+
+        :param actuator: The actuator to command; must belong to :attr:`world`.
+        :param set_point: The value the actuator should drive towards.
+        """
+        self.multi_sim.simulator.set_actuator_control(
+            actuator_name=actuator.name.name, value=set_point
+        )
+
     def settle(self) -> None:
         """
         Run the simulation until nothing in the scene is moving any more, or until
@@ -1192,6 +1220,33 @@ class SimulatedScene:
             category: scene.position_of(category).to_np().flatten()[:3]
             for category in scene.categories
         }
+
+
+@dataclass
+class SimulatedSceneMujocoInterface:
+    """
+    Presents a :class:`SimulatedScene`'s own running MuJoCo mirror through the
+    ``multi_sim``/``command``/``advance`` surface :class:`~experiments.
+    tracy_experiments.real_time_simulation.RealTimeSimulation` offers, so
+    :mod:`~experiments.tracy_experiments.trajectory_planning`'s helpers can drive a
+    scene's physics without a second mirror of the same world ever being built -- two
+    mirrors of one world break each other's own callbacks on stop.
+    """
+
+    scene: SimulatedScene
+    """
+    The scene whose own mirror this drives.
+    """
+
+    @property
+    def multi_sim(self) -> MujocoSim:
+        return self.scene.multi_sim
+
+    def command(self, actuator: Actuator, set_point: float) -> None:
+        self.scene.command(actuator, set_point)
+
+    def advance(self, duration: float) -> None:
+        self.scene.advance(duration)
 
 
 # %% what is done to the scene
@@ -1826,6 +1881,196 @@ class PieceHeldWhileTheQuestionIsAsked(
 # %% the scenarios as the simulated demo runs them
 
 
+def _equip_tracy_for_mujoco_manipulation(
+    montessori: MontessoriWorld,
+) -> Dict[str, Actuator]:
+    """
+    Give Tracy's own arms and grippers the position-servo actuators
+    :class:`TracyPickThePieceUp`/:class:`TracyPutThePieceInItsHole` drive directly,
+    stand both arms in their own parked pose before the physics mirror is built, and
+    give every loose shape and the board the contact tuning a real grasp holds against
+    -- matching :func:`~experiments.tracy_experiments.montessori.montessori_demo_mujoco.
+    main`'s own equipping exactly. Without the parked pose, trajectory planning starts
+    from :func:`~experiments.tracy_experiments.equipment.parse_tracy`'s raw default
+    configuration, which is poorly conditioned for reaching at all; without the contact
+    tuning, the fingers close around a shape and detect contact but do not grip it
+    firmly enough to lift it against gravity.
+
+    :param montessori: The scene whose robot is equipped, modified in place.
+    :return: Every driven joint's own actuator, keyed by joint name.
+    """
+    # Deferred: experiments.tracy_experiments imports giskardpy's motion-planning
+    # stack transitively (see trajectory_planning.py's own docstring), which would
+    # otherwise make this module unimportable without ROS installed.
+    from experiments.tracy_experiments.equipment import (
+        apply_gravity_compensation,
+        equip_arms_with_servos,
+        equip_grippers_with_servos,
+        exclude_self_collision,
+        joint_state_of_type,
+    )
+    from experiments.tracy_experiments.grasp_contact import (
+        BOARD_FRICTION,
+        apply_contact_friction,
+        apply_montessori_grasp_contact_parameters,
+    )
+    from semantic_digital_twin.datastructures.definitions import (
+        GripperState,
+        StaticJointState,
+    )
+
+    world, robot = montessori.world, montessori.robot
+    apply_montessori_grasp_contact_parameters(
+        world.get_semantic_annotations_by_type(MontessoriShape)
+    )
+    apply_contact_friction([montessori.board.root], BOARD_FRICTION)
+    apply_gravity_compensation(world, robot)
+    exclude_self_collision(world, robot)
+    for arm in robot.get_arms():
+        joint_state_of_type(arm.end_effector, GripperState.OPEN).apply_to(world)
+        joint_state_of_type(arm, StaticJointState.PARK).apply_to(world)
+    world.notify_state_change()
+    return {
+        **equip_arms_with_servos(world, robot),
+        **equip_grippers_with_servos(world, robot),
+    }
+
+
+@dataclass
+class TracyParkBothArms(ScenePhysicsStep):
+    """
+    Command both of Tracy's arms to their own parked pose and let the physics settle
+    into it.
+
+    Run before any reach: without it, the first reach's own trajectory planning starts
+    from whatever configuration the physics mirror happened to be built with, which
+    :func:`_equip_tracy_for_mujoco_manipulation` has already stood kinematically at the
+    parked pose, but the physically driven servos have not yet been commanded to hold.
+    """
+
+    actuators: Dict[str, Actuator]
+    """
+    See :attr:`TracyPickThePieceUp.actuators`.
+    """
+
+    settle_duration: float = 0.5
+    """
+    Simulated seconds to hold the parked pose for before anything else is done.
+    """
+
+    def perform(self, world: World) -> None:
+        from experiments.tracy_experiments.equipment import joint_state_of_type
+        from semantic_digital_twin.datastructures.definitions import StaticJointState
+
+        robot = SortingScene(world).robot
+        for arm in robot.get_arms():
+            park_state = joint_state_of_type(arm, StaticJointState.PARK)
+            for connection, target in zip(
+                park_state.connections, park_state.target_values
+            ):
+                self.scene.command(self.actuators[connection.raw_dof.name.name], target)
+        self.scene.advance(self.settle_duration)
+
+
+@dataclass
+class TracyPickThePieceUp(ScenePhysicsStep):
+    """
+    Have Tracy's own gripper take hold of a loose piece by real MuJoCo contact
+    friction, driven by
+    :class:`~experiments.tracy_experiments.pick_and_place_action.PickUpActionMujoco`
+    rather than coraplex's Giskard-driven :class:`PickThePieceUp`.
+
+    Unlike :class:`PickThePieceUp`, this never re-parents what it picks up, so the
+    scene it is performed on stays carried by the same simulation throughout.
+    """
+
+    category: MontessoriShapeCategory
+    """
+    The shape of the piece to pick up.
+    """
+
+    arm: Arms
+    """
+    Which arm picks it up.
+    """
+
+    actuators: Dict[str, Actuator]
+    """
+    Every one of the robot's driven joints' own actuator, keyed by joint name (see
+    :func:`_equip_tracy_for_mujoco_manipulation`).
+    """
+
+    def perform(self, world: World) -> None:
+        from experiments.tracy_experiments.pick_and_place_action import (
+            PickUpActionMujoco,
+        )
+
+        scene = SortingScene(world)
+        shape = scene.shape_of(self.category)
+        grasp_description = GraspDescription(
+            ApproachDirection.FRONT,
+            VerticalAlignment.TOP,
+            ViewManager.get_end_effector_view(self.arm, scene.robot),
+        )
+        action = PickUpActionMujoco(
+            object_designator=shape.root,
+            arm=self.arm,
+            grasp_description=grasp_description,
+            sim=SimulatedSceneMujocoInterface(scene=self.scene),
+            actuators=self.actuators,
+        )
+        context = Context(world, scene.robot, evaluate_conditions=False)
+        sequential([action], context).plan.perform()
+
+
+@dataclass
+class TracyPutThePieceInItsHole(ScenePhysicsStep):
+    """
+    Have Tracy carry a held piece over the board's hole for its own shape and let go of
+    it there, driven by
+    :class:`~experiments.tracy_experiments.pick_and_place_action.PlaceActionMujoco`
+    rather than coraplex's Giskard-driven :class:`PutThePieceInItsHole`.
+    """
+
+    category: MontessoriShapeCategory
+    """
+    The shape of the piece to put down.
+    """
+
+    arm: Arms
+    """
+    Which arm places it.
+    """
+
+    actuators: Dict[str, Actuator]
+    """
+    See :attr:`TracyPickThePieceUp.actuators`.
+    """
+
+    def perform(self, world: World) -> None:
+        from experiments.tracy_experiments.pick_and_place_action import (
+            PlaceActionMujoco,
+        )
+
+        scene = SortingScene(world)
+        hole = scene.hole_for(self.category).root.global_transform.to_position()
+        action = PlaceActionMujoco(
+            object_designator=scene.body_of(self.category),
+            target_location=Pose.from_xyz_rpy(
+                float(hole.x),
+                float(hole.y),
+                float(hole.z) + RELEASE_HEIGHT_ABOVE_THE_HOLE,
+                reference_frame=world.root,
+            ),
+            arm=self.arm,
+            sim=SimulatedSceneMujocoInterface(scene=self.scene),
+            actuators=self.actuators,
+        )
+        context = Context(world, scene.robot, evaluate_conditions=False)
+        sequential([action], context).plan.perform()
+        self.scene.settle()
+
+
 @dataclass
 class TracyWatchesTheSceneStandStill(TheSceneStandsStill[World, Tracy]):
     """
@@ -1837,7 +2082,46 @@ class TracyWatchesTheSceneStandStill(TheSceneStandsStill[World, Tracy]):
 class TracySortsAPiece(RobotSortsAPiece[World, Tracy]):
     """
     The pick-and-place run, on the robot the simulated Montessori demo is built around.
+
+    Picks and places by real MuJoCo contact friction (:class:`TracyPickThePieceUp`/
+    :class:`TracyPutThePieceInItsHole`) rather than coraplex's Giskard-driven
+    mechanism the other scenarios use: a kinematic attach does not survive being
+    simulated on Tracy's own physically driven gripper.
     """
+
+    _actuators: Dict[str, Actuator] = field(
+        init=False, default_factory=dict, repr=False
+    )
+    """
+    Every one of the robot's driven joints' own actuator, equipped by
+    :meth:`add_what_the_script_acts_with` and read back by :meth:`steps`.
+    """
+
+    def add_what_the_script_acts_with(self, montessori: MontessoriWorld) -> None:
+        self._actuators = _equip_tracy_for_mujoco_manipulation(montessori)
+
+    def steps(self, world: World) -> Sequence[ScenarioStep[World]]:
+        return [
+            TracyParkBothArms(
+                name=SortingStep.PARK, actuators=self._actuators, scene=self.simulation
+            ),
+            LetTheSceneSettle(name=SortingStep.SETTLE, scene=self.simulation),
+            TracyPickThePieceUp(
+                name=SortingStep.PICK_UP,
+                category=self.sorted_category,
+                arm=THE_ARM_THAT_SORTS,
+                actuators=self._actuators,
+                scene=self.simulation,
+            ),
+            TracyPutThePieceInItsHole(
+                name=SortingStep.PUT_DOWN,
+                category=self.sorted_category,
+                arm=THE_ARM_THAT_SORTS,
+                actuators=self._actuators,
+                scene=self.simulation,
+            ),
+            AskTheQuestion(name=SortingStep.ANSWER, scene=self.simulation),
+        ]
 
 
 @dataclass
@@ -1851,4 +2135,33 @@ class TracyIsIdleWhileAPieceIsPushed(PiecePushedWhileTheRobotIsIdle[World, Tracy
 class TracyHoldsAPiece(PieceHeldWhileTheQuestionIsAsked[World, Tracy]):
     """
     The in-gripper run, on the robot the simulated Montessori demo is built around.
+
+    Picks up by real MuJoCo contact friction, like :class:`TracySortsAPiece`; see its
+    own docstring.
     """
+
+    _actuators: Dict[str, Actuator] = field(
+        init=False, default_factory=dict, repr=False
+    )
+    """
+    See :attr:`TracySortsAPiece._actuators`.
+    """
+
+    def add_what_the_script_acts_with(self, montessori: MontessoriWorld) -> None:
+        self._actuators = _equip_tracy_for_mujoco_manipulation(montessori)
+
+    def steps(self, world: World) -> Sequence[ScenarioStep[World]]:
+        return [
+            TracyParkBothArms(
+                name=SortingStep.PARK, actuators=self._actuators, scene=self.simulation
+            ),
+            LetTheSceneSettle(name=SortingStep.SETTLE, scene=self.simulation),
+            TracyPickThePieceUp(
+                name=SortingStep.PICK_UP,
+                category=self.held_category,
+                arm=THE_ARM_THAT_SORTS,
+                actuators=self._actuators,
+                scene=self.simulation,
+            ),
+            AskTheQuestion(name=SortingStep.ANSWER, scene=self.simulation),
+        ]

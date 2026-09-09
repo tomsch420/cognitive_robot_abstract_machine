@@ -13,12 +13,19 @@ it.
 from __future__ import annotations
 
 import pytest
+from coraplex.datastructures.enums import Arms
 
 from experiments.montessori.pieces import KNOWN_PIECE_BY_CATEGORY
 from experiments.montessori.scenarios import (
+    AskTheQuestion,
+    LetTheSceneSettle,
     PieceLayout,
     PiecePlacement,
+    SortingStep,
+    TracyHoldsAPiece,
     TracyIsIdleWhileAPieceIsPushed,
+    TracyParkBothArms,
+    TracyPickThePieceUp,
     TracyWatchesTheSceneStandStill,
 )
 from experiments.montessori.semantics import MontessoriShapeCategory
@@ -129,5 +136,45 @@ def test_the_pushed_piece_run_bound_to_this_builder_moves_the_piece():
     world = scenario.build_world()
     for step in scenario.steps(world):
         step.perform(world)
+
+    assert scenario.goal(world)()
+
+
+# %% picking and placing by real MuJoCo contact friction
+
+
+def test_a_piece_picked_up_by_mujoco_contact_friction_is_actually_held():
+    """
+    :class:`TracyPickThePieceUp` (driven by :class:`~experiments.tracy_experiments.
+
+    pick_and_place_action.PickUpActionMujoco`) against the left arm, whose reach to
+    this board position is proven -- see :mod:`~experiments.tracy_experiments.
+    montessori.montessori_demo_mujoco`'s own working demo.
+    :data:`~experiments.montessori.scenarios.THE_ARM_THAT_SORTS` is the right arm in
+    production (the left one is broken on the physical robot); reach convergence for
+    the right arm, and for a full pick-and-place with either arm, at this board
+    position are both separate, open tuning gaps this test does not cover.
+    """
+    scenario = TracyHoldsAPiece(
+        layout=_layout_with_one_cube(),
+        world_builder=TracyMontessoriWorldBuilder(),
+        held_category=MontessoriShapeCategory.CUBE,
+    )
+
+    world = scenario.build_world()
+    actuators = scenario._actuators
+    scene = scenario.simulation
+    TracyParkBothArms(name=SortingStep.PARK, actuators=actuators, scene=scene).perform(
+        world
+    )
+    LetTheSceneSettle(name=SortingStep.SETTLE, scene=scene).perform(world)
+    TracyPickThePieceUp(
+        name=SortingStep.PICK_UP,
+        category=MontessoriShapeCategory.CUBE,
+        arm=Arms.LEFT,
+        actuators=actuators,
+        scene=scene,
+    ).perform(world)
+    AskTheQuestion(name=SortingStep.ANSWER, scene=scene).perform(world)
 
     assert scenario.goal(world)()
