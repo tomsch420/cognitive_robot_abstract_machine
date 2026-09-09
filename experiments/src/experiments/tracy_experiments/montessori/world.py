@@ -29,7 +29,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from typing_extensions import List
+from typing_extensions import List, Optional, Type
+
+from krrood.exceptions import DataclassException
 
 from experiments.montessori.hole_geometry import (
     HOLE_MARKER_THICKNESS,
@@ -47,6 +49,7 @@ from experiments.montessori.pieces import (
     TRIANGULAR_PRISM_SIDE,
     equilateral_triangle_boundary,
 )
+from experiments.montessori.scenarios import MontessoriWorldBuilder
 from experiments.montessori.semantics import (
     MONTESSORI_SHAPE_CLASSES,
     MontessoriShapeCategory,
@@ -79,7 +82,12 @@ from experiments.montessori.world import (
     _open_space_under,
 )
 from experiments.montessori.world2 import SPAWNED_SHAPE_CATEGORIES
+from experiments.tracy_experiments.equipment import (
+    parse_tracy,
+    tracy_table_mount_position,
+)
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Drawer,
     Floor,
@@ -399,3 +407,77 @@ class TracyMontessoriWorld(MontessoriWorld):
         """
         lowest_local_z = body.collision.combined_mesh.bounds[0][2]
         return Point3(SHAPE_ROW_X, y, self.table_top_z - lowest_local_z)
+
+
+# %% the scene the simulated demo builds
+
+
+@dataclass
+class TableTopHeightNotYetKnownError(DataclassException):
+    """
+    Raised when :attr:`TracyMontessoriWorldBuilder.table_top_z` is read before
+    :meth:`TracyMontessoriWorldBuilder.build` has computed it.
+    """
+
+    builder: TracyMontessoriWorldBuilder
+    """
+    The builder whose table height was asked for before it built a scene.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{self.builder} has not built a scene yet, so Tracy's own table height is "
+            "not known."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Call build() before reading table_top_z."
+
+
+@dataclass
+class TracyMontessoriWorldBuilder(MontessoriWorldBuilder):
+    """
+    The scene the simulated Tracy demo runs its scripted trials in: the board and loose
+    shapes standing on Tracy's own built-in table (see :class:`TracyMontessoriWorld`),
+    with Tracy itself bolted where that table's own legs rest on the floor
+    (:func:`~experiments.tracy_experiments.equipment.tracy_table_mount_position`).
+    """
+
+    mount_x: float = 0.0
+    """
+    X-coordinate Tracy's own root is bolted at, in the scene's root frame; matches
+    :mod:`~experiments.tracy_experiments.montessori.montessori_demo_mujoco`'s own
+    ``TRACY_MOUNT_X``.
+    """
+
+    mount_y: float = 0.0
+    """
+    Y-coordinate Tracy's own root is bolted at, in the scene's root frame; matches
+    :mod:`~experiments.tracy_experiments.montessori.montessori_demo_mujoco`'s own
+    ``TRACY_MOUNT_Y``.
+    """
+
+    _table_top_z: Optional[float] = field(init=False, default=None, repr=False)
+    """
+    Height, in the world root frame, Tracy's own table top ended up at once mounted by
+    the most recent call to :meth:`build`; read back by :attr:`table_top_z`.
+    """
+
+    def build(self, robot_type: Type[AbstractRobot]) -> TracyMontessoriWorld:
+        tracy_world = parse_tracy()
+        mount_position, self._table_top_z = tracy_table_mount_position(
+            tracy_world, x=self.mount_x, y=self.mount_y
+        )
+        montessori = TracyMontessoriWorld(
+            shapes_are_movable=True, table_top_z=self._table_top_z
+        )
+        montessori.mount_stationary_robot(
+            robot_type, tracy_world, mount_position, mount_yaw=0.0
+        )
+        return montessori
+
+    @property
+    def table_top_z(self) -> float:
+        if self._table_top_z is None:
+            raise TableTopHeightNotYetKnownError(self)
+        return self._table_top_z
