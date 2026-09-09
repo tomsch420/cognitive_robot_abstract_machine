@@ -177,6 +177,15 @@ class GiskardExecutable(Executable):
         """
         return [self]
 
+    @property
+    def is_paused(self) -> bool:
+        """
+        :return: Whether execution should be held because a plan node contributing to
+            this executable's motion state chart (see :attr:`motion_mappings`) has been
+            paused, via :meth:`~coraplex.plans.plan_node.PlanNode.pause`.
+        """
+        return any(node.is_paused for node in self.motion_mappings)
+
     def prepare_for_execution(self) -> None:
         """
         Extend the motion state chart with the nodes that terminate it.

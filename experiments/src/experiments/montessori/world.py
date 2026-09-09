@@ -279,6 +279,16 @@ Detected from the board's mesh by
 :func:`~experiments.montessori.hole_geometry.detect_hole_footprints`.
 """
 
+_HOLE_KEY_BY_CATEGORY: Dict[MontessoriShapeCategory, str] = {
+    hole_spec.category: hole_spec.key for hole_spec in _HOLES
+}
+"""
+Each non-circular hole's own key (see :class:`_HoleSpec`), by the single category it
+accepts; the board's two circular holes both accept
+:attr:`~experiments.montessori.semantics.MontessoriShapeCategory.CYLINDER`, so callers
+that need to tell those two apart index :const:`_HOLES` directly instead of this map.
+"""
+
 _BOARD_MESH: trimesh.Trimesh = cut_board_mesh(BOARD_SCALE, _HOLE_FOOTPRINTS)
 """
 The shape-sorting board's mesh, with all of :const:`_HOLE_FOOTPRINTS` cut fully through

@@ -57,9 +57,8 @@ from experiments.montessori.world import (
     _drawer_body,
     _hole_marker_shape,
     _landing_region,
-    _landing_region_height,
-    _landing_region_position,
     _name,
+    _open_space_under,
     _shape_body,
     _table_shapes,
 )
@@ -191,8 +190,8 @@ def _hole_spec_from_footprint_2(footprint: HoleFootprint, key: str) -> _HoleSpec
     time and so cannot be reused directly for a differently-positioned board.
     """
     position = Point3(
-        BOARD_POSITION_2.x + footprint.center[0],
-        BOARD_POSITION_2.y + footprint.center[1],
+        BOARD_POSITION_2.x + footprint.center.x,
+        BOARD_POSITION_2.y + footprint.center.y,
         BOARD_POSITION_2.z + BOARD_SCALE.z / 2 - HOLE_MARKER_THICKNESS / 2,
     )
     return _HoleSpec(key, footprint.category, position, footprint)
@@ -283,7 +282,7 @@ class MontessoriWorld2(MontessoriWorld):
 
         table_top_z = float(BOARD_TABLE_POSITION.z) + BOARD_TABLE_SCALE.z / 2
         board_top_z = float(BOARD_POSITION_2.z) + BOARD_SCALE.z / 2
-        landing_region_height = _landing_region_height(table_top_z, board_top_z)
+        holes_by_key = {}
         for hole_spec in _HOLES_2:
             hole = ShapeSortingHole(
                 name=_name(hole_spec.key),
@@ -301,19 +300,18 @@ class MontessoriWorld2(MontessoriWorld):
             )
             self._spawn(hole, hole_spec.position)
             board.add(hole)
+            holes_by_key[hole_spec.key] = hole
 
-            landing_region = _landing_region(
-                _name(f"{hole_spec.key}_landing_region"),
-                hole_spec.shape,
-                landing_region_height,
-            )
-            self._spawn_region(
-                landing_region,
-                _landing_region_position(
-                    hole_spec.position, table_top_z, landing_region_height
-                ),
-            )
-            self.landing_regions[hole_spec.key] = landing_region
+        # Measuring the open space under a hole (see `_open_space_under`) reads the
+        # world's actual collision geometry, so it can only run once every hole above is
+        # spawned and forward kinematics reflects it.
+        self.world.update_forward_kinematics()
+        for key, hole in holes_by_key.items():
+            open_space = _open_space_under(hole, table_top_z, board_top_z)
+            landing_region = _landing_region(_name(f"{key}_landing_region"), open_space)
+            self._spawn_region(landing_region, open_space.center)
+            hole.landing_region = landing_region
+            self.landing_regions[key] = landing_region
 
         for index, drawer_position in enumerate(_DRAWER_POSITIONS_2, start=1):
             drawer = Drawer(

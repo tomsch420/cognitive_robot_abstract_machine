@@ -4,11 +4,9 @@ import json
 from dataclasses import dataclass, field
 from threading import Thread
 from time import sleep
-from typing import Dict, List
+from typing import Dict, List, TYPE_CHECKING
 
 import rclpy
-from json_msgs.action import JsonAction
-from json_msgs.action._json_action import JsonAction_Result
 from giskardpy.middleware.ros2 import rospy
 from giskardpy.middleware.ros2.exceptions import NoActiveGoalToCancelError
 from giskardpy.middleware.ros2.motion_goal import MotionGoal
@@ -28,6 +26,10 @@ from semantic_digital_twin.adapters.ros.world_synchronizer import WorldSynchroni
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.world import World
+
+if TYPE_CHECKING:
+    from json_msgs.action import JsonAction
+    from json_msgs.action._json_action import JsonAction_Result
 
 
 @dataclass
@@ -69,6 +71,11 @@ class GiskardWrapper:
         self.world_updates = ClientWorldUpdates(
             world_synchronizer=WorldSynchronizer.of_world(self.world)
         )
+        # Deferred: json_msgs is a ROS message package, which would otherwise make this
+        # module unimportable in an interpreter that only needs to introspect its types
+        # (e.g. ORM generation), without json_msgs installed.
+        from json_msgs.action import JsonAction
+
         giskard_topic = f"{self.giskard_node_name}/command"
         self._client = MyActionClient(self.node_handle, JsonAction, giskard_topic)
         sleep(0.3)
@@ -134,6 +141,8 @@ class GiskardWrapper:
         :param motion_statechart: statechart to send to Giskard
         :return: action goal message holding the serialized motion goal
         """
+        from json_msgs.action import JsonAction
+
         goal_msg = JsonAction.Goal()
         goal = MotionGoal.for_motion_statechart(
             motion_statechart,

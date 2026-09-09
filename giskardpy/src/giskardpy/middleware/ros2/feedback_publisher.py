@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from typing import Any, Dict
-
-from json_msgs.action import JsonAction
+from typing import Any, Dict, TYPE_CHECKING
 
 from giskardpy.executor import Executor
 from giskardpy.middleware.ros2.action_server import ActionServerHandler
+
+if TYPE_CHECKING:
+    from json_msgs.action import JsonAction
 
 
 @dataclass
@@ -94,6 +95,11 @@ class ActionFeedbackPublisher:
         """
         Publish the given data as action feedback.
         """
+        # Deferred: json_msgs is a ROS message package, which would otherwise make this
+        # module unimportable in an interpreter that only needs to introspect its types
+        # (e.g. ORM generation), without json_msgs installed.
+        from json_msgs.action import JsonAction
+
         message = JsonAction.Feedback()
         message.feedback = json.dumps(data)
         self.action_server.send_feedback(message)

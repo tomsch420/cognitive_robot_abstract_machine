@@ -7,7 +7,6 @@ from dataclasses import dataclass, field
 from typing import List
 
 import rclpy
-from json_msgs.action import JsonAction
 from sqlalchemy.orm import sessionmaker
 
 from giskardpy.data_types.exceptions import NoControlledJointsError
@@ -118,6 +117,11 @@ class Giskard:
         """
         Build the goal lifecycle around the executor.
         """
+        # Deferred: json_msgs is a ROS message package, which would otherwise make this
+        # module unimportable in an interpreter that only needs to introspect its types
+        # (e.g. ORM generation), without json_msgs installed.
+        from json_msgs.action import JsonAction
+
         world = self.world_config.world
         action_server = ActionServerHandler(
             action_name=f"{rospy.get_node().get_name()}/command", action_type=JsonAction

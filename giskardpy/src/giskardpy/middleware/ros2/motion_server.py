@@ -7,7 +7,6 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List
 
 import rclpy
-from json_msgs.action import JsonAction
 
 from giskardpy.data_types.exceptions import DontPrintStackTrace
 from giskardpy.executor import Executor, RealTimePacer
@@ -243,6 +242,11 @@ class MotionServer:
         cannot tell a client whether sending the goal again would help. The error is
         serialized so that the client can rebuild and raise the very same exception.
         """
+        # Deferred: json_msgs is a ROS message package, which would otherwise make this
+        # module unimportable in an interpreter that only needs to introspect its types
+        # (e.g. ORM generation), without json_msgs installed.
+        from json_msgs.action import JsonAction
+
         match error:
             case ExecutionCanceledException():
                 self.action_server.set_canceled()
