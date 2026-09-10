@@ -326,7 +326,18 @@ class PickUpActionMujoco(ActionDescription):
         close_gripper_around(
             self.sim, self.actuators, robot, self.arm, self.object_designator
         )
-        _reach(world, self.sim, self.actuators, self.arm, pick_hover)
+        # Recomputed, not reused: the knuckle has just closed, and the finger-pad
+        # midpoint's own offset from the tool frame -- baked into pose() -- is measured
+        # off whatever the gripper's own geometry was at the moment pose() was built.
+        # Reusing the pre-grasp (open-gripper) pick_hover here would retreat to where
+        # the *open* gripper's own midpoint should be, not the closed one now actually
+        # holding the piece -- confirmed directly, ~1.35cm off along the closing axis
+        # (see _finger_midpoint_offset's own docstring for that measurement).
+        closed_pose = _top_down_pose_builder(world, robot, self.arm)
+        pick_hover_closed = closed_pose(
+            body_center[0], body_center[1], body_center[2] + self.hover_clearance
+        )
+        _reach(world, self.sim, self.actuators, self.arm, pick_hover_closed)
 
 
 @dataclass
@@ -397,4 +408,14 @@ class PlaceActionMujoco(ActionDescription):
         _reach(world, self.sim, self.actuators, self.arm, place_hover)
         _reach(world, self.sim, self.actuators, self.arm, place_pose)
         set_gripper(self.sim, self.actuators, robot, self.arm, GripperState.OPEN)
-        _reach(world, self.sim, self.actuators, self.arm, place_hover)
+        # Recomputed, not reused: pose() was built while still holding the piece
+        # (closed-gripper geometry), but the knuckle has just opened for this retreat --
+        # see PickUpActionMujoco._run's own comment on the same recompute, other
+        # direction.
+        open_pose = _top_down_pose_builder(world, robot, self.arm)
+        place_hover_open = open_pose(
+            float(target_position.x),
+            float(target_position.y),
+            float(target_position.z) + self.hover_clearance,
+        )
+        _reach(world, self.sim, self.actuators, self.arm, place_hover_open)
