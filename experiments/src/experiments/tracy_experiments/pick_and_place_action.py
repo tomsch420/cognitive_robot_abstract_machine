@@ -182,21 +182,36 @@ def _top_down_pose_builder(world: World, robot: Tracy, arm: Arms):
     return pose
 
 
-MAX_REACH_ATTEMPTS = 3
+REACH_SETTLE_TIMEOUT = 10.0
 """
-How many times :func:`_reach` re-plans and re-drives towards the same ``goal_pose``
-before giving up.
+Simulated seconds :func:`_reach` waits, in a single attempt, for the servo to settle on
+a leg's own final waypoint -- see :func:`~experiments.tracy_experiments.
+trajectory_planning.follow_joint_trajectory`'s own ``settle_timeout``, whose default
+this matches exactly (kept as its own name here rather than just omitting the argument,
+so the choice -- one attempt, no retry -- reads as deliberate at the call site).
 
-Confirmed directly: a reach that misses :func:`~experiments.tracy_experiments.
-trajectory_planning.follow_joint_trajectory`'s own settle check does so with an error
-that has been shrinking the whole window, never oscillating or plateauing -- the
-signature of a servo that is still converging, not one that is stuck. Re-planning from
-wherever the arm actually ended up (rather than giving up after one settle window)
-lets a second, shorter trajectory close most of what remains; most misses settle by the
-second or third attempt. This does not replace a genuine fix for why the first attempt
-is so often short in the first place (see :data:`~experiments.tracy_experiments.
-equipment._LARGE_JOINT_TORQUE_HEADROOM`); it is a cheap, bounded safety net on top of
-that, not a substitute for it.
+Was a bounded 3-attempt *retry* (a fresh Giskard re-plan from wherever the first attempt
+left off) rather than a single wait. Confirmed directly, with instrumentation tracking
+the held piece's own position tick by tick through a whole reach: the piece survived
+being carried the entire length of a reach's own planned trajectory just fine, then
+separated abruptly right where the first attempt's settle window ran out and a retry's
+fresh re-plan began -- a second, shorter re-plan trajectory is necessarily jerkier (same
+tick budget, less distance left to cover), and that jerk is what shook a piece loose
+that the original, smoother trajectory was carrying without incident. Removing the
+retry (holding the same single planned trajectory's own final waypoint instead) let a
+real episode's grasp survive an entire pick-up for the first time, and land within a
+couple of centimetres of the hole (confirmed directly: 0.0mm/27mm/17mm off in x/y/z,
+0.25 containment against the 0.90 needed to count as sorted).
+
+Tried lengthening this same single wait to 30s next, on the theory that more patience
+alone could close that last gap -- confirmed directly it does not: a real episode with
+the longer wait landed back at the piece's own spawn position (0.0 containment), worse
+than the 10s version, not better. This is a chaotic system (see :data:`~experiments.
+tracy_experiments.equipment._LARGE_JOINT_TORQUE_HEADROOM`'s own docstring on why first
+attempts are short to begin with); changing how long the arm dwells anywhere changes
+every subsequent tick's own physics state, not just precision at that one leg, so this
+value should be treated as load-bearing and re-validated against a real episode (not
+just assumed safe to raise) before it is changed again.
 """
 
 
@@ -209,10 +224,10 @@ def _reach(
 ) -> None:
     """
     Plan a Cartesian reach against an isolated scratch copy of ``world`` and play it
-    back on the real, physically simulated ``sim``, retrying up to
-    :data:`MAX_REACH_ATTEMPTS` times against the same ``goal_pose`` if the servo has not
-    settled by the end of a leg -- see :data:`MAX_REACH_ATTEMPTS`'s own docstring for
-    why a retry (rather than accepting wherever the first attempt left off) is worth it.
+    back on the real, physically simulated ``sim``, holding the final waypoint for up to
+    :data:`REACH_SETTLE_TIMEOUT` (rather than retrying with a fresh re-plan -- see its
+    own docstring for why a retry specifically breaks a reach that is carrying
+    something).
 
     Collision avoidance is off: a much more crowded scene than an open table (e.g. the
     Montessori board plus its three drawers) can make Giskard's own collision-avoidance
@@ -229,38 +244,13 @@ def _reach(
     :param arm: Which arm's tool centre point should reach ``goal_pose``.
     :param goal_pose: Target pose for the gripper's own finger midpoint.
     """
-    for attempt in range(MAX_REACH_ATTEMPTS):
-        trajectory = plan_cartesian_trajectory(
-            world, arm, goal_pose, translation_only=False, avoid_collisions=False
-        )
-        follow_joint_trajectory(sim, actuators, trajectory)
-        if _has_settled(sim, trajectory[-1]):
-            return
-
-
-def _has_settled(
-    sim: RealTimeSimulation,
-    targets: Dict[str, float],
-    convergence_threshold: float = 0.01,
-) -> bool:
-    """
-    Whether every joint named in ``targets`` currently sits within
-    ``convergence_threshold`` radians of its own target, read straight off the real,
-    physically simulated joint values -- the same check
-    :func:`~experiments.tracy_experiments.trajectory_planning.follow_joint_trajectory`
-    itself makes at the end of its own settle window, reused here so :func:`_reach` can
-    tell a leg that only just missed it from one still far off.
-
-    :param sim: The running real-time simulation to read joint values from.
-    :param targets: Target position by joint name, e.g. a trajectory's own last waypoint.
-    :param convergence_threshold: Maximum per-joint error, in radians, to count as
-        settled; matches ``follow_joint_trajectory``'s own default.
-    """
-    return all(
-        abs(sim.multi_sim.simulator.get_joint_value(joint_name).result - target)
-        < convergence_threshold
-        for joint_name, target in targets.items()
+    trajectory = plan_cartesian_trajectory(
+        world, arm, goal_pose, translation_only=False, avoid_collisions=False
     )
+    follow_joint_trajectory(
+        sim, actuators, trajectory, settle_timeout=REACH_SETTLE_TIMEOUT
+    )
+
 
 
 @dataclass
