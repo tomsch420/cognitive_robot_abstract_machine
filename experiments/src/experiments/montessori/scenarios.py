@@ -137,6 +137,10 @@ if TYPE_CHECKING:
     from krrood.entity_query_language.verbalization.fragments.base import (
         VerbalizationFragment,
     )
+    from experiments.episodes.episode import Tick
+    from experiments.tracy_experiments.montessori.event_monitoring import (
+        MontessoriEventMonitor,
+    )
 
 # %% the steps a sorting run is divided into
 
@@ -872,6 +876,13 @@ SCENE_CAMERA_NAME = "the camera a run is filmed by"
 The name of the camera a filmed run is watched through.
 """
 
+TRACY_CAMERA_NAME = "tracy's own camera"
+"""
+The name a filmed run is watched through when it is watched from Tracy's own mounted
+camera (see :meth:`TracySortsAPiece._camera_for_the_recording`) rather than the generic
+overview :data:`SCENE_CAMERA_NAME` frames.
+"""
+
 DEFAULT_VIDEO_DIRECTORY_NAME = "montessori_scenario_videos"
 """
 The directory filmed runs are written into when nothing says where they should go.
@@ -1044,6 +1055,17 @@ without end, which no scene here is built to be; the bound is what stops a run h
 on one if it happens.
 """
 
+MONITOR_TICK_RATE_HZ = 5.0
+"""
+How often a scene's own event monitor is ticked, in simulated ticks per second.
+
+Matches :data:`~experiments.tracy_experiments.montessori.event_monitoring.
+DEFAULT_TICK_RATE_HZ`, the rate a monitor would tick at on its own background thread on
+the real robot; paced against simulated rather than wall-clock time here (see
+:meth:`SimulatedScene._tick_the_monitor_if_due`), since nothing here runs a monitor on
+a thread of its own -- see :attr:`SimulatedScene.monitor` for why.
+"""
+
 
 @dataclass(eq=False)
 class _LetGoOfTheSimulationCallback(ModelChangeCallback):
@@ -1086,9 +1108,34 @@ class SimulatedScene:
     The video the run is being filmed as, when it is being filmed.
     """
 
+    monitor: Optional["MontessoriEventMonitor"] = None
+    """
+    What is watching the scene for segmind events while it runs, when it is being
+    watched.
+
+    Ticked here, synchronously from whichever thread is already calling
+    :meth:`advance`, rather than on a background thread of its own (contrast
+    :meth:`~experiments.tracy_experiments.montessori.event_monitoring.
+    MontessoriEventMonitor.start`): this scene's own physics is already deliberately
+    stepped from the calling thread rather than a background one, and a detector
+    reading the scene from a second thread while this one is still writing to it would
+    race exactly what that choice exists to avoid.
+    """
+
     physics: Optional[MujocoSim] = field(init=False, default=None, repr=False)
     """
     The MuJoCo simulation the scene is carried in, once there is one.
+    """
+
+    ticks: List["Tick"] = field(init=False, default_factory=list, repr=False)
+    """
+    What :attr:`monitor` detected, one entry per tick taken so far while advancing.
+    """
+
+    _elapsed_simulated_seconds: float = field(init=False, default=0.0, repr=False)
+    """
+    Simulated seconds advanced so far: what :attr:`ticks` are timestamped against, and
+    what paces how often :attr:`monitor` is ticked.
     """
 
     _let_go_of_the_simulation: Optional[_LetGoOfTheSimulationCallback] = field(
@@ -1112,9 +1159,38 @@ class SimulatedScene:
         self._take_up_carrying_the_scene()
         if self.recording is not None:
             self.recording.film().advance_simulation(duration)
+        else:
+            for _ in range(round(duration / self.step_size)):
+                self.physics.simulator.step()
+        self._elapsed_simulated_seconds += duration
+        self._tick_the_monitor_if_due()
+
+    def _tick_the_monitor_if_due(self) -> None:
+        """
+        Tick :attr:`monitor` and keep what it detected as one more of :attr:`ticks`, if
+        it has been long enough in simulated time since the last one.
+
+        Paced against simulated time rather than the wall clock, like everything else
+        this scene advances by, so two runs of the same scenario take the same ticks.
+        """
+        if self.monitor is None:
             return
-        for _ in range(round(duration / self.step_size)):
-            self.physics.simulator.step()
+        if (
+            self.ticks
+            and self._elapsed_simulated_seconds - self.ticks[-1].moment
+            < 1.0 / MONITOR_TICK_RATE_HZ
+        ):
+            return
+        from experiments.episodes.episode import Tick
+
+        already_seen = len(self.monitor.events)
+        self.monitor.tick()
+        self.ticks.append(
+            Tick(
+                moment=self._elapsed_simulated_seconds,
+                events=list(self.monitor.events[already_seen:]),
+            )
+        )
 
     def _take_up_carrying_the_scene(self) -> None:
         """
@@ -1668,10 +1744,12 @@ class MontessoriSortingScenario(
                 SceneRecording(
                     world=montessori.world,
                     frames_per_second=self.video_frames_per_second,
+                    camera=self._camera_for_the_recording(montessori),
                 )
                 if self.filmed
                 else None
             ),
+            monitor=self._watch_the_scene(montessori),
         )
         return montessori.world
 
@@ -1682,6 +1760,50 @@ class MontessoriSortingScenario(
 
         :param montessori: The scene being built.
         """
+
+    def _watch_the_scene(
+        self, montessori: MontessoriWorld
+    ) -> Optional["MontessoriEventMonitor"]:
+        """
+        An event monitor to tick alongside :attr:`simulation` while it runs, or None
+        for a scenario that watches nothing.
+
+        A scenario that wants its run recorded as more than an outcome and a duration
+        overrides this; what it returns ends up as :attr:`ticks`, and from there as one
+        of the trial's own recorded ticks (see :meth:`~experiments.episodes.episode.
+        RecordedTrial.from_trial`).
+
+        :param montessori: The freshly built scene.
+        """
+        return None
+
+    def _camera_for_the_recording(
+        self, montessori: MontessoriWorld
+    ) -> Optional[MujocoCamera]:
+        """
+        Where a filmed run of this scenario is watched from, or None to let
+        :meth:`SceneRecording._camera_watching_the_scene` attach the generic overview
+        automatically.
+
+        :param montessori: The freshly built scene.
+        """
+        return None
+
+    @property
+    def ticks(self) -> List["Tick"]:
+        """
+        What :attr:`simulation`'s own monitor detected, in the order it detected it, or
+        empty if this scenario has not yet built a world, or watches nothing.
+        """
+        return [] if self.simulation is None else self.simulation.ticks
+
+    @property
+    def world(self) -> Optional[World]:
+        """
+        The world :attr:`simulation` is carrying, or None if this scenario has not yet
+        built one.
+        """
+        return None if self.simulation is None else self.simulation.world
 
     def _keep_only_the_layouts_pieces(self, montessori: MontessoriWorld) -> None:
         """
@@ -2136,6 +2258,87 @@ class TracySortsAPiece(RobotSortsAPiece[World, Tracy]):
 
     def add_what_the_script_acts_with(self, montessori: MontessoriWorld) -> None:
         self._actuators = _equip_tracy_for_mujoco_manipulation(montessori)
+
+    def _watch_the_scene(
+        self, montessori: MontessoriWorld
+    ) -> Optional["MontessoriEventMonitor"]:
+        """
+        A monitor tracking the sorted piece's own grasping, lifting, pick-up and
+        insertion into its hole, arm-aware so its grasp and lift detectors watch the
+        gripper that is actually doing the sorting.
+
+        Built from :func:`~experiments.tracy_experiments.montessori.event_monitoring.
+        build_shape_monitor_in_world` rather than :func:`~experiments.tracy_experiments.
+        montessori.event_monitoring.build_shape_monitor`, since ``montessori`` is typed
+        as the generic :class:`MontessoriWorld` here (this hook is inherited from
+        :class:`MontessoriSortingScenario`), not the narrower :class:`~experiments.
+        tracy_experiments.montessori.world.TracyMontessoriWorld` that function expects
+        -- the pieces it would otherwise read off ``montessori`` itself are read off it
+        directly here instead.
+
+        :param montessori: The freshly built scene.
+        """
+        # Deferred: experiments.tracy_experiments transitively imports giskardpy's
+        # motion-planning stack (see _equip_tracy_for_mujoco_manipulation's own
+        # docstring), which would otherwise make this module unimportable without ROS
+        # installed.
+        from experiments.tracy_experiments.montessori.event_monitoring import (
+            build_shape_monitor_in_world,
+        )
+
+        return build_shape_monitor_in_world(
+            world=montessori.world,
+            board=montessori.board,
+            landing_regions=montessori.landing_regions,
+            shape=SortingScene(montessori.world).shape_of(self.sorted_category),
+            robot=montessori.robot,
+            arm=self.arm,
+        )
+
+    def _camera_for_the_recording(
+        self, montessori: MontessoriWorld
+    ) -> Optional[MujocoCamera]:
+        """
+        A camera watching the scene from Tracy's own mounted camera
+        (:class:`~semantic_digital_twin.robots.tracy.TracyCamera`), so a filmed run is
+        seen the way Tracy itself sees it rather than from a generic overview.
+
+        Computed once, from where the sensor stands and looks at the moment the scene
+        is built, and attached to the world's own root rather than tracking the live
+        sensor body -- like :meth:`SceneRecording._camera_watching_the_scene`'s own
+        overview camera, for the same reason: Tracy is bolted to the scene and its
+        camera never moves, so a fixed world-frame pose is exactly as accurate as
+        tracking the live body would be, without needing MuJoCo to keep resolving it
+        every frame, and a cut between two takes must not also move the camera.
+
+        :param montessori: The freshly built scene.
+        """
+        [sensor] = [
+            sensor for sensor in montessori.robot.sensors if sensor.default_camera
+        ]
+        root_T_sensor = sensor.root.global_transform
+        position = root_T_sensor.to_position()
+        looking_at = (
+            position + root_T_sensor.to_rotation_matrix() @ sensor.forward_facing_axis
+        )
+        pose = HomogeneousTransformationMatrix.from_point_rotation_matrix(
+            position, MujocoCamera._look_at_rotation(position, looking_at)
+        )
+        # MuJoCo writes the scalar of a quaternion first, and Quaternion.to_np last.
+        quaternion = pose.to_quaternion().to_np().tolist()
+        camera = MujocoCamera(
+            name=TRACY_CAMERA_NAME,
+            body=montessori.world.root,
+            position=pose.to_position().to_np()[:3].tolist(),
+            quaternion=[quaternion[3]] + quaternion[:3],
+            fovy=math.degrees(sensor.field_of_view.vertical_angle),
+            resolution=[float(VIDEO_RESOLUTION.width), float(VIDEO_RESOLUTION.height)],
+        )
+        # A camera only ends up in the compiled MuJoCo model if it is registered on a
+        # body's own additional properties, exactly like
+        # SceneRecording._camera_watching_the_scene's overview camera registers itself.
+        montessori.world.root.simulator_additional_properties.append(camera)
+        return camera
 
     def steps(self, world: World) -> Sequence[ScenarioStep[World]]:
         return [

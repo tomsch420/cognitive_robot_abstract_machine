@@ -215,17 +215,28 @@ class RecordedTrial:
     """
 
     @classmethod
-    def from_trial(cls, trial: Trial, episode: Episode) -> RecordedTrial:
+    def from_trial(
+        cls, trial: Trial, episode: Episode, ticks: Sequence[Tick] = ()
+    ) -> RecordedTrial:
         """
         Take what a finished trial recorded of itself.
 
-        What the trial's own runner cannot see - the monitor's ticks, the queries asked
-        and the insertions attempted - is added by whatever observed it.
+        What the trial's own runner cannot see - the queries asked and the insertions
+        attempted - is added by whatever observed it; a scenario that watched its own
+        run already has its ticks by the time it finishes, so those are taken directly
+        rather than added later.
 
         :param trial: The trial that has finished.
         :param episode: The episode the trial belongs to.
+        :param ticks: The event monitor's ticks, if the scenario watched itself while
+            it ran.
         """
-        return cls(episode=episode, outcome=trial.outcome, duration=trial.duration)
+        return cls(
+            episode=episode,
+            outcome=trial.outcome,
+            duration=trial.duration,
+            ticks=list(ticks),
+        )
 
 
 # %% the episode itself

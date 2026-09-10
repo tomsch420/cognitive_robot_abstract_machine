@@ -157,7 +157,21 @@ class EpisodeRecording(ScenarioRunner[ScenarioType, WorldType]):
         """
         Keep the trial that has just finished as one of this episode's.
 
+        A scenario that watched itself while it ran (see
+        :attr:`~experiments.montessori.scenarios.MontessoriSortingScenario.ticks`) and
+        one that knows what world it ran in (see
+        :attr:`~experiments.montessori.scenarios.MontessoriSortingScenario.world`) are
+        read here rather than required of every :class:`~experiments.scenarios.
+        scenario.Scenario` -- a scenario that offers neither simply records a trial
+        with no ticks and no world, same as before either existed.
+
         :param scenario: The scenario the trial ran.
         :param trial: The trial that has finished.
         """
-        self.records_trials.record(RecordedTrial.from_trial(trial, self.episode))
+        if self.episode.world is None:
+            self.episode.world = getattr(scenario, "world", None)
+        self.records_trials.record(
+            RecordedTrial.from_trial(
+                trial, self.episode, ticks=getattr(scenario, "ticks", ())
+            )
+        )
