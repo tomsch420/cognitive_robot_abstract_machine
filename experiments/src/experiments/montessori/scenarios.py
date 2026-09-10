@@ -1632,6 +1632,19 @@ class MontessoriSortingScenario(
     Whether a video of the run is made while it is performed.
     """
 
+    video_frames_per_second: int = field(kw_only=True, default=FRAMES_PER_SECOND)
+    """
+    See :attr:`SceneRecording.frames_per_second`; only read while :attr:`filmed` is set.
+
+    This is what actually paces how many frames a run costs to film, not how many are
+    merely kept: :meth:`~semantic_digital_twin.adapters.mujoco_video_recording.
+    MujocoVideoRecorder.advance_simulation` (what every step of a :class:`SimulatedScene`
+    is driven through) derives its own capture rate from this on every call, so lowering
+    it is what actually cuts the real offscreen renders a run costs -- not a decimation
+    counter set once at construction, which that method overrides on every call it
+    makes regardless of what it was given.
+    """
+
     simulation: Optional[SimulatedScene] = field(init=False, default=None)
     """
     The physics carrying the world this scenario built most recently.
@@ -1651,7 +1664,14 @@ class MontessoriSortingScenario(
         montessori.world.update_forward_kinematics()
         self.simulation = SimulatedScene(
             world=montessori.world,
-            recording=(SceneRecording(world=montessori.world) if self.filmed else None),
+            recording=(
+                SceneRecording(
+                    world=montessori.world,
+                    frames_per_second=self.video_frames_per_second,
+                )
+                if self.filmed
+                else None
+            ),
         )
         return montessori.world
 
@@ -2095,6 +2115,17 @@ class TracySortsAPiece(RobotSortsAPiece[World, Tracy]):
     simulated on Tracy's own physically driven gripper.
     """
 
+    arm: Arms = field(kw_only=True, default=THE_ARM_THAT_SORTS)
+    """
+    Which arm sorts the piece.
+
+    Defaults to :data:`THE_ARM_THAT_SORTS`, the production arm; overridable so a caller
+    that knows the other arm reaches more reliably at a given board position (see
+    :data:`THE_ARM_THAT_SORTS`'s own docstring) can ask for that one instead, e.g. when
+    generating a corpus of runs where reach convergence matters more than matching the
+    physical robot's own broken arm.
+    """
+
     _actuators: Dict[str, Actuator] = field(
         init=False, default_factory=dict, repr=False
     )
@@ -2115,14 +2146,14 @@ class TracySortsAPiece(RobotSortsAPiece[World, Tracy]):
             TracyPickThePieceUp(
                 name=SortingStep.PICK_UP,
                 category=self.sorted_category,
-                arm=THE_ARM_THAT_SORTS,
+                arm=self.arm,
                 actuators=self._actuators,
                 scene=self.simulation,
             ),
             TracyPutThePieceInItsHole(
                 name=SortingStep.PUT_DOWN,
                 category=self.sorted_category,
-                arm=THE_ARM_THAT_SORTS,
+                arm=self.arm,
                 actuators=self._actuators,
                 scene=self.simulation,
             ),
@@ -2146,6 +2177,11 @@ class TracyHoldsAPiece(PieceHeldWhileTheQuestionIsAsked[World, Tracy]):
     own docstring.
     """
 
+    arm: Arms = field(kw_only=True, default=THE_ARM_THAT_SORTS)
+    """
+    See :attr:`TracySortsAPiece.arm`.
+    """
+
     _actuators: Dict[str, Actuator] = field(
         init=False, default_factory=dict, repr=False
     )
@@ -2165,7 +2201,7 @@ class TracyHoldsAPiece(PieceHeldWhileTheQuestionIsAsked[World, Tracy]):
             TracyPickThePieceUp(
                 name=SortingStep.PICK_UP,
                 category=self.held_category,
-                arm=THE_ARM_THAT_SORTS,
+                arm=self.arm,
                 actuators=self._actuators,
                 scene=self.simulation,
             ),

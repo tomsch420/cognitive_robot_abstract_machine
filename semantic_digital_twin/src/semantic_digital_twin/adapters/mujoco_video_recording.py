@@ -272,10 +272,15 @@ class MujocoVideoRecorder:
         steps_per_frame = max(1, round((1.0 / self.frames_per_second) / step_size))
         previous_decimation = self.capture_every_n_state_changes
         self.capture_every_n_state_changes = steps_per_frame
-        # Restart the decimation period cleanly so the first frame of this call lands
-        # exactly steps_per_frame steps in, rather than wherever the previous decimation
-        # period's phase happened to leave off.
-        self._state_change_count = 0
+        # _state_change_count is deliberately left running across calls rather than
+        # restarted here: a caller driving this through many short calls (e.g. settling
+        # or trajectory-following, each far shorter than one frame period) must still
+        # get frames_per_second frames per simulated second overall. Resetting the
+        # counter at the start of every call always satisfies its own "already at the
+        # boundary" check, so every short call would capture a frame regardless of how
+        # low frames_per_second is asked to be -- defeating the whole point of asking
+        # for a lower one. steps_per_frame is recomputed identically call to call (from
+        # the same frames_per_second and step_size), so the running phase stays valid.
         try:
             for _ in range(max(1, round(duration / step_size))):
                 self._multi_sim.simulator.step()

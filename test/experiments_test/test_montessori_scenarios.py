@@ -20,6 +20,8 @@ from experiments.montessori.pieces import KNOWN_PIECES
 from krrood.entity_query_language.factories import variable
 from krrood.entity_query_language.verbalization.pipeline import verbalize_expression
 
+from coraplex.datastructures.enums import Arms
+
 from experiments.montessori.scenarios import (
     BoardOnItsOwnTable,
     CONTAINED_IN_ITS_LANDING_REGION,
@@ -35,10 +37,12 @@ from experiments.montessori.scenarios import (
     PieceLayout,
     PiecePlacement,
     PiecePushedWhileTheRobotIsIdle,
+    FRAMES_PER_SECOND,
     RobotSortsAPiece,
     SceneRecording,
     SortingScene,
     SortingStep,
+    THE_ARM_THAT_SORTS,
     TheSceneIsUndisturbed,
     ThePieceIsHeld,
     ThePieceIsInItsHole,
@@ -845,9 +849,11 @@ def test_every_demo_scenario_runs_on_tracy(scenario_class, area):
     assert scenario.robot_type is Tracy
 
 
-def _instantiated(scenario_class, area: LayoutArea):
+def _instantiated(scenario_class, area: LayoutArea, **overrides):
     """
     One instance of a scenario class, given whatever piece its script names.
+
+    :param overrides: Field values to use instead of this helper's own defaults.
     """
     arguments = {
         "layout": PieceLayout.randomized(seed=SEED, area=area),
@@ -856,7 +862,35 @@ def _instantiated(scenario_class, area: LayoutArea):
     for field_name in ("sorted_category", "pushed_category", "held_category"):
         if field_name in scenario_class.__dataclass_fields__:
             arguments[field_name] = MontessoriShapeCategory.CUBE
+    arguments.update(overrides)
     return scenario_class(**arguments)
+
+
+# %% which arm a demo scenario sorts or holds with
+
+
+@pytest.mark.parametrize("scenario_class", [TracySortsAPiece, TracyHoldsAPiece])
+def test_a_demo_scenario_sorts_with_the_arm_that_sorts_unless_told_otherwise(
+    scenario_class, area
+):
+    scenario = _instantiated(scenario_class, area)
+
+    assert scenario.arm is THE_ARM_THAT_SORTS
+
+
+@pytest.mark.parametrize("scenario_class", [TracySortsAPiece, TracyHoldsAPiece])
+def test_a_demo_scenario_can_be_told_to_sort_with_the_other_arm(scenario_class, area):
+    """
+    A caller that knows the other arm reaches more reliably at a given board position
+    (e.g. when generating a corpus of runs where reach convergence matters more than
+    matching the physical robot's own broken arm) can ask for it instead of the
+    production arm.
+    """
+    other_arm = Arms.LEFT if THE_ARM_THAT_SORTS is Arms.RIGHT else Arms.RIGHT
+
+    scenario = _instantiated(scenario_class, area, arm=other_arm)
+
+    assert scenario.arm is other_arm
 
 
 # %% the video a run is filmed as
@@ -959,6 +993,29 @@ def test_a_filmed_run_is_written_as_one_video_where_videos_are_kept(
     )
 
 
+def test_a_lower_frame_rate_records_fewer_frames_of_the_same_run(a_filmed_sorting_run):
+    """
+    Filming a run whose physics itself needs many steps is dominated by rendering, not
+    physics, so a caller trading smoothness for speed (e.g. a corpus of many runs, where
+    only a coarse record of what happened is wanted) has to actually get fewer frames.
+
+    Asks for a much lower frame rate rather than a coarser decimation count: MujocoVideo
+    Recorder.advance_simulation derives its own decimation from frames_per_second on
+    every call it makes (what every step of a SimulatedScene is driven through), so
+    frames_per_second is what actually paces filming's own cost -- not a decimation
+    count, which that method recomputes and overrides regardless of what it was given.
+    """
+    coarse = _sorting_run(filmed=True, frames_per_second=1)
+    world = coarse.build_world()
+    for step in coarse.steps(world):
+        step.perform(world)
+
+    assert (
+        coarse.simulation.recording.frame_count
+        < a_filmed_sorting_run.frames_by_the_end_of[SortingStep.ANSWER]
+    )
+
+
 def test_videos_are_written_where_the_environment_says(monkeypatch, tmp_path):
     monkeypatch.setenv(MontessoriEnvironmentVariable.VIDEO_DIRECTORY, str(tmp_path))
 
@@ -979,11 +1036,15 @@ def test_videos_of_a_machine_that_says_nothing_are_kept_beside_its_other_tempora
 # %% helpers
 
 
-def _sorting_run(filmed: bool) -> SyntheticGrasperSortsAPiece:
+def _sorting_run(
+    filmed: bool, frames_per_second: int = FRAMES_PER_SECOND
+) -> SyntheticGrasperSortsAPiece:
     """
     The pick-and-place run every test about a video is about.
 
     :param filmed: Whether to film it.
+    :param frames_per_second: See :attr:`SceneRecording.frames_per_second`; only read
+        while filmed.
     """
     return SyntheticGrasperSortsAPiece(
         layout=PieceLayout.randomized(
@@ -992,6 +1053,7 @@ def _sorting_run(filmed: bool) -> SyntheticGrasperSortsAPiece:
         world_builder=board_and_the_arm(),
         sorted_category=SORTED_PIECE,
         filmed=filmed,
+        video_frames_per_second=frames_per_second,
     )
 
 
