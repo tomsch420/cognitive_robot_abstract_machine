@@ -59,7 +59,7 @@ from experiments.tracy_experiments.trajectory_planning import (
 )
 from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.robots.tracy import Tracy
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from semantic_digital_twin.spatial_types.spatial_types import Point3, Pose
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Actuator, Body
 
@@ -77,6 +77,36 @@ PLACE_HOVER_CLEARANCE = 0.05
 """
 Height, in metres, above ``target_location`` a body is released at, rather than
 descending onto it exactly.
+"""
+
+CORRECTED_PLACE_DESCENT_CLEARANCE = 0.015
+"""
+Height, in metres, above ``target_location`` the held piece descends to for its own
+closed-loop-corrected release (see :func:`_correct_place_xy`), once XY is already known
+to be accurate -- lower than :data:`PLACE_HOVER_CLEARANCE` since there is little risk
+left of drifting into the hole's own rim on the way down, and less height to fall gives
+it less chance to catch on that rim instead of dropping straight through.
+"""
+
+MAX_PLACE_CORRECTIONS = 3
+"""
+How many times :func:`_correct_place_xy` re-measures the held piece's own position and
+reaches again before giving up and releasing anyway.
+
+A single correction pass took a real 2.7cm miss down to 2.5mm (confirmed directly) --
+close, but still enough to land the piece on the hole's own board surface rather than
+drop through it, since the opening leaves only a few millimetres of true clearance
+around a piece this size. The piece is still held at this point, so nothing stops
+measuring and correcting again; bounded rather than looped forever since each pass
+costs a full reach and there is no guarantee of converging below whatever the true
+clearance turns out to require.
+"""
+
+PLACE_XY_CONVERGED = 0.001
+"""
+Metres of remaining XY error :func:`_correct_place_xy` accepts as close enough to stop
+correcting early, rather than spending its full :data:`MAX_PLACE_CORRECTIONS` budget
+regardless.
 """
 
 GRASP_CLOSE_SWING_CLEARANCE = 0.015
@@ -252,6 +282,54 @@ def _reach(
     )
 
 
+def _correct_place_xy(
+    world: World,
+    sim: RealTimeSimulation,
+    actuators: Dict[str, Actuator],
+    arm: Arms,
+    robot: Tracy,
+    held_body: Body,
+    target_position: Point3,
+    descent_clearance: float,
+) -> None:
+    """
+    Reach for ``target_position`` again, as many times as :data:`MAX_PLACE_CORRECTIONS`
+    allows, each time measuring where the held piece actually ended up and correcting
+    for exactly that much XY error -- see :data:`MAX_PLACE_CORRECTIONS`'s own docstring
+    for why one pass was not always enough.
+
+    Descends to ``descent_clearance`` above ``target_position`` (not
+    :data:`PLACE_HOVER_CLEARANCE`) throughout: confirmed directly, once XY is close
+    there is little risk left of swinging into the hole's own rim on the way down, and
+    a shorter fall gives the piece less chance to catch on that rim instead of dropping
+    straight through it.
+
+    :param world: The live world to clone for planning; never itself modified.
+    :param sim: The running real-time simulation to drive.
+    :param actuators: Every joint's own actuator, keyed by joint name.
+    :param arm: Which arm is holding and placing the piece.
+    :param robot: The robot ``arm`` belongs to.
+    :param held_body: The body currently held, whose own position is measured.
+    :param target_position: Where ``held_body`` should end up.
+    :param descent_clearance: Height, in metres, above ``target_position`` each
+        correction reaches to.
+    """
+    pose = _top_down_pose_builder(world, robot, arm)
+    for _ in range(MAX_PLACE_CORRECTIONS):
+        actual_center = _bounding_box_center_world(world, held_body)
+        xy_error = (
+            float(target_position.x) - float(actual_center[0]),
+            float(target_position.y) - float(actual_center[1]),
+        )
+        if max(abs(xy_error[0]), abs(xy_error[1])) < PLACE_XY_CONVERGED:
+            return
+        corrected_pose = pose(
+            float(target_position.x) + xy_error[0],
+            float(target_position.y) + xy_error[1],
+            float(target_position.z) + descent_clearance,
+        )
+        _reach(world, sim, actuators, arm, corrected_pose)
+
 
 @dataclass
 class PickUpActionMujoco(ActionDescription):
@@ -397,6 +475,30 @@ class PlaceActionMujoco(ActionDescription):
 
         _reach(world, self.sim, self.actuators, self.arm, place_hover)
         _reach(world, self.sim, self.actuators, self.arm, place_pose)
+        # Closed-loop correction: the reach above is open-loop -- it plans once,
+        # against a kinematic snapshot, and trusts the result -- so whatever residual
+        # joint error is still there when it gives up its own settle window (a few
+        # hundredths of a radian, confirmed directly) becomes a few centimetres of
+        # Cartesian error in the held piece's own actual position, not just the tool
+        # frame's. The piece is still held at this point, so its own actual position
+        # can be measured and corrected for as many times as needed -- see
+        # :func:`_correct_place_xy`'s own docstring for why one pass alone was not
+        # enough (confirmed directly: a first pass took a 2.7cm miss down to 2.5mm).
+        #
+        # Tried correcting at a safe hover height first, well clear of the board,
+        # then descending once and correcting again -- confirmed directly this is
+        # worse, not better: it adds reach legs (each one a jerk event on a piece
+        # held only by friction -- see :data:`~experiments.montessori.
+        # world.LOOSE_PIECE_MASS`, 30g), and a real episode's own tracked
+        # position/quaternion showed the piece losing the gripper's grip entirely
+        # partway through that longer sequence (every reach after some point left
+        # both the piece's position and orientation completely unchanged, meaning
+        # the arm kept moving but nothing was attached to it any more) -- worse than
+        # this shorter sequence's own known failure mode (landing on the board,
+        # still held, tipped).
+        _correct_place_xy(world, self.sim, self.actuators, self.arm, robot,
+                           self.object_designator, target_position,
+                           CORRECTED_PLACE_DESCENT_CLEARANCE)
         set_gripper(self.sim, self.actuators, robot, self.arm, GripperState.OPEN)
         # Recomputed, not reused: pose() was built while still holding the piece
         # (closed-gripper geometry), but the knuckle has just opened for this retreat --
