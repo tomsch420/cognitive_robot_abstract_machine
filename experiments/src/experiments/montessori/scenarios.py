@@ -876,11 +876,29 @@ SCENE_CAMERA_NAME = "the camera a run is filmed by"
 The name of the camera a filmed run is watched through.
 """
 
-TRACY_CAMERA_NAME = "tracy's own camera"
+TOP_DOWN_CAMERA_NAME = "top-down view of the board"
 """
-The name a filmed run is watched through when it is watched from Tracy's own mounted
-camera (see :meth:`TracySortsAPiece._camera_for_the_recording`) rather than the generic
-overview :data:`SCENE_CAMERA_NAME` frames.
+The name a filmed run is watched through when it is watched from directly above the
+board and its pieces (see :meth:`TracySortsAPiece._camera_for_the_recording`) rather
+than the generic overview :data:`SCENE_CAMERA_NAME` frames.
+"""
+
+TOP_DOWN_DISTANCE_FACTOR = 3.0
+"""
+How far above the board, its pieces and the robot's own base -- combined into one
+horizontal extent -- the top-down camera is placed, as a multiple of that extent.
+
+Fitting the horizontal extent inside the field of view alone only needs a small
+multiple of it (the field of view is wide), but the arm reaching up out of that flat
+footprint needs real clearance too, or it looms close enough to the camera to fill the
+frame on its own; this is sized for that clearance, not for the footprint.
+"""
+
+MINIMUM_TOP_DOWN_EXTENT = 0.3
+"""
+Floor for the horizontal extent the top-down camera frames, in metres, so a layout
+whose one piece stands close to the board still gets a sensibly framed camera rather
+than one nearly touching it.
 """
 
 DEFAULT_VIDEO_DIRECTORY_NAME = "montessori_scenario_videos"
@@ -2299,39 +2317,58 @@ class TracySortsAPiece(RobotSortsAPiece[World, Tracy]):
         self, montessori: MontessoriWorld
     ) -> Optional[MujocoCamera]:
         """
-        A camera watching the scene from Tracy's own mounted camera
-        (:class:`~semantic_digital_twin.robots.tracy.TracyCamera`), so a filmed run is
-        seen the way Tracy itself sees it rather than from a generic overview.
+        A camera looking straight down at the board, every piece the layout stands, and
+        the robot's own base, so a filmed run shows the whole task area -- including
+        the reach in and out of it -- rather than only the tabletop the pieces start
+        and end up on.
 
-        Computed once, from where the sensor stands and looks at the moment the scene
-        is built, and attached to the world's own root rather than tracking the live
-        sensor body -- like :meth:`SceneRecording._camera_watching_the_scene`'s own
-        overview camera, for the same reason: Tracy is bolted to the scene and its
-        camera never moves, so a fixed world-frame pose is exactly as accurate as
-        tracking the live body would be, without needing MuJoCo to keep resolving it
-        every frame, and a cut between two takes must not also move the camera.
+        Tracy's own mounted camera (:class:`~semantic_digital_twin.robots.tracy.
+        TracyCamera`) was tried first and discarded: its real aim is calibrated for
+        wherever a table sits on the physical robot, not for the height :class:`~experi
+        ments.tracy_experiments.montessori.world.TracyMontessoriWorldBuilder` mounts
+        this board at, so every frame it filmed was a close-up of whatever arm happened
+        to be in its level sightline -- the board itself was never in frame at all. A
+        first cut of this camera fixed that but framed only the board and the pieces'
+        own starting positions, tightly enough that the arm reaching in from the
+        robot's own base -- well outside that footprint -- was never in frame either;
+        including the base as a third reference point is what actually keeps the reach
+        itself in shot.
+
+        Computed once, from where the board, the pieces and the robot stand at the
+        moment the scene is built, and attached to the world's own root -- like
+        :meth:`SceneRecording._camera_watching_the_scene`'s own overview camera, for
+        the same reason: a cut between two takes must not also move the camera, and
+        none of the three moves before the first take begins.
 
         :param montessori: The freshly built scene.
         """
-        [sensor] = [
-            sensor for sensor in montessori.robot.sensors if sensor.default_camera
-        ]
-        root_T_sensor = sensor.root.global_transform
-        position = root_T_sensor.to_position()
-        looking_at = (
-            position + root_T_sensor.to_rotation_matrix() @ sensor.forward_facing_axis
+        scene = SortingScene(montessori.world)
+        positions = [
+            montessori.board.root.global_transform.to_position(),
+            montessori.robot.root.global_transform.to_position(),
+        ] + [scene.position_of(category) for category in scene.categories]
+        xs = [float(position.x) for position in positions]
+        ys = [float(position.y) for position in positions]
+        lowest_z = min(float(position.z) for position in positions)
+        center_x = (min(xs) + max(xs)) / 2
+        center_y = (min(ys) + max(ys)) / 2
+        horizontal_extent = max(
+            max(xs) - min(xs), max(ys) - min(ys), MINIMUM_TOP_DOWN_EXTENT
         )
+        height_above = horizontal_extent * TOP_DOWN_DISTANCE_FACTOR
+        looking_at = Point3(center_x, center_y, lowest_z)
+        camera_position = Point3(center_x, center_y, lowest_z + height_above)
         pose = HomogeneousTransformationMatrix.from_point_rotation_matrix(
-            position, MujocoCamera._look_at_rotation(position, looking_at)
+            camera_position,
+            MujocoCamera._look_at_rotation(camera_position, looking_at),
         )
         # MuJoCo writes the scalar of a quaternion first, and Quaternion.to_np last.
         quaternion = pose.to_quaternion().to_np().tolist()
         camera = MujocoCamera(
-            name=TRACY_CAMERA_NAME,
+            name=TOP_DOWN_CAMERA_NAME,
             body=montessori.world.root,
             position=pose.to_position().to_np()[:3].tolist(),
             quaternion=[quaternion[3]] + quaternion[:3],
-            fovy=math.degrees(sensor.field_of_view.vertical_angle),
             resolution=[float(VIDEO_RESOLUTION.width), float(VIDEO_RESOLUTION.height)],
         )
         # A camera only ends up in the compiled MuJoCo model if it is registered on a
