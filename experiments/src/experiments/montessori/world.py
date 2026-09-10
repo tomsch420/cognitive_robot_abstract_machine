@@ -75,6 +75,10 @@ from semantic_digital_twin.world_description.shape_collection import (
     BoundingBoxCollection,
     ShapeCollection,
 )
+from semantic_digital_twin.world_description.inertial_properties import (
+    Inertial,
+    InertiaTensor,
+)
 from semantic_digital_twin.world_description.world_entity import Body, Region
 
 NAME_PREFIX = "montessori"
@@ -715,6 +719,35 @@ def _landing_region(name: PrefixedName, open_space: VolumetricBoundingBox) -> Re
     return Region(name=name, area=ShapeCollection([Box(scale=open_space.scale)]))
 
 
+LOOSE_PIECE_MASS = 0.03
+"""
+Mass, in kilograms, given to every loose Montessori piece's own :class:`Inertial`.
+
+Confirmed directly as the root cause of a grip that held a piece rock-steady at rest but
+lost it the instant the next reach put it under any acceleration, however much squeeze
+force, gripper servo torque, or contact stiffness the fingers were given: every loose
+piece silently fell back on :class:`Inertial`'s own dataclass default of ``1.0`` kg,
+never overridden here or anywhere else these bodies are built. For a piece a few
+centimetres across, ``1.0`` kg means a density on the order of tens of thousands of
+kg/m^3 -- denser than lead, closer to the densest metals that exist -- so no grip tuned
+for a real object this size could ever have held one this heavy while accelerating.
+``0.03`` kg (30g) matches a real wood or plastic Montessori piece this size at ordinary
+material density (roughly 600-1200 kg/m^3 over a few cm^3).
+"""
+
+LOOSE_PIECE_INERTIA = InertiaTensor.from_values(1e-5, 1e-5, 1e-5, 0.0, 0.0, 0.0)
+"""
+Diagonal inertia tensor, in kg*m^2, given to every loose Montessori piece alongside
+:data:`LOOSE_PIECE_MASS` -- otherwise :class:`Inertial`'s own default (``1.0`` kg*m^2 on
+each axis) would leave a 30g piece rotationally as sluggish as a much larger, heavier
+body, right after fixing the same problem for translation. ``1e-5`` matches the order of
+magnitude of a solid ~3cm cube's own moment of inertia at :data:`LOOSE_PIECE_MASS`
+(``(1/6) * m * side^2``); every category here is close enough in both size and mass that
+one shared value is a reasonable approximation for all of them, rather than computing
+each shape's own exactly.
+"""
+
+
 def _shape_body(
     name: PrefixedName,
     category: MontessoriShapeCategory,
@@ -723,6 +756,11 @@ def _shape_body(
     """
     Build the :class:`Body` of a loose Montessori shape, its geometry depending on its
     category.
+
+    Given a real, small-object mass and inertia (see :data:`LOOSE_PIECE_MASS`) rather
+    than leaving :class:`Inertial`'s own default -- sized for something roughly a metre
+    across and dense as the heaviest metals, not a piece that fits in a hand -- in
+    place.
 
     :param name: Name of the resulting body.
     :param category: The geometric shape it is.
@@ -734,12 +772,15 @@ def _shape_body(
     """
     color = _SHAPE_COLORS[category]
     if category is MontessoriShapeCategory.DISK:
-        return _body_with_shape(name, Cylinder(width=0.044, height=0.004, color=color))
-    if category is MontessoriShapeCategory.SPHERE:
-        return _body_with_shape(name, Sphere(radius=0.02, color=color))
-    return _body_with_shape(
-        name, _measured_piece_mesh(footprint, KNOWN_PIECE_BY_CATEGORY[category])
-    )
+        body = _body_with_shape(name, Cylinder(width=0.044, height=0.004, color=color))
+    elif category is MontessoriShapeCategory.SPHERE:
+        body = _body_with_shape(name, Sphere(radius=0.02, color=color))
+    else:
+        body = _body_with_shape(
+            name, _measured_piece_mesh(footprint, KNOWN_PIECE_BY_CATEGORY[category])
+        )
+    body.inertial = Inertial(mass=LOOSE_PIECE_MASS, inertia=LOOSE_PIECE_INERTIA)
+    return body
 
 
 def robot_installed(robot_class: Type[AbstractRobot]) -> bool:

@@ -154,11 +154,22 @@ close enough
 to reuse this directly.
 """
 
-GRIPPER_JOINT_SERVO = ServoGains(100.0, 10.0, 10.0, 0.0, 0.05)
+GRIPPER_JOINT_SERVO = ServoGains(600.0, 30.0, 60.0, 0.0, 0.05)
 """
 Tuning for a Robotiq-85 knuckle joint; no MuJoCo Menagerie or otherwise pre-tuned
-reference exists for this gripper. Matches the cube-stacking demo's own, empirically
-raised value.
+reference exists for this gripper. Started from the cube-stacking demo's own,
+empirically raised value, then raised twice more here (first 3x, then another 2x on
+torque limit and stiffness): confirmed directly by comparing the knuckle's own commanded
+vs. measured angle mid-squeeze (not just whether the piece got picked up), the knuckle
+closes quickly right up until first fingertip contact, then visibly plateaus -- closing
+speed drops off sharply and the remaining gap to the commanded squeeze target stops
+shrinking well before the trajectory's own waypoints run out, the textbook signature of
+the actuator's own torque limit capping how hard it can press into the object's contact
+reaction force, not of insufficient closing time. The piece still never left the table
+at the first (3x) level either. See :data:`~experiments.tracy_experiments.
+trajectory_planning.SQUEEZE_MARGIN` and :data:`~experiments.tracy_experiments.
+trajectory_planning.POST_CONTACT_SQUEEZE_TICKS` for the other half of this fix -- a
+firmer servo alone still needs real squeeze force commanded for it to hold against.
 """
 
 GRIPPER_JOINT_VELOCITY_LIMIT = 1.0

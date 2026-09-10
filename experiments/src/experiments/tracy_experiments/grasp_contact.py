@@ -60,23 +60,36 @@ prior friction experiment). Torsional and rolling use MuJoCo's own defaults rath
 pinched between fingers.
 """
 
-GRASP_SOLVER_REFERENCE = [0.008, 1.0]
+GRASP_SOLVER_REFERENCE = [0.005, 1.0]
 """
 Contact solver reference (see
 :attr:`~semantic_digital_twin.adapters.multi_sim.MujocoGeom.solver_reference`) given to
-every loose shape, matching ``coraplex_panda_demo``'s cube (``solref="0.008"``).
+every loose shape, started from ``coraplex_panda_demo``'s cube (``solref="0.008"``) and
+tightened a further step from there.
 
 Stiffer than MuJoCo's own default (``0.02``): a soft contact lets a pinched shape sink
 into the fingers and then slip back out as the arm lifts, rather than being held solidly
-between them.
+between them. Confirmed directly on the montessori board: even at ``0.008`` a grasped
+piece's own height never left the table across several full episodes -- squeeze force
+and squeeze duration both measurably increased first (see :data:`~experiments.
+tracy_experiments.trajectory_planning.SQUEEZE_MARGIN`/:data:`~experiments.
+tracy_experiments.trajectory_planning.POST_CONTACT_SQUEEZE_TICKS` and :data:`~experi
+ments.tracy_experiments.equipment.GRIPPER_JOINT_SERVO`) without changing that outcome,
+narrowing this down as the next thing actually worth moving. Kept to a single, modest
+step (``0.008`` to ``0.005``, not lower) rather than a larger jump: an earlier,
+unrelated over-tuning of :data:`GRASP_FRICTION` in this same file drove physics-blowup
+runs from 10% to 39% of a 90-run batch, so a stiffness change here is deliberately
+conservative and worth re-checking for the same failure mode before going further.
 """
 
-GRASP_SOLVER_IMPEDANCE = [0.96, 0.99, 0.001, 0.5, 2.0]
+GRASP_SOLVER_IMPEDANCE = [0.98, 0.99, 0.001, 0.5, 2.0]
 """
 Contact solver impedance (see
 :attr:`~semantic_digital_twin.adapters.multi_sim.MujocoGeom.solver_impedance`) given to
-every loose shape, matching ``coraplex_panda_demo``'s cube (``solimp="0.96 0.99"``, the
-remaining three values MuJoCo's own defaults).
+every loose shape, started from ``coraplex_panda_demo``'s cube (``solimp="0.96 0.99"``)
+and raised the lower bound one modest step further -- see :data:`GRASP_SOLVER_REFERENCE`
+for why and how far this was pushed, and its own note on staying conservative. The
+remaining three values keep MuJoCo's own defaults.
 
 Harder than MuJoCo's own default (``0.9 0.95``), for the same reason as
 :data:`GRASP_SOLVER_REFERENCE`.

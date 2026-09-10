@@ -102,6 +102,7 @@ from semantic_digital_twin.world_description.geometry import (
     Scale,
 )
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
+from semantic_digital_twin.world_description.inertial_properties import Inertial
 from semantic_digital_twin.world_description.world_entity import Body, Region
 
 BOARD_POSITION_TRACY = Point3(0.85, 0.0, 0.0)
@@ -262,7 +263,19 @@ def _measured_shape_body(name: PrefixedName, category: MontessoriShapeCategory) 
             solid = extrude_polygon(boundary, TRIANGULAR_PRISM_HEIGHT)
             shape = Mesh.from_trimesh(mesh=solid)
             shape.color = color
-    return _body_with_shape(name, shape)
+    body = _body_with_shape(name, shape)
+    # Matches experiments.montessori.world._shape_body's own fix, needed here too since
+    # this function builds its own Body independently rather than reusing that one --
+    # see LOOSE_PIECE_MASS's own docstring there for why: every loose piece otherwise
+    # silently falls back on Inertial's 1.0 kg dataclass default, which for a piece a
+    # few centimetres across is denser than lead -- confirmed directly as the reason a
+    # grip that held rock-steady at rest lost the piece the instant the very next reach
+    # put it under any acceleration, no matter how much squeeze force, gripper servo
+    # torque, or contact stiffness the fingers were given.
+    from experiments.montessori.world import LOOSE_PIECE_INERTIA, LOOSE_PIECE_MASS
+
+    body.inertial = Inertial(mass=LOOSE_PIECE_MASS, inertia=LOOSE_PIECE_INERTIA)
+    return body
 
 
 @dataclass(eq=False)

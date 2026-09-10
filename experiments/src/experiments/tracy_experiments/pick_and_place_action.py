@@ -79,7 +79,7 @@ Height, in metres, above ``target_location`` a body is released at, rather than
 descending onto it exactly.
 """
 
-GRASP_CLOSE_SWING_CLEARANCE = 0.0435
+GRASP_CLOSE_SWING_CLEARANCE = 0.015
 """
 Extra height, in metres, added on top of the object's own vertical centre when reaching
 the grasp pose, so the fingertip pads still clear the resting surface after closing.
@@ -90,6 +90,19 @@ directly: pad centre sits at 0.1208m from the gripper mount when open, 0.1343m w
 closed) -- confirmed directly, a pad that clears the table by that same ~1.35cm while
 open ends up flush with the table once closed. ``0.015`` covers that swing with a small
 margin.
+
+Was ``0.0435`` -- nearly 3x this docstring's own derived value -- confirmed directly as
+a real bug, not an intentional deviation: for a piece a few centimetres tall (e.g. a
+3cm cube, so 1.5cm half-height), reaching 4.35cm above its own centre put the grasp
+target *above the piece's own top face entirely*, closing the fingers on whatever sliver
+of the piece's upper edge they happened to catch rather than pinching it securely around
+its middle. That grip held the piece rock-steady the instant it stopped closing --
+gravity alone does not need much from a marginal top-edge pinch -- but let it slip free
+as soon as the very next reach put it under any acceleration at all, regardless of how
+much squeeze force, gripper servo torque, or contact stiffness the fingers were given
+(all already tried; see :data:`~experiments.tracy_experiments.equipment.
+GRIPPER_JOINT_SERVO`'s own docstring and :data:`SQUEEZE_MARGIN`'s), because none of
+those make a bad pinch point good.
 """
 
 def _bounding_box_center_world(world: World, body: Body) -> numpy.ndarray:

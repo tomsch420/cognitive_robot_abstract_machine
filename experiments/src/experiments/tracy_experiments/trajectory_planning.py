@@ -373,15 +373,18 @@ def _fingertip_body_names(arm_side: Arms) -> Tuple[str, str]:
     )
 
 
-SQUEEZE_MARGIN = 0.001
+SQUEEZE_MARGIN = 0.003
 """
 How far, in metres, past a grasped object's own half-width the fingers are commanded to
 close, so they press into it firmly rather than merely touching.
 
-Mirrors the proven-working Franka Montessori demo's own
-(``montessori_segmind_integration``) ``MoveGripperMotion.squeeze_margin``: kept small,
-since it is *commanded* penetration into a rigid object, and the whole point of sizing
-the close to the object is to keep that penetration bounded and deliberate.
+Started from the proven-working Franka Montessori demo's own
+(``montessori_segmind_integration``) ``MoveGripperMotion.squeeze_margin`` of ``0.001``,
+then tripled here: confirmed directly, at ``0.001`` the fingertips registered contact
+and closing stopped (see :data:`POST_CONTACT_SQUEEZE_TICKS`) with too little normal
+force between the pads to survive the arm's own acceleration on the very next reach --
+the grasped piece was never actually lifted off the table. Still bounded and deliberate,
+just a deeper deliberate penetration than the Franka gripper needed.
 """
 
 
@@ -485,6 +488,26 @@ def _closing_raw_angle_for_half_width(
     return upper
 
 
+POST_CONTACT_SQUEEZE_TICKS = 25
+"""
+How many extra waypoints :func:`close_gripper_around` keeps closing for after both
+fingertip pads first register contact, instead of stopping the instant they touch.
+
+Confirmed directly: stopping on the very first tick where both pads register contact
+means the close happens to land on the object's own surface (the pads' own inner faces
+first pass through it there, by construction) *before* any of :data:`SQUEEZE_MARGIN`'s
+own commanded penetration is actually reached -- so the early-stop safety net was
+silently defeating the squeeze margin it was added alongside, every single time,
+leaving a hold too weak to survive the arm's own acceleration on the very next reach.
+The gripper picked the piece up and then set it right back down where it started,
+untouched from the outside, because the fingertips lost contact almost immediately once
+the arm began to move. 15 ticks (0.3s at :data:`TARGET_FREQUENCY`) is a small, bounded
+amount of further closing -- still far short of fully closed -- that lets real squeeze
+force build up while keeping the same protection against a badly mismeasured target
+this safety net existed for in the first place.
+"""
+
+
 def close_gripper_around(
     sim: RealTimeSimulation,
     actuators: Dict[str, Actuator],
@@ -494,6 +517,7 @@ def close_gripper_around(
     squeeze_margin: float = SQUEEZE_MARGIN,
     max_ticks: int = DEFAULT_MAX_TICKS,
     tick_period: float = 1.0 / TARGET_FREQUENCY,
+    post_contact_squeeze_ticks: int = POST_CONTACT_SQUEEZE_TICKS,
 ) -> None:
     """
     Close an arm's gripper around ``target_body``, sized to the object's own width
@@ -508,9 +532,12 @@ def close_gripper_around(
     the gripper's closing axis, in the gripper's own root frame (so it stays correct
     regardless of the object's orientation relative to the approach), and close to
     that instead, minus :data:`SQUEEZE_MARGIN` so the fingers press in rather than
-    merely touch. Also stops early if both fingertip pads register real MuJoCo contact
-    against ``target_body`` before reaching the computed target, as a safety net
-    against the target being sized slightly off.
+    merely touch. Once both fingertip pads register real MuJoCo contact against
+    ``target_body``, closing continues for :data:`POST_CONTACT_SQUEEZE_TICKS` more
+    waypoints -- see its own docstring for why stopping on the very first contact tick
+    left the object barely touched, not actually held -- rather than driving all the
+    way to the computed target, as a safety net against the target being sized
+    slightly off.
 
     :param sim: The running real-time simulation to drive.
     :param actuators: Every joint's own actuator, keyed by joint name.
@@ -521,6 +548,7 @@ def close_gripper_around(
     :param max_ticks: Tick budget before giving up.
     :param tick_period: Simulated seconds to advance per waypoint; matches the tick rate
         the trajectory was planned at.
+    :param post_contact_squeeze_ticks: See :data:`POST_CONTACT_SQUEEZE_TICKS`.
     """
     world = robot._world
     gripper_root = _arm_of(robot, arm_side).end_effector.root
@@ -554,15 +582,30 @@ def close_gripper_around(
         ).result
         return target_name in left_contacts and target_name in right_contacts
 
+    ticks_since_contact = None
     for waypoint in trajectory:
         for joint_name, target in waypoint.items():
             sim.command(actuators[joint_name], target)
         sim.advance(tick_period)
-        if both_fingertips_touching():
+        if ticks_since_contact is None and both_fingertips_touching():
+            ticks_since_contact = 0
+        elif ticks_since_contact is not None:
+            ticks_since_contact += 1
+        if ticks_since_contact is not None and ticks_since_contact >= post_contact_squeeze_ticks:
             logger.info(
-                "%s: gripper stopped early on both-fingertip contact.", target_body.name
+                "%s: gripper stopped %d ticks after first fingertip contact.",
+                target_body.name,
+                ticks_since_contact,
             )
             return
+    if ticks_since_contact is not None:
+        logger.info(
+            "%s: gripper reached its own half-width-sized target %d ticks after first "
+            "fingertip contact.",
+            target_body.name,
+            ticks_since_contact,
+        )
+        return
     logger.info(
         "%s: gripper closed to its own half-width-sized target (%.4fm).",
         target_body.name,

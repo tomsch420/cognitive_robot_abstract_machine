@@ -2077,7 +2077,9 @@ def _equip_tracy_for_mujoco_manipulation(
     )
     from experiments.tracy_experiments.grasp_contact import (
         BOARD_FRICTION,
+        GRASP_FRICTION,
         apply_contact_friction,
+        apply_grasp_contact_parameters,
         apply_montessori_grasp_contact_parameters,
     )
     from semantic_digital_twin.datastructures.definitions import (
@@ -2090,6 +2092,34 @@ def _equip_tracy_for_mujoco_manipulation(
         world.get_semantic_annotations_by_type(MontessoriShape)
     )
     apply_contact_friction([montessori.board.root], BOARD_FRICTION)
+    # The fingertip pads themselves were left at MuJoCo's own default solver reference
+    # and impedance -- confirmed directly, still [0.02, 1.0]/[0.9, 0.95, ...] even after
+    # apply_montessori_grasp_contact_parameters stiffened the *piece's* own side of the
+    # contact. MuJoCo mixes each pair's own solref/solimp between the two contacting
+    # geoms, so a grasped piece's stiffened side alone was only ever half of what the
+    # finger-piece contact actually ran with -- the softer fingertip default pulled the
+    # effective stiffness back down. A piece held this way sat rock-steady the instant
+    # the fingers stopped closing (confirmed directly: ten physics ticks of the arm
+    # sitting still, held position to sub-millimetre precision) but separated from the
+    # gripper as soon as the very next reach put it under any acceleration at all --
+    # consistent with a contact softer than intended, not with too little squeeze force
+    # (already tried, see GRIPPER_JOINT_SERVO's own docstring). Giving both fingertip
+    # pads of both arms the same stiffening the piece already gets closes that gap from
+    # the other side.
+    # Sliding friction stays at MuJoCo's own default (1.0, already higher than
+    # GRASP_FRICTION's own 0.3 and dominant either way under the sliding component's
+    # own element-wise-maximum combining rule -- passing GRASP_FRICTION here instead
+    # would silently *lower* it to 0.3, undoing rather than helping the grip); only
+    # torsional and rolling friction are raised to GRASP_FRICTION's own grip-stabilizing
+    # values, matching how BOARD_FRICTION already treats a fixed sliding component as
+    # separate from this pair's own torsional/rolling multiples.
+    fingertip_friction = [1.0, GRASP_FRICTION[1], GRASP_FRICTION[2]]
+    for prefix in ("left_", "right_"):
+        fingertip_bodies = [
+            world.get_body_by_name(f"{prefix}robotiq_85_left_finger_tip_link"),
+            world.get_body_by_name(f"{prefix}robotiq_85_right_finger_tip_link"),
+        ]
+        apply_grasp_contact_parameters(fingertip_bodies, fingertip_friction)
     apply_gravity_compensation(world, robot)
     exclude_self_collision(world, robot)
     for arm in robot.get_arms():
