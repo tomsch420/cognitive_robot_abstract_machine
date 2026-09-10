@@ -303,23 +303,31 @@ class AddDegreeOfFreedomModification(WorldModificationWithWorldEntityReference):
 
 @dataclass
 class RemoveDegreeOfFreedomModification(WorldModification):
-
-    degree_of_freedom_id: UUID
-
-    degree_of_freedom: Optional[DegreeOfFreedom] = field(default=None, repr=False)
     """
-    The degree of freedom that was removed, kept so this modification can be reverted.
+    Removal of a degree of freedom from the world.
+    """
+
+    degree_of_freedom: DegreeOfFreedom
+    """
+    The degree of freedom that was removed, kept so this modification can be applied
+    and reverted.
+
+    Deliberately not also kept as a separate ``degree_of_freedom_id`` field the way
+    :class:`RemoveKinematicStructureEntityModification`/:class:`RemoveConnectionModification`
+    keep theirs: a field named exactly ``degree_of_freedom_id`` collides with the
+    foreign-key column ORMatic generates for this very field (also named
+    ``degree_of_freedom_id``), and the second definition silently shadows the first in
+    the generated mapping -- so a recorded removal could never be read back. Applying
+    directly through the kept object, like :class:`AddDegreeOfFreedomModification`
+    already does, needs no id lookup and so avoids the collision entirely.
     """
 
     @classmethod
     def from_kwargs(cls, kwargs: Dict[str, Any]):
-        dof = kwargs["dof"]
-        return cls(degree_of_freedom_id=dof.id, degree_of_freedom=dof)
+        return cls(degree_of_freedom=kwargs["dof"])
 
     def apply(self, world: World):
-        world.remove_degree_of_freedom(
-            world.get_degree_of_freedom_by_id(self.degree_of_freedom_id)
-        )
+        world.remove_degree_of_freedom(self.degree_of_freedom)
 
     def revert(self, world: World):
         world.add_degree_of_freedom(self.degree_of_freedom)
@@ -454,20 +462,27 @@ class AddActuatorModification(WorldModificationWithWorldEntityReference):
 
 @dataclass
 class RemoveActuatorModification(WorldModification):
-    actuator_id: UUID
-
-    actuator: Optional[Actuator] = field(default=None, repr=False)
     """
-    The actuator that was removed, kept so this modification can be reverted.
+    Removal of an actuator from the world.
+    """
+
+    actuator: Actuator
+    """
+    The actuator that was removed, kept so this modification can be applied and
+    reverted.
+
+    Deliberately not also kept as a separate ``actuator_id`` field -- see
+    :attr:`RemoveDegreeOfFreedomModification.degree_of_freedom`'s own docstring for why
+    a field named exactly like the foreign key ORMatic would generate for it breaks the
+    generated mapping.
     """
 
     @classmethod
     def from_kwargs(cls, kwargs: Dict[str, Any]):
-        actuator = kwargs["actuator"]
-        return cls(actuator_id=actuator.id, actuator=actuator)
+        return cls(actuator=kwargs["actuator"])
 
     def apply(self, world: World):
-        world.remove_actuator(world.get_actuator_by_id(self.actuator_id))
+        world.remove_actuator(self.actuator)
 
     def revert(self, world: World):
         world.add_actuator(self.actuator)
