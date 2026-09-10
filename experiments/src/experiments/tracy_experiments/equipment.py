@@ -107,28 +107,50 @@ identically to every joint regardless of size; only torque limit and the joint's
 passive damping are given separately per size class there.
 """
 
+_LARGE_JOINT_TORQUE_HEADROOM = 3.0
+"""
+Multiplier applied to the shoulder and elbow joints' own real UR10e torque limit below.
+
+Confirmed directly (montessori corpus generation, board-mounted left-arm reach): with
+the real UR10e limit, several of ``TracySortsAPiece``'s own Cartesian reaches never
+settle within a practical timeout -- the joint-space error shrinks steadily and never
+oscillates or plateaus, the signature of the servo being torque-saturated rather than
+under- or over-damped, not of the target being physically blocked (no contact is ever
+registered at the moment a reach gives up). Tripling headroom on the joints that carry
+the most of the arm's own weight (see the size comments below) measurably speeds
+convergence without touching stiffness or damping. This does depart from the real,
+hardware-sourced value the rest of this tuning is otherwise faithful to -- deliberately:
+nothing here drives the physical robot, only MuJoCo's own simulated servo, so there is
+no real actuator whose limit this could misrepresent.
+"""
+
 ARM_JOINT_SERVO: Dict[str, ServoGains] = {
     # "size4" in ur10e.xml: the two shoulder joints, which carry the whole rest of the
     # arm's weight and so need the most torque and the most passive damping to settle
     # without ringing.
     "shoulder_pan_joint": ServoGains(
-        _STIFFNESS, _ACTUATOR_DAMPING, 330.0, 10.0, _ARMATURE
+        _STIFFNESS, _ACTUATOR_DAMPING, 330.0 * _LARGE_JOINT_TORQUE_HEADROOM, 10.0, _ARMATURE
     ),
     "shoulder_lift_joint": ServoGains(
-        _STIFFNESS, _ACTUATOR_DAMPING, 330.0, 10.0, _ARMATURE
+        _STIFFNESS, _ACTUATOR_DAMPING, 330.0 * _LARGE_JOINT_TORQUE_HEADROOM, 10.0, _ARMATURE
     ),
     # "size3" in ur10e.xml: the elbow.
-    "elbow_joint": ServoGains(_STIFFNESS, _ACTUATOR_DAMPING, 150.0, 5.0, _ARMATURE),
+    "elbow_joint": ServoGains(
+        _STIFFNESS, _ACTUATOR_DAMPING, 150.0 * _LARGE_JOINT_TORQUE_HEADROOM, 5.0, _ARMATURE
+    ),
     # "size2" in ur10e.xml: the three wrist joints, which carry only the gripper and so
-    # need much less of either.
+    # need much less of either -- and were never observed torque-saturated, so keep the
+    # real UR10e limit.
     "wrist_1_joint": ServoGains(_STIFFNESS, _ACTUATOR_DAMPING, 56.0, 2.0, _ARMATURE),
     "wrist_2_joint": ServoGains(_STIFFNESS, _ACTUATOR_DAMPING, 56.0, 2.0, _ARMATURE),
     "wrist_3_joint": ServoGains(_STIFFNESS, _ACTUATOR_DAMPING, 56.0, 2.0, _ARMATURE),
 }
 """
-Real, per-joint-size UR10e gains and torque limits, taken as-is from MuJoCo Menagerie's
-own ``universal_robots_ur10e/ur10e.xml``, keyed by joint name with Tracy's own
-``left_``/``right_`` prefix stripped. Tracy's own UR10 (not UR10e) arms are close enough
+Per-joint-size UR10e gains and torque limits, taken from MuJoCo Menagerie's own
+``universal_robots_ur10e/ur10e.xml`` (with the shoulder/elbow torque limit raised past
+that real value -- see :data:`_LARGE_JOINT_TORQUE_HEADROOM`), keyed by joint name with
+Tracy's own ``left_``/``right_`` prefix stripped. Tracy's own UR10 (not UR10e) arms are
+close enough
 to reuse this directly.
 """
 

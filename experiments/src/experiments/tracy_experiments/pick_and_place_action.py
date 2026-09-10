@@ -169,6 +169,24 @@ def _top_down_pose_builder(world: World, robot: Tracy, arm: Arms):
     return pose
 
 
+MAX_REACH_ATTEMPTS = 3
+"""
+How many times :func:`_reach` re-plans and re-drives towards the same ``goal_pose``
+before giving up.
+
+Confirmed directly: a reach that misses :func:`~experiments.tracy_experiments.
+trajectory_planning.follow_joint_trajectory`'s own settle check does so with an error
+that has been shrinking the whole window, never oscillating or plateauing -- the
+signature of a servo that is still converging, not one that is stuck. Re-planning from
+wherever the arm actually ended up (rather than giving up after one settle window)
+lets a second, shorter trajectory close most of what remains; most misses settle by the
+second or third attempt. This does not replace a genuine fix for why the first attempt
+is so often short in the first place (see :data:`~experiments.tracy_experiments.
+equipment._LARGE_JOINT_TORQUE_HEADROOM`); it is a cheap, bounded safety net on top of
+that, not a substitute for it.
+"""
+
+
 def _reach(
     world: World,
     sim: RealTimeSimulation,
@@ -178,7 +196,10 @@ def _reach(
 ) -> None:
     """
     Plan a Cartesian reach against an isolated scratch copy of ``world`` and play it
-    back on the real, physically simulated ``sim``.
+    back on the real, physically simulated ``sim``, retrying up to
+    :data:`MAX_REACH_ATTEMPTS` times against the same ``goal_pose`` if the servo has not
+    settled by the end of a leg -- see :data:`MAX_REACH_ATTEMPTS`'s own docstring for
+    why a retry (rather than accepting wherever the first attempt left off) is worth it.
 
     Collision avoidance is off: a much more crowded scene than an open table (e.g. the
     Montessori board plus its three drawers) can make Giskard's own collision-avoidance
@@ -195,10 +216,38 @@ def _reach(
     :param arm: Which arm's tool centre point should reach ``goal_pose``.
     :param goal_pose: Target pose for the gripper's own finger midpoint.
     """
-    trajectory = plan_cartesian_trajectory(
-        world, arm, goal_pose, translation_only=False, avoid_collisions=False
+    for attempt in range(MAX_REACH_ATTEMPTS):
+        trajectory = plan_cartesian_trajectory(
+            world, arm, goal_pose, translation_only=False, avoid_collisions=False
+        )
+        follow_joint_trajectory(sim, actuators, trajectory)
+        if _has_settled(sim, trajectory[-1]):
+            return
+
+
+def _has_settled(
+    sim: RealTimeSimulation,
+    targets: Dict[str, float],
+    convergence_threshold: float = 0.01,
+) -> bool:
+    """
+    Whether every joint named in ``targets`` currently sits within
+    ``convergence_threshold`` radians of its own target, read straight off the real,
+    physically simulated joint values -- the same check
+    :func:`~experiments.tracy_experiments.trajectory_planning.follow_joint_trajectory`
+    itself makes at the end of its own settle window, reused here so :func:`_reach` can
+    tell a leg that only just missed it from one still far off.
+
+    :param sim: The running real-time simulation to read joint values from.
+    :param targets: Target position by joint name, e.g. a trajectory's own last waypoint.
+    :param convergence_threshold: Maximum per-joint error, in radians, to count as
+        settled; matches ``follow_joint_trajectory``'s own default.
+    """
+    return all(
+        abs(sim.multi_sim.simulator.get_joint_value(joint_name).result - target)
+        < convergence_threshold
+        for joint_name, target in targets.items()
     )
-    follow_joint_trajectory(sim, actuators, trajectory)
 
 
 @dataclass
