@@ -52,6 +52,7 @@ from coraplex.robot_plans.actions.base import ActionDescription
 from dataclasses import dataclass
 from experiments.tracy_experiments.real_time_simulation import RealTimeSimulation
 from experiments.tracy_experiments.trajectory_planning import (
+    SQUEEZE_MARGIN,
     close_gripper_around,
     follow_joint_trajectory,
     plan_cartesian_trajectory,
@@ -370,6 +371,24 @@ class PickUpActionMujoco(ActionDescription):
     See :data:`HOVER_CLEARANCE`.
     """
 
+    squeeze_margin: float = SQUEEZE_MARGIN
+    """
+    How far past the object's own half-width the fingers close, in metres; see
+    :data:`~experiments.tracy_experiments.trajectory_planning.SQUEEZE_MARGIN`.
+
+    A fixed absolute value over-squeezes a piece spawned smaller than
+    :data:`~experiments.montessori.pieces.CUBE_EDGE` et al (e.g. via
+    :attr:`~experiments.tracy_experiments.montessori.world.TracyMontessoriWorld.
+    piece_scale`) -- confirmed directly: the default margin, unscaled, held a
+    0.8-scaled cube firmly enough at rest but let it swing through ~30 degrees of
+    transient tilt in transit (vs. a few degrees at full scale), overshooting the
+    XY correction :func:`~experiments.tracy_experiments.pick_and_place_action.
+    _correct_place_xy` converges against and landing the piece beside its hole
+    (containment 0.125) rather than through it. Scaling this margin down by the
+    same factor as the piece itself restored a clean grip and full insertion
+    (containment 1.0, confirmed directly, repeated).
+    """
+
     @property
     def _action_plan(self) -> PlanNode:
         return code(self._run)
@@ -392,7 +411,12 @@ class PickUpActionMujoco(ActionDescription):
         _reach(world, self.sim, self.actuators, self.arm, pick_hover)
         _reach(world, self.sim, self.actuators, self.arm, pick_grasp)
         close_gripper_around(
-            self.sim, self.actuators, robot, self.arm, self.object_designator
+            self.sim,
+            self.actuators,
+            robot,
+            self.arm,
+            self.object_designator,
+            squeeze_margin=self.squeeze_margin,
         )
         # Recomputed, not reused: the knuckle has just closed, and the finger-pad
         # midpoint's own offset from the tool frame -- baked into pose() -- is measured

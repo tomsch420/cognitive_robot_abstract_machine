@@ -30,6 +30,16 @@ def main(argument_list: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--database-uri", default=None)
     parser.add_argument("--artifact-directory", default=None)
+    parser.add_argument(
+        "--piece-scale",
+        type=float,
+        default=1.0,
+        help=(
+            "Factor applied to the sorted piece's own measured size (the board's "
+            "holes stay full size); mirrors reprinting the physical piece smaller "
+            "than it was originally measured, for more clearance through its hole."
+        ),
+    )
     arguments = parser.parse_args(argument_list)
 
     # Imported here, not at module level: importing the CRAM stack (coraplex, giskardpy,
@@ -79,7 +89,7 @@ def main(argument_list: list[str] | None = None) -> int:
     )
     scenario = TracySortsAPiece(
         layout=layout,
-        world_builder=TracyMontessoriWorldBuilder(),
+        world_builder=TracyMontessoriWorldBuilder(piece_scale=arguments.piece_scale),
         sorted_category=MontessoriShapeCategory.CUBE,
         filmed=True,
         # The production arm (THE_ARM_THAT_SORTS, the right one) does not reliably

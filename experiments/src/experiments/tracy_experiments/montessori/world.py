@@ -230,7 +230,9 @@ def _build_hole_specs_tracy(
     return hole_specs
 
 
-def _measured_shape_body(name: PrefixedName, category: MontessoriShapeCategory) -> Body:
+def _measured_shape_body(
+    name: PrefixedName, category: MontessoriShapeCategory, scale: float = 1.0
+) -> Body:
     """
     Build the :class:`Body` of a loose Montessori shape from this scene's own measured
     physical dimensions, rather than :func:`~experiments.montessori.world._shape_body`'s
@@ -240,27 +242,35 @@ def _measured_shape_body(name: PrefixedName, category: MontessoriShapeCategory) 
         :attr:`~MontessoriShapeCategory.CUBE`, :attr:`~MontessoriShapeCategory.CYLINDER`,
         :attr:`~MontessoriShapeCategory.RECTANGULAR_PRISM`, or
         :attr:`~MontessoriShapeCategory.TRIANGULAR_PRISM`.
+    :param scale: Factor applied to the measured size along every axis, e.g. to spawn
+        pieces reprinted smaller than the board's holes were measured from (mirrors the
+        real-world fix of reprinting the physical pieces at 80% scale for more
+        clearance through their own holes). The holes themselves are cut from the
+        board's own unscaled mesh and stay full size regardless.
     """
     color = _SHAPE_COLORS[category]
     match category:
         case MontessoriShapeCategory.CUBE:
-            shape = Box(scale=Scale(CUBE_EDGE, CUBE_EDGE, CUBE_EDGE), color=color)
+            edge = CUBE_EDGE * scale
+            shape = Box(scale=Scale(edge, edge, edge), color=color)
         case MontessoriShapeCategory.CYLINDER:
             shape = Cylinder(
-                width=CYLINDER_DIAMETER, height=CYLINDER_HEIGHT, color=color
+                width=CYLINDER_DIAMETER * scale,
+                height=CYLINDER_HEIGHT * scale,
+                color=color,
             )
         case MontessoriShapeCategory.RECTANGULAR_PRISM:
             shape = Box(
                 scale=Scale(
-                    RECTANGULAR_PRISM_WIDTH,
-                    RECTANGULAR_PRISM_LENGTH,
-                    RECTANGULAR_PRISM_HEIGHT,
+                    RECTANGULAR_PRISM_WIDTH * scale,
+                    RECTANGULAR_PRISM_LENGTH * scale,
+                    RECTANGULAR_PRISM_HEIGHT * scale,
                 ),
                 color=color,
             )
         case MontessoriShapeCategory.TRIANGULAR_PRISM:
-            boundary = equilateral_triangle_boundary(TRIANGULAR_PRISM_SIDE)
-            solid = extrude_polygon(boundary, TRIANGULAR_PRISM_HEIGHT)
+            boundary = equilateral_triangle_boundary(TRIANGULAR_PRISM_SIDE * scale)
+            solid = extrude_polygon(boundary, TRIANGULAR_PRISM_HEIGHT * scale)
             shape = Mesh.from_trimesh(mesh=solid)
             shape.color = color
     body = _body_with_shape(name, shape)
@@ -293,6 +303,14 @@ class TracyMontessoriWorld(MontessoriWorld):
     :func:`~experiments.tracy_experiments.equipment.tracy_table_mount_position`),
     computed by the caller before constructing this class since Tracy is mounted only
     afterward.
+    """
+
+    piece_scale: float = field(default=1.0, kw_only=True)
+    """
+    Factor applied to every loose shape's measured size along every axis (see
+    :func:`_measured_shape_body`); the board's holes stay full size regardless, so a
+    value below ``1.0`` widens a piece's real clearance through its own hole -- mirrors
+    reprinting the physical pieces smaller than they were originally measured.
     """
 
     _hole_specs: List[_HoleSpec] = field(init=False, default_factory=list)
@@ -402,7 +420,9 @@ class TracyMontessoriWorld(MontessoriWorld):
         ]
         for index, hole_spec in enumerate(spawned_holes):
             shape_key = f"{hole_spec.key}_shape"
-            body = _measured_shape_body(_name(shape_key), hole_spec.category)
+            body = _measured_shape_body(
+                _name(shape_key), hole_spec.category, self.piece_scale
+            )
             shape_class = MONTESSORI_SHAPE_CLASSES[hole_spec.category]
             shape = shape_class(name=_name(shape_key), root=body)
             y = SHAPE_ROW_START_Y + index * SHAPE_ROW_SPACING
@@ -470,6 +490,13 @@ class TracyMontessoriWorldBuilder(MontessoriWorldBuilder):
     ``TRACY_MOUNT_Y``.
     """
 
+    piece_scale: float = 1.0
+    """
+    Factor applied to every loose shape's measured size (see
+    :attr:`TracyMontessoriWorld.piece_scale`); the board's holes stay full size, so a
+    value below ``1.0`` widens a piece's real clearance through its own hole.
+    """
+
     _table_top_z: Optional[float] = field(init=False, default=None, repr=False)
     """
     Height, in the world root frame, Tracy's own table top ended up at once mounted by
@@ -482,7 +509,9 @@ class TracyMontessoriWorldBuilder(MontessoriWorldBuilder):
             tracy_world, x=self.mount_x, y=self.mount_y
         )
         montessori = TracyMontessoriWorld(
-            shapes_are_movable=True, table_top_z=self._table_top_z
+            shapes_are_movable=True,
+            table_top_z=self._table_top_z,
+            piece_scale=self.piece_scale,
         )
         montessori.mount_stationary_robot(
             robot_type, tracy_world, mount_position, mount_yaw=0.0

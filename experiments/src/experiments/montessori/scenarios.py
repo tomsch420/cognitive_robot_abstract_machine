@@ -2196,8 +2196,21 @@ class TracyPickThePieceUp(ScenePhysicsStep):
     :func:`_equip_tracy_for_mujoco_manipulation`).
     """
 
+    squeeze_margin: Optional[float] = None
+    """
+    How far past the piece's own half-width the fingers close, in metres; see
+    :attr:`~experiments.tracy_experiments.pick_and_place_action.PickUpActionMujoco.
+    squeeze_margin`. ``None`` keeps that action's own default (tuned for a full-size
+    piece); a piece spawned smaller (see :attr:`~experiments.tracy_experiments.
+    montessori.world.TracyMontessoriWorld.piece_scale`) needs this scaled down by the
+    same factor, or the fixed default margin over-squeezes it -- see
+    :class:`TracySortsAPiece`'s own :meth:`~TracySortsAPiece.steps` for where that
+    scaling is actually computed.
+    """
+
     def perform(self, world: World) -> None:
         from experiments.tracy_experiments.pick_and_place_action import (
+            SQUEEZE_MARGIN,
             PickUpActionMujoco,
         )
 
@@ -2214,6 +2227,9 @@ class TracyPickThePieceUp(ScenePhysicsStep):
             grasp_description=grasp_description,
             sim=SimulatedSceneMujocoInterface(scene=self.scene),
             actuators=self.actuators,
+            squeeze_margin=(
+                SQUEEZE_MARGIN if self.squeeze_margin is None else self.squeeze_margin
+            ),
         )
         context = Context(world, scene.robot, evaluate_conditions=False)
         sequential([action], context).plan.perform()
@@ -2408,6 +2424,14 @@ class TracySortsAPiece(RobotSortsAPiece[World, Tracy]):
         return camera
 
     def steps(self, world: World) -> Sequence[ScenarioStep[World]]:
+        from experiments.tracy_experiments.pick_and_place_action import SQUEEZE_MARGIN
+
+        # A world_builder without its own piece_scale (e.g. the free-standing
+        # MontessoriWorldBuilder) always spawns full-size pieces, so 1.0 is the right
+        # fallback -- getattr rather than a field here since piece_scale only exists on
+        # TracyMontessoriWorldBuilder, not the base MontessoriWorldBuilder this scenario
+        # is typed against.
+        piece_scale = getattr(self.world_builder, "piece_scale", 1.0)
         return [
             TracyParkBothArms(
                 name=SortingStep.PARK, actuators=self._actuators, scene=self.simulation
@@ -2419,6 +2443,7 @@ class TracySortsAPiece(RobotSortsAPiece[World, Tracy]):
                 arm=self.arm,
                 actuators=self._actuators,
                 scene=self.simulation,
+                squeeze_margin=SQUEEZE_MARGIN * piece_scale,
             ),
             TracyPutThePieceInItsHole(
                 name=SortingStep.PUT_DOWN,
