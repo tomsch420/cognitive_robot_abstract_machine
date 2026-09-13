@@ -3,7 +3,7 @@ from __future__ import annotations
 import itertools
 import math
 import plotly.graph_objects as go
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import (
     TYPE_CHECKING,
     Union,
@@ -76,12 +76,10 @@ class ProbabilisticModel(ABC):
         """
         return self.__class__.__name__
 
-    @property
-    @abstractmethod
-    def variables(self) -> Tuple[Variable, ...]:
-        """
-        :return: The variables of the model.
-        """
+    variables: Tuple[Variable, ...] = field(init=False)
+    """
+    The variables of the model.
+    """
 
     def get_variable_by_name(self, name: str) -> Variable:
         [variable] = [v for v in self.variables if v.name == name]

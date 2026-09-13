@@ -37,10 +37,10 @@ class UnivariateDistribution(ProbabilisticModel):
     """
 
     variable: Variable
+    variables: Tuple[Variable, ...] = field(init=False)
 
-    @property
-    def variables(self) -> Tuple[Variable, ...]:
-        return (self.variable,)
+    def __post_init__(self):
+        self.variables = (self.variable,)
 
     @property
     def support(self) -> Event:

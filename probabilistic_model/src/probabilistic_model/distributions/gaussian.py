@@ -44,10 +44,10 @@ class GaussianDistribution(ContinuousDistribution):
         return reals()
 
     def log_likelihood(self, x: npt.NDArray) -> npt.NDArray:
-        return norm.logpdf(x[:, 0], loc=self.location, scale=self.scale)
+        return norm.logpdf(x[:, 0].astype(float), loc=self.location, scale=self.scale)
 
     def cumulative_distribution_function(self, x: npt.NDArray) -> npt.NDArray:
-        return norm.cdf(x[:, 0], loc=self.location, scale=self.scale)
+        return norm.cdf(x[:, 0].astype(float), loc=self.location, scale=self.scale)
 
     def univariate_log_mode(self) -> Tuple[AbstractCompositeSet, float]:
         return (
