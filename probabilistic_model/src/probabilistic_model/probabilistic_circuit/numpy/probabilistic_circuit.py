@@ -2,7 +2,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import numpy as np
-from krrood.adapters.json_serializer import SubclassJSONSerializer, to_json, from_json
+from krrood.adapters.json_serializer import (
+    SubclassJSONSerializer,
+    to_json,
+    from_json,
+    DataclassJSONSerializer,
+)
 from random_events.variable import Variable
 from sortedcontainers import SortedSet
 from typing_extensions import Tuple, Self, List, Optional, Dict, Any
@@ -10,7 +15,11 @@ import tqdm
 
 from probabilistic_model.probabilistic_circuit.numpy.layer import (
     Layer,
+)
+from probabilistic_model.probabilistic_circuit.numpy.conversion import (
     RustworkxLayerConverter,
+    from_rustworkx,
+    to_rustworkx,
 )
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit as RustworkxProbabilisticCircuit,
@@ -106,23 +115,7 @@ class ProbabilisticCircuit(SubclassJSONSerializer, ProbabilisticModel):
         :param progress_bar: Whether to show a progress bar.
         :return: The layered circuit.
         """
-        # group nodes by depth
-        layer_to_nodes_map = {index: layer for index, layer in enumerate(pc.layers)}
-        reversed_layers_to_nodes_map = dict(reversed(layer_to_nodes_map.items()))
-
-        # create layers from nodes
-        child_layers: List[RustworkxLayerConverter] = []
-        for layer_index, nodes in (
-            tqdm.tqdm(reversed_layers_to_nodes_map.items(), desc="Creating Layers")
-            if progress_bar
-            else reversed_layers_to_nodes_map.items()
-        ):
-            child_layers = Layer.create_layers_from_nodes(
-                nodes, child_layers, progress_bar
-            )
-        root = child_layers[0].layer
-
-        return cls(pc.variables, root)
+        return from_rustworkx(pc, progress_bar)
 
     def to_rustworkx(self, progress_bar: bool = True) -> RustworkxProbabilisticCircuit:
         """
@@ -131,25 +124,11 @@ class ProbabilisticCircuit(SubclassJSONSerializer, ProbabilisticModel):
         :param progress_bar: Whether to show a progress bar.
         :return: The rustworkx graph.
         """
-        if progress_bar:
-            number_of_edges = self.root.number_of_components
-            progress_bar = tqdm.tqdm(total=number_of_edges, desc="Converting to rx")
-        else:
-            progress_bar = None
-        result = RustworkxProbabilisticCircuit()
-        self.root.to_rustworkx(self.variables, result, progress_bar)
-        return result
+        return to_rustworkx(self, progress_bar)
 
-    def to_json(self) -> Dict[str, Any]:
-        result = super().to_json()
-        result["variables"] = [to_json(variable) for variable in self.circuit_variables]
-        result["root"] = self.root.to_json()
-        return result
+    def to_json(self, **kwargs) -> Dict[str, Any]:
+        return DataclassJSONSerializer.to_json(self, **kwargs)
 
     @classmethod
     def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
-        variables = SortedSet(
-            from_json(variable, **kwargs) for variable in data["variables"]
-        )
-        root = Layer.from_json(data["root"], **kwargs)
-        return cls(variables, root)
+        return DataclassJSONSerializer.from_json(data, cls, **kwargs)

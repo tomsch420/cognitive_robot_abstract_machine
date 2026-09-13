@@ -5,10 +5,18 @@ from dataclasses import dataclass
 import numpy as np
 import scipy.stats
 import math
-from typing_extensions import List, Tuple, Optional, Any, Self, Dict, Type
+from typing_extensions import List, Tuple, Optional, Any, Self, Dict, Type, TypeVar, Union
+from krrood.adapters.json_serializer import (
+    SubclassJSONSerializer,
+    DataclassJSONSerializer,
+    to_json,
+    from_json,
+)
 from probabilistic_model.probabilistic_circuit.numpy.layer import (
     Layer,
     InputLayer,
+)
+from probabilistic_model.probabilistic_circuit.numpy.conversion import (
     RustworkxLayerConverter,
 )
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
@@ -35,28 +43,42 @@ from random_events.product_algebra import Event, SimpleEvent
 import tqdm
 
 
-def double_factorial(n):
+def double_factorial(n: int) -> int:
+    """
+    Calculate the double factorial of a non-negative integer n.
+
+    The double factorial is defined as the product of all integers from 1 up to n
+    that have the same parity as n.
+
+    :param n: The integer to calculate the double factorial of.
+    :return: The double factorial of n.
+    """
     if n <= 0:
         return 1
     return math.prod(range(n, 0, -2))
 
 
+T = TypeVar("T")
+
+
 @dataclass
-class ContinuousLayer(InputLayer, ABC):
+class ContinuousLayer(InputLayer[T], ABC):
     """
     Abstract base class for continuous univariate input units.
     """
 
 
 @dataclass
-class ContinuousLayerWithFiniteSupport(ContinuousLayer, ABC):
+class ContinuousLayerWithFiniteSupport(ContinuousLayer[T], ABC):
     """
     Abstract class for continuous univariate input units with finite support.
     """
 
     interval: np.ndarray
     """
-    The interval of the distribution as an array of shape (num_nodes, 2).
+    The interval of the distribution as an array of shape (number_of_nodes, 2).
+    The first column contains the lower bounds, the second column contains the upper
+    bounds. All intervals are assumed to be closed.
     """
 
     @property
@@ -67,14 +89,9 @@ class ContinuousLayerWithFiniteSupport(ContinuousLayer, ABC):
     def upper(self) -> np.ndarray:
         return self.interval[:, 1]
 
-    def to_json(self) -> Dict[str, Any]:
-        result = super().to_json()
-        result["interval"] = self.interval.tolist()
-        return result
-
 
 @dataclass
-class DiscreteLayer(InputLayer):
+class DiscreteLayer(InputLayer[Union[SymbolicDistribution, DiscreteDistribution]]):
     """
     A layer that represents discrete distributions over a single variable.
     """
@@ -83,34 +100,31 @@ class DiscreteLayer(InputLayer):
     """
     The probability for each state of the variable.
 
-    Shape: (num_nodes, num_states)
+    Shape: (number_of_nodes, number_of_states)
     """
 
-    hash_to_index: Optional[Dict[int, int]] = None
+    symbol_hash_to_index: Optional[Dict[int, int]] = None
     """
     Mapping from hash of the symbol to index in the probabilities matrix.
 
-    Only used for symbolic variables.
+    This is mandatory for symbolic variables and optional for integer variables
+    where the values can be used directly as indices.
     """
 
     @property
     def number_of_nodes(self) -> int:
         return self.probabilities.shape[0]
 
-    @classmethod
-    def rustworkx_classes(cls) -> Tuple[Type[Unit], ...]:
-        return (SymbolicDistribution, DiscreteDistribution)
-
     def log_likelihood_of_nodes(self, x: np.ndarray) -> np.ndarray:
-        vals = x[:, self.variable]
-        if self.hash_to_index is not None:
-            indices = np.array([self.hash_to_index[hash(v)] for v in vals])
+        values = x[:, self.variable]
+        if self.symbol_hash_to_index is not None:
+            indices = np.array([self.symbol_hash_to_index[hash(v)] for v in values])
         else:
-            indices = vals.astype(int)
+            indices = values.astype(int)
         # self.probabilities has shape (nodes, states)
         # result[n, j] = log(self.probabilities[j, indices[n]])
         # result shape (N, nodes)
-        probs = self.probabilities[:, indices].T  # (N, nodes)
+        probs = self.probabilities[:, indices].T  # (number_of_samples, number_of_nodes)
         return np.log(probs)
 
     def moment(
@@ -120,15 +134,15 @@ class DiscreteLayer(InputLayer):
         variable_to_index_map: Dict[Variable, int],
     ) -> np.ndarray:
         variable = list(variable_to_index_map.keys())[self.variable]
-        num_vars = len(variable_to_index_map)
-        result = np.zeros((self.number_of_nodes, num_vars))
+        number_of_variables = len(variable_to_index_map)
+        result = np.zeros((self.number_of_nodes, number_of_variables))
 
         if variable in order:
-            o = order[variable]
-            c = center[variable]
+            order_value = order[variable]
+            center_value = center[variable]
             states = np.array([float(s) for s in variable.domain.simple_sets])
             result[:, variable_to_index_map[variable]] = (
-                self.probabilities @ (states - c) ** o
+                self.probabilities @ (states - center_value) ** order_value
             )
         return result
 
@@ -136,17 +150,17 @@ class DiscreteLayer(InputLayer):
         self, indices: np.ndarray, variables: Tuple[Variable, ...]
     ) -> np.ndarray:
         variable = variables[self.variable]
-        num_samples = len(indices)
-        num_vars = len(variables)
-        result = np.empty((num_samples, num_vars), dtype=object)
+        number_of_samples = len(indices)
+        number_of_variables = len(variables)
+        result = np.empty((number_of_samples, number_of_variables), dtype=object)
         domain_list = list(variable.domain.simple_sets)
 
         unique_indices, counts = np.unique(indices, return_counts=True)
-        for idx, count in zip(unique_indices, counts):
-            mask = indices == idx
-            probs = self.probabilities[idx]
-            state_indices = np.random.choice(len(probs), size=count, p=probs)
-            sampled_states = [domain_list[s_idx] for s_idx in state_indices]
+        for index, count in zip(unique_indices, counts):
+            mask = indices == index
+            probabilities = self.probabilities[index]
+            state_indices = np.random.choice(len(probabilities), size=count, p=probabilities)
+            sampled_states = [domain_list[state_index] for state_index in state_indices]
             result[mask, self.variable] = sampled_states
         return result
 
@@ -171,13 +185,13 @@ class DiscreteLayer(InputLayer):
         variable = variables[self.variable]
         result = []
         domain_list = list(variable.domain.simple_sets)
-        for node_probs in self.probabilities:
-            max_prob = np.max(node_probs)
+        for node_probabilities in self.probabilities:
+            max_probability = np.max(node_probabilities)
             mode_states = [
-                domain_list[i] for i, p in enumerate(node_probs) if p == max_prob
+                domain_list[index] for index, probability in enumerate(node_probabilities) if probability == max_probability
             ]
             event = SimpleEvent.from_data({variable: mode_states}).as_composite_set()
-            result.append((event, np.log(max_prob)))
+            result.append((event, np.log(max_probability)))
         return result
 
     def log_truncated(
@@ -289,30 +303,21 @@ class DiscreteLayer(InputLayer):
                 SymbolicDistribution(
                     variable=variable,
                     probabilities={
-                        hash(state): prob
-                        for state, prob in zip(domain_elements, node_probs)
+                        hash(state): probability
+                        for state, probability in zip(domain_elements, node_probabilities)
                     },
                 ),
                 probabilistic_circuit=result,
             )
-            for node_probs in self.probabilities
+            for node_probabilities in self.probabilities
         ]
         if progress_bar:
             progress_bar.update(self.number_of_nodes)
         return units
 
-    def to_json(self) -> Dict[str, Any]:
-        result = super().to_json()
-        result["probabilities"] = self.probabilities.tolist()
-        return result
-
-    @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
-        return cls(data["variable"], np.array(data["probabilities"]))
-
 
 @dataclass
-class GaussianLayer(ContinuousLayer):
+class GaussianLayer(ContinuousLayer[GaussianDistribution]):
     """
     A layer that represents Gaussian distributions over a single variable.
     """
@@ -323,10 +328,6 @@ class GaussianLayer(ContinuousLayer):
     @property
     def number_of_nodes(self) -> int:
         return self.location.shape[0]
-
-    @classmethod
-    def rustworkx_classes(cls) -> Tuple[Type[Unit], ...]:
-        return (GaussianDistribution,)
 
     def log_likelihood_of_nodes(self, x: np.ndarray) -> np.ndarray:
         vals = x[:, self.variable].astype(float)  # (N,)
@@ -341,37 +342,39 @@ class GaussianLayer(ContinuousLayer):
         variable_to_index_map: Dict[Variable, int],
     ) -> np.ndarray:
         variable = list(variable_to_index_map.keys())[self.variable]
-        num_vars = len(variable_to_index_map)
-        result = np.zeros((self.number_of_nodes, num_vars))
+        number_of_variables = len(variable_to_index_map)
+        result = np.zeros((self.number_of_nodes, number_of_variables))
 
         if variable in order:
-            k = order[variable]
-            c = center[variable]
+            k_order = order[variable]
+            center_value = center[variable]
 
-            mu = self.location
-            sigma = self.scale
+            current_locations = self.location
+            current_scales = self.scale
 
-            res = np.zeros_like(mu)
-            for i in range(k + 1):
+            moment_values = np.zeros_like(current_locations)
+            for i in range(k_order + 1):
                 if i % 2 == 0:
-                    term_i = double_factorial(i - 1) * (sigma**i)
+                    current_term = double_factorial(i - 1) * (current_scales**i)
                 else:
-                    term_i = 0
-                comb = math.comb(k, i)
-                res += comb * term_i * ((mu - c) ** (k - i))
+                    current_term = 0
+                combination = math.comb(k_order, i)
+                moment_values += (
+                    combination * current_term * ((current_locations - center_value) ** (k_order - i))
+                )
 
-            result[:, variable_to_index_map[variable]] = res
+            result[:, variable_to_index_map[variable]] = moment_values
         return result
 
     def sample(
         self, indices: np.ndarray, variables: Tuple[Variable, ...]
     ) -> np.ndarray:
-        num_samples = len(indices)
-        num_vars = len(variables)
-        result = np.zeros((num_samples, num_vars))
-        locs = self.location[indices]
+        number_of_samples = len(indices)
+        number_of_variables = len(variables)
+        result = np.zeros((number_of_samples, number_of_variables))
+        locations = self.location[indices]
         scales = self.scale[indices]
-        result[:, self.variable] = np.random.normal(locs, scales)
+        result[:, self.variable] = np.random.normal(locations, scales)
         return result
 
     def support(self, variables: Tuple[Variable, ...]) -> List[Event]:
@@ -483,30 +486,18 @@ class GaussianLayer(ContinuousLayer):
 
         units = [
             UnivariateContinuousLeaf(
-                GaussianDistribution(variable=variable, location=loc, scale=s),
+                GaussianDistribution(variable=variable, location=location, scale=scale),
                 probabilistic_circuit=result,
             )
-            for loc, s in zip(self.location, self.scale)
+            for location, scale in zip(self.location, self.scale)
         ]
         if progress_bar:
             progress_bar.update(self.number_of_nodes)
         return units
 
-    def to_json(self) -> Dict[str, Any]:
-        result = super().to_json()
-        result["location"] = self.location.tolist()
-        result["scale"] = self.scale.tolist()
-        return result
-
-    @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
-        return cls(
-            data["variable"], np.array(data["location"]), np.array(data["scale"])
-        )
-
 
 @dataclass
-class TruncatedGaussianLayer(ContinuousLayerWithFiniteSupport):
+class TruncatedGaussianLayer(ContinuousLayerWithFiniteSupport[TruncatedGaussianDistribution]):
     """
     A layer that represents Truncated Gaussian distributions over a single variable.
     """
@@ -517,10 +508,6 @@ class TruncatedGaussianLayer(ContinuousLayerWithFiniteSupport):
     @property
     def number_of_nodes(self) -> int:
         return self.location.shape[0]
-
-    @classmethod
-    def rustworkx_classes(cls) -> Tuple[Type[Unit], ...]:
-        return (TruncatedGaussianDistribution,)
 
     def log_likelihood_of_nodes(self, x: np.ndarray) -> np.ndarray:
         vals = x[:, self.variable].astype(float)[:, np.newaxis]
@@ -705,17 +692,23 @@ class TruncatedGaussianLayer(ContinuousLayerWithFiniteSupport):
                 f"Creating Truncated Gaussian distributions for {variable.name}"
             )
 
+        from random_events.interval import Bound
+
         units = [
             UnivariateContinuousLeaf(
                 TruncatedGaussianDistribution(
                     variable=variable,
-                    location=loc,
-                    scale=s,
-                    interval=SimpleInterval.from_data(l, u, Bound.CLOSED, Bound.CLOSED),
+                    location=location,
+                    scale=scale,
+                    interval=SimpleInterval.from_data(
+                        lower, upper, Bound.CLOSED, Bound.CLOSED
+                    ),
                 ),
                 probabilistic_circuit=result,
             )
-            for loc, s, (l, u) in zip(self.location, self.scale, self.interval)
+            for location, scale, (lower, upper) in zip(
+                self.location, self.scale, self.interval
+            )
         ]
         if progress_bar:
             progress_bar.update(self.number_of_nodes)
@@ -723,14 +716,10 @@ class TruncatedGaussianLayer(ContinuousLayerWithFiniteSupport):
 
 
 @dataclass
-class UniformLayer(ContinuousLayerWithFiniteSupport):
+class UniformLayer(ContinuousLayerWithFiniteSupport[UniformDistribution]):
     """
     A layer that represents Uniform distributions over a single variable.
     """
-
-    @classmethod
-    def rustworkx_classes(cls) -> Tuple[Type[Unit], ...]:
-        return (UniformDistribution,)
 
     @property
     def number_of_nodes(self) -> int:
@@ -895,13 +884,9 @@ class UniformLayer(ContinuousLayerWithFiniteSupport):
             progress_bar.update(self.number_of_nodes)
         return units
 
-    @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
-        return cls(data["variable"], np.array(data["interval"]))
-
 
 @dataclass
-class DiracDeltaLayer(ContinuousLayer):
+class DiracDeltaLayer(ContinuousLayer[DiracDeltaDistribution]):
     """
     A layer that represents Dirac delta distributions over a single variable.
     """
@@ -913,16 +898,12 @@ class DiracDeltaLayer(ContinuousLayer):
     def number_of_nodes(self) -> int:
         return self.location.shape[0]
 
-    @classmethod
-    def rustworkx_classes(cls) -> Tuple[Type[Unit], ...]:
-        return (DiracDeltaDistribution,)
-
     def log_likelihood_of_nodes(self, x: np.ndarray) -> np.ndarray:
-        res = np.full((x.shape[0], self.number_of_nodes), -np.inf)
+        result = np.full((x.shape[0], self.number_of_nodes), -np.inf)
         for i in range(self.number_of_nodes):
-            m = np.abs(x[:, self.variable] - self.location[i]) < 1e-6
-            res[m, i] = np.log(self.density_cap[i])
-        return res
+            mask = np.abs(x[:, self.variable] - self.location[i]) < 1e-6
+            result[mask, i] = np.log(self.density_cap[i])
+        return result
 
     def probability(self, event: Event, variables: Tuple[Variable, ...]) -> np.ndarray:
         variable = variables[self.variable]
@@ -943,21 +924,21 @@ class DiracDeltaLayer(ContinuousLayer):
         variable_to_index_map: Dict[Variable, int],
     ) -> np.ndarray:
         variable = list(variable_to_index_map.keys())[self.variable]
-        num_vars = len(variable_to_index_map)
-        result = np.zeros((self.number_of_nodes, num_vars))
+        number_of_variables = len(variable_to_index_map)
+        result = np.zeros((self.number_of_nodes, number_of_variables))
 
         if variable in order:
-            o = order[variable]
-            c = center[variable]
-            result[:, variable_to_index_map[variable]] = (self.location - c) ** o
+            order_value = order[variable]
+            center_value = center[variable]
+            result[:, variable_to_index_map[variable]] = (self.location - center_value) ** order_value
         return result
 
     def sample(
         self, indices: np.ndarray, variables: Tuple[Variable, ...]
     ) -> np.ndarray:
-        num_samples = len(indices)
-        num_vars = len(variables)
-        result = np.zeros((num_samples, num_vars))
+        number_of_samples = len(indices)
+        number_of_variables = len(variables)
+        result = np.zeros((number_of_samples, number_of_variables))
         result[:, self.variable] = self.location[indices]
         return result
 
@@ -973,10 +954,10 @@ class DiracDeltaLayer(ContinuousLayer):
         return result
 
     def cumulative_distribution_function(self, x: np.ndarray) -> np.ndarray:
-        vals = x[:, self.variable][:, np.newaxis]
-        res = np.zeros((x.shape[0], self.number_of_nodes))
-        res[vals >= self.location - 1e-6] = 1.0
-        return res
+        values = x[:, self.variable][:, np.newaxis]
+        result = np.zeros((x.shape[0], self.number_of_nodes))
+        result[values >= self.location - 1e-6] = 1.0
+        return result
 
     def log_mode(self, variables: Tuple[Variable, ...]) -> List[Tuple[Event, float]]:
         result = []
@@ -1031,11 +1012,13 @@ class DiracDeltaLayer(ContinuousLayer):
         units = [
             UnivariateContinuousLeaf(
                 DiracDeltaDistribution(
-                    variable=variable, location=float(loc), density_cap=float(cap)
+                    variable=variable,
+                    location=float(location),
+                    density_cap=float(density_cap),
                 ),
                 probabilistic_circuit=result,
             )
-            for loc, cap in zip(self.location, self.density_cap)
+            for location, density_cap in zip(self.location, self.density_cap)
         ]
         if progress_bar:
             progress_bar.update(self.number_of_nodes)

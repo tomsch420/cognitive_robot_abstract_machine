@@ -1,6 +1,11 @@
+from __future__ import annotations
 import time
 import numpy as np
 import random
+from dataclasses import dataclass
+from typing_extensions import List, Dict, Any, Tuple
+from sortedcontainers import SortedSet
+
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit as RXProbabilisticCircuit,
     SumUnit,
@@ -16,7 +21,55 @@ from random_events.variable import Continuous, Symbolic
 from random_events.product_algebra import SimpleEvent
 from random_events.interval import closed
 from random_events.set import Set
-import typing
+
+from experiments.experiment_definitions import (
+    ExperimentResult,
+    ExperimentsTable,
+    MeanAndStandardDeviation,
+    Unit,
+)
+
+
+@dataclass
+class NumPyCircuitBenchmarkResult(ExperimentResult):
+    """
+    Results of a single benchmark run comparing Rustworkx and NumPy implementations.
+    """
+
+    depth: int
+    """
+    The depth of the random circuit.
+    """
+
+    width: int
+    """
+    The width of each layer in the random circuit.
+    """
+
+    batch_size: str
+    """
+    The batch size (or number of sets for truncation).
+    """
+
+    operation: str
+    """
+    The inference operation performed.
+    """
+
+    rx_duration: MeanAndStandardDeviation
+    """
+    Duration of the Rustworkx implementation.
+    """
+
+    np_duration: MeanAndStandardDeviation
+    """
+    Duration of the NumPy implementation.
+    """
+
+    speedup: float
+    """
+    Calculated speedup (rx / np).
+    """
 
 
 def generate_random_circuit(variables, depth, width):
@@ -100,7 +153,10 @@ def generate_random_circuit(variables, depth, width):
     return pc
 
 
-def benchmark():
+def run_random_circuit_benchmark(iterations: int = 3) -> ExperimentsTable:
+    """
+    Run the random circuit benchmark and return the results as a table.
+    """
     np.random.seed(42)
     random.seed(42)
 
@@ -113,19 +169,11 @@ def benchmark():
     configs = [(1, 5), (2, 10), (3, 20), (4, 40)]
     batch_sizes = [1000, 10000]
 
-    print(
-        f"{'Config (D,W)':<15} | {'Batch':<7} | {'Op':<15} | {'RX (s)':<10} | {'NP (s)':<10} | {'Speedup':<8}"
-    )
-    print("-" * 85)
+    results = []
 
     for depth, width in configs:
         rx_pc = generate_random_circuit(variables, depth, width)
-
-        start = time.time()
         np_pc = NumPyProbabilisticCircuit.from_rustworkx(rx_pc)
-        conv_time = time.time() - start
-
-        config_str = f"({depth}, {width})"
 
         for batch_size in batch_sizes:
             # Construct data
@@ -138,38 +186,53 @@ def benchmark():
                     data[:, i] = np.random.choice(domain_elements, size=batch_size)
 
             # Likelihood
-            t0 = time.time()
-            rx_pc.log_likelihood(data)
-            t_rx = time.time() - t0
-            t0 = time.time()
-            np_pc.log_likelihood(data)
-            t_np = time.time() - t0
-            print(
-                f"{config_str:<15} | {batch_size:<7} | {'Likelihood':<15} | {t_rx:10.4f} | {t_np:10.4f} | {t_rx/t_np:7.2f}x"
+            rx_times = []
+            np_times = []
+            for _ in range(iterations):
+                t0 = time.time()
+                rx_pc.log_likelihood(data)
+                rx_times.append(time.time() - t0)
+                t0 = time.time()
+                np_pc.log_likelihood(data)
+                np_times.append(time.time() - t0)
+
+            rx_ms = MeanAndStandardDeviation.from_measurements(rx_times, Unit.SECONDS)
+            np_ms = MeanAndStandardDeviation.from_measurements(np_times, Unit.SECONDS)
+            results.append(
+                NumPyCircuitBenchmarkResult(
+                    depth,
+                    width,
+                    str(batch_size),
+                    "Likelihood",
+                    rx_ms,
+                    np_ms,
+                    rx_ms.mean / np_ms.mean if np_ms.mean > 0 else float("inf"),
+                )
             )
 
             # Sampling
-            t0 = time.time()
-            rx_pc.sample(batch_size)
-            t_rx = time.time() - t0
-            t0 = time.time()
-            np_pc.sample(batch_size)
-            t_np = time.time() - t0
-            print(
-                f"{config_str:<15} | {batch_size:<7} | {'Sampling':<15} | {t_rx:10.4f} | {t_np:10.4f} | {t_rx/t_np:7.2f}x"
-            )
+            rx_times = []
+            np_times = []
+            for _ in range(iterations):
+                t0 = time.time()
+                rx_pc.sample(batch_size)
+                rx_times.append(time.time() - t0)
+                t0 = time.time()
+                np_pc.sample(batch_size)
+                np_times.append(time.time() - t0)
 
-            # Combined
-            t0 = time.time()
-            samples = rx_pc.sample(batch_size)
-            rx_pc.log_likelihood(samples)
-            t_rx = time.time() - t0
-            t0 = time.time()
-            samples = np_pc.sample(batch_size)
-            np_pc.log_likelihood(samples)
-            t_np = time.time() - t0
-            print(
-                f"{config_str:<15} | {batch_size:<7} | {'Samp+LL':<15} | {t_rx:10.4f} | {t_np:10.4f} | {t_rx/t_np:7.2f}x"
+            rx_ms = MeanAndStandardDeviation.from_measurements(rx_times, Unit.SECONDS)
+            np_ms = MeanAndStandardDeviation.from_measurements(np_times, Unit.SECONDS)
+            results.append(
+                NumPyCircuitBenchmarkResult(
+                    depth,
+                    width,
+                    str(batch_size),
+                    "Sampling",
+                    rx_ms,
+                    np_ms,
+                    rx_ms.mean / np_ms.mean if np_ms.mean > 0 else float("inf"),
+                )
             )
 
         # Truncation
@@ -198,42 +261,38 @@ def benchmark():
                         composite_event = composite_event | simple_event
                 events.append(composite_event)
 
-            t_rx_total = 0
-            t_np_total = 0
-            for event in events:
-                t0 = time.time()
-                rx_pc.log_truncated(event)
-                t_rx_total += time.time() - t0
-                t0 = time.time()
-                np_pc.log_truncated(event)
-                t_np_total += time.time() - t0
-            print(
-                f"{config_str:<15} | {'-':<7} | {f'Trunc ({num_simple_sets} sets)':<15} | {t_rx_total:10.4f} | {t_np_total:10.4f} | {t_rx_total/t_np_total:7.2f}x"
+            rx_times = []
+            np_times = []
+            for _ in range(iterations):
+                t_rx = 0
+                t_np = 0
+                for event in events:
+                    t0 = time.time()
+                    rx_pc.log_truncated(event)
+                    t_rx += time.time() - t0
+                    t0 = time.time()
+                    np_pc.log_truncated(event)
+                    t_np += time.time() - t0
+                rx_times.append(t_rx / len(events))
+                np_times.append(t_np / len(events))
+
+            rx_ms = MeanAndStandardDeviation.from_measurements(rx_times, Unit.SECONDS)
+            np_ms = MeanAndStandardDeviation.from_measurements(np_times, Unit.SECONDS)
+            results.append(
+                NumPyCircuitBenchmarkResult(
+                    depth,
+                    width,
+                    f"{num_simple_sets} sets",
+                    "Truncation",
+                    rx_ms,
+                    np_ms,
+                    rx_ms.mean / np_ms.mean if np_ms.mean > 0 else float("inf"),
+                )
             )
 
-        # Conditioning
-        points = []
-        for _ in range(3):
-            pt = {
-                variables[0]: random.uniform(-1, 1),
-                variables[2]: random.choice(list(variables[2].domain.simple_sets)),
-            }
-            points.append(pt)
-
-        t_rx_total = 0
-        t_np_total = 0
-        for pt in points:
-            t0 = time.time()
-            rx_pc.log_conditional(pt)
-            t_rx_total += time.time() - t0
-            t0 = time.time()
-            np_pc.log_conditional(pt)
-            t_np_total += time.time() - t0
-        print(
-            f"{config_str:<15} | {'-':<7} | {'Conditioning (x3)':<15} | {t_rx_total:10.4f} | {t_np_total:10.4f} | {t_rx_total/t_np_total:7.2f}x"
-        )
-        print("-" * 85)
+    return ExperimentsTable(results)
 
 
 if __name__ == "__main__":
-    benchmark()
+    table = run_random_circuit_benchmark()
+    print(table.render())

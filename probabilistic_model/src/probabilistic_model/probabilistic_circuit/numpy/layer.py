@@ -5,18 +5,29 @@ from abc import abstractmethod, ABC
 from dataclasses import dataclass, field
 import numpy as np
 import scipy.sparse
-from krrood.adapters.json_serializer import SubclassJSONSerializer, recursive_subclasses
-from typing_extensions import (
+from krrood.adapters.json_serializer import (
+    SubclassJSONSerializer,
+    recursive_subclasses,
+    DataclassJSONSerializer,
+)
+from typing import (
     List,
     Tuple,
     Optional,
     Any,
-    Self,
     Dict,
     Union,
     Type,
     Iterator,
+    Generic,
 )
+from typing_extensions import (
+    Self,
+    get_origin,
+    get_args,
+    TypeVar,
+)
+from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     Unit,
     SumUnit,
@@ -31,40 +42,14 @@ from random_events.product_algebra import Event
 import tqdm
 
 
-def inverse_class_of(clazz: Type[Unit]) -> Type[Layer]:
-    """
-    Get the layered circuit layer class for a rustworkx unit class.
-    """
-    from probabilistic_model.probabilistic_circuit.numpy.input_layer import (
-        DiscreteLayer,
-        GaussianLayer,
-        UniformLayer,
-        DiracDeltaLayer,
-        TruncatedGaussianLayer,
-    )
+from probabilistic_model.probabilistic_circuit.numpy.conversion import RustworkxLayerConverter
 
-    for subclass in recursive_subclasses(Layer):
-        if not inspect.isabstract(subclass):
-            if issubclass(clazz, subclass.rustworkx_classes()):
-                return subclass
 
-    raise TypeError(f"Could not find class for {clazz}")
+T = TypeVar("T")
 
 
 @dataclass
-class RustworkxLayerConverter:
-    """
-    Class used for conversion from a probabilistic circuit in rustworkx to a layered
-    circuit in numpy.
-    """
-
-    layer: Layer
-    nodes: List[Unit]
-    hash_remap: Dict[int, int]
-
-
-@dataclass
-class Layer(SubclassJSONSerializer, ABC):
+class Layer(Generic[T], SubClassSafeGeneric, SubclassJSONSerializer, ABC):
     """
     Abstract class for Layers of a layered circuit.
 
@@ -83,6 +68,13 @@ class Layer(SubclassJSONSerializer, ABC):
     @variables.setter
     def variables(self, value: np.ndarray):
         self._variables = value
+
+    def to_json(self, **kwargs) -> Dict[str, Any]:
+        return DataclassJSONSerializer.to_json(self, **kwargs)
+
+    @classmethod
+    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+        return DataclassJSONSerializer.from_json(data, cls, **kwargs)
 
     @abstractmethod
     def log_likelihood_of_nodes(self, x: np.ndarray) -> np.ndarray:
@@ -115,58 +107,19 @@ class Layer(SubclassJSONSerializer, ABC):
         return self.number_of_nodes
 
     @classmethod
-    @abstractmethod
     def rustworkx_classes(cls) -> Tuple[Type[Unit], ...]:
         """
         :return: The rustworkx classes that this layer represents.
         """
+        parameters = cls.get_generic_type_parameters()
+        if not parameters:
+            return ()
 
-    @staticmethod
-    def create_layers_from_nodes(
-        nodes: List[Unit],
-        child_layers: List[RustworkxLayerConverter],
-        progress_bar: bool = True,
-    ) -> List[RustworkxLayerConverter]:
-        """
-        Create a layer from a list of nodes.
-        """
-        result = []
+        bound_type = parameters[0]
+        if get_origin(bound_type) is Union:
+            return get_args(bound_type)
+        return (bound_type,)
 
-        unique_types = set(
-            type(node) if not node.is_leaf else type(node.distribution)
-            for node in nodes
-        )
-        for unique_type in unique_types:
-            nodes_of_current_type = [
-                node
-                for node in nodes
-                if (
-                    isinstance(node, unique_type)
-                    if not node.is_leaf
-                    else isinstance(node.distribution, unique_type)
-                )
-            ]
-
-            if nodes[0].is_leaf:
-                unique_type = type(nodes_of_current_type[0].distribution)
-
-            layer_type = inverse_class_of(unique_type)
-
-            scopes = [tuple(node.variables) for node in nodes_of_current_type]
-            unique_scopes = set(scopes)
-            for scope in unique_scopes:
-                nodes_of_current_type_and_scope = [
-                    node
-                    for node in nodes_of_current_type
-                    if tuple(node.variables) == scope
-                ]
-
-                layer = layer_type.create_layer_from_nodes_with_same_type_and_scope(
-                    nodes_of_current_type_and_scope, child_layers, progress_bar
-                )
-                result.append(layer)
-
-        return result
 
     @classmethod
     @abstractmethod
@@ -263,7 +216,7 @@ class Layer(SubclassJSONSerializer, ABC):
 
 
 @dataclass
-class InnerLayer(Layer, ABC):
+class InnerLayer(Layer[T], ABC):
     """
     Abstract Base Class for inner layers.
     """
@@ -279,16 +232,10 @@ class InnerLayer(Layer, ABC):
             result.extend(child_layer.all_layers())
         return result
 
-    def to_json(self) -> Dict[str, Any]:
-        result = super().to_json()
-        result["child_layers"] = [
-            child_layer.to_json() for child_layer in self.child_layers
-        ]
-        return result
 
 
 @dataclass
-class InputLayer(Layer, ABC):
+class InputLayer(Layer[T], ABC):
     """
     Abstract base class for univariate input units.
     """
@@ -302,10 +249,6 @@ class InputLayer(Layer, ABC):
     def variable(self) -> int:
         return self._variables[0]
 
-    def to_json(self) -> Dict[str, Any]:
-        result = super().to_json()
-        result["variable"] = int(self.variable)
-        return result
 
     @property
     def number_of_nodes(self) -> int:
@@ -313,7 +256,7 @@ class InputLayer(Layer, ABC):
 
 
 @dataclass
-class SumLayer(InnerLayer, ABC):
+class SumLayer(InnerLayer[T], ABC):
     """
     Abstract base class for sum layers.
     """
@@ -324,13 +267,9 @@ class SumLayer(InnerLayer, ABC):
             self._variables = self.child_layers[0].variables
         return self._variables
 
-    @classmethod
-    def rustworkx_classes(cls) -> Tuple[Type[Unit], ...]:
-        return (SumUnit,)
-
 
 @dataclass
-class SparseSumLayer(SumLayer):
+class SparseSumLayer(SumLayer[SumUnit]):
     """
     A SumLayer that uses SciPy Sparse matrices for weights.
     """
@@ -348,25 +287,25 @@ class SparseSumLayer(SumLayer):
         return self.weights[0].shape[0]
 
     def log_likelihood_of_nodes(self, x: np.ndarray) -> np.ndarray:
-        child_lls = [child.log_likelihood_of_nodes(x) for child in self.child_layers]
+        child_log_likelihoods = [child.log_likelihood_of_nodes(x) for child in self.child_layers]
 
         # Stability trick: subtract max
-        m = np.max([np.max(cll, axis=1) for cll in child_lls], axis=0)
+        maximum_log_likelihood = np.max([np.max(cll, axis=1) for cll in child_log_likelihoods], axis=0)
 
         # mask for samples where all children have -inf log likelihood
-        inf_mask = m == -np.inf
+        inf_mask = maximum_log_likelihood == -np.inf
 
         total_prob = np.zeros((x.shape[0], self.number_of_nodes))
 
         # for samples with -inf, we don't care about the exp value as long as it's not nan
         # we can just use 0 as m for those samples
-        safe_m = np.where(inf_mask, 0.0, m)
+        safe_maximum = np.where(inf_mask, 0.0, maximum_log_likelihood)
 
-        for cll, w in zip(child_lls, self.weights):
-            prob = np.exp(cll - safe_m[:, np.newaxis])
-            total_prob += prob @ w.T
+        for child_ll, weights in zip(child_log_likelihoods, self.weights):
+            prob = np.exp(child_ll - safe_maximum[:, np.newaxis])
+            total_prob += prob @ weights.T
 
-        result = np.log(total_prob) + safe_m[:, np.newaxis]
+        result = np.log(total_prob) + safe_maximum[:, np.newaxis]
         result[inf_mask, :] = -np.inf
         return result
 
@@ -380,10 +319,10 @@ class SparseSumLayer(SumLayer):
             child.moment(order, center, variable_to_index_map)
             for child in self.child_layers
         ]
-        num_vars = len(variable_to_index_map)
-        result = np.zeros((self.number_of_nodes, num_vars))
-        for cm, w in zip(child_moments, self.weights):
-            result += w @ cm
+        number_of_variables = len(variable_to_index_map)
+        result = np.zeros((self.number_of_nodes, number_of_variables))
+        for child_moment, weights in zip(child_moments, self.weights):
+            result += weights @ child_moment
         return result
 
     def sample(
@@ -449,8 +388,8 @@ class SparseSumLayer(SumLayer):
             child.cumulative_distribution_function(x) for child in self.child_layers
         ]
         result = np.zeros((x.shape[0], self.number_of_nodes))
-        for ccdf, w in zip(child_cdfs, self.weights):
-            result += ccdf @ w.T
+        for child_cdf, weights in zip(child_cdfs, self.weights):
+            result += child_cdf @ weights.T
         return result
 
     def log_mode(self, variables: Tuple[Variable, ...]) -> List[Tuple[Event, float]]:
@@ -668,7 +607,7 @@ class SparseSumLayer(SumLayer):
 
 
 @dataclass
-class ProductLayer(InnerLayer):
+class ProductLayer(InnerLayer[ProductUnit]):
     """
     A layer that represents the product of multiple other units.
     """
@@ -684,10 +623,6 @@ class ProductLayer(InnerLayer):
     @property
     def number_of_nodes(self) -> int:
         return self.edges.shape[1]
-
-    @classmethod
-    def rustworkx_classes(cls) -> Tuple[Type[Unit], ...]:
-        return (ProductUnit,)
 
     @property
     def variables(self) -> np.ndarray:
@@ -791,8 +726,8 @@ class ProductLayer(InnerLayer):
 
         # Overall log probs: sum of child log probs
         overall_log_probs = np.zeros(self.number_of_nodes)
-        for i, clp in enumerate(child_log_probs):
-            overall_log_probs += clp[self.edges[i, :]]
+        for i, child_log_probs_in_layer in enumerate(child_log_probs):
+            overall_log_probs += child_log_probs_in_layer[self.edges[i, :]]
 
         return new_layer, overall_log_probs
 
@@ -835,13 +770,13 @@ class ProductLayer(InnerLayer):
         edges = np.zeros((len(child_layers), number_of_nodes), dtype=int)
 
         if progress_bar:
-            pbar = tqdm.tqdm(total=number_of_nodes, desc="Assembling Product Layer")
+            progress_bar_instance = tqdm.tqdm(total=number_of_nodes, desc="Assembling Product Layer")
         # for every node in the nodes for this layer
         for node_index, node in enumerate(nodes):
 
             # for every child layer
             for child_layer_index, child_layer in enumerate(child_layers):
-                cl_variables = SortedSet(
+                child_layer_variables = SortedSet(
                     [
                         node.probabilistic_circuit.variables[index]
                         for index in child_layer.layer.variables
@@ -851,15 +786,15 @@ class ProductLayer(InnerLayer):
                 # for every subcircuit
                 for subcircuit in node.subcircuits:
                     # if the scopes are compatible
-                    if cl_variables == subcircuit.variables:
+                    if child_layer_variables == subcircuit.variables:
                         # add the edge
                         edges[child_layer_index, node_index] = child_layer.hash_remap[
                             hash(subcircuit)
                         ]
             if progress_bar:
-                pbar.update(1)
+                progress_bar_instance.update(1)
 
-        layer = cls([cl.layer for cl in child_layers], edges)
+        layer = cls([child_layer.layer for child_layer in child_layers], edges)
         return RustworkxLayerConverter(layer, nodes, hash_remap)
 
     def to_rustworkx(
@@ -897,13 +832,3 @@ class ProductLayer(InnerLayer):
 
         return units
 
-    def to_json(self) -> Dict[str, Any]:
-        result = super().to_json()
-        result["edges"] = self.edges.tolist()
-        return result
-
-    @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
-        child_layers = [Layer.from_json(cl, **kwargs) for cl in data["child_layers"]]
-        edges = np.array(data["edges"])
-        return cls(child_layers, edges)
