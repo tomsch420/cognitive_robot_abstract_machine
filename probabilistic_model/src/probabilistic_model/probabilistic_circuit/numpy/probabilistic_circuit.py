@@ -64,11 +64,16 @@ class LayeredProbabilisticCircuit(SubclassJSONSerializer, ProbabilisticModel):
         return self.root.probability(event.as_composite_set(), tuple(self.variables))[0]
 
     def moment(self, order: OrderType, center: CenterType) -> MomentType:
-        variable_to_index_map = {var: i for i, var in enumerate(self.variables)}
+        variable_to_index_map = {
+            variable: index for index, variable in enumerate(self.variables)
+        }
         moments = self.root.moment(order, center, variable_to_index_map)
         root_moments = moments[0]
         return MomentType(
-            {var: root_moments[i] for var, i in variable_to_index_map.items()}
+            {
+                variable: root_moments[index]
+                for variable, index in variable_to_index_map.items()
+            }
         )
 
     def sample(self, amount: int) -> np.ndarray:
@@ -81,20 +86,29 @@ class LayeredProbabilisticCircuit(SubclassJSONSerializer, ProbabilisticModel):
     def log_mode(self) -> Tuple[Event, float]:
         return self.root.log_mode(tuple(self.variables))[0]
 
-    def marginal(self, variables: Iterable[Variable]) -> Optional[LayeredProbabilisticCircuit]:
+    def marginal(
+        self, variables: Iterable[Variable]
+    ) -> Optional[LayeredProbabilisticCircuit]:
         new_root = self.root.marginal(variables, tuple(self.variables))
         if new_root is None:
             return None
-        new_vars = SortedSet([v for v in self.variables if v in variables])
-        return LayeredProbabilisticCircuit(new_vars, new_root)
+        new_variables = SortedSet(
+            [variable for variable in self.variables if variable in variables]
+        )
+        return LayeredProbabilisticCircuit(new_variables, new_root)
 
     def log_truncated(
         self, event: Event, singleton_allowed: bool = False
     ) -> Tuple[Optional[LayeredProbabilisticCircuit], float]:
-        new_root, log_probs = self.root.log_truncated(event, tuple(self.variables))
-        if new_root is None or log_probs[0] == -np.inf:
+        new_root, log_probabilities = self.root.log_truncated(
+            event, tuple(self.variables)
+        )
+        if new_root is None or log_probabilities[0] == -np.inf:
             return None, -np.inf
-        return LayeredProbabilisticCircuit(self.variables, new_root), log_probs[0]
+        return (
+            LayeredProbabilisticCircuit(self.variables, new_root),
+            log_probabilities[0],
+        )
 
     def log_conditional(
         self, point: Dict[Variable, Any]

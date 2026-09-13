@@ -415,19 +415,19 @@ class GaussianLayer(ContinuousLayer[GaussianDistribution]):
         if variable_event == reals():
             return self, np.zeros(self.number_of_nodes)
 
-        log_probs = np.log(self.probability(event, variables))
+        log_probabilities = np.log(self.probability(event, variables))
 
         if len(variable_event.simple_sets) == 1:
-            s = variable_event.simple_sets[0]
-            interval = np.array([[s.lower, s.upper]] * self.number_of_nodes)
+            simple_set = variable_event.simple_sets[0]
+            interval = np.array([[simple_set.lower, simple_set.upper]] * self.number_of_nodes)
             return (
                 TruncatedGaussianLayer(
                     self.variable, interval, self.location, self.scale
                 ),
-                log_probs,
+                log_probabilities,
             )
 
-        return self, log_probs
+        return self, log_probabilities
 
     def marginal(
         self, variables: Iterable[Variable], all_variables: Tuple[Variable, ...]
@@ -443,7 +443,7 @@ class GaussianLayer(ContinuousLayer[GaussianDistribution]):
             return np.ones(self.number_of_nodes)
 
         variable_event = event.marginal([variable]).simple_sets[0][variable]
-        prob = np.zeros(self.number_of_nodes)
+        probabilities = np.zeros(self.number_of_nodes)
         for interval in variable_event.simple_sets:
             p_upper = scipy.stats.norm.cdf(
                 interval.upper, loc=self.location, scale=self.scale
@@ -451,8 +451,8 @@ class GaussianLayer(ContinuousLayer[GaussianDistribution]):
             p_lower = scipy.stats.norm.cdf(
                 interval.lower, loc=self.location, scale=self.scale
             )
-            prob += p_upper - p_lower
-        return prob
+            probabilities += p_upper - p_lower
+        return probabilities
 
     @classmethod
     def create_layer_from_nodes_with_same_type_and_scope(
@@ -605,20 +605,22 @@ class TruncatedGaussianLayer(ContinuousLayerWithFiniteSupport[TruncatedGaussianD
         # Mode of truncated gaussian: mu if in [l, u], else l or u
         result = []
         variable = variables[self.variable]
-        for loc, scale, l, u in zip(self.location, self.scale, self.lower, self.upper):
-            if loc < l:
-                mode = l
-            elif loc > u:
-                mode = u
+        for location, scale, lower_bound, upper_bound in zip(
+            self.location, self.scale, self.lower, self.upper
+        ):
+            if location < lower_bound:
+                mode = lower_bound
+            elif location > upper_bound:
+                mode = upper_bound
             else:
-                mode = loc
+                mode = location
             event = SimpleEvent.from_data({variable: float(mode)}).as_composite_set()
             # Log-likelihood calculation
-            log_likelihood = scipy.stats.norm.logpdf(float(mode), loc=loc, scale=scale)
-            z = scipy.stats.norm.cdf(u, loc=loc, scale=scale) - scipy.stats.norm.cdf(
-                l, loc=loc, scale=scale
-            )
-            result.append((event, log_likelihood - np.log(z)))
+            log_likelihood = scipy.stats.norm.logpdf(float(mode), loc=location, scale=scale)
+            normalization_constant = scipy.stats.norm.cdf(
+                upper_bound, loc=location, scale=scale
+            ) - scipy.stats.norm.cdf(lower_bound, loc=location, scale=scale)
+            result.append((event, log_likelihood - np.log(normalization_constant)))
         return result
 
     def log_truncated(
@@ -629,14 +631,17 @@ class TruncatedGaussianLayer(ContinuousLayerWithFiniteSupport[TruncatedGaussianD
         if variable not in event.variables:
             return self, np.zeros(self.number_of_nodes)
 
-        log_probs = np.log(self.probability(event, variables))
+        log_probabilities = np.log(self.probability(event, variables))
 
         variable_event = event.marginal([variable]).simple_sets[0][variable]
         # Only handle simple interval truncation for now to keep it in ONE layer
-        s = variable_event.simple_sets[0]
+        simple_set = variable_event.simple_sets[0]
         new_interval = np.array(
             [
-                [np.maximum(s.lower, self.lower[i]), np.minimum(s.upper, self.upper[i])]
+                [
+                    np.maximum(simple_set.lower, self.lower[i]),
+                    np.minimum(simple_set.upper, self.upper[i]),
+                ]
                 for i in range(self.number_of_nodes)
             ]
         )
@@ -645,7 +650,7 @@ class TruncatedGaussianLayer(ContinuousLayerWithFiniteSupport[TruncatedGaussianD
             TruncatedGaussianLayer(
                 self.variable, new_interval, self.location, self.scale
             ),
-            log_probs,
+            log_probabilities,
         )
 
     def marginal(
@@ -804,22 +809,22 @@ class UniformLayer(ContinuousLayerWithFiniteSupport[UniformDistribution]):
         if variable_event == reals():
             return self, np.zeros(self.number_of_nodes)
 
-        log_probs = np.log(self.probability(event, variables))
+        log_probabilities = np.log(self.probability(event, variables))
 
         if len(variable_event.simple_sets) == 1:
-            s = variable_event.simple_sets[0]
+            simple_set = variable_event.simple_sets[0]
             new_interval = np.array(
                 [
                     [
-                        np.maximum(s.lower, self.lower[i]),
-                        np.minimum(s.upper, self.upper[i]),
+                        np.maximum(simple_set.lower, self.lower[i]),
+                        np.minimum(simple_set.upper, self.upper[i]),
                     ]
                     for i in range(self.number_of_nodes)
                 ]
             )
-            return UniformLayer(self.variable, new_interval), log_probs
+            return UniformLayer(self.variable, new_interval), log_probabilities
 
-        return self, log_probs
+        return self, log_probabilities
 
     def marginal(
         self, variables: Iterable[Variable], all_variables: Tuple[Variable, ...]
@@ -945,11 +950,11 @@ class DiracDeltaLayer(ContinuousLayer[DiracDeltaDistribution]):
     def support(self, variables: Tuple[Variable, ...]) -> List[Event]:
         variable = variables[self.variable]
         result = []
-        for loc in self.location:
+        for location in self.location:
             from random_events.interval import singleton
 
             result.append(
-                SimpleEvent.from_data({variable: singleton(loc)}).as_composite_set()
+                SimpleEvent.from_data({variable: singleton(location)}).as_composite_set()
             )
         return result
 

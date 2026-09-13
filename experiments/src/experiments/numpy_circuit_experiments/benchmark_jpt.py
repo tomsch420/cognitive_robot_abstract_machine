@@ -23,7 +23,10 @@ from experiments.experiment_definitions import (
 )
 
 
-from experiments.numpy_circuit_experiments.common import ProbabilisticCircuitBenchmarkResult
+from experiments.numpy_circuit_experiments.common import (
+    ProbabilisticCircuitBenchmarkResult,
+    generate_random_events,
+)
 
 @dataclass
 class JPTBenchmarkResult(ProbabilisticCircuitBenchmarkResult):
@@ -141,25 +144,9 @@ def run_truncation_benchmarks(
     # Truncation
     truncation_configurations = [1, 10, 50]
     for number_of_simple_sets in truncation_configurations:
-        events = []
-        for _ in range(2):
-            composite_event = None
-            for _ in range(number_of_simple_sets):
-                event_data = {}
-                for variable in rustworkx_probabilistic_circuit.variables:
-                    if isinstance(variable, Continuous):
-                        variable_min = dataframe[variable.name].min()
-                        variable_max = dataframe[variable.name].max()
-                        lower, upper = sorted(
-                            [random.uniform(variable_min, variable_max), random.uniform(variable_min, variable_max)]
-                        )
-                        event_data[variable] = closed(lower, upper)
-                simple_event = SimpleEvent.from_data(event_data).as_composite_set()
-                if composite_event is None:
-                    composite_event = simple_event
-                else:
-                    composite_event = composite_event | simple_event
-            events.append(composite_event)
+        events = generate_random_events(
+            rustworkx_probabilistic_circuit.variables, number_of_simple_sets, number_of_events=2
+        )
 
         rustworkx_times = []
         layered_times = []
@@ -176,15 +163,21 @@ def run_truncation_benchmarks(
             rustworkx_times.append(total_rustworkx_time / len(events))
             layered_times.append(total_layered_time / len(events))
 
-        rustworkx_measurements = MeanAndStandardDeviation.from_measurements(rustworkx_times, Unit.SECONDS)
-        layered_measurements = MeanAndStandardDeviation.from_measurements(layered_times, Unit.SECONDS)
+        rustworkx_measurements = MeanAndStandardDeviation.from_measurements(
+            rustworkx_times, Unit.SECONDS
+        )
+        layered_measurements = MeanAndStandardDeviation.from_measurements(
+            layered_times, Unit.SECONDS
+        )
         results.append(
             JPTBenchmarkResult(
                 f"{number_of_simple_sets} sets",
                 "Truncation",
                 rustworkx_measurements,
                 layered_measurements,
-                rustworkx_measurements.mean / layered_measurements.mean if layered_measurements.mean > 0 else float("inf"),
+                rustworkx_measurements.mean / layered_measurements.mean
+                if layered_measurements.mean > 0
+                else float("inf"),
             )
         )
     return results
