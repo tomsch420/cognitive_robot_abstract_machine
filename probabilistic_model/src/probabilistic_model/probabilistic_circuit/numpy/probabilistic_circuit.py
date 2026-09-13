@@ -34,12 +34,12 @@ from random_events.product_algebra import Event, SimpleEvent
 
 
 @dataclass
-class ProbabilisticCircuit(SubclassJSONSerializer, ProbabilisticModel):
+class LayeredProbabilisticCircuit(SubclassJSONSerializer, ProbabilisticModel):
     """
     A probabilistic circuit as wrapper for a layered probabilistic model using NumPy.
     """
 
-    circuit_variables: SortedSet
+    _variables: SortedSet
     """
     The variables of the circuit.
     """
@@ -49,22 +49,32 @@ class ProbabilisticCircuit(SubclassJSONSerializer, ProbabilisticModel):
     The root layer of the circuit.
     """
 
+    def __post_init__(self):
+        pass
+
     @property
     def variables(self) -> Tuple[Variable, ...]:
-        return tuple(self.circuit_variables)
+        return tuple(self._variables)
+
+    @property
+    def circuit_variables(self) -> SortedSet:
+        """
+        Alias for variables to maintain compatibility if needed, though 'variables' is preferred.
+        """
+        return self._variables
 
     @property
     def support(self) -> Event:
-        return self.root.support(self.variables)[0]
+        return self.root.support(tuple(self.variables))[0]
 
     def log_likelihood(self, x: np.ndarray) -> np.ndarray:
         return self.root.log_likelihood_of_nodes(x)[:, 0]
 
     def probability_of_simple_event(self, event: SimpleEvent) -> float:
-        return self.root.probability(event.as_composite_set(), self.variables)[0]
+        return self.root.probability(event.as_composite_set(), tuple(self.variables))[0]
 
     def moment(self, order: OrderType, center: CenterType) -> MomentType:
-        variable_to_index_map = {var: i for i, var in enumerate(self.circuit_variables)}
+        variable_to_index_map = {var: i for i, var in enumerate(self.variables)}
         moments = self.root.moment(order, center, variable_to_index_map)
         root_moments = moments[0]
         return MomentType(
@@ -73,39 +83,39 @@ class ProbabilisticCircuit(SubclassJSONSerializer, ProbabilisticModel):
 
     def sample(self, amount: int) -> np.ndarray:
         indices = np.zeros(amount, dtype=int)
-        return self.root.sample(indices, self.variables)
+        return self.root.sample(indices, tuple(self.variables))
 
     def cumulative_distribution_function(self, x: np.ndarray) -> np.ndarray:
         return self.root.cumulative_distribution_function(x)[:, 0]
 
     def log_mode(self) -> Tuple[Event, float]:
-        return self.root.log_mode(self.variables)[0]
+        return self.root.log_mode(tuple(self.variables))[0]
 
-    def marginal(self, variables: Iterable[Variable]) -> Optional[ProbabilisticCircuit]:
-        new_root = self.root.marginal(variables, self.variables)
+    def marginal(self, variables: Iterable[Variable]) -> Optional[LayeredProbabilisticCircuit]:
+        new_root = self.root.marginal(variables, tuple(self.variables))
         if new_root is None:
             return None
-        new_vars = SortedSet([v for v in self.circuit_variables if v in variables])
-        return ProbabilisticCircuit(new_vars, new_root)
+        new_vars = SortedSet([v for v in self.variables if v in variables])
+        return LayeredProbabilisticCircuit(new_vars, new_root)
 
     def log_truncated(
         self, event: Event, singleton_allowed: bool = False
-    ) -> Tuple[Optional[ProbabilisticCircuit], float]:
-        new_root, log_probs = self.root.log_truncated(event, self.variables)
+    ) -> Tuple[Optional[LayeredProbabilisticCircuit], float]:
+        new_root, log_probs = self.root.log_truncated(event, tuple(self.variables))
         if new_root is None or log_probs[0] == -np.inf:
             return None, -np.inf
-        return ProbabilisticCircuit(self.circuit_variables, new_root), log_probs[0]
+        return LayeredProbabilisticCircuit(self.variables, new_root), log_probs[0]
 
     def log_conditional(
         self, point: Dict[Variable, Any]
-    ) -> Tuple[Optional[ProbabilisticCircuit], float]:
+    ) -> Tuple[Optional[LayeredProbabilisticCircuit], float]:
         event = SimpleEvent.from_data(point).as_composite_set()
         return self.log_truncated(event, singleton_allowed=True)
 
     @classmethod
     def from_rustworkx(
         cls, pc: RustworkxProbabilisticCircuit, progress_bar: bool = False
-    ) -> ProbabilisticCircuit:
+    ) -> LayeredProbabilisticCircuit:
         """
         Convert a probabilistic circuit to a layered circuit.
 
@@ -132,3 +142,4 @@ class ProbabilisticCircuit(SubclassJSONSerializer, ProbabilisticModel):
     @classmethod
     def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
         return DataclassJSONSerializer.from_json(data, cls, **kwargs)
+

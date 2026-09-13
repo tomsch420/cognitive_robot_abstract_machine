@@ -16,7 +16,7 @@ from sortedcontainers import SortedSet
 
 if TYPE_CHECKING:
     from probabilistic_model.probabilistic_circuit.numpy.layer import Layer
-    from probabilistic_model.probabilistic_circuit.numpy.probabilistic_circuit import ProbabilisticCircuit
+    from probabilistic_model.probabilistic_circuit.numpy.probabilistic_circuit import LayeredProbabilisticCircuit
 
 
 @dataclass
@@ -100,23 +100,23 @@ def create_layers_from_nodes(
 
 
 def from_rustworkx(
-    pc: RustworkxProbabilisticCircuit, progress_bar: bool = False
-) -> ProbabilisticCircuit:
+    rustworkx_probabilistic_circuit: RustworkxProbabilisticCircuit, progress_bar: bool = False
+) -> LayeredProbabilisticCircuit:
     """
     Convert a probabilistic circuit to a layered circuit.
 
-    The result expresses the same distribution as `pc`.
+    The result expresses the same distribution as `rustworkx_probabilistic_circuit`.
 
-    :param pc: The probabilistic circuit.
+    :param rustworkx_probabilistic_circuit: The probabilistic circuit.
     :param progress_bar: Whether to show a progress bar.
     :return: The layered circuit.
     """
     from probabilistic_model.probabilistic_circuit.numpy.probabilistic_circuit import (
-        ProbabilisticCircuit,
+        LayeredProbabilisticCircuit,
     )
 
     # group nodes by depth
-    layer_to_nodes_map = {index: layer for index, layer in enumerate(pc.layers)}
+    layer_to_nodes_map = {index: layer for index, layer in enumerate(rustworkx_probabilistic_circuit.layers)}
     reversed_layers_to_nodes_map = dict(reversed(layer_to_nodes_map.items()))
 
     # create layers from nodes
@@ -129,24 +129,24 @@ def from_rustworkx(
         child_layers = create_layers_from_nodes(nodes, child_layers, progress_bar)
     root = child_layers[0].layer
 
-    return ProbabilisticCircuit(pc.variables, root)
+    return LayeredProbabilisticCircuit(rustworkx_probabilistic_circuit.variables, root)
 
 
 def to_rustworkx(
-    pc: ProbabilisticCircuit, progress_bar: bool = True
+    layered_probabilistic_circuit: LayeredProbabilisticCircuit, progress_bar: bool = True
 ) -> RustworkxProbabilisticCircuit:
     """
     Convert the probabilistic circuit to a rustworkx graph.
 
-    :param pc: The probabilistic circuit.
+    :param layered_probabilistic_circuit: The probabilistic circuit.
     :param progress_bar: Whether to show a progress bar.
     :return: The rustworkx graph.
     """
     if progress_bar:
-        number_of_edges = pc.root.number_of_components
-        progress_bar = tqdm.tqdm(total=number_of_edges, desc="Converting to rx")
+        number_of_components = layered_probabilistic_circuit.root.number_of_components
+        progress_bar = tqdm.tqdm(total=number_of_components, desc="Converting to rx")
     else:
         progress_bar = None
     result = RustworkxProbabilisticCircuit()
-    pc.root.to_rustworkx(pc.variables, result, progress_bar)
+    layered_probabilistic_circuit.root.to_rustworkx(layered_probabilistic_circuit.variables, result, progress_bar)
     return result

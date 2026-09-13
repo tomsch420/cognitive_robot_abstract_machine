@@ -118,14 +118,14 @@ class DiscreteLayer(InputLayer[Union[SymbolicDistribution, DiscreteDistribution]
     def log_likelihood_of_nodes(self, x: np.ndarray) -> np.ndarray:
         values = x[:, self.variable]
         if self.symbol_hash_to_index is not None:
-            indices = np.array([self.symbol_hash_to_index[hash(v)] for v in values])
+            indices = np.array([self.symbol_hash_to_index[hash(value)] for value in values])
         else:
             indices = values.astype(int)
         # self.probabilities has shape (nodes, states)
         # result[n, j] = log(self.probabilities[j, indices[n]])
         # result shape (N, nodes)
-        probs = self.probabilities[:, indices].T  # (number_of_samples, number_of_nodes)
-        return np.log(probs)
+        probabilities = self.probabilities[:, indices].T  # (number_of_samples, number_of_nodes)
+        return np.log(probabilities)
 
     def moment(
         self,
@@ -176,9 +176,9 @@ class DiscreteLayer(InputLayer[Union[SymbolicDistribution, DiscreteDistribution]
         return result
 
     def cumulative_distribution_function(self, x: np.ndarray) -> np.ndarray:
-        vals = x[:, self.variable]
+        values = x[:, self.variable]
         cdf_states = np.cumsum(self.probabilities, axis=1)
-        indices = np.clip(vals.astype(int), 0, self.probabilities.shape[1] - 1)
+        indices = np.clip(values.astype(int), 0, self.probabilities.shape[1] - 1)
         return cdf_states[:, indices].T
 
     def log_mode(self, variables: Tuple[Variable, ...]) -> List[Tuple[Event, float]]:
@@ -330,9 +330,9 @@ class GaussianLayer(ContinuousLayer[GaussianDistribution]):
         return self.location.shape[0]
 
     def log_likelihood_of_nodes(self, x: np.ndarray) -> np.ndarray:
-        vals = x[:, self.variable].astype(float)  # (N,)
+        values = x[:, self.variable].astype(float)  # (N,)
         return scipy.stats.norm.logpdf(
-            vals[:, np.newaxis], loc=self.location, scale=self.scale
+            values[:, np.newaxis], loc=self.location, scale=self.scale
         )
 
     def moment(
@@ -388,18 +388,18 @@ class GaussianLayer(ContinuousLayer[GaussianDistribution]):
         return result
 
     def cumulative_distribution_function(self, x: np.ndarray) -> np.ndarray:
-        vals = x[:, self.variable].astype(float)
+        values = x[:, self.variable].astype(float)
         return scipy.stats.norm.cdf(
-            vals[:, np.newaxis], loc=self.location, scale=self.scale
+            values[:, np.newaxis], loc=self.location, scale=self.scale
         )
 
     def log_mode(self, variables: Tuple[Variable, ...]) -> List[Tuple[Event, float]]:
         variable = variables[self.variable]
         result = []
-        for loc, scale in zip(self.location, self.scale):
-            event = SimpleEvent.from_data({variable: float(loc)}).as_composite_set()
-            ll = scipy.stats.norm.logpdf(float(loc), loc=loc, scale=scale)
-            result.append((event, ll))
+        for location, scale in zip(self.location, self.scale):
+            event = SimpleEvent.from_data({variable: float(location)}).as_composite_set()
+            log_likelihood = scipy.stats.norm.logpdf(float(location), loc=location, scale=scale)
+            result.append((event, log_likelihood))
         return result
 
     def log_truncated(
@@ -510,18 +510,18 @@ class TruncatedGaussianLayer(ContinuousLayerWithFiniteSupport[TruncatedGaussianD
         return self.location.shape[0]
 
     def log_likelihood_of_nodes(self, x: np.ndarray) -> np.ndarray:
-        vals = x[:, self.variable].astype(float)[:, np.newaxis]
-        ll = scipy.stats.norm.logpdf(vals, loc=self.location, scale=self.scale)
+        values = x[:, self.variable].astype(float)[:, np.newaxis]
+        log_likelihood = scipy.stats.norm.logpdf(values, loc=self.location, scale=self.scale)
 
-        p_upper = scipy.stats.norm.cdf(self.upper, loc=self.location, scale=self.scale)
-        p_lower = scipy.stats.norm.cdf(self.lower, loc=self.location, scale=self.scale)
-        z = p_upper - p_lower
+        probabilities_upper = scipy.stats.norm.cdf(self.upper, loc=self.location, scale=self.scale)
+        probabilities_lower = scipy.stats.norm.cdf(self.lower, loc=self.location, scale=self.scale)
+        normalization_constant = probabilities_upper - probabilities_lower
 
         # mask values outside interval
-        mask = (vals >= self.lower) & (vals <= self.upper)
-        res = ll - np.log(z)
-        res[~mask] = -np.inf
-        return res
+        mask = (values >= self.lower) & (values <= self.upper)
+        result = log_likelihood - np.log(normalization_constant)
+        result[~mask] = -np.inf
+        return result
 
     def probability(self, event: Event, variables: Tuple[Variable, ...]) -> np.ndarray:
         variable = variables[self.variable]
@@ -531,25 +531,25 @@ class TruncatedGaussianLayer(ContinuousLayerWithFiniteSupport[TruncatedGaussianD
         variable_event = event.marginal([variable]).simple_sets[0][variable]
 
         # normalizing constant
-        p_upper_total = scipy.stats.norm.cdf(
+        probabilities_upper_total = scipy.stats.norm.cdf(
             self.upper, loc=self.location, scale=self.scale
         )
-        p_lower_total = scipy.stats.norm.cdf(
+        probabilities_lower_total = scipy.stats.norm.cdf(
             self.lower, loc=self.location, scale=self.scale
         )
-        z = p_upper_total - p_lower_total
+        normalization_constant = probabilities_upper_total - probabilities_lower_total
 
-        prob = np.zeros(self.number_of_nodes)
+        probability = np.zeros(self.number_of_nodes)
         for interval in variable_event.simple_sets:
             # intersect interval with self.interval
             low = np.maximum(interval.lower, self.lower)
             high = np.minimum(interval.upper, self.upper)
 
-            p_high = scipy.stats.norm.cdf(high, loc=self.location, scale=self.scale)
-            p_low = scipy.stats.norm.cdf(low, loc=self.location, scale=self.scale)
-            prob += np.maximum(0, p_high - p_low)
+            probabilities_high = scipy.stats.norm.cdf(high, loc=self.location, scale=self.scale)
+            probabilities_low = scipy.stats.norm.cdf(low, loc=self.location, scale=self.scale)
+            probability += np.maximum(0, probabilities_high - probabilities_low)
 
-        return prob / z
+        return probability / normalization_constant
 
     def moment(
         self,
@@ -589,16 +589,16 @@ class TruncatedGaussianLayer(ContinuousLayerWithFiniteSupport[TruncatedGaussianD
         return result
 
     def cumulative_distribution_function(self, x: np.ndarray) -> np.ndarray:
-        vals = x[:, self.variable].astype(float)[:, np.newaxis]
-        p_val = scipy.stats.norm.cdf(vals, loc=self.location, scale=self.scale)
-        p_lower = scipy.stats.norm.cdf(self.lower, loc=self.location, scale=self.scale)
-        p_upper = scipy.stats.norm.cdf(self.upper, loc=self.location, scale=self.scale)
-        z = p_upper - p_lower
+        values = x[:, self.variable].astype(float)[:, np.newaxis]
+        probabilities_value = scipy.stats.norm.cdf(values, loc=self.location, scale=self.scale)
+        probabilities_lower = scipy.stats.norm.cdf(self.lower, loc=self.location, scale=self.scale)
+        probabilities_upper = scipy.stats.norm.cdf(self.upper, loc=self.location, scale=self.scale)
+        normalization_constant = probabilities_upper - probabilities_lower
 
-        cdf = (p_val - p_lower) / z
+        cdf = (probabilities_value - probabilities_lower) / normalization_constant
         cdf = np.clip(cdf, 0, 1)
-        cdf[vals < self.lower] = 0
-        cdf[vals > self.upper] = 1
+        cdf[values < self.lower] = 0
+        cdf[values > self.upper] = 1
         return cdf
 
     def log_mode(self, variables: Tuple[Variable, ...]) -> List[Tuple[Event, float]]:
@@ -726,9 +726,9 @@ class UniformLayer(ContinuousLayerWithFiniteSupport[UniformDistribution]):
         return self.interval.shape[0]
 
     def log_likelihood_of_nodes(self, x: np.ndarray) -> np.ndarray:
-        vals = x[:, self.variable].astype(float)  # (N,)
+        values = x[:, self.variable].astype(float)  # (number_of_samples,)
         return scipy.stats.uniform.logpdf(
-            vals[:, np.newaxis], loc=self.lower, scale=self.upper - self.lower
+            values[:, np.newaxis], loc=self.lower, scale=self.upper - self.lower
         )
 
     def moment(
@@ -738,29 +738,29 @@ class UniformLayer(ContinuousLayerWithFiniteSupport[UniformDistribution]):
         variable_to_index_map: Dict[Variable, int],
     ) -> np.ndarray:
         variable = list(variable_to_index_map.keys())[self.variable]
-        num_vars = len(variable_to_index_map)
-        result = np.zeros((self.number_of_nodes, num_vars))
+        number_of_variables = len(variable_to_index_map)
+        result = np.zeros((self.number_of_nodes, number_of_variables))
 
         if variable in order:
-            k = order[variable]
-            c = center[variable]
+            order_value = order[variable]
+            center_value = center[variable]
 
-            l = self.lower
-            u = self.upper
+            lower = self.lower
+            upper = self.upper
 
-            res = ((u - c) ** (k + 1) - (l - c) ** (k + 1)) / ((k + 1) * (u - l))
-            result[:, variable_to_index_map[variable]] = res
+            moment_value = ((upper - center_value) ** (order_value + 1) - (lower - center_value) ** (order_value + 1)) / ((order_value + 1) * (upper - lower))
+            result[:, variable_to_index_map[variable]] = moment_value
         return result
 
     def sample(
         self, indices: np.ndarray, variables: Tuple[Variable, ...]
     ) -> np.ndarray:
-        num_samples = len(indices)
-        num_vars = len(variables)
-        result = np.zeros((num_samples, num_vars))
-        lows = self.lower[indices]
-        highs = self.upper[indices]
-        result[:, self.variable] = np.random.uniform(lows, highs)
+        number_of_samples = len(indices)
+        number_of_variables = len(variables)
+        result = np.zeros((number_of_samples, number_of_variables))
+        lower_bounds = self.lower[indices]
+        upper_bounds = self.upper[indices]
+        result[:, self.variable] = np.random.uniform(lower_bounds, upper_bounds)
         return result
 
     def support(self, variables: Tuple[Variable, ...]) -> List[Event]:
@@ -775,22 +775,22 @@ class UniformLayer(ContinuousLayerWithFiniteSupport[UniformDistribution]):
         return result
 
     def cumulative_distribution_function(self, x: np.ndarray) -> np.ndarray:
-        vals = x[:, self.variable].astype(float)
+        values = x[:, self.variable].astype(float)
         return scipy.stats.uniform.cdf(
-            vals[:, np.newaxis], loc=self.lower, scale=self.upper - self.lower
+            values[:, np.newaxis], loc=self.lower, scale=self.upper - self.lower
         )
 
     def log_mode(self, variables: Tuple[Variable, ...]) -> List[Tuple[Event, float]]:
         variable = variables[self.variable]
         result = []
-        for l, u in zip(self.lower, self.upper):
+        for lower, upper in zip(self.lower, self.upper):
             from random_events.interval import closed
 
             event = SimpleEvent.from_data(
-                {variable: (l + u) / 2}
-            ).as_composite_set()  # Mode for uniform is any point in [l, u]
-            ll = np.log(1 / (u - l))
-            result.append((event, ll))
+                {variable: (lower + upper) / 2}
+            ).as_composite_set()  # Mode for uniform is any point in [lower, upper]
+            log_likelihood = np.log(1 / (upper - lower))
+            result.append((event, log_likelihood))
         return result
 
     def log_truncated(
@@ -835,12 +835,12 @@ class UniformLayer(ContinuousLayerWithFiniteSupport[UniformDistribution]):
             return np.ones(self.number_of_nodes)
 
         variable_event = event.marginal([variable]).simple_sets[0][variable]
-        prob = np.zeros(self.number_of_nodes)
+        probability = np.zeros(self.number_of_nodes)
         for interval in variable_event.simple_sets:
             low = np.maximum(interval.lower, self.lower)
             high = np.minimum(interval.upper, self.upper)
-            prob += np.maximum(0, high - low) / (self.upper - self.lower)
-        return prob
+            probability += np.maximum(0, high - low) / (self.upper - self.lower)
+        return probability
 
     @classmethod
     def create_layer_from_nodes_with_same_type_and_scope(
@@ -911,11 +911,11 @@ class DiracDeltaLayer(ContinuousLayer[DiracDeltaDistribution]):
             return np.ones(self.number_of_nodes)
 
         variable_event = event.marginal([variable]).simple_sets[0][variable]
-        prob = np.zeros(self.number_of_nodes)
+        probability = np.zeros(self.number_of_nodes)
         for i in range(self.number_of_nodes):
             if self.location[i] in variable_event:
-                prob[i] = 1.0
-        return prob
+                probability[i] = 1.0
+        return probability
 
     def moment(
         self,
@@ -962,9 +962,9 @@ class DiracDeltaLayer(ContinuousLayer[DiracDeltaDistribution]):
     def log_mode(self, variables: Tuple[Variable, ...]) -> List[Tuple[Event, float]]:
         result = []
         variable = variables[self.variable]
-        for loc, cap in zip(self.location, self.density_cap):
-            event = SimpleEvent.from_data({variable: float(loc)}).as_composite_set()
-            result.append((event, np.log(cap)))
+        for location, density_cap in zip(self.location, self.density_cap):
+            event = SimpleEvent.from_data({variable: float(location)}).as_composite_set()
+            result.append((event, np.log(density_cap)))
         return result
 
     def log_truncated(
@@ -974,8 +974,8 @@ class DiracDeltaLayer(ContinuousLayer[DiracDeltaDistribution]):
         if variable not in event.variables:
             return self, np.zeros(self.number_of_nodes)
 
-        log_probs = np.log(self.probability(event, variables))
-        return self, log_probs
+        log_probabilities = np.log(self.probability(event, variables))
+        return self, log_probabilities
 
     @classmethod
     def create_layer_from_nodes_with_same_type_and_scope(

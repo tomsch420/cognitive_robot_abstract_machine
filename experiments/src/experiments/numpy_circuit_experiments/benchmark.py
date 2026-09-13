@@ -13,7 +13,7 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     leaf,
 )
 from probabilistic_model.probabilistic_circuit.numpy.probabilistic_circuit import (
-    ProbabilisticCircuit as NumPyProbabilisticCircuit,
+    LayeredProbabilisticCircuit,
 )
 from probabilistic_model.distributions.gaussian import GaussianDistribution
 from probabilistic_model.distributions.distributions import SymbolicDistribution
@@ -30,8 +30,10 @@ from experiments.experiment_definitions import (
 )
 
 
+from experiments.numpy_circuit_experiments.common import ProbabilisticCircuitBenchmarkResult
+
 @dataclass
-class NumPyCircuitBenchmarkResult(ExperimentResult):
+class NumPyCircuitBenchmarkResult(ProbabilisticCircuitBenchmarkResult):
     """
     Results of a single benchmark run comparing Rustworkx and NumPy implementations.
     """
@@ -46,83 +48,58 @@ class NumPyCircuitBenchmarkResult(ExperimentResult):
     The width of each layer in the random circuit.
     """
 
-    batch_size: str
-    """
-    The batch size (or number of sets for truncation).
-    """
-
-    operation: str
-    """
-    The inference operation performed.
-    """
-
-    rx_duration: MeanAndStandardDeviation
-    """
-    Duration of the Rustworkx implementation.
-    """
-
-    np_duration: MeanAndStandardDeviation
-    """
-    Duration of the NumPy implementation.
-    """
-
-    speedup: float
-    """
-    Calculated speedup (rx / np).
-    """
-
 
 def generate_random_circuit(variables, depth, width):
-    pc = RXProbabilisticCircuit()
+    probabilistic_circuit = RXProbabilisticCircuit()
 
     current_layer = []
-    for var in variables:
+    for variable in variables:
         for _ in range(width):
-            if isinstance(var, Continuous):
-                dist = GaussianDistribution(
-                    variable=var,
+            if isinstance(variable, Continuous):
+                distribution = GaussianDistribution(
+                    variable=variable,
                     location=random.uniform(-5, 5),
                     scale=random.uniform(0.5, 2.0),
                 )
             else:
-                domain_elements = list(var.domain.simple_sets)
-                probs = np.random.dirichlet(np.ones(len(domain_elements)))
-                dist = SymbolicDistribution(
-                    variable=var,
+                domain_elements = list(variable.domain.simple_sets)
+                probabilities = np.random.dirichlet(np.ones(len(domain_elements)))
+                distribution = SymbolicDistribution(
+                    variable=variable,
                     probabilities={
-                        hash(val): p for val, p in zip(domain_elements, probs)
+                        hash(value): probability for value, probability in zip(domain_elements, probabilities)
                     },
                 )
-            l = leaf(dist, pc)
-            current_layer.append(l)
+            leaf_node = leaf(distribution, probabilistic_circuit)
+            current_layer.append(leaf_node)
 
-    for d in range(depth):
+    for current_depth in range(depth):
         product_layer = []
         if len(variables) > 1:
-            nodes_by_var = {
-                var: [n for n in current_layer if var in n.variables]
-                for var in variables
+            nodes_by_variable = {
+                variable: [node for node in current_layer if variable in node.variables]
+                for variable in variables
             }
             unused_nodes = set(current_layer)
 
             while unused_nodes or len(product_layer) < width:
-                p = ProductUnit(probabilistic_circuit=pc)
-                for var in variables:
-                    var_unused = [n for n in unused_nodes if var in n.variables]
-                    if var_unused:
-                        node = random.choice(var_unused)
+                product_unit = ProductUnit(probabilistic_circuit=probabilistic_circuit)
+                for variable in variables:
+                    variable_unused = [node for node in unused_nodes if variable in node.variables]
+                    if variable_unused:
+                        node = random.choice(variable_unused)
                         unused_nodes.remove(node)
                     else:
-                        node = random.choice(nodes_by_var[var])
-                    p.add_subcircuit(node)
-                product_layer.append(p)
+                        node = random.choice(nodes_by_variable[variable])
+                    product_unit.add_subcircuit(node)
+                product_layer.append(product_unit)
         else:
             product_layer = current_layer
 
         sum_layer = []
         unused_nodes = set(product_layer)
         while unused_nodes or len(sum_layer) < width:
-            s = SumUnit(probabilistic_circuit=pc)
+            sum_unit = SumUnit(probabilistic_circuit=probabilistic_circuit)
             if unused_nodes:
                 node = random.choice(list(unused_nodes))
                 unused_nodes.remove(node)
@@ -130,27 +107,27 @@ def generate_random_circuit(variables, depth, width):
             else:
                 children = [random.choice(product_layer)]
 
-            num_extra = random.randint(1, 4)
+            number_of_extra_children = random.randint(1, 4)
             if len(product_layer) > 1:
                 extra_children = random.sample(
-                    product_layer, min(len(product_layer), num_extra)
+                    product_layer, min(len(product_layer), number_of_extra_children)
                 )
-                for c in extra_children:
-                    if c not in children:
-                        children.append(c)
+                for child in extra_children:
+                    if child not in children:
+                        children.append(child)
 
             weights = np.random.dirichlet(np.ones(len(children)))
             for child, weight in zip(children, weights):
-                s.add_subcircuit(child, np.log(weight))
-            sum_layer.append(s)
+                sum_unit.add_subcircuit(child, np.log(weight))
+            sum_layer.append(sum_unit)
         current_layer = sum_layer
 
-    root = SumUnit(probabilistic_circuit=pc)
+    root = SumUnit(probabilistic_circuit=probabilistic_circuit)
     weights = np.random.dirichlet(np.ones(len(current_layer)))
     for child, weight in zip(current_layer, weights):
         root.add_subcircuit(child, np.log(weight))
 
-    return pc
+    return probabilistic_circuit
 
 
 def run_random_circuit_benchmark(iterations: int = 3) -> ExperimentsTable:
@@ -160,137 +137,182 @@ def run_random_circuit_benchmark(iterations: int = 3) -> ExperimentsTable:
     np.random.seed(42)
     random.seed(42)
 
-    c_vars = [Continuous(f"c{i}") for i in range(2)]
-    s_vars = [
+    continuous_variables = [Continuous(f"c{i}") for i in range(2)]
+    symbolic_variables = [
         Symbolic(f"s{i}", domain=Set.from_iterable(["a", "b", "c"])) for i in range(1)
     ]
-    variables = c_vars + s_vars
+    variables = continuous_variables + symbolic_variables
 
-    configs = [(1, 5), (2, 10), (3, 20), (4, 40)]
+    configurations = [(1, 5), (2, 10), (3, 20), (4, 40)]
     batch_sizes = [1000, 10000]
 
     results = []
 
-    for depth, width in configs:
-        rx_pc = generate_random_circuit(variables, depth, width)
-        np_pc = NumPyProbabilisticCircuit.from_rustworkx(rx_pc)
+    for depth, width in configurations:
+        rustworkx_probabilistic_circuit = generate_random_circuit(variables, depth, width)
+        layered_probabilistic_circuit = LayeredProbabilisticCircuit.from_rustworkx(rustworkx_probabilistic_circuit)
 
         for batch_size in batch_sizes:
-            # Construct data
-            data = np.empty((batch_size, len(variables)), dtype=object)
-            for i, var in enumerate(variables):
-                if isinstance(var, Continuous):
-                    data[:, i] = np.random.randn(batch_size)
-                else:
-                    domain_elements = list(var.domain.simple_sets)
-                    data[:, i] = np.random.choice(domain_elements, size=batch_size)
-
-            # Likelihood
-            rx_times = []
-            np_times = []
-            for _ in range(iterations):
-                t0 = time.time()
-                rx_pc.log_likelihood(data)
-                rx_times.append(time.time() - t0)
-                t0 = time.time()
-                np_pc.log_likelihood(data)
-                np_times.append(time.time() - t0)
-
-            rx_ms = MeanAndStandardDeviation.from_measurements(rx_times, Unit.SECONDS)
-            np_ms = MeanAndStandardDeviation.from_measurements(np_times, Unit.SECONDS)
-            results.append(
-                NumPyCircuitBenchmarkResult(
+            results.extend(
+                run_inference_benchmarks(
+                    rustworkx_probabilistic_circuit,
+                    layered_probabilistic_circuit,
+                    variables,
+                    batch_size,
                     depth,
                     width,
-                    str(batch_size),
-                    "Likelihood",
-                    rx_ms,
-                    np_ms,
-                    rx_ms.mean / np_ms.mean if np_ms.mean > 0 else float("inf"),
+                    iterations,
                 )
             )
 
-            # Sampling
-            rx_times = []
-            np_times = []
-            for _ in range(iterations):
-                t0 = time.time()
-                rx_pc.sample(batch_size)
-                rx_times.append(time.time() - t0)
-                t0 = time.time()
-                np_pc.sample(batch_size)
-                np_times.append(time.time() - t0)
-
-            rx_ms = MeanAndStandardDeviation.from_measurements(rx_times, Unit.SECONDS)
-            np_ms = MeanAndStandardDeviation.from_measurements(np_times, Unit.SECONDS)
-            results.append(
-                NumPyCircuitBenchmarkResult(
-                    depth,
-                    width,
-                    str(batch_size),
-                    "Sampling",
-                    rx_ms,
-                    np_ms,
-                    rx_ms.mean / np_ms.mean if np_ms.mean > 0 else float("inf"),
-                )
+        results.extend(
+            run_truncation_benchmarks(
+                rustworkx_probabilistic_circuit,
+                layered_probabilistic_circuit,
+                variables,
+                depth,
+                width,
+                iterations,
             )
-
-        # Truncation
-        trunc_configs = [1, 10, 100]
-        for num_simple_sets in trunc_configs:
-            events = []
-            for _ in range(3):
-                composite_event = None
-                for _ in range(num_simple_sets):
-                    event_data = {}
-                    for v in variables:
-                        if isinstance(v, Continuous):
-                            l, r = sorted([random.uniform(-2, 2), random.uniform(-2, 2)])
-                            event_data[v] = closed(l, r)
-                        else:
-                            domain_elements = [se.element for se in v.domain.simple_sets]
-                            event_data[v] = v.make_value(
-                                random.sample(
-                                    domain_elements, random.randint(1, len(domain_elements))
-                                )
-                            )
-                    simple_event = SimpleEvent.from_data(event_data).as_composite_set()
-                    if composite_event is None:
-                        composite_event = simple_event
-                    else:
-                        composite_event = composite_event | simple_event
-                events.append(composite_event)
-
-            rx_times = []
-            np_times = []
-            for _ in range(iterations):
-                t_rx = 0
-                t_np = 0
-                for event in events:
-                    t0 = time.time()
-                    rx_pc.log_truncated(event)
-                    t_rx += time.time() - t0
-                    t0 = time.time()
-                    np_pc.log_truncated(event)
-                    t_np += time.time() - t0
-                rx_times.append(t_rx / len(events))
-                np_times.append(t_np / len(events))
-
-            rx_ms = MeanAndStandardDeviation.from_measurements(rx_times, Unit.SECONDS)
-            np_ms = MeanAndStandardDeviation.from_measurements(np_times, Unit.SECONDS)
-            results.append(
-                NumPyCircuitBenchmarkResult(
-                    depth,
-                    width,
-                    f"{num_simple_sets} sets",
-                    "Truncation",
-                    rx_ms,
-                    np_ms,
-                    rx_ms.mean / np_ms.mean if np_ms.mean > 0 else float("inf"),
-                )
-            )
+        )
 
     return ExperimentsTable(results)
+
+
+def run_inference_benchmarks(
+    rustworkx_probabilistic_circuit,
+    layered_probabilistic_circuit,
+    variables,
+    batch_size,
+    depth,
+    width,
+    iterations,
+) -> List[NumPyCircuitBenchmarkResult]:
+    # Construct data
+    data = np.empty((batch_size, len(variables)), dtype=object)
+    for i, variable in enumerate(variables):
+        if isinstance(variable, Continuous):
+            data[:, i] = np.random.randn(batch_size)
+        else:
+            domain_elements = list(variable.domain.simple_sets)
+            data[:, i] = np.random.choice(domain_elements, size=batch_size)
+
+    results = []
+    # Likelihood
+    rustworkx_times = []
+    layered_times = []
+    for _ in range(iterations):
+        start_time = time.time()
+        rustworkx_probabilistic_circuit.log_likelihood(data)
+        rustworkx_times.append(time.time() - start_time)
+        start_time = time.time()
+        layered_probabilistic_circuit.log_likelihood(data)
+        layered_times.append(time.time() - start_time)
+
+    rustworkx_measurements = MeanAndStandardDeviation.from_measurements(rustworkx_times, Unit.SECONDS)
+    layered_measurements = MeanAndStandardDeviation.from_measurements(layered_times, Unit.SECONDS)
+    results.append(
+        NumPyCircuitBenchmarkResult(
+            str(batch_size),
+            "Likelihood",
+            rustworkx_measurements,
+            layered_measurements,
+            rustworkx_measurements.mean / layered_measurements.mean if layered_measurements.mean > 0 else float("inf"),
+            depth,
+            width,
+        )
+    )
+
+    # Sampling
+    rustworkx_times = []
+    layered_times = []
+    for _ in range(iterations):
+        start_time = time.time()
+        rustworkx_probabilistic_circuit.sample(batch_size)
+        rustworkx_times.append(time.time() - start_time)
+        start_time = time.time()
+        layered_probabilistic_circuit.sample(batch_size)
+        layered_times.append(time.time() - start_time)
+
+    rustworkx_measurements = MeanAndStandardDeviation.from_measurements(rustworkx_times, Unit.SECONDS)
+    layered_measurements = MeanAndStandardDeviation.from_measurements(layered_times, Unit.SECONDS)
+    results.append(
+        NumPyCircuitBenchmarkResult(
+            str(batch_size),
+            "Sampling",
+            rustworkx_measurements,
+            layered_measurements,
+            rustworkx_measurements.mean / layered_measurements.mean if layered_measurements.mean > 0 else float("inf"),
+            depth,
+            width,
+        )
+    )
+    return results
+
+
+def run_truncation_benchmarks(
+    rustworkx_probabilistic_circuit,
+    layered_probabilistic_circuit,
+    variables,
+    depth,
+    width,
+    iterations,
+) -> List[NumPyCircuitBenchmarkResult]:
+    results = []
+    truncation_configurations = [1, 10, 100]
+    for number_of_simple_sets in truncation_configurations:
+        events = []
+        for _ in range(3):
+            composite_event = None
+            for _ in range(number_of_simple_sets):
+                event_data = {}
+                for variable in variables:
+                    if isinstance(variable, Continuous):
+                        lower, upper = sorted([random.uniform(-2, 2), random.uniform(-2, 2)])
+                        event_data[variable] = closed(lower, upper)
+                    else:
+                        domain_elements = [simple_set.element for simple_set in variable.domain.simple_sets]
+                        event_data[variable] = variable.make_value(
+                            random.sample(
+                                domain_elements, random.randint(1, len(domain_elements))
+                            )
+                        )
+                simple_event = SimpleEvent.from_data(event_data).as_composite_set()
+                if composite_event is None:
+                    composite_event = simple_event
+                else:
+                    composite_event = composite_event | simple_event
+            events.append(composite_event)
+
+        rustworkx_times = []
+        layered_times = []
+        for _ in range(iterations):
+            total_rustworkx_time = 0
+            total_layered_time = 0
+            for event in events:
+                start_time = time.time()
+                rustworkx_probabilistic_circuit.log_truncated(event)
+                total_rustworkx_time += time.time() - start_time
+                start_time = time.time()
+                layered_probabilistic_circuit.log_truncated(event)
+                total_layered_time += time.time() - start_time
+            rustworkx_times.append(total_rustworkx_time / len(events))
+            layered_times.append(total_layered_time / len(events))
+
+        rustworkx_measurements = MeanAndStandardDeviation.from_measurements(rustworkx_times, Unit.SECONDS)
+        layered_measurements = MeanAndStandardDeviation.from_measurements(layered_times, Unit.SECONDS)
+        results.append(
+            NumPyCircuitBenchmarkResult(
+                f"{number_of_simple_sets} sets",
+                "Truncation",
+                rustworkx_measurements,
+                layered_measurements,
+                rustworkx_measurements.mean / layered_measurements.mean if layered_measurements.mean > 0 else float("inf"),
+                depth,
+                width,
+            )
+        )
+    return results
 
 
 if __name__ == "__main__":
