@@ -25,9 +25,7 @@ from typing_extensions import TYPE_CHECKING, List, Optional, Sequence, Tuple
 
 from experiments.experiment_definitions import VolumeBound
 from semantic_digital_twin.pipeline.mesh_decomposition.vhacd import VHACDMeshDecomposer
-from semantic_digital_twin.spatial_types.spatial_types import (
-    HomogeneousTransformationMatrix,
-)
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.geometry import (
     VolumetricBoundingBox,
     Shape,

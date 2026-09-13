@@ -13,7 +13,7 @@ from semantic_digital_twin.adapters.ros.msg_converter import (
     SemDTToRos2Converter,
     InputType,
 )
-from semantic_digital_twin.spatial_types.spatial_types import (
+from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
     Point3,
     Vector3,

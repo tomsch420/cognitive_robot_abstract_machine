@@ -35,27 +35,17 @@ class SetElement(AbstractSimpleSet):
         Use :py:func:`from_data` class method to create a set element from a dictionary, do not use the constructor directly.
     """
 
-    element: Hashable = None
-    all_elements: AllElements = field(default_factory=tuple)
-    cpp_object: rl.SetElement = field(init=False, repr=False)
+    cpp_object: rl.SetElement = field(default_factory=lambda: rl.SetElement(set()))
 
-    def __post_init__(self):
-        if self.element is not None and self.element not in self.all_elements:
-            raise ValueError(
-                f"Element {self.element} is not in the set of all elements. "
-                f"All elements: {self.all_elements}"
-            )
-        if self.element is None:
-            object.__setattr__(self, "cpp_object", rl.SetElement(set()))
-        else:
-            if not isinstance(self.all_elements, tuple):
-                object.__setattr__(self, "all_elements", tuple(self.all_elements))
-            element_index = self.all_elements.index(self.element)
-            object.__setattr__(
-                self,
-                "cpp_object",
-                rl.SetElement(element_index, set(self.hash_map.keys())),
-            )
+    element: Hashable = field(init=False)
+    """
+    The element.
+    """
+
+    all_elements: AllElements = field(init=False)
+    """
+    The set of all elements.
+    """
 
     @classmethod
     def from_data(cls, element: Hashable, all_elements: AllElements) -> Self:
@@ -66,7 +56,24 @@ class SetElement(AbstractSimpleSet):
             empty set element.
         :param all_elements: The set of all elements.
         """
-        return cls(element, all_elements)
+        instance = cls.__new__(cls)
+        instance.all_elements = all_elements
+        if element is not None and element not in all_elements:
+            raise ValueError(
+                f"Element {element} is not in the set of all elements. "
+                f"All elements: {all_elements}"
+            )
+        if element is None:
+            instance.cpp_object = rl.SetElement(set())
+        else:
+            if not isinstance(all_elements, Tuple):
+                instance.all_elements = tuple(all_elements)
+            element_index = instance.all_elements.index(element)
+            instance.cpp_object = rl.SetElement(
+                element_index, set(instance.hash_map.keys())
+            )
+            instance.element = element
+        return instance
 
     @cached_property
     def hash_map(self) -> HashMap:
@@ -138,36 +145,25 @@ class Set(AbstractCompositeSet):
         Use :py:func:`from_simple_sets` class method to create a set from a list of simple sets, do not use the constructor directly.
     """
 
-    simple_sets_input: Optional[Iterable[SetElement]] = None
-    cpp_object: rl.Set = field(init=False, repr=False)
-    simple_set_example: SetElement = field(init=False, repr=False)
-    all_elements: Tuple[Hashable] = field(init=False, repr=False)
-
-    def __post_init__(self):
-        if self.simple_sets_input is not None:
-            simple_sets_list = list(self.simple_sets_input)
-            if len(simple_sets_list) > 0:
-                object.__setattr__(self, "simple_set_example", simple_sets_list[0])
-                object.__setattr__(
-                    self,
-                    "cpp_object",
-                    rl.Set(
-                        {ss.cpp_object for ss in simple_sets_list},
-                        self.simple_set_example.cpp_object.all_elements,
-                    ),
-                )
-                object.__setattr__(
-                    self, "all_elements", simple_sets_list[0].all_elements
-                )
-                return
-
-        object.__setattr__(self, "cpp_object", rl.Set(set(), set()))
-        object.__setattr__(self, "all_elements", tuple())
-        object.__setattr__(self, "simple_set_example", SetElement())
+    cpp_object: rl.Set = field(default_factory=lambda: rl.Set(set(), set()))
+    simple_set_example: SetElement = field(init=False)
+    all_elements: Tuple[Hashable] = field(init=False)
 
     @classmethod
     def from_simple_sets(cls, *simple_sets: SetElement) -> Self:
-        return cls(simple_sets_input=simple_sets)
+        instance = cls.__new__(cls)
+        if len(simple_sets) > 0:
+            instance.simple_set_example = simple_sets[0]
+            instance.cpp_object = rl.Set(
+                {simple_set.cpp_object for simple_set in simple_sets},
+                instance.simple_set_example.cpp_object.all_elements,
+            )
+            instance.all_elements = simple_sets[0].all_elements
+
+        else:
+            instance.cpp_object = rl.Set(set(), set())
+            instance.all_elements = tuple()
+        return instance
 
     def _from_cpp(self, cpp_object):
         return Set.from_simple_sets(

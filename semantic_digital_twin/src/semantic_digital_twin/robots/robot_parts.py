@@ -50,7 +50,7 @@ from semantic_digital_twin.robots.robot_part_mixins import (
 )
 from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Agent
-from semantic_digital_twin.spatial_types.spatial_types import (
+from semantic_digital_twin.spatial_types import (
     Quaternion,
     Vector3,
     RotationMatrix,

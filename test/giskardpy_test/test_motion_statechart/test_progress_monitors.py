@@ -47,7 +47,7 @@ from krrood.symbolic_math.symbolic_math import Scalar
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
 )
-from semantic_digital_twin.spatial_types.spatial_types import Point3
+from semantic_digital_twin.spatial_types import Point3
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world import World
 
@@ -328,13 +328,13 @@ class TestStallDetection:
         ]
         assert [node.seconds for node in timer] == [timeout.total_seconds()]
 
-    def test_a_task_at_its_goal_is_not_approaching_one(self, cylinder_bot_world: World):
+    def test_a_task_at_its_goal_is_not_approaching_one(
+        self, cylinder_bot_world: World
+    ):
         """
         A task that is exactly at its goal has no rate to measure, since the rate of a
-        distance divides by that distance.
-
-        Having arrived is not approaching, so it must not read as the progress that
-        keeps a stalled motion from being given up on.
+        distance divides by that distance. Having arrived is not approaching, so it must
+        not read as the progress that keeps a stalled motion from being given up on.
         """
         bot = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
         arrived = CartesianPosition(
@@ -356,7 +356,6 @@ class TestStallDetection:
 
         assert arrived.error_signal.expression.evaluate()[0] == 0
         assert monitor.observation_state == ObservationStateValues.TRUE
-
 
 # %% measuring the convergence rate
 

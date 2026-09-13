@@ -49,10 +49,7 @@ from semantic_digital_twin.orm.model import (
 from semantic_digital_twin.robots.robot_parts import (
     EndEffector,
 )
-from semantic_digital_twin.spatial_types.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Pose,
-)
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Pose
 from semantic_digital_twin.robots.pr2 import PR2Joint
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 
@@ -432,8 +429,8 @@ def _torso_position(world):
 
 def test_sequence_runs_all_motions(immutable_model_world):
     """
-    Every motion of a sequence is executed, so the torso ends at the target of the
-    *last* motion.
+    Every motion of a sequence is executed, so the torso ends at the target of the *last*
+    motion.
 
     The robot starts in the LOW configuration, so a final HIGH motion proves the second
     motion actually ran.

@@ -23,7 +23,7 @@ from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.robots.justin import Justin
 from semantic_digital_twin.robots.robot_part_mixins import HasMobileBase
 from semantic_digital_twin.robots.robot_parts import EndEffector
-from semantic_digital_twin.spatial_types.spatial_types import Point3, Vector3
+from semantic_digital_twin.spatial_types import Point3, Vector3
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.world_entity import Body
 from coraplex.exceptions import MissingToolFrame, MissingWaypoints

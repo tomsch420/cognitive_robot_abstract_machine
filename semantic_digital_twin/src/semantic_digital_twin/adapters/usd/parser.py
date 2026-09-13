@@ -73,55 +73,6 @@ except ImportError:
         "'pip install usd-core'"
     )
 
-    class Gf:
-        class Vec3d:
-            pass
-
-        class Quatf:
-            pass
-
-        class Matrix4d:
-            pass
-
-    class Sdf:
-        class Path:
-            pass
-
-    class Usd:
-        class Prim:
-            pass
-
-        class Stage:
-            pass
-
-    class UsdGeom:
-        class Imageable:
-            pass
-
-        class Mesh:
-            pass
-
-        class Cube:
-            pass
-
-        class Sphere:
-            pass
-
-        class Cylinder:
-            pass
-
-    class UsdPhysics:
-        class Joint:
-            pass
-
-        class RigidBodyAPI:
-            pass
-
-    class UsdShade:
-        class Material:
-            pass
-
-
 try:
     from pxr import UsdSemantics
 except ImportError:

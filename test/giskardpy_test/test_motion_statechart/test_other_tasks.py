@@ -41,7 +41,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     ScrewMechanism,
 )
 from semantic_digital_twin.world_description.geometry import Scale
-from semantic_digital_twin.spatial_types.spatial_types import (
+from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
     Vector3,
     Point3,

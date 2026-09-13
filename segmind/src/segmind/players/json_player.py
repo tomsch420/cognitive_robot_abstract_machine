@@ -13,7 +13,7 @@ from trimesh import Geometry
 
 
 from segmind.players.data_player import FilePlayer, FrameData
-from semantic_digital_twin.spatial_types.spatial_types import RotationMatrix
+from semantic_digital_twin.spatial_types import RotationMatrix
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
@@ -26,7 +26,6 @@ class JSONPlayer(FilePlayer):
     """
     Plays the episode from a JSON file.
     """
-
     scene_id: int = 1
     """
     ID of the scene to play.
@@ -39,9 +38,8 @@ class JSONPlayer(FilePlayer):
 
     obj_id_to_name: Optional[Dict[int, str]] = None
     """
-    Mapping from object ID to object name.
-
-    It also selects what is replayed: objects whose ID is not in this mapping are ignored, since the file may contain objects that have no body
+    Mapping from object ID to object name. It also selects what is replayed: objects whose ID
+    is not in this mapping are ignored, since the file may contain objects that have no body
     in the world.
     """
 
@@ -55,23 +53,17 @@ class JSONPlayer(FilePlayer):
     Meshes of the objects in the file.
     """
 
-    correction_quaternions: Dict[Body, np.ndarray] = field(
-        default_factory=dict, init=False
-    )
+    correction_quaternions: Dict[Body, np.ndarray] = field(default_factory=dict, init=False)
     """
     Correction quaternions for the objects in the file.
     """
 
-    base_origin_of_objects: Dict[Body, np.ndarray] = field(
-        default_factory=dict, init=False
-    )
+    base_origin_of_objects: Dict[Body, np.ndarray] = field(default_factory=dict, init=False)
     """
     Sets the origin of the objects to the base of the robot.
     """
 
-    average_rotation_correction_matrix: Optional[np.ndarray] = field(
-        default=None, init=False
-    )
+    average_rotation_correction_matrix: Optional[np.ndarray] = field(default=None, init=False)
     """
     Correction matrix for the average rotation of the objects.
     """
@@ -80,17 +72,13 @@ class JSONPlayer(FilePlayer):
         """
         Generates the frame data from the json file.
         """
-        with open(self.file_path, "r") as f:
+        with open(self.file_path, 'r') as f:
             self.data_frames = json.load(f)[str(self.scene_id)]
-        self.data_frames = {
-            int(frame_id): objects_data
-            for frame_id, objects_data in self.data_frames.items()
-        }
+        self.data_frames = {int(frame_id): objects_data for frame_id, objects_data in self.data_frames.items()}
         self.data_frames = dict(sorted(self.data_frames.items(), key=lambda x: x[0]))
         for i, (frame_id, objects_data) in enumerate(self.data_frames.items()):
-            yield FrameData(
-                i * self.time_between_frames.total_seconds(), objects_data, frame_idx=i
-            )
+            yield FrameData(i * self.time_between_frames.total_seconds(), objects_data, frame_idx=i)
+
 
     def _pause(self): ...
 
@@ -103,15 +91,14 @@ class JSONPlayer(FilePlayer):
         :param frame_data: The frame data.
         :return: A dictionary mapping bodies to poses.
         """
+
         objects_data = frame_data.objects_data
         obj_id_to_name = self.obj_id_to_name or {}
         objects_poses: Dict[Body, Pose] = {}
         for obj_name, obj_data in objects_data.items():
             body_name = obj_id_to_name.get(int(obj_name))
             if body_name is None:
-                logger.debug(
-                    f"Skipping object {obj_name}, it has no entry in obj_id_to_name."
-                )
+                logger.debug(f"Skipping object {obj_name}, it has no entry in obj_id_to_name.")
                 continue
             for det in obj_data:
                 R = det["R"]
@@ -137,15 +124,19 @@ class JSONPlayer(FilePlayer):
     def get_joint_states(self, frame_data: FrameData) -> Dict[str, float]:
         pass
 
+
     def transform_to_stl(self, path: str):
         """
-        Transform ply files to stl files.
+        Transform ply files to stl files
 
         :param path: Path to ply files
         """
         for filename in os.listdir(path):
             if filename.lower().endswith(".ply"):
                 ply_path = os.path.join(path, filename)
-                stl_path = os.path.join(path, os.path.splitext(filename)[0] + ".stl")
+                stl_path = os.path.join(
+                    path,
+                    os.path.splitext(filename)[0] + ".stl"
+                )
                 mesh = trimesh.load(ply_path)
                 mesh.export(stl_path)

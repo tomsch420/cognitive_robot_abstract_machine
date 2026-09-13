@@ -8,11 +8,10 @@ from coraplex.locations.costmaps import (
     GaussianCostmap,
     OrientationGenerator,
 )
-from semantic_digital_twin.spatial_types.spatial_types import (
-    HomogeneousTransformationMatrix,
-)
-from semantic_digital_twin.spatial_types.spatial_types import Vector3
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.spatial_types import Vector3
 from semantic_digital_twin.spatial_types.spatial_types import Pose, Point3
+
 
 # ---- Occupancy locations tests ----
 

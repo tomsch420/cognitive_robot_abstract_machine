@@ -3,9 +3,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from probabilistic_model.probabilistic_circuit.rx.helper import uniform_measure_of_event
-from probabilistic_model.probabilistic_model.probabilistic_model import (
-    ProbabilisticModel,
-)
+from probabilistic_model.probabilistic_model import ProbabilisticModel
 
 
 @dataclass

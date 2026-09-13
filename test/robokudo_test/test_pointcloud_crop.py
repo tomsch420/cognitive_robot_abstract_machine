@@ -22,9 +22,7 @@ from robokudo.annotators.outputs import AnnotatorOutputPerPipelineMap, Annotator
 from robokudo.annotators.pointcloud_crop import PointcloudCropAnnotator
 from robokudo.cas import CAS, CASViews
 from robokudo.pipeline import Pipeline
-from semantic_digital_twin.spatial_types.spatial_types import (
-    HomogeneousTransformationMatrix,
-)
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 
 
 @pytest.fixture()

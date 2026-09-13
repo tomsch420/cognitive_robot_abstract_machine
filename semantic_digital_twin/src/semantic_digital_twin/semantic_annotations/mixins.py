@@ -57,7 +57,7 @@ from semantic_digital_twin.reasoning.predicates import is_supported_by
 from semantic_digital_twin.semantic_annotations.part_whole import (
     IsPartWholeRelationship,
 )
-from semantic_digital_twin.spatial_types.spatial_types import (
+from semantic_digital_twin.spatial_types import (
     Point3,
     HomogeneousTransformationMatrix,
     Vector3,

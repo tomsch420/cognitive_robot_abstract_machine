@@ -24,9 +24,7 @@ from robokudo.utils.annotator_helper import (
     resize_mask,
     generate_source_name,
 )
-from semantic_digital_twin.spatial_types.spatial_types import (
-    HomogeneousTransformationMatrix,
-)
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 
 
 class TestUtilsAnnotatorHelper(object):

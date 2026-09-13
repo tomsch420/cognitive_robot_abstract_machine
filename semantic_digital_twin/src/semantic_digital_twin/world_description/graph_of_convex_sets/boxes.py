@@ -37,7 +37,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     SemanticEnvironmentAnnotation,
     Wall,
 )
-from semantic_digital_twin.spatial_types.spatial_types import (
+from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
     Point2,
     Point3,

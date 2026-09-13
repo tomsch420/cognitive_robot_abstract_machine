@@ -1,8 +1,6 @@
 from dataclasses import dataclass, field
 
-from semantic_digital_twin.spatial_types.spatial_types import (
-    HomogeneousTransformationMatrix,
-)
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from typing_extensions import Tuple
 
 

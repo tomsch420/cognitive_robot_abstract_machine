@@ -1,6 +1,4 @@
-"""
-Shape-specific adapters for fitted primitive results.
-"""
+"""Shape-specific adapters for fitted primitive results."""
 
 from __future__ import annotations
 
@@ -9,9 +7,7 @@ from dataclasses import dataclass
 
 import numpy as np
 import open3d as o3d
-from semantic_digital_twin.spatial_types.spatial_types import (
-    HomogeneousTransformationMatrix,
-)
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.geometry import (
     Box as SemDTBox,
 )
@@ -41,9 +37,7 @@ from robokudo.utils.transform import get_quaternion_from_rotation_matrix
 
 @dataclass(frozen=True)
 class SphereFitParameters:
-    """
-    Parameters for fitting one sphere candidate.
-    """
+    """Parameters for fitting one sphere candidate."""
 
     distance_threshold: float
     robust_loss: str
@@ -56,9 +50,7 @@ class SphereFitParameters:
 
 @dataclass(frozen=True)
 class CylinderFitParameters:
-    """
-    Parameters for fitting one cylinder candidate.
-    """
+    """Parameters for fitting one cylinder candidate."""
 
     distance_threshold: float
     robust_loss: str
@@ -75,9 +67,7 @@ class CylinderFitParameters:
 
 @dataclass(frozen=True)
 class CuboidFitParameters:
-    """
-    Parameters for fitting one cuboid candidate.
-    """
+    """Parameters for fitting one cuboid candidate."""
 
     distance_threshold: float
     max_extent: float
@@ -93,42 +83,28 @@ ShapeFitParameters = Union[
 
 @dataclass(frozen=True)
 class ShapeFitSummary(ABC):
-    """
-    Shared compact metrics for one fitted shape candidate.
-    """
+    """Shared compact metrics for one fitted shape candidate."""
 
     score: float
-    """
-    Fit quality score.
-    """
+    """Fit quality score."""
 
     inlier_ratio: float
-    """
-    Ratio of input points explained by the fitted shape.
-    """
+    """Ratio of input points explained by the fitted shape."""
 
     root_mean_square_error: float
-    """
-    Root mean square distance error of inlier points.
-    """
+    """Root mean square distance error of inlier points."""
 
     @property
     @abstractmethod
     def shape_name(self) -> str:
-        """
-        Name of the fitted shape.
-        """
+        """Name of the fitted shape."""
 
     @abstractmethod
     def shape_specific_fields(self) -> tuple[tuple[str, object, str | None], ...]:
-        """
-        Return fields that only apply to this fitted shape.
-        """
+        """Return fields that only apply to this fitted shape."""
 
     def __str__(self) -> str:
-        """
-        Return the compact log representation.
-        """
+        """Return the compact log representation."""
         common_fields = (
             ("score", self.score, ".3f"),
             ("inlier_ratio", self.inlier_ratio, ".3f"),
@@ -144,14 +120,10 @@ class ShapeFitSummary(ABC):
 
 @dataclass(frozen=True)
 class SphereFitSummary(ShapeFitSummary):
-    """
-    Compact metrics for one fitted sphere candidate.
-    """
+    """Compact metrics for one fitted sphere candidate."""
 
     radius: float
-    """
-    Fitted sphere radius.
-    """
+    """Fitted sphere radius."""
 
     @property
     def shape_name(self) -> str:
@@ -163,19 +135,13 @@ class SphereFitSummary(ShapeFitSummary):
 
 @dataclass(frozen=True)
 class CylinderFitSummary(ShapeFitSummary):
-    """
-    Compact metrics for one fitted cylinder candidate.
-    """
+    """Compact metrics for one fitted cylinder candidate."""
 
     radius: float
-    """
-    Fitted cylinder radius.
-    """
+    """Fitted cylinder radius."""
 
     height: float
-    """
-    Fitted cylinder height.
-    """
+    """Fitted cylinder height."""
 
     @property
     def shape_name(self) -> str:
@@ -190,14 +156,10 @@ class CylinderFitSummary(ShapeFitSummary):
 
 @dataclass(frozen=True)
 class CuboidFitSummary(ShapeFitSummary):
-    """
-    Compact metrics for one fitted cuboid candidate.
-    """
+    """Compact metrics for one fitted cuboid candidate."""
 
     extents: list[float]
-    """
-    Fitted cuboid side lengths.
-    """
+    """Fitted cuboid side lengths."""
 
     @property
     def shape_name(self) -> str:
@@ -208,70 +170,50 @@ class CuboidFitSummary(ShapeFitSummary):
 
 
 class ShapeFitAdapter(ABC):
-    """
-    Shape-specific behavior for one fitted primitive type.
-    """
+    """Shape-specific behavior for one fitted primitive type."""
 
     shape_name: str
 
     @abstractmethod
     def matches(self, fit_result: FittedShape) -> bool:
-        """
-        Return whether this adapter handles the fit result.
-        """
+        """Return whether this adapter handles the fit result."""
 
     @abstractmethod
     def fit(
         self, points: np.ndarray, parameters: ShapeFitParameters
     ) -> Optional[FittedShape]:
-        """
-        Fit this primitive using shape-specific fit parameters.
-        """
+        """Fit this primitive using shape-specific fit parameters."""
 
     @abstractmethod
     def to_annotation(self, fit_result: FittedShape) -> Shape:
-        """
-        Convert a fit result into a RoboKudo shape annotation.
-        """
+        """Convert a fit result into a RoboKudo shape annotation."""
 
     @abstractmethod
     def to_o3d_geometry(self, fit_result: FittedShape) -> o3d.geometry.Geometry:
-        """
-        Convert a fitted primitive into an Open3D geometry.
-        """
+        """Convert a fitted primitive into an Open3D geometry."""
 
     @abstractmethod
     def to_coordinate_frame(self, fit_result: FittedShape) -> o3d.geometry.TriangleMesh:
-        """
-        Create a coordinate frame located at the fitted primitive center.
-        """
+        """Create a coordinate frame located at the fitted primitive center."""
 
     @abstractmethod
     def summary(self, fit_result: FittedShape) -> ShapeFitSummary:
-        """
-        Return compact metrics for one fitted candidate.
-        """
+        """Return compact metrics for one fitted candidate."""
 
 
 class SphereFitAdapter(ShapeFitAdapter):
-    """
-    Adapter for sphere fit results.
-    """
+    """Adapter for sphere fit results."""
 
     shape_name = "Sphere"
 
     def matches(self, fit_result: FittedShape) -> bool:
-        """
-        Return whether this adapter handles the fit result.
-        """
+        """Return whether this adapter handles the fit result."""
         return isinstance(fit_result, SphereFit)
 
     def fit(
         self, points: np.ndarray, parameters: ShapeFitParameters
     ) -> Optional[SphereFit]:
-        """
-        Fit one sphere candidate.
-        """
+        """Fit one sphere candidate."""
         fit_parameters = _as_sphere_fit_parameters(parameters)
         return fit_sphere(
             points=points,
@@ -291,9 +233,7 @@ class SphereFitAdapter(ShapeFitAdapter):
         )
 
     def to_annotation(self, fit_result: FittedShape) -> Sphere:
-        """
-        Create a sphere annotation from a sphere fit.
-        """
+        """Create a sphere annotation from a sphere fit."""
         sphere_fit = _as_sphere_fit(fit_result)
         origin = HomogeneousTransformationMatrix.from_xyz_quaternion(
             pos_x=float(sphere_fit.center[0]),
@@ -312,9 +252,7 @@ class SphereFitAdapter(ShapeFitAdapter):
         )
 
     def to_o3d_geometry(self, fit_result: FittedShape) -> o3d.geometry.Geometry:
-        """
-        Convert a fitted sphere into an Open3D geometry.
-        """
+        """Convert a fitted sphere into an Open3D geometry."""
         sphere_fit = _as_sphere_fit(fit_result)
         sphere = o3d.geometry.TriangleMesh.create_sphere(radius=sphere_fit.radius)
         sphere.translate(sphere_fit.center)
@@ -322,9 +260,7 @@ class SphereFitAdapter(ShapeFitAdapter):
         return sphere
 
     def to_coordinate_frame(self, fit_result: FittedShape) -> o3d.geometry.TriangleMesh:
-        """
-        Create a coordinate frame at the fitted sphere center.
-        """
+        """Create a coordinate frame at the fitted sphere center."""
         sphere_fit = _as_sphere_fit(fit_result)
         frame_size = max(float(sphere_fit.radius * 1.5), 0.01)
         return _coordinate_frame(
@@ -334,9 +270,7 @@ class SphereFitAdapter(ShapeFitAdapter):
         )
 
     def summary(self, fit_result: FittedShape) -> SphereFitSummary:
-        """
-        Return compact metrics for one sphere fit.
-        """
+        """Return compact metrics for one sphere fit."""
         sphere_fit = _as_sphere_fit(fit_result)
         return SphereFitSummary(
             score=float(sphere_fit.score),
@@ -347,24 +281,18 @@ class SphereFitAdapter(ShapeFitAdapter):
 
 
 class CylinderFitAdapter(ShapeFitAdapter):
-    """
-    Adapter for cylinder fit results.
-    """
+    """Adapter for cylinder fit results."""
 
     shape_name = "Cylinder"
 
     def matches(self, fit_result: FittedShape) -> bool:
-        """
-        Return whether this adapter handles the fit result.
-        """
+        """Return whether this adapter handles the fit result."""
         return isinstance(fit_result, CylinderFit)
 
     def fit(
         self, points: np.ndarray, parameters: ShapeFitParameters
     ) -> Optional[CylinderFit]:
-        """
-        Fit one cylinder candidate.
-        """
+        """Fit one cylinder candidate."""
         fit_parameters = _as_cylinder_fit_parameters(parameters)
         return fit_cylinder(
             points=points,
@@ -388,9 +316,7 @@ class CylinderFitAdapter(ShapeFitAdapter):
         )
 
     def to_annotation(self, fit_result: FittedShape) -> Cylinder:
-        """
-        Create a cylinder annotation from a cylinder fit.
-        """
+        """Create a cylinder annotation from a cylinder fit."""
         cylinder_fit = _as_cylinder_fit(fit_result)
         rotation_matrix = rotation_matrix_from_axis(cylinder_fit.axis_direction)
         quaternion = get_quaternion_from_rotation_matrix(rotation_matrix)
@@ -412,9 +338,7 @@ class CylinderFitAdapter(ShapeFitAdapter):
         )
 
     def to_o3d_geometry(self, fit_result: FittedShape) -> o3d.geometry.Geometry:
-        """
-        Convert a fitted cylinder into an Open3D geometry.
-        """
+        """Convert a fitted cylinder into an Open3D geometry."""
         cylinder_fit = _as_cylinder_fit(fit_result)
         cylinder = o3d.geometry.TriangleMesh.create_cylinder(
             radius=cylinder_fit.radius, height=cylinder_fit.height
@@ -427,9 +351,7 @@ class CylinderFitAdapter(ShapeFitAdapter):
         return cylinder
 
     def to_coordinate_frame(self, fit_result: FittedShape) -> o3d.geometry.TriangleMesh:
-        """
-        Create a coordinate frame at the fitted cylinder center.
-        """
+        """Create a coordinate frame at the fitted cylinder center."""
         cylinder_fit = _as_cylinder_fit(fit_result)
         frame_size = max(float(cylinder_fit.radius * 1.8), 0.01)
         return _coordinate_frame(
@@ -439,9 +361,7 @@ class CylinderFitAdapter(ShapeFitAdapter):
         )
 
     def summary(self, fit_result: FittedShape) -> CylinderFitSummary:
-        """
-        Return compact metrics for one cylinder fit.
-        """
+        """Return compact metrics for one cylinder fit."""
         cylinder_fit = _as_cylinder_fit(fit_result)
         return CylinderFitSummary(
             score=float(cylinder_fit.score),
@@ -453,24 +373,18 @@ class CylinderFitAdapter(ShapeFitAdapter):
 
 
 class CuboidFitAdapter(ShapeFitAdapter):
-    """
-    Adapter for cuboid fit results.
-    """
+    """Adapter for cuboid fit results."""
 
     shape_name = "Cuboid"
 
     def matches(self, fit_result: FittedShape) -> bool:
-        """
-        Return whether this adapter handles the fit result.
-        """
+        """Return whether this adapter handles the fit result."""
         return isinstance(fit_result, CuboidFit)
 
     def fit(
         self, points: np.ndarray, parameters: ShapeFitParameters
     ) -> Optional[CuboidFit]:
-        """
-        Fit one cuboid candidate.
-        """
+        """Fit one cuboid candidate."""
         fit_parameters = _as_cuboid_fit_parameters(parameters)
         return fit_cuboid(
             points=points,
@@ -480,9 +394,7 @@ class CuboidFitAdapter(ShapeFitAdapter):
         )
 
     def to_annotation(self, fit_result: FittedShape) -> Cuboid:
-        """
-        Create a cuboid annotation from a cuboid fit.
-        """
+        """Create a cuboid annotation from a cuboid fit."""
         cuboid_fit = _as_cuboid_fit(fit_result)
         quaternion = get_quaternion_from_rotation_matrix(cuboid_fit.rotation_matrix)
         origin = HomogeneousTransformationMatrix.from_xyz_quaternion(
@@ -506,9 +418,7 @@ class CuboidFitAdapter(ShapeFitAdapter):
         )
 
     def to_o3d_geometry(self, fit_result: FittedShape) -> o3d.geometry.Geometry:
-        """
-        Convert a fitted cuboid into an Open3D geometry.
-        """
+        """Convert a fitted cuboid into an Open3D geometry."""
         cuboid_fit = _as_cuboid_fit(fit_result)
         oriented_box = o3d.geometry.OrientedBoundingBox(
             center=cuboid_fit.center,
@@ -520,9 +430,7 @@ class CuboidFitAdapter(ShapeFitAdapter):
         return line_set
 
     def to_coordinate_frame(self, fit_result: FittedShape) -> o3d.geometry.TriangleMesh:
-        """
-        Create a coordinate frame at the fitted cuboid center.
-        """
+        """Create a coordinate frame at the fitted cuboid center."""
         cuboid_fit = _as_cuboid_fit(fit_result)
         frame_size = max(float(np.max(cuboid_fit.extents) * 0.35), 0.01)
         return _coordinate_frame(
@@ -532,9 +440,7 @@ class CuboidFitAdapter(ShapeFitAdapter):
         )
 
     def summary(self, fit_result: FittedShape) -> CuboidFitSummary:
-        """
-        Return compact metrics for one cuboid fit.
-        """
+        """Return compact metrics for one cuboid fit."""
         cuboid_fit = _as_cuboid_fit(fit_result)
         return CuboidFitSummary(
             score=float(cuboid_fit.score),
@@ -556,9 +462,7 @@ SHAPE_FIT_ADAPTERS = (
 
 
 def adapter_for_fit(fit_result: FittedShape) -> ShapeFitAdapter:
-    """
-    Return the adapter for a fitted primitive.
-    """
+    """Return the adapter for a fitted primitive."""
     for adapter in SHAPE_FIT_ADAPTERS:
         if adapter.matches(fit_result):
             return adapter
@@ -566,9 +470,7 @@ def adapter_for_fit(fit_result: FittedShape) -> ShapeFitAdapter:
 
 
 def rotation_matrix_from_axis(axis_direction: np.ndarray) -> np.ndarray:
-    """
-    Create an orthonormal rotation matrix with z aligned to the axis.
-    """
+    """Create an orthonormal rotation matrix with z aligned to the axis."""
     normalized_axis = np.asarray(axis_direction, dtype=np.float64)
     axis_norm = np.linalg.norm(normalized_axis)
     if axis_norm < 1e-9:
@@ -593,9 +495,7 @@ def rotation_matrix_from_axis(axis_direction: np.ndarray) -> np.ndarray:
 
 
 def _format_summary_value(value: object, format_spec: str | None) -> str:
-    """
-    Format one summary value for compact log output.
-    """
+    """Format one summary value for compact log output."""
     if format_spec is None:
         return str(value)
     return f"{value:{format_spec}}"
@@ -606,9 +506,7 @@ def _coordinate_frame(
     rotation_matrix: np.ndarray,
     frame_size: float,
 ) -> o3d.geometry.TriangleMesh:
-    """
-    Create a transformed Open3D coordinate frame.
-    """
+    """Create a transformed Open3D coordinate frame."""
     frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=frame_size)
     transform = np.eye(4, dtype=np.float64)
     transform[:3, :3] = rotation_matrix

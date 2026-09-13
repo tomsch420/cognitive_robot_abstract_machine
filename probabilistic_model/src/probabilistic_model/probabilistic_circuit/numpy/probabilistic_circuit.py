@@ -30,7 +30,7 @@ class ProbabilisticCircuit(SubclassJSONSerializer, ProbabilisticModel):
     A probabilistic circuit as wrapper for a layered probabilistic model using NumPy.
     """
 
-    _variables: SortedSet
+    circuit_variables: SortedSet
     """
     The variables of the circuit.
     """
@@ -42,7 +42,7 @@ class ProbabilisticCircuit(SubclassJSONSerializer, ProbabilisticModel):
 
     @property
     def variables(self) -> Tuple[Variable, ...]:
-        return tuple(self._variables)
+        return tuple(self.circuit_variables)
 
     @property
     def support(self) -> Event:
@@ -55,7 +55,7 @@ class ProbabilisticCircuit(SubclassJSONSerializer, ProbabilisticModel):
         return self.root.probability(event.as_composite_set(), self.variables)[0]
 
     def moment(self, order: OrderType, center: CenterType) -> MomentType:
-        variable_to_index_map = {var: i for i, var in enumerate(self._variables)}
+        variable_to_index_map = {var: i for i, var in enumerate(self.circuit_variables)}
         moments = self.root.moment(order, center, variable_to_index_map)
         root_moments = moments[0]
         return MomentType(
@@ -76,7 +76,7 @@ class ProbabilisticCircuit(SubclassJSONSerializer, ProbabilisticModel):
         new_root = self.root.marginal(variables, self.variables)
         if new_root is None:
             return None
-        new_vars = SortedSet([v for v in self._variables if v in variables])
+        new_vars = SortedSet([v for v in self.circuit_variables if v in variables])
         return ProbabilisticCircuit(new_vars, new_root)
 
     def log_truncated(
@@ -85,7 +85,7 @@ class ProbabilisticCircuit(SubclassJSONSerializer, ProbabilisticModel):
         new_root, log_probs = self.root.log_truncated(event, self.variables)
         if new_root is None or log_probs[0] == -np.inf:
             return None, -np.inf
-        return ProbabilisticCircuit(self._variables, new_root), log_probs[0]
+        return ProbabilisticCircuit(self.circuit_variables, new_root), log_probs[0]
 
     def log_conditional(
         self, point: Dict[Variable, Any]
@@ -142,7 +142,7 @@ class ProbabilisticCircuit(SubclassJSONSerializer, ProbabilisticModel):
 
     def to_json(self) -> Dict[str, Any]:
         result = super().to_json()
-        result["variables"] = [to_json(variable) for variable in self._variables]
+        result["variables"] = [to_json(variable) for variable in self.circuit_variables]
         result["root"] = self.root.to_json()
         return result
 

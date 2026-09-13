@@ -5,7 +5,7 @@ from dataclasses import field, dataclass
 import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode, NodeArtifacts
-from semantic_digital_twin.spatial_types.spatial_types import Point3, Vector3
+from semantic_digital_twin.spatial_types import Point3, Vector3
 from semantic_digital_twin.world_description.world_entity import Body
 
 

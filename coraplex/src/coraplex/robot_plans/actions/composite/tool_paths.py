@@ -5,9 +5,7 @@ from dataclasses import dataclass
 import numpy as np
 from typing_extensions import Callable, List, Optional, Tuple
 
-from semantic_digital_twin.spatial_types.spatial_types import (
-    HomogeneousTransformationMatrix,
-)
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
 from semantic_digital_twin.world_description.world_entity import Body
 

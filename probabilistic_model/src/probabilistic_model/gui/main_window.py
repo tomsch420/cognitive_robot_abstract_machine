@@ -15,9 +15,7 @@ from .home_widget import HomeWidget
 from .query_widget import QueryWidget
 from .posterior_widget import PosteriorWidget
 from .mode_widget import ModeWidget
-from probabilistic_model.probabilistic_model.probabilistic_model import (
-    ProbabilisticModel,
-)
+from probabilistic_model.probabilistic_model import ProbabilisticModel
 
 
 @dataclass

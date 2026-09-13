@@ -28,7 +28,7 @@ from krrood.ormatic.data_access_objects.alternative_mappings import (
 )
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from krrood.symbol_graph.symbol_graph import Symbol
-from krrood.logging_config import logger
+from krrood import logger
 
 try:
     from random_events.interval import Bound, SimpleInterval
@@ -187,7 +187,7 @@ class NestedAction:
 @dataclass
 class EnumAction:
     obj: Body
-    enum: ExEnum
+    enum: TestEnum
 
 
 @dataclass
@@ -722,7 +722,7 @@ class MultipleInheritance(PrimaryBase, Mixin):
 
 
 # %% Test enum list
-class ExEnum(Enum):
+class TestEnum(Enum):
     OPTION_A = "option_a"
     OPTION_B = "option_b"
     OPTION_C = "option_c"
@@ -730,7 +730,7 @@ class ExEnum(Enum):
 
 @dataclass
 class ListOfEnum(Symbol):
-    list_of_enum: List[ExEnum]
+    list_of_enum: List[TestEnum]
 
 
 # %% Test forward reference resolution with multiple unresolved types
@@ -783,7 +783,7 @@ class UnderspecifiedTypesContainer:
 
 
 @dataclass
-class ExPositionSet:
+class TestKRROODPositionSet:
     positions: Set[KRROODPosition] = field(default_factory=set)
 
 
@@ -872,7 +872,7 @@ class SceneRoom:
 
 
 @dataclass
-class ExParts:
+class TestExParts:
     objects: List[SceneObject]
     rooms: List[SceneRoom]
 
@@ -929,9 +929,9 @@ class SceneRoomAggregations(SceneObjectAggregationBase[SceneRoom]):
 
 
 @dataclass
-class ExPartsAggregations(SceneObjectAggregationBase[ExParts]):
+class TestExPartsAggregations(SceneObjectAggregationBase[TestExParts]):
     """
-    Aggregation statistics for :class:`ExParts` over its ``objects`` and
+    Aggregation statistics for :class:`TestExParts` over its ``objects`` and
     ``rooms`` fields.
     """
 

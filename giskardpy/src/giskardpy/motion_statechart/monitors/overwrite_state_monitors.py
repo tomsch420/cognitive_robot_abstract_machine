@@ -4,9 +4,7 @@ from dataclasses import field, dataclass
 from typing import Optional, Type, Tuple
 
 import krrood.symbolic_math.symbolic_math as sm
-from semantic_digital_twin.spatial_types.spatial_types import (
-    HomogeneousTransformationMatrix,
-)
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.connections import (
     OmniDrive,
 )

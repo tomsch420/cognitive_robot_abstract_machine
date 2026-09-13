@@ -4,9 +4,7 @@ from time import sleep
 import pytest
 
 from rclpy.node import Node
-from semantic_digital_twin.spatial_types.spatial_types import (
-    HomogeneousTransformationMatrix,
-)
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.connections import OmniDrive
 from visualization_msgs.msg import Marker, MarkerArray
 

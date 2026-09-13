@@ -101,7 +101,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     FirstFloor,
     Level,
 )
-from semantic_digital_twin.spatial_types.spatial_types import (
+from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
     Vector3,
     Point3,

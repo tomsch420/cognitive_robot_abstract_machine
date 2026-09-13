@@ -22,7 +22,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Milk,
     Spoon,
 )
-from semantic_digital_twin.spatial_types.spatial_types import (
+from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
 )
 from semantic_digital_twin.spatial_types.spatial_types import Pose
@@ -97,25 +97,17 @@ plan = sequential(
         ParkArmsAction(Arms.BOTH),
         MoveTorsoAction(TorsoState.HIGH),
         TransportAction(
-            next(
-                an(entity(variable(Milk, domain=world.semantic_annotations))).evaluate()
-            ),
+            next(an(entity(variable(Milk, domain=world.semantic_annotations))).evaluate()),
             Pose.from_xyz_rpy(4.9, 3.3, 0.8, yaw=1.57, reference_frame=world.root),
             Arms.LEFT,
         ),
         TransportAction(
-            next(
-                an(entity(variable(Bowl, domain=world.semantic_annotations))).evaluate()
-            ),
+            next(an(entity(variable(Bowl, domain=world.semantic_annotations))).evaluate()),
             Pose.from_xyz_rpy(5, 3.3, 0.75, yaw=1.57, reference_frame=world.root),
             Arms.LEFT,
         ),
         TransportAction(
-            next(
-                an(
-                    entity(variable(Spoon, domain=world.semantic_annotations))
-                ).evaluate()
-            ),
+            next(an(entity(variable(Spoon, domain=world.semantic_annotations))).evaluate()),
             Pose.from_xyz_rpy(5.1, 3.3, 0.75, yaw=1.57, reference_frame=world.root),
             Arms.LEFT,
             GraspDescription(

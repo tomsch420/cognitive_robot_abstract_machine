@@ -44,7 +44,7 @@ from krrood.symbolic_math.symbolic_math import trinary_logic_not
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_parts import EndEffector
 from semantic_digital_twin.robots.hsrb import HSRB
-from semantic_digital_twin.spatial_types.spatial_types import (
+from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
     Vector3,
     Point3,

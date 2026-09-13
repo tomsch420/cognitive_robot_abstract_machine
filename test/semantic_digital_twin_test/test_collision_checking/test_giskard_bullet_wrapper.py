@@ -20,9 +20,7 @@ from semantic_digital_twin.pipeline.mesh_decomposition.bullet_vhacd import (
 )
 from semantic_digital_twin.pipeline.mesh_decomposition.coacd import COACDMeshDecomposer
 from semantic_digital_twin.pipeline.mesh_decomposition.vhacd import VHACDMeshDecomposer
-from semantic_digital_twin.spatial_types.spatial_types import (
-    HomogeneousTransformationMatrix,
-)
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.testing import world_setup_simple
 from semantic_digital_twin.world_description.geometry import Mesh
 from semantic_digital_twin.world_description.world_entity import Body
@@ -170,7 +168,6 @@ def test_create_shape_from_geometry_shared_shape_does_not_leak_pose_between_worl
     """
     Two independent ``BulletCollisionDetector`` instances built from worlds with
     identical geometry may end up sharing the same cached ``bullet.CollisionShape``.
-
     Moving a body's pose in one world must not affect collision results in the other.
     """
     world_a, box_a, cylinder_a, sphere_a, mesh_a, compound_a = world_setup_simple

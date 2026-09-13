@@ -18,9 +18,7 @@ from PySide6.QtGui import QIcon
 from .controller import ModelController
 from .variable_constraint_widget import VariableConstraintWidget
 from random_events.product_algebra import SimpleEvent, Event
-from probabilistic_model.probabilistic_model.probabilistic_model import (
-    ProbabilisticModel,
-)
+from probabilistic_model.probabilistic_model import ProbabilisticModel
 
 
 @dataclass

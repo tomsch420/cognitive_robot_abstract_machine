@@ -38,6 +38,10 @@ class DiscreteLayer(InputLayer):
     The shape is (#nodes, #states).
     """
 
+    def __init__(self, variable: int, log_probabilities: jnp.array):
+        super().__init__(variable)
+        self.log_probabilities = log_probabilities
+
     @classmethod
     def rustworkx_classes(cls) -> Tuple[Type, ...]:
         return (SymbolicDistribution,)

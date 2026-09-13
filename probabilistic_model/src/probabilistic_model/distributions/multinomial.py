@@ -13,9 +13,7 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit,
     leaf,
 )
-from probabilistic_model.probabilistic_model.probabilistic_model import (
-    ProbabilisticModel,
-)
+from probabilistic_model.probabilistic_model import ProbabilisticModel
 from probabilistic_model.utils import MissingDict
 from random_events.product_algebra import SimpleEvent, Event
 from random_events.variable import Symbolic, Variable

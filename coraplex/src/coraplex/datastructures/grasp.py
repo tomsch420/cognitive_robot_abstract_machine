@@ -8,9 +8,7 @@ from typing import Tuple
 import numpy as np
 from typing_extensions import Optional, Union, List, TYPE_CHECKING
 
-from semantic_digital_twin.spatial_types.spatial_types import (
-    HomogeneousTransformationMatrix,
-)
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.spatial_types.spatial_types import (
     Pose,
     Point3,

@@ -4,7 +4,7 @@ from types import NoneType
 
 from typing_extensions import Optional, Any, Type, TypeVar
 
-from krrood.logging_config import logger
+from krrood import logger
 
 try:
     from krrood.symbolic_math.symbolic_math import Scalar as SymbolicScalar

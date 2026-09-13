@@ -28,7 +28,7 @@ from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, Joi
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from semantic_digital_twin.datastructures.definitions import StaticJointState
 from semantic_digital_twin.robots.daisy import DAiSy, DAiSyJoint
-from semantic_digital_twin.spatial_types.spatial_types import (
+from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
 )
 from semantic_digital_twin.spatial_types.spatial_types import Pose

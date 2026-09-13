@@ -9,11 +9,7 @@ import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.motion_statechart.data_types import DefaultWeights
 from giskardpy.qp.constraint import LargeNumber
 from giskardpy.qp.constraint_collection import ConstraintCollection
-from semantic_digital_twin.spatial_types.spatial_types import (
-    Point3,
-    Vector3,
-    RotationMatrix,
-)
+from semantic_digital_twin.spatial_types import Point3, Vector3, RotationMatrix
 
 
 @dataclass

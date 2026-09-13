@@ -9,7 +9,7 @@ from random_events.product_algebra import Event
 from sqlalchemy.orm import sessionmaker
 from typing_extensions import ClassVar, Dict, List, Optional
 
-from krrood.logging_config import logger
+from krrood import logger
 from krrood.entity_query_language.verbalization.vocabulary.english import Directive
 
 from krrood.entity_query_language.core.base_expressions import (

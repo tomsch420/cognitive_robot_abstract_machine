@@ -32,7 +32,7 @@ from typing_extensions import (
     _SpecialForm,
 )
 
-from krrood.logging_config import logger
+from krrood import logger
 from krrood.exceptions import (
     NoModuleSourceProvided,
     NoDefaultValueFound,

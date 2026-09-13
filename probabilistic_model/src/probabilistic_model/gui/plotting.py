@@ -17,9 +17,7 @@ from PySide6.QtCharts import (
 from PySide6.QtCore import Qt, QPointF
 from PySide6.QtGui import QPainter, QColor, QCursor, QMouseEvent
 
-from probabilistic_model.probabilistic_model.probabilistic_model import (
-    ProbabilisticModel,
-)
+from probabilistic_model.probabilistic_model import ProbabilisticModel
 from random_events.variable import Symbolic, Continuous, Integer
 from random_events.interval import SimpleInterval, Interval
 from probabilistic_model.utils import neighbouring_points

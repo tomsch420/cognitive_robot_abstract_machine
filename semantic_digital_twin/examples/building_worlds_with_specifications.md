@@ -115,7 +115,7 @@ parent frame. Because a specification is reusable, that placement and the name c
 *overridden* when you spawn, together with the `parent` the entity attaches to.
 
 ```{code-cell} ipython3
-from semantic_digital_twin.spatial_types.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 
 # Bake a default pose straight into the specification.
 leg = BodySpecification.box(
@@ -185,7 +185,7 @@ corresponding `Body` constructors:
 from importlib.resources import files
 from pathlib import Path
 
-from semantic_digital_twin.spatial_types.spatial_types import Point3
+from semantic_digital_twin.spatial_types import Point3
 
 resources = Path(files("semantic_digital_twin")).parent.parent / "resources"
 
@@ -287,7 +287,7 @@ rotation to its translation.
 
 ```{code-cell} ipython3
 from semantic_digital_twin.api import PrismaticConnectionSpecification
-from semantic_digital_twin.spatial_types.spatial_types import Vector3
+from semantic_digital_twin.spatial_types import Vector3
 
 world = World.create_with_root_body()
 

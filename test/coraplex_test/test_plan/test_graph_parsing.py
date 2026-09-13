@@ -56,10 +56,7 @@ from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.goals.templates import (
     Parallel,
     RepeatOnStall,
-    Sequence,
-    TryAll,
-    TryInOrder,
-    CancelledWhenTrue,
+    Sequence, TryAll, TryInOrder, CancelledWhenTrue,
 )
 from giskardpy.motion_statechart.graph_node import CancelMotion
 from giskardpy.motion_statechart.monitors.payload_monitors import CountNodeResets
@@ -74,9 +71,7 @@ from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
 )
 from semantic_digital_twin.datastructures.definitions import TorsoState
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
-from semantic_digital_twin.spatial_types.spatial_types import (
-    HomogeneousTransformationMatrix,
-)
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.spatial_types.spatial_types import Pose, Point3
 from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
 

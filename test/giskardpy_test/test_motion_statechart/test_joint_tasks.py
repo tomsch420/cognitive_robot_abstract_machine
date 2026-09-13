@@ -31,7 +31,7 @@ from krrood.symbolic_math.symbolic_math import (
     shortest_angular_distance,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types.spatial_types import (
+from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
     Vector3,
 )

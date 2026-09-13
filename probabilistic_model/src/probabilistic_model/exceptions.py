@@ -4,9 +4,7 @@ from typing import Any, TYPE_CHECKING
 from krrood.exceptions import DataclassException
 
 if TYPE_CHECKING:
-    from probabilistic_model.probabilistic_model.probabilistic_model import (
-        ProbabilisticModel,
-    )
+    from probabilistic_model.probabilistic_model import ProbabilisticModel
 
 
 @dataclass

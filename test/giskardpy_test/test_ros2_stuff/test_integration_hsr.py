@@ -26,7 +26,7 @@ from giskardpy.motion_statechart.tasks.pointing import Pointing
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from numpy import pi
 from semantic_digital_twin.robots.hsrb import HSRB, HSRBJoint
-from semantic_digital_twin.spatial_types.spatial_types import (
+from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
     Vector3,
     Point3,

@@ -28,10 +28,7 @@ from semantic_digital_twin.adapters.ros.world_synchronizer import WorldSynchroni
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.tracy import Tracy
-from semantic_digital_twin.spatial_types.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Pose,
-)
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Pose
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
     FixedConnection,

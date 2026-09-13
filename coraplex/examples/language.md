@@ -66,7 +66,7 @@ from coraplex.datastructures.enums import Arms
 from coraplex.plans.factories import sequential
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from semantic_digital_twin.spatial_types import Pose
 
 navigate = NavigateAction(Pose.from_xyz_rpy(1, 1, 0, reference_frame=world.root))
 park = ParkArmsAction(Arms.BOTH)
@@ -105,7 +105,7 @@ from coraplex.datastructures.enums import Arms
 from coraplex.plans.factories import try_in_order
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from semantic_digital_twin.spatial_types import Pose
 
 navigate = NavigateAction(Pose.from_xyz_rpy(1, 1, 0, reference_frame=world.root))
 park = ParkArmsAction(Arms.BOTH)
@@ -130,7 +130,7 @@ from coraplex.datastructures.enums import Arms
 from coraplex.plans.factories import parallel
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from semantic_digital_twin.spatial_types import Pose
 
 navigate = NavigateAction(Pose.from_xyz_rpy(1, 1, 0, reference_frame=world.root))
 park = ParkArmsAction(Arms.BOTH)
@@ -153,7 +153,7 @@ from coraplex.datastructures.enums import Arms
 from coraplex.plans.factories import try_all
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from semantic_digital_twin.spatial_types import Pose
 
 navigate = NavigateAction(Pose.from_xyz_rpy(1, 1, 0, reference_frame=world.root))
 park = ParkArmsAction(Arms.BOTH)
@@ -175,7 +175,7 @@ from coraplex.plans.factories import parallel, sequential
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.robot_body import MoveTorsoAction, ParkArmsAction
 from semantic_digital_twin.datastructures.definitions import TorsoState
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from semantic_digital_twin.spatial_types import Pose
 
 navigate = NavigateAction(Pose.from_xyz_rpy(1, 1, 0, reference_frame=world.root))
 park = ParkArmsAction(Arms.BOTH)
@@ -241,7 +241,7 @@ the whole plan.
 from coraplex.plans.factories import code, try_all
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.plans.failures import PlanFailure
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from semantic_digital_twin.spatial_types import Pose
 
 
 def code_test():

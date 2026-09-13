@@ -14,7 +14,7 @@ from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.robot_body import MoveManipulatorAction
 from coraplex.robot_plans.mixins import HasTcpGoalThresholds
 from coraplex.robot_plans.motions.misc import DetectingMotion
-from semantic_digital_twin.spatial_types.spatial_types import (
+from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
     RotationMatrix,
     Vector3,

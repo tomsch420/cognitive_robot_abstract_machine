@@ -38,15 +38,6 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
 
 
 def inverse_class_of(clazz: Type[Unit]) -> Type[Layer]:
-    from probabilistic_model.probabilistic_circuit.jax.input_layer import (
-        GaussianLayer,
-        UniformLayer,
-        DiracDeltaLayer,
-    )
-    from probabilistic_model.probabilistic_circuit.jax.discrete_layer import (
-        DiscreteLayer,
-    )
-
     for subclass in recursive_subclasses(Layer):
         if not inspect.isabstract(subclass):
             if issubclass(clazz, subclass.rustworkx_classes()):
@@ -245,7 +236,9 @@ class InnerLayer(Layer, ABC):
     The child layers of this layer.
     """
 
-    def __post_init__(self):
+    def __init__(self, child_layers: List[Layer]):
+        super().__init__()
+        self.child_layers = child_layers
         self.variables  # initialize the variables of the layer
 
     def set_variables(self, value: jnp.array):
@@ -289,10 +282,9 @@ class InputLayer(Layer, ABC):
     loops.
     """
 
-    input_variable: int
-
-    def __post_init__(self):
-        object.__setattr__(self, "_variables", jnp.array([self.input_variable]))
+    def __init__(self, variable: int):
+        super().__init__()
+        self._variables = jnp.array([variable])
 
     @property
     def variables(self) -> jax.Array:
@@ -314,6 +306,12 @@ class InputLayer(Layer, ABC):
 class SumLayer(InnerLayer, ABC):
     log_weights: List[Union[jax.array, BCOO]]
     child_layers: Union[List[[ProductLayer]], List[InputLayer]]
+
+    def __init__(
+        self, child_layers: List[Layer], log_weights: List[Union[jax.array, BCOO]]
+    ):
+        super().__init__(child_layers)
+        self.log_weights = log_weights
 
     def validate(self):
         for log_weights in self.log_weights:
@@ -681,6 +679,17 @@ class ProductLayer(InnerLayer):
 
     The shape is (#child_layers, #nodes).
     """
+
+    def __init__(self, child_layers: List[Layer], edges: BCOO):
+        """
+        Initialize the product layer.
+
+        :param child_layers: The child layers of the product layer.
+        :param edges: The edges of the product layer.
+        """
+        super().__init__(child_layers)
+        self.edges = edges
+        self.variables
 
     def validate(self):
         if not self.edges.shape == (len(self.child_layers), self.number_of_nodes):

@@ -19,7 +19,7 @@ from typing_extensions import (
     Unpack,
 )
 
-from krrood.logging_config import logger
+from krrood import logger
 from krrood.adapters.json_serializer import list_like_classes
 from krrood.class_diagrams.exceptions import CouldNotResolveType
 from krrood.class_diagrams.utils import (

@@ -62,7 +62,7 @@ from giskardpy.motion_statechart.goals.templates import Sequence
 from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPosition
-from semantic_digital_twin.spatial_types.spatial_types import Point3
+from semantic_digital_twin.spatial_types import Point3
 
 msc_pcc = MotionStatechart()
 msc_pcc.add_node(

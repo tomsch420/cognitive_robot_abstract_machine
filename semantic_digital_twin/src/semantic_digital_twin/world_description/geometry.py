@@ -38,7 +38,7 @@ from random_events.product_algebra import SimpleEvent
 from semantic_digital_twin.datastructures.variables import SpatialVariables
 from semantic_digital_twin.exceptions import MalformedHexColor
 from semantic_digital_twin.mixin import HasSimulatorProperties
-from semantic_digital_twin.spatial_types.spatial_types import (
+from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
     Point2,
     Point3,

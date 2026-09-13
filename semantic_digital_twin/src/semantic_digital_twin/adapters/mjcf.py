@@ -23,7 +23,7 @@ from semantic_digital_twin.adapters.multi_sim import (
 from semantic_digital_twin.adapters.world_model_parser import WorldModelParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import WorldEntityNotFoundError
-from semantic_digital_twin.spatial_types.spatial_types import (
+from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
     RotationMatrix,
     Point3,

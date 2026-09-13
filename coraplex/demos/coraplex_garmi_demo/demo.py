@@ -16,7 +16,7 @@ from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.robots.garmi import Garmi
-from semantic_digital_twin.spatial_types.spatial_types import (
+from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
     Point3,
 )

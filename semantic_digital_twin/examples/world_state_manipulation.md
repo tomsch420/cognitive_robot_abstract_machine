@@ -33,7 +33,7 @@ from krrood.entity_query_language.factories import entity, variable, in_, the
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Drawer, Handle, Slider, Dresser
-from semantic_digital_twin.spatial_types.spatial_types import HomogeneousTransformationMatrix, Vector3
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Vector3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import Scale, Box, Color
 from semantic_digital_twin.world_description.world_entity import Body

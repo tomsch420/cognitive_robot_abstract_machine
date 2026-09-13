@@ -29,9 +29,7 @@ from giskardpy.motion_statechart.goals.collision_avoidance import (
 )
 from coraplex.view_manager import ViewManager
 from semantic_digital_twin.robots.pr2 import PR2
-from semantic_digital_twin.spatial_types.spatial_types import (
-    HomogeneousTransformationMatrix,
-)
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.spatial_types.spatial_types import Pose, Point3
 
 
