@@ -2,7 +2,7 @@ import ast
 import logging
 from _ast import AST
 
-from krrood.ripple_down_rules import logger
+from krrood.logging_config import logger
 
 from colorama import Fore, Style
 from pygments import highlight

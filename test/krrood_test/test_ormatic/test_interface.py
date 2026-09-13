@@ -681,7 +681,7 @@ def test_multiple_inheritance(session, database):
 
 
 def test_list_of_enum(session, database):
-    obj = ListOfEnum([TestEnum.OPTION_A, TestEnum.OPTION_B, TestEnum.OPTION_C])
+    obj = ListOfEnum([ExEnum.OPTION_A, ExEnum.OPTION_B, ExEnum.OPTION_C])
     dao = to_dao(obj)
 
     session.add(dao)
@@ -691,9 +691,9 @@ def test_list_of_enum(session, database):
     reconstructed = queried.from_dao()
     assert reconstructed == obj
     assert reconstructed.list_of_enum == [
-        TestEnum.OPTION_A,
-        TestEnum.OPTION_B,
-        TestEnum.OPTION_C,
+        ExEnum.OPTION_A,
+        ExEnum.OPTION_B,
+        ExEnum.OPTION_C,
     ]
 
 
@@ -722,12 +722,12 @@ def test_underspecified_types():
 
 def test_position_set(session, database):
     p1, p2 = KRROODPosition(1, 2, 3), KRROODPosition(2, 3, 4)
-    obj = TestKRROODPositionSet({p1, p2})
+    obj = ExPositionSet({p1, p2})
     dao = to_dao(obj)
     session.add(dao)
     session.commit()
 
-    r = session.scalars(select(TestKRROODPositionSetDAO)).one()
+    r = session.scalars(select(ExPositionSetDAO)).one()
     reconstructed = r.from_dao()
     assert reconstructed == obj
 

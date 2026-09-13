@@ -187,7 +187,7 @@ class NestedAction:
 @dataclass
 class EnumAction:
     obj: Body
-    enum: TestEnum
+    enum: ExEnum
 
 
 @dataclass
@@ -722,7 +722,7 @@ class MultipleInheritance(PrimaryBase, Mixin):
 
 
 # %% Test enum list
-class TestEnum(Enum):
+class ExEnum(Enum):
     OPTION_A = "option_a"
     OPTION_B = "option_b"
     OPTION_C = "option_c"
@@ -730,7 +730,7 @@ class TestEnum(Enum):
 
 @dataclass
 class ListOfEnum(Symbol):
-    list_of_enum: List[TestEnum]
+    list_of_enum: List[ExEnum]
 
 
 # %% Test forward reference resolution with multiple unresolved types
@@ -783,7 +783,7 @@ class UnderspecifiedTypesContainer:
 
 
 @dataclass
-class TestKRROODPositionSet:
+class ExPositionSet:
     positions: Set[KRROODPosition] = field(default_factory=set)
 
 
@@ -872,7 +872,7 @@ class SceneRoom:
 
 
 @dataclass
-class TestExParts:
+class ExParts:
     objects: List[SceneObject]
     rooms: List[SceneRoom]
 
@@ -929,9 +929,9 @@ class SceneRoomAggregations(SceneObjectAggregationBase[SceneRoom]):
 
 
 @dataclass
-class TestExPartsAggregations(SceneObjectAggregationBase[TestExParts]):
+class ExPartsAggregations(SceneObjectAggregationBase[ExParts]):
     """
-    Aggregation statistics for :class:`TestExParts` over its ``objects`` and
+    Aggregation statistics for :class:`ExParts` over its ``objects`` and
     ``rooms`` fields.
     """
 

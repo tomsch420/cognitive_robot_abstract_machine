@@ -10,7 +10,7 @@ from io import TextIOWrapper
 from pathlib import Path
 from types import NoneType, ModuleType
 
-from krrood.ripple_down_rules import logger
+from krrood.logging_config import logger
 from krrood.ripple_down_rules.exceptions import RDRLoadError
 
 try:
@@ -1164,7 +1164,12 @@ class RDRWithCodeWriter(RippleDownRules, ABC):
         imports = get_imports_from_types(main_types, file_name, package_name)
         defs_imports = get_imports_from_types(defs_types, defs_file_name, package_name)
 
-        defs_imports.append(f"from krrood.ripple_down_rules import *")
+        defs_imports.append(f"from krrood.ripple_down_rules.rdr import *")
+        defs_imports.append(f"from krrood.ripple_down_rules.rules import *")
+        defs_imports.append(f"from krrood.ripple_down_rules.experts import *")
+        defs_imports.append(
+            f"from krrood.ripple_down_rules.datastructures.enums import *"
+        )
         # Add the imports to the defs file
         with open(defs_file_name, "w") as f:
             f.write("\n".join(defs_imports) + "\n\n\n")

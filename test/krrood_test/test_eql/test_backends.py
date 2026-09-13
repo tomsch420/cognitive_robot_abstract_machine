@@ -38,7 +38,7 @@ from ..dataset.example_classes import (
     KRROODOrientation,
     Atom,
     Element,
-    TestEnum,
+    ExEnum,
     NestedAction,
     EnumAction,
 )
@@ -189,12 +189,12 @@ def test_enum_value_as_literal():
         obj=Body(
             "x",
         ),
-        enum=TestEnum.OPTION_A,
+        enum=ExEnum.OPTION_A,
     )
     pm_backend = ProbabilisticBackend(number_of_samples=10)
     values = list(prob_q.evaluate(backend=pm_backend))
     for value in values:
-        assert value.enum == TestEnum.OPTION_A
+        assert value.enum == ExEnum.OPTION_A
 
 
 def test_probabilistic_query_backend():

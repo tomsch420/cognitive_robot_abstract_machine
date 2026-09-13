@@ -9,7 +9,10 @@ from krrood.ripple_down_rules.utils import draw_tree, render_tree
 
 from ..datasets import *
 from krrood.ripple_down_rules.helpers import is_matching
-from krrood.ripple_down_rules import *
+from krrood.ripple_down_rules.rdr import *
+from krrood.ripple_down_rules.rules import *
+from krrood.ripple_down_rules.experts import *
+from krrood.ripple_down_rules.datastructures.enums import *
 
 
 def test_drawer_cabinet_rdr(drawer_cabinet_rdr):
