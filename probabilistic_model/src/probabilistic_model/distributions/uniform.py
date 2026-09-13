@@ -44,6 +44,7 @@ class UniformDistribution(ContinuousDistributionWithFiniteSupport):
         return np.full((len(x),), self.log_probability_density_function_value())
 
     def cumulative_distribution_function(self, x: npt.NDArray) -> npt.NDArray:
+        x = x.astype(float)
         result = (x - self.lower) / (self.upper - self.lower)
         result = np.minimum(1, np.maximum(0, result))
         return result[:, 0]
