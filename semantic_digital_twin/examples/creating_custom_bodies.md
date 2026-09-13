@@ -44,7 +44,7 @@ Finally, in our kinematic structure, each entity has a name. For this we can use
 
 ```{code-cell} ipython3
 import os
-from semantic_digital_twin.spatial_types import Point3, Vector3
+from semantic_digital_twin.spatial_types.spatial_types import Point3, Vector3
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.geometry import Box, Scale, Sphere, Cylinder, Mesh, Color
 

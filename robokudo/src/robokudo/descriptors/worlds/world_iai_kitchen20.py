@@ -1,7 +1,9 @@
 from pathlib import Path
 
 from robokudo.world_descriptor import BaseWorldDescriptor, ObjectSpec, RegionSpec
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.spatial_types.spatial_types import (
+    HomogeneousTransformationMatrix,
+)
 from semantic_digital_twin.world_description.geometry import Scale
 
 

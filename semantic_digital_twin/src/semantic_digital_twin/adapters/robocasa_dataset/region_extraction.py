@@ -27,7 +27,10 @@ from semantic_digital_twin.adapters.robocasa_dataset.semantics import (
     GripperExclusionZone,
     PlacementArea,
 )
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Point3
+from semantic_digital_twin.spatial_types.spatial_types import (
+    HomogeneousTransformationMatrix,
+    Point3,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import Box, Scale, Sphere

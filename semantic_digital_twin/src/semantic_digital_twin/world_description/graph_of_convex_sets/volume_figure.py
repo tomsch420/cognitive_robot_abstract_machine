@@ -29,7 +29,7 @@ from random_events.plotting import EventPlotter
 from random_events.product_algebra import Event
 from typing_extensions import List, Sequence
 
-from semantic_digital_twin.spatial_types import Point3
+from semantic_digital_twin.spatial_types.spatial_types import Point3
 from semantic_digital_twin.world_description.geometry import Bounds
 from semantic_digital_twin.world_description.graph_of_convex_sets.plotting import (
     FigurePalette,

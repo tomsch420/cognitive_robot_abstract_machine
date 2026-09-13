@@ -99,7 +99,7 @@ from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types import (
+from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
     Quaternion,
     RotationMatrix,

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import inspect
 from abc import abstractmethod, ABC
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import numpy as np
 import scipy.sparse
 from krrood.adapters.json_serializer import SubclassJSONSerializer, recursive_subclasses
@@ -35,6 +35,14 @@ def inverse_class_of(clazz: Type[Unit]) -> Type[Layer]:
     """
     Get the layered circuit layer class for a rustworkx unit class.
     """
+    from probabilistic_model.probabilistic_circuit.numpy.input_layer import (
+        DiscreteLayer,
+        GaussianLayer,
+        UniformLayer,
+        DiracDeltaLayer,
+        TruncatedGaussianLayer,
+    )
+
     for subclass in recursive_subclasses(Layer):
         if not inspect.isabstract(subclass):
             if issubclass(clazz, subclass.rustworkx_classes()):
@@ -55,6 +63,7 @@ class RustworkxLayerConverter:
     hash_remap: Dict[int, int]
 
 
+@dataclass
 class Layer(SubclassJSONSerializer, ABC):
     """
     Abstract class for Layers of a layered circuit.
@@ -62,7 +71,7 @@ class Layer(SubclassJSONSerializer, ABC):
     Layers have the same scope (set of variables) for every node in them.
     """
 
-    _variables: Optional[np.ndarray] = None
+    _variables: Optional[np.ndarray] = field(default=None, init=False)
     """
     The variable indices of the layer.
     """
@@ -253,6 +262,7 @@ class Layer(SubclassJSONSerializer, ABC):
         """
 
 
+@dataclass
 class InnerLayer(Layer, ABC):
     """
     Abstract Base Class for inner layers.
@@ -262,10 +272,6 @@ class InnerLayer(Layer, ABC):
     """
     The child layers of this layer.
     """
-
-    def __init__(self, child_layers: List[Layer]):
-        super().__init__()
-        self.child_layers = child_layers
 
     def all_layers(self) -> List[Layer]:
         result = [self]
@@ -281,14 +287,16 @@ class InnerLayer(Layer, ABC):
         return result
 
 
+@dataclass
 class InputLayer(Layer, ABC):
     """
     Abstract base class for univariate input units.
     """
 
-    def __init__(self, variable: int):
-        super().__init__()
-        self._variables = np.array([variable])
+    input_variable: int
+
+    def __post_init__(self):
+        self._variables = np.array([self.input_variable])
 
     @property
     def variable(self) -> int:
@@ -304,13 +312,11 @@ class InputLayer(Layer, ABC):
         return 1
 
 
+@dataclass
 class SumLayer(InnerLayer, ABC):
     """
     Abstract base class for sum layers.
     """
-
-    def __init__(self, child_layers: List[Layer]):
-        super().__init__(child_layers)
 
     @property
     def variables(self) -> np.ndarray:
@@ -323,6 +329,7 @@ class SumLayer(InnerLayer, ABC):
         return (SumUnit,)
 
 
+@dataclass
 class SparseSumLayer(SumLayer):
     """
     A SumLayer that uses SciPy Sparse matrices for weights.
@@ -335,12 +342,6 @@ class SparseSumLayer(SumLayer):
     Each element is a sparse matrix of shape (number_of_nodes,
     child_layer.number_of_nodes).
     """
-
-    def __init__(
-        self, child_layers: List[Layer], weights: List[scipy.sparse.csr_matrix]
-    ):
-        super().__init__(child_layers)
-        self.weights = weights
 
     @property
     def number_of_nodes(self) -> int:
@@ -666,6 +667,7 @@ class SparseSumLayer(SumLayer):
         return cls(child_layers, weights)
 
 
+@dataclass
 class ProductLayer(InnerLayer):
     """
     A layer that represents the product of multiple other units.
@@ -678,10 +680,6 @@ class ProductLayer(InnerLayer):
     Shape: (len(child_layers), number_of_nodes)
     Each entry edges[i, j] is the index of the node in child_layers[i] that node j in this layer uses.
     """
-
-    def __init__(self, child_layers: List[Layer], edges: np.ndarray):
-        super().__init__(child_layers)
-        self.edges = edges
 
     @property
     def number_of_nodes(self) -> int:

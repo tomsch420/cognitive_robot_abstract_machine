@@ -21,7 +21,7 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianOrientation,
 )
 from giskardpy.motion_statechart.tasks.pointing import Pointing
-from semantic_digital_twin.spatial_types import (
+from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
     Point3,
     Vector3,

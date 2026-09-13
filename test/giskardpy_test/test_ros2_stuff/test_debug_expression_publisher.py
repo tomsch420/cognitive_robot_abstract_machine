@@ -12,7 +12,7 @@ from giskardpy.motion_statechart.graph_node import DebugExpression
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
 from giskardpy.ros_executor import Ros2Executor
-from semantic_digital_twin.spatial_types import Vector3
+from semantic_digital_twin.spatial_types.spatial_types import Vector3
 from semantic_digital_twin.world import World
 
 
@@ -48,7 +48,9 @@ def build_align_planes_task(world: World) -> AlignPlanes:
 
 
 def test_ros_executor_importable_without_rclpy(monkeypatch):
-    """giskardpy.ros_executor must stay importable when rclpy is not installed."""
+    """
+    giskardpy.ros_executor must stay importable when rclpy is not installed.
+    """
     modules_to_evict = [
         name
         for name in sys.modules

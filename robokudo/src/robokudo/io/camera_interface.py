@@ -53,7 +53,9 @@ from robokudo.world import (
     world_instance,
 )
 from semantic_digital_twin.adapters.ros.node_registry import ROSNodeRegistry
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.spatial_types.spatial_types import (
+    HomogeneousTransformationMatrix,
+)
 
 if TYPE_CHECKING:
     import numpy.typing as npt

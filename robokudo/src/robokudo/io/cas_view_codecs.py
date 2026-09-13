@@ -21,7 +21,9 @@ from robokudo.io.open3d_codec_utils import (
     decode_open3d_point_cloud_from_base64_pcd,
 )
 from robokudo.types.tf import StampedTransform
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.spatial_types.spatial_types import (
+    HomogeneousTransformationMatrix,
+)
 
 
 def _recursive_convert(value: Any) -> Any:

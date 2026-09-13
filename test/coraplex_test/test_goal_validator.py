@@ -23,7 +23,7 @@ from coraplex.validation.goal_validator import (
     MultiPositionGoalValidator,
     MultiOrientationGoalValidator,
 )
-from semantic_digital_twin.spatial_types import (
+from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
     Quaternion,
 )
@@ -41,9 +41,7 @@ def goal_validator_world(immutable_model_world):
     milk_connection.origin = HomogeneousTransformationMatrix.from_xyz_quaternion(
         2.2, 2, 1, reference_frame=milk_connection.parent
     )
-    cereal_connection = world.get_body_by_name(
-        "breakfast_cereal.stl"
-    ).parent_connection
+    cereal_connection = world.get_body_by_name("breakfast_cereal.stl").parent_connection
     cereal_connection.origin = HomogeneousTransformationMatrix.from_xyz_quaternion(
         2.2, 1.8, 1, reference_frame=cereal_connection.parent
     )

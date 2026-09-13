@@ -31,7 +31,7 @@ from semantic_digital_twin.spatial_computations.ik_solver import (
     UnreachableException,
 )
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
-from semantic_digital_twin.spatial_types import Vector3, Point3, math
+from semantic_digital_twin.spatial_types.spatial_types import Vector3, Point3, math
 from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
     Pose,

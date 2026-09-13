@@ -5,7 +5,7 @@ import pytest
 import krrood.symbolic_math.symbolic_math as sm
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import SpatialTypeNotJsonSerializable
-from semantic_digital_twin.spatial_types import Point2, Point3, Pose
+from semantic_digital_twin.spatial_types.spatial_types import Point2, Point3, Pose
 from semantic_digital_twin.world_description.world_entity import Body
 
 

@@ -22,7 +22,9 @@ from probabilistic_model.probabilistic_circuit.rx.helper import fully_factorized
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit,
 )
-from probabilistic_model.probabilistic_model import ProbabilisticModel
+from probabilistic_model.probabilistic_model.probabilistic_model import (
+    ProbabilisticModel,
+)
 
 
 @dataclass

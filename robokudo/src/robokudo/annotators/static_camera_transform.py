@@ -7,7 +7,9 @@ from __future__ import annotations
 from timeit import default_timer
 
 from py_trees.common import Status
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.spatial_types.spatial_types import (
+    HomogeneousTransformationMatrix,
+)
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.io.camera_interface import CameraInterface

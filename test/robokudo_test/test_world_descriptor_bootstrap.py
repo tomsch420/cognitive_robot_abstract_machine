@@ -5,7 +5,9 @@ from robokudo.annotators.world_descriptor_bootstrap import (
     WorldDescriptorBootstrapAnnotator,
 )
 from robokudo.world_descriptor import PredefinedObject
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.spatial_types.spatial_types import (
+    HomogeneousTransformationMatrix,
+)
 from semantic_digital_twin.world_description.world_entity import Region
 
 

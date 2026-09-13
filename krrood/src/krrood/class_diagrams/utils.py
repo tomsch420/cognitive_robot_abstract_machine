@@ -25,7 +25,7 @@ from typing_extensions import (
     get_origin,
 )
 
-from krrood import logger
+from krrood.logging_config import logger
 from krrood.class_diagrams.exceptions import CouldNotResolveType
 from krrood.utils import (
     ensure_hashable,
@@ -79,7 +79,7 @@ def _underlying_function(method: Callable) -> Callable:
     The plain function a resolved method wraps.
 
     :param method: A method as resolved via attribute access on a class.
-    :return: ``method.__func__`` when *method* is a bound method (a ``classmethod``
+    :return:``method.__func__`` when *method* is a bound method (a ``classmethod``
         accessed via its class), otherwise *method* itself (a plain function or
         ``staticmethod`` access is already bare).
     """

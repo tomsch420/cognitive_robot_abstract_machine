@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC
+from dataclasses import dataclass, field
 import numpy as np
 import scipy.stats
 import math
@@ -40,25 +41,25 @@ def double_factorial(n):
     return math.prod(range(n, 0, -2))
 
 
+@dataclass
 class ContinuousLayer(InputLayer, ABC):
     """
     Abstract base class for continuous univariate input units.
     """
 
 
+@dataclass
 class ContinuousLayerWithFiniteSupport(ContinuousLayer, ABC):
     """
     Abstract class for continuous univariate input units with finite support.
     """
 
-    interval: np.ndarray
-    """
-    The interval of the distribution as an array of shape (num_nodes, 2).
-    """
+    def __post_init__(self):
+        super().__post_init__()
 
-    def __init__(self, variable: int, interval: np.ndarray):
-        super().__init__(variable)
-        self.interval = interval
+    @property
+    def interval(self) -> np.ndarray:
+        raise NotImplementedError
 
     @property
     def lower(self) -> np.ndarray:
@@ -74,6 +75,7 @@ class ContinuousLayerWithFiniteSupport(ContinuousLayer, ABC):
         return result
 
 
+@dataclass
 class DiscreteLayer(InputLayer):
     """
     A layer that represents discrete distributions over a single variable.
@@ -93,15 +95,8 @@ class DiscreteLayer(InputLayer):
     Only used for symbolic variables.
     """
 
-    def __init__(
-        self,
-        variable: int,
-        probabilities: np.ndarray,
-        hash_to_index: Optional[Dict[int, int]] = None,
-    ):
-        super().__init__(variable)
-        self.probabilities = probabilities
-        self.hash_to_index = hash_to_index
+    def __post_init__(self):
+        super().__post_init__()
 
     @property
     def number_of_nodes(self) -> int:
@@ -321,6 +316,7 @@ class DiscreteLayer(InputLayer):
         return cls(data["variable"], np.array(data["probabilities"]))
 
 
+@dataclass
 class GaussianLayer(ContinuousLayer):
     """
     A layer that represents Gaussian distributions over a single variable.
@@ -329,10 +325,8 @@ class GaussianLayer(ContinuousLayer):
     location: np.ndarray
     scale: np.ndarray
 
-    def __init__(self, variable: int, location: np.ndarray, scale: np.ndarray):
-        super().__init__(variable)
-        self.location = location
-        self.scale = scale
+    def __post_init__(self):
+        super().__post_init__()
 
     @property
     def number_of_nodes(self) -> int:
@@ -515,28 +509,30 @@ class GaussianLayer(ContinuousLayer):
     @classmethod
     def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
         return cls(
-            data["variable"], np.array(data["location"]), np.array(data["scale"])
+            data["variable"],
+            np.array(data["location"]),
+            np.array(data["scale"]),
+            np.array(data["interval"]),
         )
 
 
+@dataclass
 class TruncatedGaussianLayer(ContinuousLayerWithFiniteSupport):
     """
     A layer that represents Truncated Gaussian distributions over a single variable.
     """
 
+    input_variable: int
     location: np.ndarray
     scale: np.ndarray
+    _interval: np.ndarray
 
-    def __init__(
-        self,
-        variable: int,
-        location: np.ndarray,
-        scale: np.ndarray,
-        interval: np.ndarray,
-    ):
-        super().__init__(variable, interval)
-        self.location = location
-        self.scale = scale
+    def __post_init__(self):
+        super().__post_init__()
+
+    @property
+    def interval(self) -> np.ndarray:
+        return self._interval
 
     @property
     def number_of_nodes(self) -> int:
@@ -746,10 +742,21 @@ class TruncatedGaussianLayer(ContinuousLayerWithFiniteSupport):
         return units
 
 
+@dataclass
 class UniformLayer(ContinuousLayerWithFiniteSupport):
     """
     A layer that represents Uniform distributions over a single variable.
     """
+
+    input_variable: int
+    _interval: np.ndarray
+
+    def __post_init__(self):
+        super().__post_init__()
+
+    @property
+    def interval(self) -> np.ndarray:
+        return self._interval
 
     @classmethod
     def rustworkx_classes(cls) -> Tuple[Type[Unit], ...]:
@@ -923,6 +930,7 @@ class UniformLayer(ContinuousLayerWithFiniteSupport):
         return cls(data["variable"], np.array(data["interval"]))
 
 
+@dataclass
 class DiracDeltaLayer(ContinuousLayer):
     """
     A layer that represents Dirac delta distributions over a single variable.
@@ -931,10 +939,8 @@ class DiracDeltaLayer(ContinuousLayer):
     location: np.ndarray
     density_cap: np.ndarray
 
-    def __init__(self, variable: int, location: np.ndarray, density_cap: np.ndarray):
-        super().__init__(variable)
-        self.location = location
-        self.density_cap = density_cap
+    def __post_init__(self):
+        super().__post_init__()
 
     @property
     def number_of_nodes(self) -> int:

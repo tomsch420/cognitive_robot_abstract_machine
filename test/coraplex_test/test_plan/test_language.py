@@ -38,7 +38,7 @@ from giskardpy.motion_statechart.nodes_for_testing.nodes_for_testing import (
     ConstTrueNode,
 )
 from semantic_digital_twin.datastructures.definitions import TorsoState
-from semantic_digital_twin.spatial_types import Pose
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.robots.pr2 import PR2Joint
 
 

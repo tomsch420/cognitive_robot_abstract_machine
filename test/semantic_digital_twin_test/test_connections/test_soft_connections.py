@@ -13,7 +13,9 @@ from semantic_digital_twin.datastructures.soft_trunk import (
     SoftTrunkSection,
 )
 from semantic_digital_twin.spatial_computations.ik_solver import InverseKinematicsSolver
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.spatial_types.spatial_types import (
+    HomogeneousTransformationMatrix,
+)
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 from semantic_digital_twin.world_description.degree_of_freedom import (

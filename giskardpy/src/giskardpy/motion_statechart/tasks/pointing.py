@@ -6,7 +6,7 @@ from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.error_signals import SymbolicErrorSignal
 from giskardpy.motion_statechart.graph_node import NodeArtifacts
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianTask
-from semantic_digital_twin.spatial_types import Point3, Vector3
+from semantic_digital_twin.spatial_types.spatial_types import Point3, Vector3
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )

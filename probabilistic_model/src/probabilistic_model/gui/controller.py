@@ -2,7 +2,9 @@ from dataclasses import dataclass, field
 from typing import Optional, Dict, Tuple
 import json
 
-from probabilistic_model.probabilistic_model import ProbabilisticModel
+from probabilistic_model.probabilistic_model.probabilistic_model import (
+    ProbabilisticModel,
+)
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit,
 )

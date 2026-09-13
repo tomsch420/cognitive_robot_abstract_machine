@@ -55,7 +55,9 @@ from random_events.variable import (
 )
 
 if TYPE_CHECKING:
-    from probabilistic_model.probabilistic_model import ProbabilisticModel
+    from probabilistic_model.probabilistic_model.probabilistic_model import (
+        ProbabilisticModel,
+    )
 
 
 class ModelQueryParameters(ABC):

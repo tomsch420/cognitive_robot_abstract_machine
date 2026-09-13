@@ -20,7 +20,9 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from giskardpy.middleware.ros2.python_interface import GiskardWrapper
 from giskardpy.middleware.ros2 import rospy
 from semantic_digital_twin.exceptions import WorldEntityNotFoundError
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.spatial_types.spatial_types import (
+    HomogeneousTransformationMatrix,
+)
 
 
 @dataclass

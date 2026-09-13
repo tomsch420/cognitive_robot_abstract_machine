@@ -14,7 +14,7 @@ from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
 from semantic_digital_twin.reasoning.predicates import visible
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.semantic_annotations.mixins import IsPerceivable
-from semantic_digital_twin.spatial_types import (
+from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
     RotationMatrix,
 )

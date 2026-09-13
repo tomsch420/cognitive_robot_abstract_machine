@@ -18,7 +18,9 @@ from robokudo.types.annotation import (
 )
 from robokudo.types.scene import ObjectHypothesis
 from robokudo import world as rk_world
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.spatial_types.spatial_types import (
+    HomogeneousTransformationMatrix,
+)
 
 
 def _make_hypothesis(

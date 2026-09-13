@@ -9,14 +9,12 @@ from giskardpy.motion_statechart.tasks.grasp_bar import GraspBar
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
 )
-from semantic_digital_twin.spatial_types import Point3, Vector3
+from semantic_digital_twin.spatial_types.spatial_types import Point3, Vector3
 from semantic_digital_twin.world import World
 
 
 def test_grasp_bar(pr2_world_state_reset: World, rclpy_node):
-    VizMarkerPublisher(
-        _world=pr2_world_state_reset, node=rclpy_node
-    )
+    VizMarkerPublisher(_world=pr2_world_state_reset, node=rclpy_node)
     tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
         "r_gripper_tool_frame"
     )

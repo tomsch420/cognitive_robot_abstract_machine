@@ -17,7 +17,9 @@ from semantic_digital_twin.callbacks.callback import (
     ModelChangeCallback,
     StateChangeCallback,
 )
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.spatial_types.spatial_types import (
+    HomogeneousTransformationMatrix,
+)
 
 
 class RerunMode(StrEnum):

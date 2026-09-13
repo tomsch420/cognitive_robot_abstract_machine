@@ -20,7 +20,7 @@ from semantic_digital_twin.exceptions import (
     WorldEntityWithIDNotInKwargs,
     MissingWorldError,
 )
-from semantic_digital_twin.spatial_types import (
+from semantic_digital_twin.spatial_types.spatial_types import (
     Point3,
     Vector3,
     Quaternion,

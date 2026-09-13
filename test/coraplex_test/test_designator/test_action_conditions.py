@@ -11,7 +11,9 @@ from coraplex.exceptions import ConditionNotSatisfied, MotionDidNotFinish
 from coraplex.execution_environment import simulated_robot
 from coraplex.plans.factories import sequential
 from coraplex.robot_plans.actions.core.pick_up import PickUpAction
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.spatial_types.spatial_types import (
+    HomogeneousTransformationMatrix,
+)
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 
 

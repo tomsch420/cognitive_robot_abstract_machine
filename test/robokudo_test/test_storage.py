@@ -19,7 +19,9 @@ from robokudo.io.storage import Storage
 from robokudo.io.storage_reader_interface import StorageReaderInterface
 from robokudo.types.cv import ImageROI
 from robokudo.types.scene import ObjectHypothesis
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.spatial_types.spatial_types import (
+    HomogeneousTransformationMatrix,
+)
 
 
 @dataclass

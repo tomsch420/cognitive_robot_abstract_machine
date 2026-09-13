@@ -36,6 +36,7 @@ class ContinuousLayerWithFiniteSupport(ContinuousLayer, ABC):
     Abstract class for continuous univariate input units with finite support.
     """
 
+    input_variable: int
     interval: jax.Array = eqx.field(static=True)
     """
     The interval of the distribution as a array of shape (num_nodes, 2).
@@ -44,9 +45,8 @@ class ContinuousLayerWithFiniteSupport(ContinuousLayer, ABC):
     The intervals are treated as open intervals (>/< comparator).
     """
 
-    def __init__(self, variable: int, interval: jax.Array):
-        super().__init__(variable)
-        self.interval = interval
+    def __post_init__(self):
+        super().__post_init__()
 
     @property
     def lower(self) -> jax.Array:
@@ -104,6 +104,7 @@ class DiracDeltaLayer(ContinuousLayer):
     A layer that represents Dirac delta distributions over a single variable.
     """
 
+    input_variable: int
     location: jax.Array = eqx.field(static=True)
     """
     The locations of the Dirac delta distributions.
@@ -116,10 +117,8 @@ class DiracDeltaLayer(ContinuousLayer):
     This value will be used to replace infinity in likelihoods.
     """
 
-    def __init__(self, variable_index, location, density_cap):
-        super().__init__(variable_index)
-        self.location = location
-        self.density_cap = density_cap
+    def __post_init__(self):
+        super().__post_init__()
 
     def validate(self):
         if not self.location.shape == self.density_cap.shape:

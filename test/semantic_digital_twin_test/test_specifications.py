@@ -54,7 +54,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     DoorWithType,
     EntryWay,
 )
-from semantic_digital_twin.spatial_types import (
+from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
     Point3,
     Vector3,

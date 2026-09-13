@@ -16,7 +16,7 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.variables import SpatialVariables
 from semantic_digital_twin.exceptions import PointOccupiedError
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Floor
-from semantic_digital_twin.spatial_types import Point2, Point3, Pose
+from semantic_digital_twin.spatial_types.spatial_types import Point2, Point3, Pose
 from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
 )

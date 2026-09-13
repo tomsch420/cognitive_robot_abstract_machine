@@ -3,6 +3,7 @@ from __future__ import annotations
 import itertools
 import math
 import textwrap
+from collections.abc import MutableMapping
 from dataclasses import field, dataclass
 from typing import Any, Iterable, Self, Dict, Optional, Tuple, Mapping
 
@@ -24,20 +25,32 @@ VariableMapKey = Union[str, Variable]
 VariableSet = teSet[Variable]
 
 
-class VariableMap(VariableMapSuperClassType):
+@dataclass
+class VariableMap(MutableMapping[Variable, Any]):
     """
     A map from variables to values.
 
     Accessing a variable by name is also supported.
     """
 
+    _data: SortedDict[Variable, Any] = field(default_factory=SortedDict)
+
+    def __len__(self):
+        return len(self._data)
+
+    def __iter__(self):
+        return iter(self._data)
+
+    def __delitem__(self, key: Union[str, Variable]):
+        del self._data[self.get_variable(key)]
+
     @property
     def variables(self) -> Iterable[Variable]:
-        return self.keys()
+        return self._data.keys()
 
     @property
     def assignments(self) -> SortedValuesView:
-        return self.values()
+        return self._data.values()
 
     def get_variable(self, key: VariableMapKey) -> Variable:
         """
@@ -46,7 +59,6 @@ class VariableMap(VariableMapSuperClassType):
         :param key: The variable or its name.
         :return: The matching variable.
         """
-
         if isinstance(key, Variable):
             return key
 
@@ -56,13 +68,16 @@ class VariableMap(VariableMapSuperClassType):
         return variable[0]
 
     def __getitem__(self, key: Union[str, Variable]):
-        return super().__getitem__(self.get_variable(key))
+        return self._data[self.get_variable(key)]
 
     def __setitem__(self, key: Union[str, Variable], value: Any):
-        super().__setitem__(self.get_variable(key), value)
+        variable = self.get_variable(key)
+        self._data[variable] = variable.make_value(value)
 
     def __copy__(self):
-        return self.__class__({variable: value for variable, value in self.items()})
+        return self.__class__(
+            _data=SortedDict({variable: value for variable, value in self.items()})
+        )
 
 
 @dataclass(eq=False)
@@ -76,16 +91,23 @@ class SimpleEvent(AbstractSimpleSet, VariableMap):
         Use :py:func:`from_data` class method to create a simple event from a dictionary, do not use the constructor directly.
     """
 
+    _data: SortedDict[Variable, Any] = field(default_factory=SortedDict)
     cpp_object: rl.SimpleEvent = field(default_factory=rl.SimpleEvent)
 
+    def __post_init__(self):
+        if not isinstance(self._data, SortedDict):
+            self._data = SortedDict(self._data)
+
+        # Convert values to correct type if they aren't already
+        for variable in list(self._data.keys()):
+            value = self._data.pop(variable)
+            self[variable] = value
+
+        self._update_cpp_object()
+
     @classmethod
-    def from_data(cls, *args, **kwargs) -> Self:
-        instance = cls.__new__(cls)
-        VariableMap.__init__(instance, *args, **kwargs)
-        for key, value in instance.items():
-            instance._setitem_without_cpp(key, value)
-        instance._update_cpp_object()
-        return instance
+    def from_data(cls, data: Dict[VariableMapKey, Any]) -> Self:
+        return cls(_data=data)
 
     def _update_cpp_object(self):
         self.cpp_object = rl.SimpleEvent(
@@ -147,8 +169,9 @@ class SimpleEvent(AbstractSimpleSet, VariableMap):
     def __setitem__(self, key: VariableMapKey, value: Any):
         """
         Set the value of a variable in the event.
-        Also allows for assigning variables to values outside the classes of this package.
-        If this is the case, this tries to convert the value to a CompositeSet.
+
+        Also allows for assigning variables to values outside the classes of this
+        package. If this is the case, this tries to convert the value to a CompositeSet.
 
         :param key: The variable (or its name) to set the value for
         :param value: The value to set
@@ -234,8 +257,9 @@ class SimpleEvent(AbstractSimpleSet, VariableMap):
 
     def update_variables(self, new_variables: Dict[Variable, Variable]) -> Self:
         """
-        Construct a new simple event where the own variables are replaced with the new variables.
-        If the new variables are missing mappings, the old variables are kept for the missing updates.
+        Construct a new simple event where the own variables are replaced with the new
+        variables. If the new variables are missing mappings, the old variables are kept
+        for the missing updates.
 
         :param new_variables: A dictionary mapping current variables to new variables
         :return: A new SimpleEvent with the updated variables
@@ -264,6 +288,7 @@ class SimpleEvent(AbstractSimpleSet, VariableMap):
     def fill_missing_variables_pure(self, variables: Iterable[Variable]):
         """
         Fill this with the variables that are not in self but in `variables`.
+
         The variables are mapped to their domain.
         """
         return SimpleEvent.from_data(
@@ -291,43 +316,44 @@ class Event(AbstractCompositeSet):
         Use :py:func:`from_simple_sets` class method to create an event from a list of simple events, do not use the constructor directly.
     """
 
-    cpp_object: rl.Event = field(default_factory=lambda: rl.Event(set()))
-    simple_set_example: SimpleEvent = field(init=False)
+    simple_sets_input: Optional[Iterable[SimpleEvent]] = None
+    cpp_object: rl.Event = field(init=False, repr=False)
+    simple_set_example: SimpleEvent = field(init=False, repr=False)
+    _variables: Optional[SortedSet] = field(init=False, default=None, repr=False)
 
-    _variables: Optional[SortedSet] = field(init=False, default=None)
-    """
-    Cache for the variables of the event.
-    """
+    def __post_init__(self):
+        if self.simple_sets_input is None:
+            object.__setattr__(self, "simple_set_example", SimpleEvent.from_data())
+            object.__setattr__(self, "cpp_object", rl.Event(set()))
+            object.__setattr__(self, "_variables", SortedSet())
+            return
 
-    @classmethod
-    def from_simple_sets(cls, *simple_sets: SimpleEvent):
-        if isinstance(simple_sets, SimpleEvent):
-            simple_sets = (simple_sets,)
-        instance = cls.__new__(cls)
-        instance._variables = None
+        simple_sets = list(self.simple_sets_input)
 
         if not simple_sets:
-            instance.simple_set_example = SimpleEvent.from_data()
-            instance.cpp_object = rl.Event(set())
-            instance._variables = SortedSet()
-            return instance
+            object.__setattr__(self, "simple_set_example", SimpleEvent.from_data())
+            object.__setattr__(self, "cpp_object", rl.Event(set()))
+            object.__setattr__(self, "_variables", SortedSet())
+            return
 
-        # Compute the union of all variables from Python-side inputs — no C++ round-trip.
+        # Compute the union of all variables
         all_variables = SortedSet(
             variable for simple_set in simple_sets for variable in simple_set.variables
         )
 
-        # Fill missing variables in each input SimpleEvent before building the C++ Event,
-        # so every cpp_object is up-to-date when we pass it to rl.Event.
+        # Fill missing variables
         for simple_set in simple_sets:
             simple_set.fill_missing_variables(all_variables)
 
-        instance.simple_set_example = simple_sets[0]
-        instance.cpp_object = rl.Event(
-            {simple_set.cpp_object for simple_set in simple_sets}
+        object.__setattr__(self, "simple_set_example", simple_sets[0])
+        object.__setattr__(
+            self, "cpp_object", rl.Event({ss.cpp_object for ss in simple_sets})
         )
-        instance._variables = all_variables
-        return instance
+        object.__setattr__(self, "_variables", all_variables)
+
+    @classmethod
+    def from_simple_sets(cls, *simple_sets: SimpleEvent):
+        return cls(simple_sets_input=simple_sets)
 
     def _from_cpp(self, cpp_object: rl.Event) -> Event:
         # O(1) fast path: reuse the existing simple_set_example and variable cache.
@@ -363,7 +389,6 @@ class Event(AbstractCompositeSet):
         :param key: The variable or its name.
         :return: The matching variable.
         """
-
         if isinstance(key, Variable):
             return key
 
@@ -375,6 +400,7 @@ class Event(AbstractCompositeSet):
     def update_simple_set_example(self):
         """
         Update the simple set example to the first simple set in the event.
+
         Use this whenever the simple sets change in-place
         """
         simple_sets = self.simple_sets
@@ -386,7 +412,8 @@ class Event(AbstractCompositeSet):
         """
         Fill all simple sets with the missing variables in-place.
 
-        :param variables: The variables to fill the event with. If None, all variables are used.
+        :param variables: The variables to fill the event with. If None, all variables
+            are used.
         """
         if variables is None:
             variables = set()
@@ -415,7 +442,6 @@ class Event(AbstractCompositeSet):
 
         :param variables: The variables to fill the event with.
         """
-
         if variables is None:
             variables = set()
 
@@ -463,8 +489,9 @@ class Event(AbstractCompositeSet):
     def bounding_box(self) -> SimpleEvent:
         """
         Compute the bounding box of the event.
-        The bounding box is the smallest simple event that contains this event. It is computed by taking the union
-        of all simple events variable wise.
+
+        The bounding box is the smallest simple event that contains this event. It is
+        computed by taking the union of all simple events variable wise.
 
         :return: The bounding box as a simple event
         """
@@ -483,7 +510,7 @@ class Event(AbstractCompositeSet):
 
     def update_variables(self, new_variables: Dict[Variable, Variable]) -> Event:
         """
-        see :func:`~random_events.product_algebra.SimpleEvent.update_variables`
+        See :func:`~random_events.product_algebra.SimpleEvent.update_variables`
         """
         return Event.from_simple_sets(
             *[

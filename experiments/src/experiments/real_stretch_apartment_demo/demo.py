@@ -67,7 +67,9 @@ from semantic_digital_twin.predetermined_maps.apartment_environment import (
 )
 from semantic_digital_twin.robots.stretch import Stretch
 from semantic_digital_twin.semantic_annotations.semantic_annotations import CheezeIt
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.spatial_types.spatial_types import (
+    HomogeneousTransformationMatrix,
+)
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world import World
 

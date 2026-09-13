@@ -6,7 +6,7 @@ import pytest
 from typing_extensions import Type, Any
 
 import krrood.entity_query_language.factories as eql
-from krrood import logger
+from krrood.logging_config import logger
 from krrood.entity_query_language.exceptions import (
     NonAggregatedSelectedVariablesError,
     AggregatorInWhereConditionsError,
@@ -24,6 +24,7 @@ from krrood.entity_query_language.factories import (
     flat_variable,
 )
 from krrood.inheritance_path_length import inheritance_path_length
+
 try:
     from random_events.interval import SimpleInterval, Bound
 except ImportError as e:

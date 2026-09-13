@@ -37,11 +37,20 @@ class SimpleInterval(sigma_algebra.AbstractSimpleSet):
         Use :py:func:`from_data` class method to create a simple interval from a dictionary, do not use the constructor directly.
     """
 
-    cpp_object: rl.SimpleInterval = field(
-        default_factory=lambda: rl.SimpleInterval(
-            0.0, 0.0, Bound.OPEN.value, Bound.OPEN.value
+    lower: float = 0
+    upper: float = 0
+    left: Bound = Bound.OPEN
+    right: Bound = Bound.OPEN
+    cpp_object: rl.SimpleInterval = field(init=False, repr=False)
+
+    def __post_init__(self):
+        object.__setattr__(
+            self,
+            "cpp_object",
+            rl.SimpleInterval(
+                self.lower, self.upper, self.left.value, self.right.value
+            ),
         )
-    )
 
     @classmethod
     def from_data(
@@ -51,58 +60,15 @@ class SimpleInterval(sigma_algebra.AbstractSimpleSet):
         left: Bound = Bound.OPEN,
         right: Bound = Bound.OPEN,
     ) -> Self:
-        instance = cls.__new__(cls)
-        instance.cpp_object = rl.SimpleInterval(lower, upper, left.value, right.value)
-        return instance
-
-    @property
-    def lower(self) -> float:
-        """
-        :return: The lower bound of the interval.
-        """
-        return self.cpp_object.lower
-
-    @lower.setter
-    def lower(self, value: float):
-        self.cpp_object.lower = value
-
-    @property
-    def upper(self) -> float:
-        """
-        :return: The upper bound of the interval.
-        """
-        return self.cpp_object.upper
-
-    @upper.setter
-    def upper(self, value: float):
-        self.cpp_object.upper = value
-
-    @property
-    def left(self) -> Bound:
-        """
-        :return: The bound type of the lower bound.
-        """
-        return Bound(self.cpp_object.left.value)
-
-    @left.setter
-    def left(self, value: Bound):
-        self.cpp_object.left = rl.BorderType(value.value)
-
-    @property
-    def right(self) -> Bound:
-        """
-        :return: The bound type of the upper bound.
-        """
-        return Bound(self.cpp_object.right.value)
-
-    @right.setter
-    def right(self, value: Bound):
-        self.cpp_object.right = rl.BorderType(value.value)
+        return cls(lower, upper, left, right)
 
     @classmethod
     def _from_cpp(cls, cpp_object: rl.SimpleInterval) -> Self:
-        return cls.from_data(
-            cpp_object.lower, cpp_object.upper, cpp_object.left, cpp_object.right
+        return cls(
+            cpp_object.lower,
+            cpp_object.upper,
+            Bound(cpp_object.left.value),
+            Bound(cpp_object.right.value),
         )
 
     def as_composite_set(self) -> Interval:
@@ -193,26 +159,37 @@ class Interval(sigma_algebra.AbstractCompositeSet):
         Use :py:func:`from_simple_sets` class method to create an interval from a list of simple intervals, do not use the constructor directly.
     """
 
-    cpp_object: rl.Interval = field(default_factory=lambda: rl.Interval())
-    simple_set_example: SimpleInterval = field(init=False)
+    simple_sets_input: InitVar[Optional[Iterable[SimpleInterval]]] = None
+    cpp_object: rl.Interval = field(init=False, repr=False)
+    simple_set_example: SimpleInterval = field(init=False, repr=False)
+
+    def __post_init__(self, simple_sets_input):
+        object.__setattr__(self, "simple_set_example", SimpleInterval.from_data())
+        if simple_sets_input is None:
+            object.__setattr__(self, "cpp_object", rl.Interval())
+        else:
+            if isinstance(simple_sets_input, SimpleInterval):
+                simple_sets_input = (simple_sets_input,)
+            object.__setattr__(
+                self,
+                "cpp_object",
+                rl.Interval(
+                    {simple_set.cpp_object for simple_set in simple_sets_input}
+                ),
+            )
 
     @classmethod
     def from_simple_sets(
-        cls, *simple_sets: Union[Tuple[SimpleInterval, ...], SimpleInterval]
+        cls, *simple_sets: Union[Iterable[SimpleInterval], SimpleInterval]
     ) -> Self:
         """
         Create an interval from a list of simple intervals.
         :param simple_sets: The simple intervals that make up the interval.
         :return: The interval.
         """
-        instance = cls.__new__(cls)
-        instance.simple_set_example = SimpleInterval.from_data()
-        if not isinstance(simple_sets, tuple):
-            simple_sets = (simple_sets,)
-        instance.cpp_object = rl.Interval(
-            {simple_set.cpp_object for simple_set in simple_sets}
-        )
-        return instance
+        if len(simple_sets) == 1 and not isinstance(simple_sets[0], SimpleInterval):
+            return cls(simple_sets_input=simple_sets[0])
+        return cls(simple_sets_input=simple_sets)
 
     @classmethod
     def _from_cpp(cls, cpp_object: rl.Interval) -> Self:

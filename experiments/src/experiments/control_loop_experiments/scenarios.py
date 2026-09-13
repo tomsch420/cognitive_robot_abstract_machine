@@ -50,7 +50,7 @@ from semantic_digital_twin.collision_checking.collision_rules import (
     AvoidExternalCollisions,
 )
 from semantic_digital_twin.robots.pr2 import PR2Joint
-from semantic_digital_twin.spatial_types import (
+from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
     Vector3,
 )

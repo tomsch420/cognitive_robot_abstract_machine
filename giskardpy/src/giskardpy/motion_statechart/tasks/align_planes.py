@@ -8,7 +8,7 @@ from giskardpy.motion_statechart.graph_node import (
     NodeArtifacts,
     DebugExpression,
 )
-from semantic_digital_twin.spatial_types import Vector3
+from semantic_digital_twin.spatial_types.spatial_types import Vector3
 from semantic_digital_twin.world_description.geometry import Color
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,

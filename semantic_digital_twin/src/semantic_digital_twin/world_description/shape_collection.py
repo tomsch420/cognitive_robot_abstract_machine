@@ -32,7 +32,10 @@ from semantic_digital_twin.world_description.geometry import (
     VolumetricBoundingBox,
     Color,
 )
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Point3
+from semantic_digital_twin.spatial_types.spatial_types import (
+    HomogeneousTransformationMatrix,
+    Point3,
+)
 
 BoxT = TypeVar("BoxT", bound=AxisAlignedBox)
 """

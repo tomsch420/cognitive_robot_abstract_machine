@@ -70,7 +70,7 @@ from semantic_digital_twin.spatial_computations.forward_kinematics import (
 )
 from semantic_digital_twin.spatial_computations.ik_solver import InverseKinematicsSolver
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
-from semantic_digital_twin.spatial_types import (
+from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
     Quaternion,
     Point3,
@@ -123,7 +123,7 @@ from semantic_digital_twin.pipeline.mesh_decomposition.base import MeshDecompose
 from semantic_digital_twin.pipeline.mesh_decomposition.vhacd import VHACDMeshDecomposer
 
 if TYPE_CHECKING:
-    from semantic_digital_twin.spatial_types import GenericSpatialType
+    from semantic_digital_twin.spatial_types.spatial_types import GenericSpatialType
     from semantic_digital_twin.robots.robot_parts import AbstractRobot
 
 

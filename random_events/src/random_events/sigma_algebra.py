@@ -12,7 +12,7 @@ from random_events.utils import CPPWrapper
 EMPTY_SET_SYMBOL = "∅"
 
 
-@dataclass(init=False)
+@dataclass
 class AbstractSimpleSet(CPPWrapper, SubclassJSONSerializer, ABC):
     """
     Abstract class for simple sets.

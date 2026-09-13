@@ -68,7 +68,7 @@ from semantic_digital_twin.robots.pr2 import PR2, PR2Joint
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.robots.tracy import Tracy
 from semantic_digital_twin.robots.daisy import DAiSy
-from semantic_digital_twin.spatial_types import (
+from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
     Vector3,
     Point3,

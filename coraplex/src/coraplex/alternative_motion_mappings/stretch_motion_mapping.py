@@ -30,7 +30,7 @@ from coraplex.view_manager import ViewManager
 from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.robots.stretch import Stretch
-from semantic_digital_twin.spatial_types import (
+from semantic_digital_twin.spatial_types.spatial_types import (
     Vector3,
     HomogeneousTransformationMatrix,
     RotationMatrix,

@@ -8,7 +8,9 @@ import trimesh
 from scipy import ndimage
 
 from semantic_digital_twin.pipeline.mesh_decomposition.base import MeshDecomposer
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.spatial_types.spatial_types import (
+    HomogeneousTransformationMatrix,
+)
 from semantic_digital_twin.world_description.geometry import Mesh, Box, Scale
 
 

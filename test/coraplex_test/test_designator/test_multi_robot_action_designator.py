@@ -84,7 +84,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Milk,
     Spoon,
 )
-from semantic_digital_twin.spatial_types import (
+from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
     Point3,
     Quaternion,
@@ -960,7 +960,9 @@ def test_elevator_navigation(mutable_multiple_robot_apartment, rclpy_node):
     distance_from_cabin_center = float(elevator.scale.x) / 2 + action.exit_clearance
     expected_position = (
         cabin_position[:3]
-        + elevator.hole_direction.to_np().flatten()[:3] * -1 * distance_from_cabin_center
+        + elevator.hole_direction.to_np().flatten()[:3]
+        * -1
+        * distance_from_cabin_center
     )
     expected_position[2] = starting_height + elevator_travel
 

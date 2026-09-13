@@ -29,7 +29,9 @@ from robokudo.exceptions import StoredCameraTransformFrameMetadataMissing
 from robokudo.io.camera_interface import CameraInterface
 from robokudo.io.storage import Storage
 import robokudo.world as world
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.spatial_types.spatial_types import (
+    HomogeneousTransformationMatrix,
+)
 
 
 class StorageReaderInterface(CameraInterface):

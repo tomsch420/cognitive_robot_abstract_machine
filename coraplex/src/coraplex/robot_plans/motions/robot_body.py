@@ -13,7 +13,7 @@ from giskardpy.motion_statechart.tasks.pointing import Pointing
 from coraplex.robot_plans.mixins import HasMaxJointVelocity
 from coraplex.robot_plans.motions.base import BaseMotion
 from semantic_digital_twin.robots.robot_parts import Camera
-from semantic_digital_twin.spatial_types import Vector3
+from semantic_digital_twin.spatial_types.spatial_types import Vector3
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 
 

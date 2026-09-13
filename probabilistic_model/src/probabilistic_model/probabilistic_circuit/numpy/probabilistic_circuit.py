@@ -40,10 +40,6 @@ class ProbabilisticCircuit(SubclassJSONSerializer, ProbabilisticModel):
     The root layer of the circuit.
     """
 
-    def __init__(self, variables: SortedSet, root: Layer):
-        self._variables = variables
-        self.root = root
-
     @property
     def variables(self) -> Tuple[Variable, ...]:
         return tuple(self._variables)

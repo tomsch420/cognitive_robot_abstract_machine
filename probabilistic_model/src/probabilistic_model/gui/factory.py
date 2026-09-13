@@ -7,7 +7,9 @@ from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import Qt
 from qt_material import apply_stylesheet
 
-from probabilistic_model.probabilistic_model import ProbabilisticModel
+from probabilistic_model.probabilistic_model.probabilistic_model import (
+    ProbabilisticModel,
+)
 from .main_window import MainWindow
 
 

@@ -7,7 +7,7 @@ from numpy._typing import NDArray
 from typing_extensions import Self, TypeVar
 
 from krrood.adapters.json_serializer import SubclassJSONSerializer
-from semantic_digital_twin.spatial_types import Point3, RotationMatrix
+from semantic_digital_twin.spatial_types.spatial_types import Point3, RotationMatrix
 
 
 @dataclass

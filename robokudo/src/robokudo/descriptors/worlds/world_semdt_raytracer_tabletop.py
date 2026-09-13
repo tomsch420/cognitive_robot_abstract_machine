@@ -8,7 +8,9 @@ from robokudo.world_descriptor import (
     RegionSpec,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.spatial_types.spatial_types import (
+    HomogeneousTransformationMatrix,
+)
 from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.geometry import Color, Mesh, Scale
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
@@ -16,7 +18,9 @@ from semantic_digital_twin.world_description.world_entity import Body
 
 
 class WorldDescriptor(BaseWorldDescriptor):
-    """A compact tabletop world for SemDT RayTracer-based camera simulation."""
+    """
+    A compact tabletop world for SemDT RayTracer-based camera simulation.
+    """
 
     def __init__(self) -> None:
         super().__init__()
