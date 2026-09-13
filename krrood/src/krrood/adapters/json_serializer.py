@@ -12,6 +12,7 @@ from types import NoneType
 from typing import List, Optional, TypeAlias, TYPE_CHECKING
 
 import numpy as np
+from sortedcontainers import SortedSet
 from typing_extensions import Dict, Any, Self, Union, Type, TypeVar
 
 from krrood.adapters.exceptions import (
@@ -35,6 +36,7 @@ list_like_classes = (
     list,
     tuple,
     set,
+    SortedSet,
 )  # classes that can be serialized by the built-in JSON module
 leaf_types = (
     int,

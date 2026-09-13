@@ -245,7 +245,7 @@ class DiscreteLayer(InputLayer[Union[SymbolicDistribution, DiscreteDistribution]
         hash_remap = {hash(node): index for index, node in enumerate(nodes)}
         variable: Symbolic = nodes[0].variable
         domain_elements = list(variable.domain.simple_sets)
-        num_states = len(domain_elements)
+        number_of_states = len(domain_elements)
 
         state_hash_to_index = {
             hash(state): index for index, state in enumerate(domain_elements)
@@ -254,7 +254,7 @@ class DiscreteLayer(InputLayer[Union[SymbolicDistribution, DiscreteDistribution]
 
         is_symbolic = isinstance(variable, Symbolic)
 
-        parameters = np.zeros((len(nodes), num_states))
+        parameters = np.zeros((len(nodes), number_of_states))
 
         for i, node in enumerate(
             tqdm.tqdm(nodes, desc=f"Creating discrete layer for {variable.name}")
@@ -264,14 +264,14 @@ class DiscreteLayer(InputLayer[Union[SymbolicDistribution, DiscreteDistribution]
             for state, value in node.distribution.probabilities.items():
                 if is_symbolic:
                     if isinstance(state, int):
-                        idx = state_hash_to_index.get(state)
+                        index = state_hash_to_index.get(state)
                     else:
-                        idx = state_hash_to_index.get(hash(state))
+                        index = state_hash_to_index.get(hash(state))
                 else:
-                    idx = state_to_index.get(state)
+                    index = state_to_index.get(state)
 
-                if idx is not None:
-                    parameters[i, idx] = value
+                if index is not None:
+                    parameters[i, index] = value
 
         hash_to_index = None
         if is_symbolic:
@@ -560,16 +560,16 @@ class TruncatedGaussianLayer(ContinuousLayerWithFiniteSupport[TruncatedGaussianD
         # Moment of truncated gaussian is more complex.
         # For now, return a placeholder or use rx implementation in a loop.
         # Actually, let's skip it for now and see if tests need it.
-        num_vars = len(variable_to_index_map)
-        return np.zeros((self.number_of_nodes, num_vars))
+        number_of_variables = len(variable_to_index_map)
+        return np.zeros((self.number_of_nodes, number_of_variables))
 
     def sample(
         self, indices: np.ndarray, variables: Tuple[Variable, ...]
     ) -> np.ndarray:
         # Use rejection sampling or specialized formula
-        num_samples = len(indices)
-        num_vars = len(variables)
-        result = np.zeros((num_samples, num_vars))
+        number_of_samples = len(indices)
+        number_of_variables = len(variables)
+        result = np.zeros((number_of_samples, number_of_variables))
         # Loop for now as it's complex to vectorize rejection sampling well without JAX
         for i, node_idx in enumerate(indices):
             # dist = TruncatedGaussianDistribution(...)
@@ -613,12 +613,12 @@ class TruncatedGaussianLayer(ContinuousLayerWithFiniteSupport[TruncatedGaussianD
             else:
                 mode = loc
             event = SimpleEvent.from_data({variable: float(mode)}).as_composite_set()
-            # LL calculation
-            ll = scipy.stats.norm.logpdf(float(mode), loc=loc, scale=scale)
+            # Log-likelihood calculation
+            log_likelihood = scipy.stats.norm.logpdf(float(mode), loc=loc, scale=scale)
             z = scipy.stats.norm.cdf(u, loc=loc, scale=scale) - scipy.stats.norm.cdf(
                 l, loc=loc, scale=scale
             )
-            result.append((event, ll - np.log(z)))
+            result.append((event, log_likelihood - np.log(z)))
         return result
 
     def log_truncated(

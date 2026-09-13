@@ -25,7 +25,7 @@ class MultinomialDistribution(ProbabilisticModel):
     A multinomial distribution over symbolic random variables.
     """
 
-    distribution_variables: Tuple[Symbolic, ...]
+    variables: Tuple[Symbolic, ...]
     """
     The variables of the distribution.
     """
@@ -40,6 +40,8 @@ class MultinomialDistribution(ProbabilisticModel):
     """
 
     def __post_init__(self):
+        if not isinstance(self.variables, tuple):
+            self.variables = tuple(self.variables)
         shape = tuple(len(variable.domain.simple_sets) for variable in self.variables)
 
         if self.probabilities is None:
@@ -48,10 +50,6 @@ class MultinomialDistribution(ProbabilisticModel):
 
         if shape != self.probabilities.shape:
             raise ShapeMismatchError(self.variables, self.probabilities.shape)
-
-    @property
-    def variables(self) -> Tuple[Symbolic, ...]:
-        return tuple(self.distribution_variables)
 
     @property
     def support(self) -> Event:

@@ -116,15 +116,15 @@ def from_rustworkx(
     )
 
     # group nodes by depth
-    layer_to_nodes_map = {index: layer for index, layer in enumerate(rustworkx_probabilistic_circuit.layers)}
-    reversed_layers_to_nodes_map = dict(reversed(layer_to_nodes_map.items()))
+    depth_to_nodes_map = {index: nodes for index, nodes in enumerate(rustworkx_probabilistic_circuit.layers)}
+    reversed_depth_to_nodes_map = dict(reversed(depth_to_nodes_map.items()))
 
     # create layers from nodes
     child_layers: List[RustworkxLayerConverter] = []
-    for layer_index, nodes in (
-        tqdm.tqdm(reversed_layers_to_nodes_map.items(), desc="Creating Layers")
+    for depth_index, nodes in (
+        tqdm.tqdm(reversed_depth_to_nodes_map.items(), desc="Creating Layers")
         if progress_bar
-        else reversed_layers_to_nodes_map.items()
+        else reversed_depth_to_nodes_map.items()
     ):
         child_layers = create_layers_from_nodes(nodes, child_layers, progress_bar)
     root = child_layers[0].layer

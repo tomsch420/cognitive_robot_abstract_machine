@@ -56,18 +56,10 @@ class Layer(Generic[T], SubClassSafeGeneric, SubclassJSONSerializer, ABC):
     Layers have the same scope (set of variables) for every node in them.
     """
 
-    _variables: Optional[np.ndarray] = field(default=None, init=False)
+    variables: np.ndarray = field(default=None, init=False)
     """
     The variable indices of the layer.
     """
-
-    @property
-    def variables(self) -> np.ndarray:
-        return self._variables
-
-    @variables.setter
-    def variables(self, value: np.ndarray):
-        self._variables = value
 
     def to_json(self, **kwargs) -> Dict[str, Any]:
         return DataclassJSONSerializer.to_json(self, **kwargs)
@@ -264,11 +256,9 @@ class SumLayer(InnerLayer[T], ABC):
     Abstract base class for sum layers.
     """
 
-    @property
-    def variables(self) -> np.ndarray:
-        if self._variables is None:
-            self._variables = self.child_layers[0].variables
-        return self._variables
+    def __post_init__(self):
+        if self.variables is None:
+            self.variables = self.child_layers[0].variables
 
 
 @dataclass
@@ -425,33 +415,33 @@ class SparseSumLayer(SumLayer[SumUnit]):
         ]
 
         new_child_layers = []
-        child_log_probs = []
-        for child, log_probs in truncated_children_results:
+        child_log_probabilities = []
+        for child, log_probabilities in truncated_children_results:
             new_child_layers.append(child)
-            child_log_probs.append(log_probs)
+            child_log_probabilities.append(log_probabilities)
 
-        # Update weights: new_weight = old_weight * exp(child_log_prob)
+        # Update weights: new_weight = old_weight * exp(child_log_probability)
         new_weights = []
-        overall_log_probs = np.full(self.number_of_nodes, -np.inf)
+        overall_log_probabilities = np.full(self.number_of_nodes, -np.inf)
 
-        for weight_matrix, child_log_probability in zip(self.weights, child_log_probs):
-            # weight_matrix is (num_nodes, child_nodes)
-            # child_log_probability is (child_nodes,)
+        for weight_matrix, child_log_probability in zip(self.weights, child_log_probabilities):
+            # weight_matrix is (number_of_nodes, number_of_child_nodes)
+            # child_log_probability is (number_of_child_nodes,)
             # weight_matrix_new = weight_matrix * diag(exp(child_log_probability))
             weight_matrix_new = weight_matrix.multiply(np.exp(child_log_probability))
             new_weights.append(weight_matrix_new)
 
             # Update overall log probabilities
-            # row_sums = sum_j old_weight_j * exp(child_log_prob_j)
+            # row_sums = sum_j old_weight_j * exp(child_log_probability_j)
             row_sums = np.array(weight_matrix_new.sum(axis=1)).flatten()
             row_log_sums = np.full_like(row_sums, -np.inf)
             mask = row_sums > 0
             row_log_sums[mask] = np.log(row_sums[mask])
-            overall_log_probs = np.logaddexp(overall_log_probs, row_log_sums)
+            overall_log_probabilities = np.logaddexp(overall_log_probabilities, row_log_sums)
 
         # Normalize new weights
         final_weights = []
-        safe_sums = np.exp(overall_log_probs)
+        safe_sums = np.exp(overall_log_probabilities)
         safe_sums[safe_sums == 0] = 1.0
         inverse_sums = 1.0 / safe_sums
         for weight_matrix_new in new_weights:
@@ -460,7 +450,7 @@ class SparseSumLayer(SumLayer[SumUnit]):
             weight_matrix_final = diags(inverse_sums) @ weight_matrix_new
             final_weights.append(weight_matrix_final)
 
-        return SparseSumLayer(new_child_layers, final_weights), overall_log_probs
+        return SparseSumLayer(new_child_layers, final_weights), overall_log_probabilities
 
     def probability(self, event: Event, variables: Tuple[Variable, ...]) -> np.ndarray:
         child_probabilities = [
@@ -627,12 +617,10 @@ class ProductLayer(InnerLayer[ProductUnit]):
     def number_of_nodes(self) -> int:
         return self.edges.shape[1]
 
-    @property
-    def variables(self) -> np.ndarray:
-        if self._variables is None:
+    def __post_init__(self):
+        if self.variables is None:
             variables = np.concatenate([child_layer.variables for child_layer in self.child_layers])
-            self._variables = np.unique(variables)
-        return self._variables
+            self.variables = np.sort(np.unique(variables))
 
     def log_likelihood_of_nodes(self, x: np.ndarray) -> np.ndarray:
         number_of_samples = x.shape[0]
@@ -719,20 +707,20 @@ class ProductLayer(InnerLayer[ProductUnit]):
         ]
 
         new_child_layers = []
-        child_log_probs = []
-        for child, log_probs in truncated_children_results:
+        child_log_probabilities = []
+        for child, log_probabilities in truncated_children_results:
             new_child_layers.append(child)
-            child_log_probs.append(log_probs)
+            child_log_probabilities.append(log_probabilities)
 
         # New ProductLayer
         new_layer = ProductLayer(new_child_layers, self.edges)
 
-        # Overall log probs: sum of child log probs
-        overall_log_probs = np.zeros(self.number_of_nodes)
-        for i, child_log_probs_in_layer in enumerate(child_log_probs):
-            overall_log_probs += child_log_probs_in_layer[self.edges[i, :]]
+        # Overall log probabilities: sum of child log probabilities
+        overall_log_probabilities = np.zeros(self.number_of_nodes)
+        for i, child_log_probabilities_in_layer in enumerate(child_log_probabilities):
+            overall_log_probabilities += child_log_probabilities_in_layer[self.edges[i, :]]
 
-        return new_layer, overall_log_probs
+        return new_layer, overall_log_probabilities
 
     def probability(self, event: Event, variables: Tuple[Variable, ...]) -> np.ndarray:
         child_probabilities = [

@@ -39,7 +39,7 @@ class LayeredProbabilisticCircuit(SubclassJSONSerializer, ProbabilisticModel):
     A probabilistic circuit as wrapper for a layered probabilistic model using NumPy.
     """
 
-    _variables: SortedSet
+    variables: SortedSet
     """
     The variables of the circuit.
     """
@@ -50,18 +50,8 @@ class LayeredProbabilisticCircuit(SubclassJSONSerializer, ProbabilisticModel):
     """
 
     def __post_init__(self):
-        pass
-
-    @property
-    def variables(self) -> Tuple[Variable, ...]:
-        return tuple(self._variables)
-
-    @property
-    def circuit_variables(self) -> SortedSet:
-        """
-        Alias for variables to maintain compatibility if needed, though 'variables' is preferred.
-        """
-        return self._variables
+        if not isinstance(self.variables, SortedSet):
+            self.variables = SortedSet(self.variables)
 
     @property
     def support(self) -> Event:
@@ -114,18 +104,18 @@ class LayeredProbabilisticCircuit(SubclassJSONSerializer, ProbabilisticModel):
 
     @classmethod
     def from_rustworkx(
-        cls, pc: RustworkxProbabilisticCircuit, progress_bar: bool = False
+        cls, rustworkx_probabilistic_circuit: RustworkxProbabilisticCircuit, progress_bar: bool = False
     ) -> LayeredProbabilisticCircuit:
         """
         Convert a probabilistic circuit to a layered circuit.
 
-        The result expresses the same distribution as `pc`.
+        The result expresses the same distribution as `rustworkx_probabilistic_circuit`.
 
-        :param pc: The probabilistic circuit.
+        :param rustworkx_probabilistic_circuit: The probabilistic circuit.
         :param progress_bar: Whether to show a progress bar.
         :return: The layered circuit.
         """
-        return from_rustworkx(pc, progress_bar)
+        return from_rustworkx(rustworkx_probabilistic_circuit, progress_bar)
 
     def to_rustworkx(self, progress_bar: bool = True) -> RustworkxProbabilisticCircuit:
         """
