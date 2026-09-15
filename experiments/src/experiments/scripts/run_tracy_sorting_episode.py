@@ -40,6 +40,12 @@ def main(argument_list: list[str] | None = None) -> int:
             "than it was originally measured, for more clearance through its hole."
         ),
     )
+    parser.add_argument(
+        "--category",
+        default="cube",
+        choices=["cube", "cylinder", "rectangular_prism", "triangular_prism"],
+        help="Which loose piece's own shape to sort (matches its own hole).",
+    )
     arguments = parser.parse_args(argument_list)
 
     # Imported here, not at module level: importing the CRAM stack (coraplex, giskardpy,
@@ -77,10 +83,11 @@ def main(argument_list: list[str] | None = None) -> int:
         )
     )
 
+    category = MontessoriShapeCategory(arguments.category)
     layout = PieceLayout(
         placements=[
             PiecePlacement(
-                piece=KNOWN_PIECE_BY_CATEGORY[MontessoriShapeCategory.CUBE],
+                piece=KNOWN_PIECE_BY_CATEGORY[category],
                 x=SHAPE_ROW_X,
                 y=SHAPE_ROW_START_Y,
                 yaw=0.0,
@@ -90,7 +97,7 @@ def main(argument_list: list[str] | None = None) -> int:
     scenario = TracySortsAPiece(
         layout=layout,
         world_builder=TracyMontessoriWorldBuilder(piece_scale=arguments.piece_scale),
-        sorted_category=MontessoriShapeCategory.CUBE,
+        sorted_category=category,
         filmed=True,
         # The production arm (THE_ARM_THAT_SORTS, the right one) does not reliably
         # converge its reach at this board position in simulation; the left arm's reach
