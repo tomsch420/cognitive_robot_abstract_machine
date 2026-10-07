@@ -131,6 +131,18 @@ class RobotSetup(ABC):
         :return: The arm that picks objects up.
         """
 
+    @staticmethod
+    def _park_arms(world: World, robot: AbstractRobot) -> None:
+        """
+        Put every arm of the robot into its parking configuration.
+
+        :param world: The world the robot is in.
+        :param robot: The robot.
+        """
+        for arm in robot.all_arms:
+            arm.get_joint_state_by_type(StaticJointState.PARK).apply_to(world)
+        world.notify_state_change()
+
     @abstractmethod
     def add_pick_up_area(self, world: World, robot: AbstractRobot) -> PickUpArea:
         """
@@ -183,10 +195,8 @@ class PR2Setup(RobotSetup):
         PR2PhysicalSimulationPreparation(
             robot=robot, grip_torque=self.grip_torque
         ).apply()
-        for arm in robot.all_arms:
-            arm.get_joint_state_by_type(StaticJointState.PARK).apply_to(world)
         robot.mobile_base.torso.get_joint_state_by_type(TorsoState.HIGH).apply_to(world)
-        world.notify_state_change()
+        self._park_arms(world, robot)
         return robot
 
     def arm(self, robot: PR2) -> Arm:
@@ -273,9 +283,7 @@ class TracySetup(RobotSetup):
                         body_group_b=[self._arm_body(arm, ArmBody.FOREARM)],
                     )
                 )
-        for arm in robot.all_arms:
-            arm.get_joint_state_by_type(StaticJointState.PARK).apply_to(world)
-        world.notify_state_change()
+        self._park_arms(world, robot)
         return robot
 
     @staticmethod

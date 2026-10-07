@@ -15,20 +15,22 @@ from pathlib import Path
 
 import mujoco
 import numpy as np
-from typing_extensions import Dict, Optional
+from typing_extensions import Dict, List, Optional
 from uuid import UUID
 
 from experiments.physical_pick_up.pick_up import (
     FilmingSimulationPacer,
     PhysicalPickUp,
 )
-from experiments.physical_pick_up.objects import ObjectChoice
-from experiments.physical_pick_up.robots import ObjectPlacement, PickUpRobot
-from experiments.physical_pick_up.scene import PickUpScene
+from experiments.physical_pick_up.robots import ObjectPlacement
+from experiments.physical_pick_up.scene import PickUpScene, PickUpSceneChoice
 from semantic_digital_twin.grasping.surface_grasp import GraspResult
 from giskardpy.executor import SteppedSimulationPacer
 from semantic_digital_twin.adapters.multi_sim import MujocoCamera, MujocoSim
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
+from semantic_digital_twin.grasping.grasp_trials import GraspTrier
+
+# %% the experiment
 
 CAMERA_NAME = "pick_up_camera"
 """
@@ -185,30 +187,80 @@ class PickUpExperiment:
         )
 
 
+# %% trying grasps with the experiment
+
+
+@dataclass
+class PickUpGraspTrier(GraspTrier):
+    """
+    Tries every grasp with the robot of a pick-up experiment, starting each attempt from
+    the same state of the world, and with the object standing anywhere in its pick-up
+    area if a source of randomness is given.
+    """
+
+    experiment: PickUpExperiment
+    """
+    The robot and the object the grasps are tried with.
+    """
+
+    generator: Optional[np.random.Generator] = None
+    """
+    Draws where the object stands for each attempt; ``None`` leaves it where the scene
+    first put it.
+    """
+
+    maximum_yaw: float = 0.0
+    """
+    How far the object may be turned either way about the vertical axis, in radians.
+    """
+
+    video_directory: Optional[Path] = None
+    """
+    Where to film each attempt; ``None`` films nothing.
+    """
+
+    placements: List[ObjectPlacement] = field(default_factory=list, init=False)
+    """
+    Where the object stood in each attempt so far, in order.
+    """
+
+    def try_grasp(self, grasp: GraspCandidate) -> GraspResult:
+        placement = self._placement()
+        video_path = (
+            None
+            if self.video_directory is None
+            else self.video_directory / f"trial_{len(self.placements):03d}.mp4"
+        )
+        self.placements.append(placement)
+        return self.experiment.run(grasp, video_path, placement)
+
+    def _placement(self) -> ObjectPlacement:
+        """
+        :return: Where the object stands in the next attempt.
+        """
+        area = self.experiment.scene.pick_up_area
+        if self.generator is None:
+            return area.middle()
+        return area.random_placement(self.generator, self.maximum_yaw)
+
+
+# %% the command line
+
+
 def main() -> None:
     """
     Run the experiment once from the command line and report the outcome.
     """
     parser = argparse.ArgumentParser(description=__doc__)
-    object_choice = ObjectChoice(parser)
-    object_choice.add_arguments()
-    parser.add_argument(
-        "--robot",
-        choices=[robot.name.lower() for robot in PickUpRobot],
-        default=PickUpRobot.PR2.name.lower(),
-        help="the robot that picks the object up",
-    )
+    scene_choice = PickUpSceneChoice(parser)
+    scene_choice.add_arguments()
     parser.add_argument("--video", type=Path, help="write a video of the attempt here")
     parser.add_argument(
         "--show", action="store_true", help="open MuJoCo's viewer window"
     )
     arguments = parser.parse_args()
     result = PickUpExperiment(
-        scene=PickUpScene(
-            object_description=object_choice.description(arguments),
-            robot_setup=PickUpRobot[arguments.robot.upper()].value,
-        ),
-        headless=not arguments.show,
+        scene=scene_choice.scene(arguments), headless=not arguments.show
     ).run(video_path=arguments.video)
     print(result)
 

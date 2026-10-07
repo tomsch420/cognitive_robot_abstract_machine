@@ -38,19 +38,9 @@ class GraspModel:
     A model of where grasps lift an object, learned for one task.
     """
 
-    annotation_type: str
+    task: GraspLearningTask
     """
-    See :attr:`~experiments.grasp_learning.records.GraspLearningTask.annotation_type`.
-    """
-
-    grasped_part: str
-    """
-    See :attr:`~experiments.grasp_learning.records.GraspLearningTask.grasped_part`.
-    """
-
-    gripper: str
-    """
-    See :attr:`~experiments.grasp_learning.records.GraspLearningTask.gripper`.
+    The task the model was learned for.
     """
 
     circuit: str
@@ -73,17 +63,6 @@ class GraspModel:
     The share of attempts with grasps drawn from this model that lifted the object;
     ``None`` until the model is verified.
     """
-
-    @property
-    def task(self) -> GraspLearningTask:
-        """
-        :return: The task this model was learned for.
-        """
-        return GraspLearningTask(
-            annotation_type=self.annotation_type,
-            grasped_part=self.grasped_part,
-            gripper=self.gripper,
-        )
 
     def model_registry(self) -> RelationalCircuitRegistry:
         """
@@ -131,9 +110,7 @@ class GraspModelLearner:
             ),
         ).fit(grasps)
         return GraspModel(
-            annotation_type=task.annotation_type,
-            grasped_part=task.grasped_part,
-            gripper=task.gripper,
+            task=task,
             circuit=json.dumps(
                 relational_circuit.class_probabilistic_circuit.to_json()
             ),
@@ -167,11 +144,7 @@ class GraspModelLibrary:
         :return: The latest model learned for grasping the object's grasped part with
             that gripper; ``None`` if there is none.
         """
-        task = GraspLearningTask(
-            annotation_type=type(graspable).__name__,
-            grasped_part=type(graspable.grasped_part()).__name__,
-            gripper=gripper,
-        )
+        task = GraspLearningTask.of_graspable(graspable, gripper)
         matching = [model for model in self.models if model.task == task]
         if not matching:
             return None

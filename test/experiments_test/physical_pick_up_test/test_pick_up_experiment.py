@@ -24,14 +24,19 @@ from experiments.physical_pick_up.objects import (
     PickUpObject,
     RoboCasaObjectDescription,
 )
-from experiments.physical_pick_up.pick_up_experiment import PickUpExperiment
+from experiments.physical_pick_up.pick_up_experiment import (
+    PickUpExperiment,
+    PickUpGraspTrier,
+)
 from experiments.physical_pick_up.robots import ObjectPlacement, PR2Setup
 from experiments.physical_pick_up.scene import PickUpScene
 from semantic_digital_twin.adapters.robocasa_dataset.loader import (
     RoboCasaDatasetLoader,
 )
 from semantic_digital_twin.api import RobotSpecification
+from semantic_digital_twin.grasping.grasp_trials import GraspTrials
 from semantic_digital_twin.grasping.handle_finding import ProtrudingHandleFinder
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Handle
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.pr2 import PR2, PR2Joint
 from semantic_digital_twin.world import World
@@ -426,3 +431,48 @@ def test_a_held_bowl_slips_by_much_less_than_the_lift():
     result = PickUpExperiment().run()
 
     assert result.translational_slip < PhysicalPickUp.lift_height / 4
+
+
+# %% trying grasps drawn from the object's statement
+
+
+@pytest.fixture(scope="module")
+def mug_scene() -> PickUpScene:
+    return PickUpScene(object_description=PickUpObject.YCB_MUG.value)
+
+
+def trials_on(experiment: PickUpExperiment) -> GraspTrials:
+    """
+    :return: Trials of the experiment's robot grasping its object.
+    """
+    return GraspTrials(
+        graspable=experiment.scene.graspable,
+        trier=PickUpGraspTrier(experiment=experiment),
+        number_of_trials=30,
+    )
+
+
+def test_an_object_without_a_handle_is_grasped_as_a_whole(milk_experiment):
+    trials = trials_on(milk_experiment)
+
+    assert trials.grasped_part is trials.graspable
+
+
+def test_a_mug_is_grasped_at_the_handle_found_in_its_shape(mug_scene):
+    mug = mug_scene.graspable
+
+    assert isinstance(mug.handle, Handle)
+    assert mug.grasped_part() is mug.handle
+
+
+def test_grasps_drawn_for_a_mug_reach_its_handle(mug_scene):
+    trials = trials_on(PickUpExperiment(scene=mug_scene))
+    handle = trials.grasped_part
+
+    reaching = [
+        grasp for grasp in trials.drawn_grasps() if grasp.reaches_surface_of(handle)
+    ]
+
+    assert reaching
+    for grasp in reaching:
+        assert grasp.grasp_candidate(handle).graspable is handle

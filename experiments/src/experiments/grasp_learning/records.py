@@ -13,13 +13,13 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from experiments.physical_pick_up.robots import ObjectPlacement
-from experiments.physical_pick_up.scene import PickUpScene
 from semantic_digital_twin.grasping.surface_grasp import SurfaceGrasp
+from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
 
 # %% tasks
 
 
-@dataclass(frozen=True)
+@dataclass
 class GraspLearningTask:
     """
     What one grasp model is learned for: grasps placed on one kind of part of one kind
@@ -43,15 +43,18 @@ class GraspLearningTask:
     """
 
     @classmethod
-    def of_scene(cls, scene: PickUpScene) -> GraspLearningTask:
+    def of_graspable(
+        cls, graspable: HasGraspCandidates, gripper: str
+    ) -> GraspLearningTask:
         """
-        :param scene: The scene whose robot picks up the object in it.
-        :return: The task the scene's attempts belong to.
+        :param graspable: The object to grasp.
+        :param gripper: The name of the type of the gripper that grasps.
+        :return: The task of grasping the object's grasped part with that gripper.
         """
         return cls(
-            annotation_type=type(scene.graspable).__name__,
-            grasped_part=type(scene.graspable.grasped_part()).__name__,
-            gripper=type(scene.arm.end_effector).__name__,
+            annotation_type=type(graspable).__name__,
+            grasped_part=type(graspable.grasped_part()).__name__,
+            gripper=gripper,
         )
 
 
@@ -80,19 +83,9 @@ class GraspAttempt:
     One attempt of a robot to pick an object up by a surface grasp.
     """
 
-    annotation_type: str
+    task: GraspLearningTask
     """
-    See :attr:`GraspLearningTask.annotation_type`.
-    """
-
-    grasped_part: str
-    """
-    See :attr:`GraspLearningTask.grasped_part`.
-    """
-
-    gripper: str
-    """
-    See :attr:`GraspLearningTask.gripper`.
+    The task the attempt belongs to.
     """
 
     robot: str
@@ -119,14 +112,3 @@ class GraspAttempt:
     """
     The grasp, with its result.
     """
-
-    @property
-    def task(self) -> GraspLearningTask:
-        """
-        :return: The task this attempt belongs to.
-        """
-        return GraspLearningTask(
-            annotation_type=self.annotation_type,
-            grasped_part=self.grasped_part,
-            gripper=self.gripper,
-        )

@@ -52,12 +52,21 @@ def database() -> GraspDatabase:
     return GraspDatabase.connect("sqlite:///:memory:")
 
 
+def task_of(scene: PickUpScene) -> GraspLearningTask:
+    """
+    :return: The task of the scene's robot grasping the object in it.
+    """
+    return GraspLearningTask.of_graspable(
+        scene.graspable, type(scene.arm.end_effector).__name__
+    )
+
+
 def synthetic_attempts(scene: PickUpScene, number: int) -> List[GraspAttempt]:
     """
     :return: Attempts at grasps drawn from the regions the scene's object states, which
         lift it exactly when they lie above :data:`LIFTING_HEIGHT`.
     """
-    task = GraspLearningTask.of_scene(scene)
+    task = task_of(scene)
     grasps = SurfaceGraspStatement(
         scene.graspable.grasped_part().surface_grasp_regions()
     ).draw(number)
@@ -72,9 +81,7 @@ def synthetic_attempts(scene: PickUpScene, number: int) -> List[GraspAttempt]:
         )
     return [
         GraspAttempt(
-            annotation_type=task.annotation_type,
-            grasped_part=task.grasped_part,
-            gripper=task.gripper,
+            task=task,
             robot=type(scene.robot).__name__,
             object_name=scene.graspable.root.name.name,
             source=GraspSource.STATED_REGIONS,
@@ -88,13 +95,16 @@ def synthetic_attempts(scene: PickUpScene, number: int) -> List[GraspAttempt]:
 # %% tasks and attempts
 
 
-def test_the_task_of_a_scene_names_object_part_and_gripper(milk_scene):
-    task = GraspLearningTask.of_scene(milk_scene)
+def test_the_task_of_an_object_names_object_part_and_gripper(milk_scene):
+    milk = milk_scene.graspable
+    gripper = "SomeGripper"
+
+    task = GraspLearningTask.of_graspable(milk, gripper)
 
     assert task == GraspLearningTask(
-        annotation_type=type(milk_scene.graspable).__name__,
-        grasped_part=type(milk_scene.graspable).__name__,
-        gripper=type(milk_scene.arm.end_effector).__name__,
+        annotation_type=type(milk).__name__,
+        grasped_part=type(milk.grasped_part()).__name__,
+        gripper=gripper,
     )
 
 

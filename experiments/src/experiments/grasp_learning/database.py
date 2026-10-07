@@ -17,6 +17,7 @@ from experiments.grasp_learning.records import GraspAttempt, GraspLearningTask
 from experiments.orm.ormatic_interface import (
     Base,
     GraspAttemptDAO,
+    GraspLearningTaskDAO,
     GraspModelDAO,
 )
 from krrood.ormatic.data_access_objects.helper import to_dao
@@ -85,10 +86,11 @@ class GraspDatabase:
         """
         query = (
             select(GraspAttemptDAO)
+            .join(GraspAttemptDAO.task)
             .where(
-                GraspAttemptDAO.annotation_type == task.annotation_type,
-                GraspAttemptDAO.grasped_part == task.grasped_part,
-                GraspAttemptDAO.gripper == task.gripper,
+                GraspLearningTaskDAO.annotation_type == task.annotation_type,
+                GraspLearningTaskDAO.grasped_part == task.grasped_part,
+                GraspLearningTaskDAO.gripper == task.gripper,
             )
             .order_by(GraspAttemptDAO.database_id)
         )

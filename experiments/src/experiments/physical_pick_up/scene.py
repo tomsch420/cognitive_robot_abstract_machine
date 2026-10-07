@@ -5,6 +5,7 @@ robot picks objects up.
 
 from __future__ import annotations
 
+import argparse
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -13,11 +14,13 @@ import trimesh
 from experiments.physical_pick_up.robots import (
     ObjectPlacement,
     PickUpArea,
+    PickUpRobot,
     PR2Setup,
     RobotSetup,
 )
 from experiments.physical_pick_up.objects import (
     ObjectCannotHaveAHandleError,
+    ObjectChoice,
     ObjectDescription,
     ObjectGeometry,
     PickUpObject,
@@ -239,4 +242,51 @@ class PickUpScene:
                 material.center_mass, reference_frame=body
             ),
             inertia=InertiaTensor(data=material.moment_inertia),
+        )
+
+
+# %% choosing a scene on the command line
+
+
+@dataclass
+class PickUpSceneChoice:
+    """
+    Lets a command line choose the scene: the object to pick up, as
+    :class:`~experiments.physical_pick_up.objects.ObjectChoice` does, and the robot that
+    picks it up.
+    """
+
+    parser: argparse.ArgumentParser
+    """
+    The command line's parser.
+    """
+
+    object_choice: ObjectChoice = field(init=False)
+    """
+    Chooses the object.
+    """
+
+    def __post_init__(self):
+        self.object_choice = ObjectChoice(self.parser)
+
+    def add_arguments(self) -> None:
+        """
+        Add the arguments choosing the scene to :attr:`parser`.
+        """
+        self.object_choice.add_arguments()
+        self.parser.add_argument(
+            "--robot",
+            choices=[robot.name.lower() for robot in PickUpRobot],
+            default=PickUpRobot.PR2.name.lower(),
+            help="the robot that picks the object up",
+        )
+
+    def scene(self, arguments: argparse.Namespace) -> PickUpScene:
+        """
+        :param arguments: The parsed command line.
+        :return: The chosen scene.
+        """
+        return PickUpScene(
+            object_description=self.object_choice.description(arguments),
+            robot_setup=PickUpRobot[arguments.robot.upper()].value,
         )

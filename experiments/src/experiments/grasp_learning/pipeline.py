@@ -24,11 +24,11 @@ from experiments.grasp_learning.records import (
     GraspLearningTask,
     GraspSource,
 )
-from experiments.physical_pick_up.objects import ObjectChoice
-from experiments.physical_pick_up.pick_up_experiment import PickUpExperiment
-from experiments.physical_pick_up.random_grasp_trials import PickUpGraspTrier
-from experiments.physical_pick_up.robots import PickUpRobot
-from experiments.physical_pick_up.scene import PickUpScene
+from experiments.physical_pick_up.pick_up_experiment import (
+    PickUpExperiment,
+    PickUpGraspTrier,
+)
+from experiments.physical_pick_up.scene import PickUpSceneChoice
 from krrood.parametrization.model_registries import ModelRegistry
 from semantic_digital_twin.grasping.grasp_trials import GraspTrials
 
@@ -95,7 +95,10 @@ class GraspLearningPipeline:
         """
         :return: The task the attempts belong to.
         """
-        return GraspLearningTask.of_scene(self.experiment.scene)
+        scene = self.experiment.scene
+        return GraspLearningTask.of_graspable(
+            scene.graspable, type(scene.arm.end_effector).__name__
+        )
 
     def run(self) -> GraspModel:
         """
@@ -148,9 +151,7 @@ class GraspLearningPipeline:
         attempts = []
         for record in trials.run():
             attempt = GraspAttempt(
-                annotation_type=task.annotation_type,
-                grasped_part=task.grasped_part,
-                gripper=task.gripper,
+                task=task,
                 robot=type(scene.robot).__name__,
                 object_name=scene.graspable.root.name.name,
                 source=source,
@@ -170,14 +171,8 @@ def main() -> None:
     Run the pipeline from the command line and report the stored model.
     """
     parser = argparse.ArgumentParser(description=__doc__)
-    object_choice = ObjectChoice(parser)
-    object_choice.add_arguments()
-    parser.add_argument(
-        "--robot",
-        choices=[robot.name.lower() for robot in PickUpRobot],
-        default=PickUpRobot.PR2.name.lower(),
-        help="the robot that picks the object up",
-    )
+    scene_choice = PickUpSceneChoice(parser)
+    scene_choice.add_arguments()
     parser.add_argument(
         "--attempts",
         type=int,
@@ -194,11 +189,7 @@ def main() -> None:
     arguments = parser.parse_args()
     pipeline = GraspLearningPipeline(
         experiment=PickUpExperiment(
-            scene=PickUpScene(
-                object_description=object_choice.description(arguments),
-                robot_setup=PickUpRobot[arguments.robot.upper()].value,
-            ),
-            time_limit=timedelta(seconds=20),
+            scene=scene_choice.scene(arguments), time_limit=timedelta(seconds=20)
         ),
         database=GraspDatabase.from_environment(),
         number_of_attempts=arguments.attempts,

@@ -1,6 +1,6 @@
 """
-The objects a robot can be asked to pick up from the table, each described by its
-geometry, its mass and where on it grasps make sense.
+The objects a robot can be asked to pick up, each described by its geometry, its mass,
+how it rests on a surface, how its handle is found and a grasp known to lift it.
 """
 
 from __future__ import annotations
@@ -23,6 +23,7 @@ from semantic_digital_twin.adapters.robocasa_dataset.loader import (
     RoboCasaDatasetLoader,
 )
 from semantic_digital_twin.grasping.handle_finding import (
+    ElongatedShape,
     HandleFinder,
     NarrowEndHandleFinder,
     ProtrudingHandleFinder,
@@ -64,7 +65,7 @@ class ObjectGeometry:
 
     visual: trimesh.Trimesh
     """
-    The surface the object shows; grasps are placed on it.
+    The surface the object shows; its handle is found in it.
     """
 
     collision_parts: List[trimesh.Trimesh]
@@ -138,8 +139,14 @@ class HandleTowardsRobot(RestingOrientation):
         extents = vertices.max(axis=0) - vertices.min(axis=0)
         length_axis = int(np.argmax(extents))
         thickness_axis = int(np.argmin(extents))
+        elongated = ElongatedShape(
+            points=vertices,
+            length_axis=length_axis,
+            width_axis=3 - length_axis - thickness_axis,
+            end_fraction=self.end_fraction,
+        )
         along = np.eye(3)[length_axis]
-        if self._narrower_end_is_positive(vertices, length_axis, thickness_axis):
+        if elongated.narrower_end_is_positive():
             along = -along
         up = np.eye(3)[thickness_axis]
         rotation = np.eye(4)
@@ -147,24 +154,6 @@ class HandleTowardsRobot(RestingOrientation):
         rotation[1, :3] = np.cross(up, along)
         rotation[2, :3] = up
         return rotation
-
-    def _narrower_end_is_positive(
-        self, vertices: np.ndarray, length_axis: int, thickness_axis: int
-    ) -> bool:
-        """
-        :param vertices: The points of the object's collision parts.
-        :param length_axis: The axis the object is longest along.
-        :param thickness_axis: The axis the object is thinnest along.
-        :return: Whether the end towards the positive length axis is the narrower one,
-            measured by its width across the remaining axis.
-        """
-        width_axis = 3 - length_axis - thickness_axis
-        lowest = vertices[:, length_axis].min()
-        highest = vertices[:, length_axis].max()
-        band = self.end_fraction * (highest - lowest)
-        negative_end = vertices[vertices[:, length_axis] <= lowest + band]
-        positive_end = vertices[vertices[:, length_axis] >= highest - band]
-        return np.ptp(positive_end[:, width_axis]) < np.ptp(negative_end[:, width_axis])
 
 
 # %% describing an object
