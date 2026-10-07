@@ -124,7 +124,7 @@ class GraspLearningPipeline:
         model_registry: Optional[ModelRegistry] = None,
     ) -> List[GraspAttempt]:
         """
-        Try grasps and store every attempt.
+        Try grasps and store every attempt as soon as it is tried.
 
         :param source: Where the grasps are drawn from.
         :param number_of_attempts: How many grasps are drawn.
@@ -137,30 +137,28 @@ class GraspLearningPipeline:
             generator=self._generator,
             maximum_yaw=self.maximum_yaw,
         )
-        records = list(
-            GraspTrials(
-                graspable=scene.graspable,
-                trier=trier,
-                number_of_trials=number_of_attempts,
-                model_registry=model_registry,
-                require_lifting=source == GraspSource.LEARNED_MODEL,
-            ).run()
+        trials = GraspTrials(
+            graspable=scene.graspable,
+            trier=trier,
+            number_of_trials=number_of_attempts,
+            model_registry=model_registry,
+            require_lifting=source == GraspSource.LEARNED_MODEL,
         )
         task = self.task
-        attempts = [
-            GraspAttempt(
+        attempts = []
+        for record in trials.run():
+            attempt = GraspAttempt(
                 annotation_type=task.annotation_type,
                 grasped_part=task.grasped_part,
                 gripper=task.gripper,
                 robot=type(scene.robot).__name__,
                 object_name=scene.graspable.root.name.name,
                 source=source,
-                placement=placement,
+                placement=trier.placements[-1],
                 grasp=record.grasp,
             )
-            for record, placement in zip(records, trier.placements)
-        ]
-        self.database.add_attempts(attempts)
+            self.database.add_attempts([attempt])
+            attempts.append(attempt)
         return attempts
 
 
