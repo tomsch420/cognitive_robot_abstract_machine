@@ -317,12 +317,37 @@ class SurfaceGraspStatement:
     The regions a grasp may lie in.
     """
 
+    require_lifting: bool = False
+    """
+    Whether to ask only for grasps that lift the object, by stating the grasp's result
+    as well; only a model learned over tried grasps and their results can answer that.
+    """
+
     def match(self) -> Match:
         """
         :return: The statement asking for a surface grasp within one of the regions,
-            leaving every parameter free.
+            leaving every parameter free, and its result too if :attr:`require_lifting`
+            asks for a lifting one.
         """
-        grasp = a(SurfaceGrasp)(azimuth=..., height=..., depth=..., pitch=..., roll=...)
+        if self.require_lifting:
+            grasp = a(SurfaceGrasp)(
+                azimuth=...,
+                height=...,
+                depth=...,
+                pitch=...,
+                roll=...,
+                result=a(GraspResult)(
+                    lifted=True,
+                    object_rise=...,
+                    translational_slip=...,
+                    rotational_slip=...,
+                    motion_completed=...,
+                ),
+            )
+        else:
+            grasp = a(SurfaceGrasp)(
+                azimuth=..., height=..., depth=..., pitch=..., roll=...
+            )
         conditions = [region.condition(grasp) for region in self.regions]
         grasp.where(conditions[0] if len(conditions) == 1 else or_(*conditions))
         return grasp
@@ -335,7 +360,7 @@ class SurfaceGraspStatement:
         """
         :param number_of_grasps: How many grasps to draw.
         :param model_registry: Answers the statement; ``None`` draws uniformly within
-            the regions.
+            the regions, which cannot answer a statement that requires lifting.
         :return: Grasps answering :meth:`match`.
         """
         return list(

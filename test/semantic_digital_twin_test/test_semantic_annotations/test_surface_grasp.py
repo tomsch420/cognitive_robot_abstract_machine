@@ -10,12 +10,21 @@ import pytest
 import trimesh
 
 from krrood.parametrization.exceptions import UnboundedParameterError
-from krrood.parametrization.model_registries import UniformPriorRegistry
+from krrood.parametrization.model_registries import (
+    RelationalCircuitRegistry,
+    UniformPriorRegistry,
+)
+from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
+from probabilistic_model.probabilistic_circuit.relational.rspn import (
+    RelationalProbabilisticCircuit,
+)
 from krrood.entity_query_language.backends import ProbabilisticBackend
 from krrood.entity_query_language.factories import a
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import SurfaceGraspNotOnSurfaceError
+from semantic_digital_twin.orm.ormatic_interface import SurfaceGraspDAO  # noqa: F401
 from semantic_digital_twin.grasping.surface_grasp import (
+    GraspResult,
     ParameterRange,
     SurfaceGrasp,
     SurfaceGraspRegion,
@@ -180,3 +189,70 @@ def test_the_default_region_covers_the_object_up_to_half_its_narrower_side(carto
     [region] = carton.surface_grasp_regions()
 
     assert region.depth.upper == pytest.approx(min(CARTON_EXTENTS[:2]) / 2)
+
+
+# %% asking a learned model for lifting grasps
+
+LIFTING_HEIGHT = 0.5
+"""
+In the synthetic trials, a grasp lifts the carton exactly when it lies above this
+fraction of the carton's height.
+"""
+
+
+@pytest.fixture
+def learned_carton_model(carton) -> RelationalCircuitRegistry:
+    """
+    :return: A model learned from synthetic trials on the carton, in which the grasps
+        above :data:`LIFTING_HEIGHT` lift it and the others do not.
+    """
+    grasps = SurfaceGraspStatement(carton.surface_grasp_regions()).draw(300)
+    for grasp in grasps:
+        lifted = grasp.height > LIFTING_HEIGHT
+        grasp.result = GraspResult(
+            lifted=lifted,
+            object_rise=0.2 if lifted else 0.0,
+            translational_slip=0.0 if lifted else 0.2,
+            rotational_slip=0.0,
+            motion_completed=True,
+        )
+    return RelationalCircuitRegistry(
+        RelationalProbabilisticCircuit(
+            SurfaceGrasp, learning_method=JointProbabilityTree(min_samples_per_leaf=20)
+        ).fit(grasps)
+    )
+
+
+def test_a_learned_model_answers_with_lifting_grasps(carton, learned_carton_model):
+    grasps = SurfaceGraspStatement(
+        carton.surface_grasp_regions(), require_lifting=True
+    ).draw(50, learned_carton_model)
+
+    assert len(grasps) == 50
+    for grasp in grasps:
+        assert grasp.height > LIFTING_HEIGHT
+        assert grasp.result.lifted
+
+
+def test_a_uniform_prior_cannot_require_lifting(carton):
+    with pytest.raises(UnboundedParameterError):
+        SurfaceGraspStatement(
+            carton.surface_grasp_regions(), require_lifting=True
+        ).draw(1)
+
+
+def test_an_annotation_given_a_model_draws_its_grasps_from_it(
+    carton, learned_carton_model
+):
+    grasps = carton.grasp_candidates(learned_carton_model, require_lifting=True)
+    lowest, highest = carton.grasp_surface().bounds
+    lifting_height = lowest[2] + LIFTING_HEIGHT * (highest[2] - lowest[2])
+
+    assert grasps
+    for grasp in grasps:
+        assert grasp.grasp_pose.to_np()[2, 3] > lifting_height
+
+
+def test_an_annotation_without_a_model_keeps_its_default_grasps(carton):
+    for grasp in carton.grasp_candidates():
+        assert grasp.grasp_pose.to_np()[:3, 3] == pytest.approx([0.0, 0.0, 0.0])
