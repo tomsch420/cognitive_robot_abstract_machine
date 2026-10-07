@@ -246,7 +246,7 @@ def test_the_bowl_stands_loose_on_the_table(bowl_scene):
 
     assert isinstance(bowl_connection, Connection6DoF)
     assert bowl_height + lowest_point == pytest.approx(
-        bowl_scene.placement_area.height + bowl_scene.drop_height, abs=1e-3
+        bowl_scene.pick_up_area.height + bowl_scene.drop_height, abs=1e-3
     )
 
 
@@ -301,9 +301,9 @@ def object_footprint_middle(scene: PickUpScene) -> np.ndarray:
     return (world_T_object[:3, :3] @ middle + world_T_object[:3, 3])[:2]
 
 
-def test_the_object_starts_in_the_middle_of_its_placement_area(milk_experiment):
+def test_the_object_starts_in_the_middle_of_its_pick_up_area(milk_experiment):
     scene = milk_experiment.scene
-    middle = scene.placement_area.middle()
+    middle = scene.pick_up_area.middle()
 
     assert object_footprint_middle(scene) == pytest.approx([middle.x, middle.y])
 
@@ -311,7 +311,7 @@ def test_the_object_starts_in_the_middle_of_its_placement_area(milk_experiment):
 def test_an_object_placed_elsewhere_stands_there_turned(milk_experiment):
     scene = milk_experiment.scene
     placement = ObjectPlacement(
-        x=scene.placement_area.x.lower, y=scene.placement_area.y.upper, yaw=0.4
+        x=scene.pick_up_area.x.lower, y=scene.pick_up_area.y.upper, yaw=0.4
     )
 
     scene.place_object(placement)
@@ -323,11 +323,11 @@ def test_an_object_placed_elsewhere_stands_there_turned(milk_experiment):
     assert np.arctan2(world_T_object[1, 0], world_T_object[0, 0]) == pytest.approx(
         placement.yaw
     )
-    scene.place_object(scene.placement_area.middle())
+    scene.place_object(scene.pick_up_area.middle())
 
 
 def test_a_random_placement_stays_in_the_area_and_the_turn(milk_experiment):
-    area = milk_experiment.scene.placement_area
+    area = milk_experiment.scene.pick_up_area
     generator = np.random.default_rng(0)
     maximum_yaw = 0.5
 

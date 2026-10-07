@@ -23,6 +23,7 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.grasping.surface_grasp import ParameterRange
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, Arm
+from semantic_digital_twin.robots.tracy import Tracy
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Table
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Point3
 from semantic_digital_twin.world import World
@@ -59,7 +60,7 @@ class ObjectPlacement:
 
 
 @dataclass
-class PlacementArea:
+class PickUpArea:
     """
     A rectangle on a horizontal surface where objects stand for a robot to pick them up,
     within reach of the robot's arm.
@@ -128,7 +129,7 @@ class RobotSetup(ABC):
         """
 
     @abstractmethod
-    def add_placement_area(self, world: World, robot: AbstractRobot) -> PlacementArea:
+    def add_pick_up_area(self, world: World, robot: AbstractRobot) -> PickUpArea:
         """
         Add what the objects stand on, unless the robot brings it along.
 
@@ -188,7 +189,7 @@ class PR2Setup(RobotSetup):
     def arm(self, robot: PR2) -> Arm:
         return robot.left_arm
 
-    def add_placement_area(self, world: World, robot: PR2) -> PlacementArea:
+    def add_pick_up_area(self, world: World, robot: PR2) -> PickUpArea:
         body = Body(name=PrefixedName("table"))
         box = Box(
             origin=HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=body),
@@ -212,8 +213,45 @@ class PR2Setup(RobotSetup):
                 )
             )
             world.add_semantic_annotation(Table(root=body))
-        return PlacementArea(
+        return PickUpArea(
             height=self.table_scale.z, x=self.reachable_x, y=self.reachable_y
+        )
+
+
+@dataclass
+class TracySetup(RobotSetup):
+    """
+    Tracy at the world's origin, its two arms mounted at the near end of its own table,
+    picking up with its left arm from that table.
+    """
+
+    reachable_x: ParameterRange = field(
+        default_factory=lambda: ParameterRange(0.55, 0.75)
+    )
+    """
+    Where along the x-axis the left arm reaches objects on the table.
+    """
+
+    reachable_y: ParameterRange = field(
+        default_factory=lambda: ParameterRange(0.15, 0.35)
+    )
+    """
+    Where along the y-axis the left arm reaches objects on the table.
+    """
+
+    def spawn(self, world: World) -> Tracy:
+        robot = RobotSpecification(Tracy).spawn(world)
+        for arm in robot.all_arms:
+            arm.get_joint_state_by_type(StaticJointState.PARK).apply_to(world)
+        world.notify_state_change()
+        return robot
+
+    def arm(self, robot: Tracy) -> Arm:
+        return robot.left_arm
+
+    def add_pick_up_area(self, world: World, robot: Tracy) -> PickUpArea:
+        return PickUpArea(
+            height=robot.table.top_z, x=self.reachable_x, y=self.reachable_y
         )
 
 
@@ -229,3 +267,4 @@ class PickUpRobot(Enum):
     """
     A PR2 picking up from a table in front of it with its left arm.
     """
+

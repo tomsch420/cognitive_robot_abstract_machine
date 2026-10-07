@@ -12,7 +12,7 @@ import trimesh
 
 from experiments.physical_pick_up.robots import (
     ObjectPlacement,
-    PlacementArea,
+    PickUpArea,
     PR2Setup,
     RobotSetup,
 )
@@ -83,7 +83,7 @@ class PickUpScene:
     The robot, prepared for physical simulation.
     """
 
-    placement_area: PlacementArea = field(init=False)
+    pick_up_area: PickUpArea = field(init=False)
     """
     Where the object stands for the robot to pick it up.
     """
@@ -108,11 +108,9 @@ class PickUpScene:
         with self.world.modify_world():
             self.world.add_kinematic_structure_entity(self._floor())
         self.robot = self.robot_setup.spawn(self.world)
-        self.placement_area = self.robot_setup.add_placement_area(
-            self.world, self.robot
-        )
+        self.pick_up_area = self.robot_setup.add_pick_up_area(self.world, self.robot)
         self.graspable = self._add_object()
-        self.place_object(self.placement_area.middle())
+        self.place_object(self.pick_up_area.middle())
 
     @property
     def arm(self) -> Arm:
@@ -134,7 +132,7 @@ class PickUpScene:
             HomogeneousTransformationMatrix.from_xyz_rpy(
                 x=placement.x,
                 y=placement.y,
-                z=self.placement_area.height - self._lowest_point + self.drop_height,
+                z=self.pick_up_area.height - self._lowest_point + self.drop_height,
                 yaw=placement.yaw,
             ).to_np()
             @ middle

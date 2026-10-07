@@ -1,6 +1,6 @@
 """
-Picking an object up in a physical simulation, where nothing but the contact between
-the fingers and the object holds it.
+Picking an object up in a physical simulation, where nothing but the contact between the
+fingers and the object holds it.
 """
 
 from __future__ import annotations
@@ -52,7 +52,8 @@ class FilmingSimulationPacer(SteppedSimulationPacer):
         default_factory=lambda: VideoResolution(width=640, height=480), kw_only=True
     )
     """
-    Size of the frames, which MuJoCo limits to its offscreen buffer of 640 by 480 pixels.
+    Size of the frames, which MuJoCo limits to its offscreen buffer of 640 by 480
+    pixels.
     """
 
     ticks_per_frame: int = field(default=2, kw_only=True)
@@ -177,8 +178,8 @@ class PhysicalPickUp:
 
     hold_duration: timedelta = timedelta(seconds=2)
     """
-    How long the lifted object is held before the outcome is measured, so that an
-    object slipping out of the fingers has time to fall.
+    How long the lifted object is held before the outcome is measured, so that an object
+    slipping out of the fingers has time to fall.
     """
 
     minimum_rise: float = 0.05
@@ -310,8 +311,8 @@ class PhysicalPickUp:
 
     def _tick_until_end(self, executor: Executor) -> bool:
         """
-        Tick the control loop, stepping the simulation in between, until the motion
-        ends or :attr:`time_limit` has passed.
+        Tick the control loop, stepping the simulation in between, until the motion ends
+        or :attr:`time_limit` has passed.
 
         :param executor: The compiled control loop.
         :return: Whether the motion ended in time.

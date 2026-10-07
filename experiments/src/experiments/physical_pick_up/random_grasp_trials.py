@@ -83,7 +83,7 @@ class PickUpGraspTrier(GraspTrier):
         """
         :return: Where the object stands in the next attempt.
         """
-        area = self.experiment.scene.placement_area
+        area = self.experiment.scene.pick_up_area
         if self.generator is None:
             return area.middle()
         return area.random_placement(self.generator, self.maximum_yaw)

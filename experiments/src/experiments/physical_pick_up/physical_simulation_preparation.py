@@ -43,8 +43,9 @@ class PhysicalSimulationPreparation(ABC):
 
     A robot description states the robot's kinematics and geometry. Driving the robot
     through physics additionally needs a servo on every joint that is commanded, limits
-    such a servo can be clamped to, inertia a rigid body can actually have, and something
-    carrying the links' weight. Each robot states its own servos by subclassing.
+    such a servo can be clamped to, inertia a rigid body can actually have, and
+    something carrying the links' weight. Each robot states its own servos by
+    subclassing.
     """
 
     robot: AbstractRobot
