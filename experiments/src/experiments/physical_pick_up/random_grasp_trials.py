@@ -1,5 +1,5 @@
 """
-The PR2 tries grasps on an object that the statement of where the object's annotation
+A robot tries grasps on an object that the statement of where the object's annotation
 may be grasped leaves to chance, and records what each one did.
 
 Run it with ``python -m experiments.physical_pick_up.random_grasp_trials``; see
@@ -21,28 +21,42 @@ from dataclasses import asdict, dataclass, field
 from datetime import timedelta
 from pathlib import Path
 
-from typing_extensions import Optional
+import numpy as np
+from typing_extensions import List, Optional
 
 from experiments.physical_pick_up.objects import ObjectChoice
-from experiments.physical_pick_up.pr2_pick_up import PR2PickUpExperiment
-from experiments.physical_pick_up.scene import ObjectOnTableScene
+from experiments.physical_pick_up.pick_up_experiment import PickUpExperiment
+from experiments.physical_pick_up.robots import ObjectPlacement, PickUpRobot
+from experiments.physical_pick_up.scene import PickUpScene
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.grasping.grasp_trials import GraspTrier, GraspTrials
 from semantic_digital_twin.grasping.surface_grasp import GraspResult
 
-# %% the PR2 trying grasps
+# %% a robot trying grasps
 
 
 @dataclass
-class PR2GraspTrier(GraspTrier):
+class PickUpGraspTrier(GraspTrier):
     """
-    Tries every grasp with the PR2 of an experiment, starting each attempt from the same
-    state of the world.
+    Tries every grasp with the robot of a pick-up experiment, starting each attempt from
+    the same state of the world, and with the object standing anywhere in its placement
+    area if a source of randomness is given.
     """
 
-    experiment: PR2PickUpExperiment
+    experiment: PickUpExperiment
     """
-    The robot, the table and the object the grasps are tried with.
+    The robot and the object the grasps are tried with.
+    """
+
+    generator: Optional[np.random.Generator] = None
+    """
+    Draws where the object stands for each attempt; ``None`` leaves it where the scene
+    first put it.
+    """
+
+    maximum_yaw: float = 0.0
+    """
+    How far the object may be turned either way about the vertical axis, in radians.
     """
 
     video_directory: Optional[Path] = None
@@ -50,19 +64,29 @@ class PR2GraspTrier(GraspTrier):
     Where to film each attempt; ``None`` films nothing.
     """
 
-    _number_of_attempts: int = field(default=0, init=False)
+    placements: List[ObjectPlacement] = field(default_factory=list, init=False)
     """
-    How many grasps were tried so far.
+    Where the object stood in each attempt so far, in order.
     """
 
     def try_grasp(self, grasp: GraspCandidate) -> GraspResult:
+        placement = self._placement()
         video_path = (
             None
             if self.video_directory is None
-            else self.video_directory / f"trial_{self._number_of_attempts:03d}.mp4"
+            else self.video_directory / f"trial_{len(self.placements):03d}.mp4"
         )
-        self._number_of_attempts += 1
-        return self.experiment.run(grasp, video_path)
+        self.placements.append(placement)
+        return self.experiment.run(grasp, video_path, placement)
+
+    def _placement(self) -> ObjectPlacement:
+        """
+        :return: Where the object stands in the next attempt.
+        """
+        area = self.experiment.scene.placement_area
+        if self.generator is None:
+            return area.middle()
+        return area.random_placement(self.generator, self.maximum_yaw)
 
 
 # %% the command line
@@ -76,6 +100,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     object_choice = ObjectChoice(parser)
     object_choice.add_arguments()
+    parser.add_argument(
+        "--robot",
+        choices=[robot.name.lower() for robot in PickUpRobot],
+        default=PickUpRobot.PR2.name.lower(),
+        help="the robot that picks the object up",
+    )
     parser.add_argument("--trials", type=int, default=GraspTrials.number_of_trials)
     parser.add_argument(
         "--output",
@@ -87,15 +117,16 @@ def main() -> None:
     arguments = parser.parse_args()
     if arguments.videos is not None:
         arguments.videos.mkdir(parents=True, exist_ok=True)
-    experiment = PR2PickUpExperiment(
-        scene=ObjectOnTableScene(
-            object_description=object_choice.description(arguments)
+    experiment = PickUpExperiment(
+        scene=PickUpScene(
+            object_description=object_choice.description(arguments),
+            robot_setup=PickUpRobot[arguments.robot.upper()].value,
         ),
         time_limit=timedelta(seconds=20),
     )
     trials = GraspTrials(
         graspable=experiment.scene.graspable,
-        trier=PR2GraspTrier(experiment=experiment, video_directory=arguments.videos),
+        trier=PickUpGraspTrier(experiment=experiment, video_directory=arguments.videos),
         number_of_trials=arguments.trials,
     )
     lifted = 0

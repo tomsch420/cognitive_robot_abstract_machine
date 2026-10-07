@@ -1,5 +1,5 @@
 """
-The PR2 picking objects up from a table in MuJoCo, held by contact alone.
+Robots picking objects up in MuJoCo, held by contact alone.
 """
 
 from __future__ import annotations
@@ -24,8 +24,9 @@ from experiments.physical_pick_up.objects import (
     PickUpObject,
     RoboCasaObjectDescription,
 )
-from experiments.physical_pick_up.pr2_pick_up import PR2PickUpExperiment
-from experiments.physical_pick_up.scene import ObjectOnTableScene
+from experiments.physical_pick_up.pick_up_experiment import PickUpExperiment
+from experiments.physical_pick_up.robots import ObjectPlacement, PR2Setup
+from experiments.physical_pick_up.scene import PickUpScene
 from semantic_digital_twin.adapters.robocasa_dataset.loader import (
     RoboCasaDatasetLoader,
 )
@@ -63,17 +64,17 @@ def prepared_pr2() -> PR2:
 
 
 @pytest.fixture(scope="module")
-def bowl_scene() -> ObjectOnTableScene:
-    return ObjectOnTableScene(object_description=PickUpObject.BOWL.value)
+def bowl_scene() -> PickUpScene:
+    return PickUpScene(object_description=PickUpObject.BOWL.value)
 
 
 @pytest.fixture(scope="module")
-def milk_experiment() -> PR2PickUpExperiment:
+def milk_experiment() -> PickUpExperiment:
     """
     An experiment with an object that collides as its own mesh, which is quick to build.
     """
-    return PR2PickUpExperiment(
-        scene=ObjectOnTableScene(object_description=PickUpObject.MILK.value)
+    return PickUpExperiment(
+        scene=PickUpScene(object_description=PickUpObject.MILK.value)
     )
 
 
@@ -245,7 +246,7 @@ def test_the_bowl_stands_loose_on_the_table(bowl_scene):
 
     assert isinstance(bowl_connection, Connection6DoF)
     assert bowl_height + lowest_point == pytest.approx(
-        bowl_scene.table_top_height + bowl_scene.drop_height, abs=1e-3
+        bowl_scene.placement_area.height + bowl_scene.drop_height, abs=1e-3
     )
 
 
@@ -279,7 +280,7 @@ def test_a_handle_cannot_be_found_for_an_object_that_cannot_have_one():
     )
 
     with pytest.raises(ObjectCannotHaveAHandleError):
-        ObjectOnTableScene(object_description=milk_with_a_handle)
+        PickUpScene(object_description=milk_with_a_handle)
 
 
 def test_the_object_is_what_its_description_says(milk_experiment):
@@ -289,16 +290,53 @@ def test_the_object_is_what_its_description_says(milk_experiment):
     assert scene.graspable.root.name.name == scene.object_description.body_name
 
 
-def test_the_middle_of_the_object_stands_where_the_scene_puts_it(milk_experiment):
-    scene = milk_experiment.scene
+def object_footprint_middle(scene: PickUpScene) -> np.ndarray:
+    """
+    :return: Where the middle of the object's footprint is in the world, as x and y.
+    """
     world_T_object = scene.world.compute_forward_kinematics_np(
         scene.world.root, scene.graspable.root
     )
     middle = scene.graspable.root.visual.combined_mesh.bounds.mean(axis=0)
+    return (world_T_object[:3, :3] @ middle + world_T_object[:3, 3])[:2]
 
-    position = world_T_object[:3, :3] @ middle + world_T_object[:3, 3]
 
-    assert position[:2] == pytest.approx(scene.object_position.to_np()[:2])
+def test_the_object_starts_in_the_middle_of_its_placement_area(milk_experiment):
+    scene = milk_experiment.scene
+    middle = scene.placement_area.middle()
+
+    assert object_footprint_middle(scene) == pytest.approx([middle.x, middle.y])
+
+
+def test_an_object_placed_elsewhere_stands_there_turned(milk_experiment):
+    scene = milk_experiment.scene
+    placement = ObjectPlacement(
+        x=scene.placement_area.x.lower, y=scene.placement_area.y.upper, yaw=0.4
+    )
+
+    scene.place_object(placement)
+
+    world_T_object = scene.world.compute_forward_kinematics_np(
+        scene.world.root, scene.graspable.root
+    )
+    assert object_footprint_middle(scene) == pytest.approx([placement.x, placement.y])
+    assert np.arctan2(world_T_object[1, 0], world_T_object[0, 0]) == pytest.approx(
+        placement.yaw
+    )
+    scene.place_object(scene.placement_area.middle())
+
+
+def test_a_random_placement_stays_in_the_area_and_the_turn(milk_experiment):
+    area = milk_experiment.scene.placement_area
+    generator = np.random.default_rng(0)
+    maximum_yaw = 0.5
+
+    placements = [area.random_placement(generator, maximum_yaw) for _ in range(50)]
+
+    for placement in placements:
+        assert area.x.lower <= placement.x <= area.x.upper
+        assert area.y.lower <= placement.y <= area.y.upper
+        assert abs(placement.yaw) <= maximum_yaw
 
 
 def test_an_object_without_decomposition_collides_as_its_mesh(milk_experiment):
@@ -341,8 +379,8 @@ def test_the_pr2_lifts_every_object_by_contact_alone(pick_up_object):
     The object rises with the gripper although the world never attaches it to the
     gripper: it stays a free body below the world's root.
     """
-    experiment = PR2PickUpExperiment(
-        scene=ObjectOnTableScene(object_description=pick_up_object.value)
+    experiment = PickUpExperiment(
+        scene=PickUpScene(object_description=pick_up_object.value)
     )
 
     result = experiment.run()
@@ -360,7 +398,9 @@ def test_a_grip_too_weak_leaves_the_bowl_on_the_table():
     Guards the premise of the test above: the bowl is held by the fingers' pressure, so
     without enough of it the same motion lifts nothing.
     """
-    experiment = PR2PickUpExperiment(grip_torque=0.05)
+    experiment = PickUpExperiment(
+        scene=PickUpScene(robot_setup=PR2Setup(grip_torque=0.05))
+    )
 
     result = experiment.run()
 
@@ -370,7 +410,9 @@ def test_a_grip_too_weak_leaves_the_bowl_on_the_table():
 
 @simulates_physics
 def test_a_bowl_left_behind_slips_out_of_the_gripper_by_the_whole_lift():
-    experiment = PR2PickUpExperiment(grip_torque=0.05)
+    experiment = PickUpExperiment(
+        scene=PickUpScene(robot_setup=PR2Setup(grip_torque=0.05))
+    )
 
     result = experiment.run()
 
@@ -381,6 +423,6 @@ def test_a_bowl_left_behind_slips_out_of_the_gripper_by_the_whole_lift():
 
 @simulates_physics
 def test_a_held_bowl_slips_by_much_less_than_the_lift():
-    result = PR2PickUpExperiment().run()
+    result = PickUpExperiment().run()
 
     assert result.translational_slip < PhysicalPickUp.lift_height / 4

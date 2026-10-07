@@ -1,7 +1,8 @@
 """
-The PR2 picks an object up from a table in MuJoCo, holding it by contact alone.
+A robot picks an object up in MuJoCo, holding it by contact alone.
 
-Run it with ``python -m experiments.physical_pick_up.pr2_pick_up``; see ``--help``.
+Run it with ``python -m experiments.physical_pick_up.pick_up_experiment``; see
+``--help``.
 """
 
 from __future__ import annotations
@@ -17,26 +18,17 @@ import numpy as np
 from typing_extensions import Dict, Optional
 from uuid import UUID
 
-from experiments.physical_pick_up.physical_simulation_preparation import (
-    PR2PhysicalSimulationPreparation,
-)
 from experiments.physical_pick_up.pick_up import (
     FilmingSimulationPacer,
     PhysicalPickUp,
 )
 from experiments.physical_pick_up.objects import ObjectChoice
-from experiments.physical_pick_up.scene import ObjectOnTableScene
+from experiments.physical_pick_up.robots import ObjectPlacement, PickUpRobot
+from experiments.physical_pick_up.scene import PickUpScene
 from semantic_digital_twin.grasping.surface_grasp import GraspResult
 from giskardpy.executor import SteppedSimulationPacer
 from semantic_digital_twin.adapters.multi_sim import MujocoCamera, MujocoSim
-from semantic_digital_twin.api import RobotSpecification
-from semantic_digital_twin.datastructures.definitions import (
-    StaticJointState,
-    TorsoState,
-)
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
-from semantic_digital_twin.robots.pr2 import PR2
-from semantic_digital_twin.robots.robot_parts import Arm
 
 CAMERA_NAME = "pick_up_camera"
 """
@@ -45,24 +37,19 @@ Name of the camera the experiment is filmed with.
 
 
 @dataclass
-class PR2PickUpExperiment:
+class PickUpExperiment:
     """
-    A PR2 standing in front of a table picks up the object on it with its left arm, in a
-    MuJoCo simulation stepped in lockstep with Giskard's control loop.
+    The robot of a scene picks up the object in it, in a MuJoCo simulation stepped in
+    lockstep with Giskard's control loop.
 
-    Unless told otherwise, the object is grasped by its description's default grasp.
-    Every attempt starts from the same state of the world, so attempts can follow one
-    another.
-    """
-
-    scene: ObjectOnTableScene = field(default_factory=ObjectOnTableScene)
-    """
-    The table and the object.
+    Unless told otherwise, the object is grasped by its description's default grasp
+    where the scene first put it. Every attempt starts from the same state of the
+    world, so attempts can follow one another.
     """
 
-    grip_torque: float = 8.0
+    scene: PickUpScene = field(default_factory=PickUpScene)
     """
-    The torque the finger servos press the object with, in newton meters.
+    The robot and the object.
     """
 
     headless: bool = True
@@ -85,36 +72,20 @@ class PR2PickUpExperiment:
     The simulated time after which an attempt that is still moving is given up on.
     """
 
-    robot: PR2 = field(init=False)
-    """
-    The PR2, spawned into the scene's world and prepared for physical simulation.
-    """
-
     _start_state: Dict[UUID, np.ndarray] = field(init=False)
     """
     The state of every degree of freedom of the world before the first attempt.
     """
 
     def __post_init__(self):
-        self.robot = RobotSpecification(PR2).spawn(self.scene.world)
-        PR2PhysicalSimulationPreparation(
-            robot=self.robot, grip_torque=self.grip_torque
-        ).apply()
-        self._move_to_start_configuration()
         self._add_camera()
         self._start_state = dict(self.scene.world.state.items())
-
-    @property
-    def arm(self) -> Arm:
-        """
-        :return: The arm the object is picked up with.
-        """
-        return self.robot.left_arm
 
     def run(
         self,
         grasp: Optional[GraspCandidate] = None,
         video_path: Optional[Path] = None,
+        placement: Optional[ObjectPlacement] = None,
     ) -> GraspResult:
         """
         Simulate one pick-up attempt.
@@ -122,9 +93,13 @@ class PR2PickUpExperiment:
         :param grasp: The grasp to take the object by; ``None`` takes the default grasp
             of the object's description.
         :param video_path: Where to write a video of the attempt; ``None`` films nothing.
+        :param placement: Where the object stands for this attempt; ``None`` leaves it
+            where the scene first put it.
         :return: What happened to the object.
         """
         self._restore_start_state()
+        if placement is not None:
+            self.scene.place_object(placement)
         simulation = MujocoSim(
             world=self.scene.world,
             headless=self.headless,
@@ -147,8 +122,8 @@ class PR2PickUpExperiment:
             simulation.step_simulation(self.settling_duration)
             pacer = self._pacer(simulation, video_path)
             result = PhysicalPickUp(
-                robot=self.robot,
-                arm=self.arm,
+                robot=self.scene.robot,
+                arm=self.scene.arm,
                 grasp=(
                     grasp
                     if grasp is not None
@@ -185,19 +160,6 @@ class PR2PickUpExperiment:
             return SteppedSimulationPacer(simulation)
         return FilmingSimulationPacer(simulation, camera_name=CAMERA_NAME)
 
-    def _move_to_start_configuration(self) -> None:
-        """
-        Park both arms and raise the torso, so that the left arm reaches the table from
-        above.
-        """
-        world = self.scene.world
-        for arm in self.robot.all_arms:
-            arm.get_joint_state_by_type(StaticJointState.PARK).apply_to(world)
-        self.robot.mobile_base.torso.get_joint_state_by_type(TorsoState.HIGH).apply_to(
-            world
-        )
-        world.notify_state_change()
-
     def _add_camera(self) -> None:
         """
         Put a camera into the scene that looks at the object and the arm from the far
@@ -230,22 +192,22 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     object_choice = ObjectChoice(parser)
     object_choice.add_arguments()
-    parser.add_argument("--video", type=Path, help="write a video of the attempt here")
     parser.add_argument(
-        "--grip-torque",
-        type=float,
-        default=PR2PickUpExperiment.grip_torque,
-        help="torque the fingers press with, in newton meters",
+        "--robot",
+        choices=[robot.name.lower() for robot in PickUpRobot],
+        default=PickUpRobot.PR2.name.lower(),
+        help="the robot that picks the object up",
     )
+    parser.add_argument("--video", type=Path, help="write a video of the attempt here")
     parser.add_argument(
         "--show", action="store_true", help="open MuJoCo's viewer window"
     )
     arguments = parser.parse_args()
-    result = PR2PickUpExperiment(
-        scene=ObjectOnTableScene(
-            object_description=object_choice.description(arguments)
+    result = PickUpExperiment(
+        scene=PickUpScene(
+            object_description=object_choice.description(arguments),
+            robot_setup=PickUpRobot[arguments.robot.upper()].value,
         ),
-        grip_torque=arguments.grip_torque,
         headless=not arguments.show,
     ).run(video_path=arguments.video)
     print(result)

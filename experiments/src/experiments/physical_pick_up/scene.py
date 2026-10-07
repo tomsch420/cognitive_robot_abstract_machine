@@ -1,13 +1,21 @@
 """
-The scene of the physical pick-up experiment: a table with an object standing on it.
+The scene of the physical pick-up experiment: a robot and an object standing where the
+robot picks objects up.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+import numpy as np
 import trimesh
 
+from experiments.physical_pick_up.robots import (
+    ObjectPlacement,
+    PlacementArea,
+    PR2Setup,
+    RobotSetup,
+)
 from experiments.physical_pick_up.objects import (
     ObjectCannotHaveAHandleError,
     ObjectDescription,
@@ -19,16 +27,11 @@ from semantic_digital_twin.semantic_annotations.mixins import (
     HasGraspCandidates,
     HasHandle,
 )
-from semantic_digital_twin.semantic_annotations.semantic_annotations import (
-    Handle,
-    Table,
-)
+from semantic_digital_twin.robots.robot_parts import AbstractRobot, Arm
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Handle
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Point3
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connections import (
-    Connection6DoF,
-    FixedConnection,
-)
+from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.geometry import Box, Color, Mesh, Scale
 from semantic_digital_twin.world_description.inertial_properties import (
     Inertial,
@@ -39,20 +42,25 @@ from semantic_digital_twin.world_description.world_entity import Body
 
 
 @dataclass
-class ObjectOnTableScene:
+class PickUpScene:
     """
-    A world holding a table and an object that stands loose on it, ready for a robot to
-    be spawned at the world's origin, facing the table along the x-axis.
+    A world holding a robot and an object that stands loose where the robot picks
+    objects up.
 
-    The object is a free body: nothing but contact holds it on the table, and nothing but
-    contact can lift it off.
+    The object is a free body: nothing but contact holds it where it stands, and nothing
+    but contact can lift it off.
     """
 
     object_description: ObjectDescription = field(
         default_factory=lambda: PickUpObject.BOWL.value
     )
     """
-    The object standing on the table.
+    The object to pick up.
+    """
+
+    robot_setup: RobotSetup = field(default_factory=PR2Setup)
+    """
+    The robot that picks the object up, and where the object stands for it.
     """
 
     floor_scale: Scale = field(default_factory=lambda: Scale(4.0, 4.0, 0.1))
@@ -60,35 +68,24 @@ class ObjectOnTableScene:
     Length, width and thickness of the floor.
     """
 
-    table_scale: Scale = field(default_factory=lambda: Scale(0.6, 1.0, 0.72))
-    """
-    Depth, width and height of the table.
-    """
-
-    table_position: Point3 = field(default_factory=lambda: Point3(0.85, 0.0, 0.0))
-    """
-    Where the middle of the table stands on the floor.
-    """
-
-    object_position: Point3 = field(default_factory=lambda: Point3(0.68, 0.15, 0.0))
-    """
-    Where on the table the middle of the object stands; only x and y are read, the
-    object is put down on the table top.
-    """
-
     drop_height: float = 0.002
     """
-    How far above the table top the object starts, so that it is not spawned in contact.
+    How far above its surface the object starts, so that it is not spawned in contact.
     """
 
     world: World = field(init=False)
     """
-    The world holding the table and the object.
+    The world holding the robot and the object.
     """
 
-    table: Table = field(init=False)
+    robot: AbstractRobot = field(init=False)
     """
-    The table.
+    The robot, prepared for physical simulation.
+    """
+
+    placement_area: PlacementArea = field(init=False)
+    """
+    Where the object stands for the robot to pick it up.
     """
 
     graspable: HasGraspCandidates = field(init=False)
@@ -96,17 +93,61 @@ class ObjectOnTableScene:
     The object, as what :attr:`object_description` says it is.
     """
 
+    _footprint_middle: np.ndarray = field(init=False)
+    """
+    The middle of the object's footprint in its own frame, as x and y.
+    """
+
+    _lowest_point: float = field(init=False)
+    """
+    The height of the object's lowest point in its own frame.
+    """
+
     def __post_init__(self):
         self.world = World()
         with self.world.modify_world():
             self.world.add_kinematic_structure_entity(self._floor())
-        self.table = self._add_table()
+        self.robot = self.robot_setup.spawn(self.world)
+        self.placement_area = self.robot_setup.add_placement_area(
+            self.world, self.robot
+        )
         self.graspable = self._add_object()
+        self.place_object(self.placement_area.middle())
+
+    @property
+    def arm(self) -> Arm:
+        """
+        :return: The arm that picks the object up.
+        """
+        return self.robot_setup.arm(self.robot)
+
+    def place_object(self, placement: ObjectPlacement) -> None:
+        """
+        Put the object down where ``placement`` says.
+
+        :param placement: Where the object is to stand.
+        """
+        middle = HomogeneousTransformationMatrix.from_xyz_rpy(
+            x=-self._footprint_middle[0], y=-self._footprint_middle[1]
+        ).to_np()
+        world_T_object = (
+            HomogeneousTransformationMatrix.from_xyz_rpy(
+                x=placement.x,
+                y=placement.y,
+                z=self.placement_area.height - self._lowest_point + self.drop_height,
+                yaw=placement.yaw,
+            ).to_np()
+            @ middle
+        )
+        connection = self.graspable.root.parent_connection
+        connection.origin = HomogeneousTransformationMatrix(
+            world_T_object, reference_frame=self.world.root
+        )
 
     def _floor(self) -> Body:
         """
         :return: The floor, a slab whose top is at height zero, so that an object
-            dropped off the table comes to rest on it.
+            dropped off its surface comes to rest on it.
         """
         body = Body(name=PrefixedName("floor"))
         slab = Box(
@@ -120,47 +161,9 @@ class ObjectOnTableScene:
         body.visual = ShapeCollection([slab], reference_frame=body)
         return body
 
-    @property
-    def table_top_height(self) -> float:
-        """
-        :return: The height of the table's surface above the floor.
-        """
-        return self.table_scale.z
-
-    def _add_table(self) -> Table:
-        """
-        :return: The table, a box standing fixed on the floor.
-        """
-        body = Body(name=PrefixedName("table"))
-        box = Box(
-            origin=HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=body),
-            scale=self.table_scale,
-            color=Color(0.6, 0.45, 0.3, 1.0),
-        )
-        body.collision = ShapeCollection([box], reference_frame=body)
-        body.visual = ShapeCollection([box], reference_frame=body)
-        table = Table(root=body)
-        x, y, _ = self.table_position.to_np()[:3]
-        with self.world.modify_world():
-            self.world.add_connection(
-                FixedConnection(
-                    parent=self.world.root,
-                    child=body,
-                    parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
-                        x=x,
-                        y=y,
-                        z=self.table_top_height / 2,
-                        reference_frame=self.world.root,
-                    ),
-                )
-            )
-            self.world.add_semantic_annotation(table)
-        return table
-
     def _add_object(self) -> HasGraspCandidates:
         """
-        :return: The object, a free body resting on the table with the middle of its
-            footprint at :attr:`object_position`.
+        :return: The object, a free body, not yet placed.
         """
         description = self.object_description
         body = Body(name=PrefixedName(description.body_name))
@@ -173,21 +176,14 @@ class ObjectOnTableScene:
             reference_frame=body,
         )
         body.inertial = self._object_inertial(body)
-        middle = geometry.visual.bounds.mean(axis=0)
-        lowest = body.collision.combined_mesh.bounds[0]
+        self._footprint_middle = geometry.visual.bounds.mean(axis=0)[:2]
+        self._lowest_point = float(body.collision.combined_mesh.bounds[0][2])
         graspable = description.semantic_annotation_type(root=body)
-        x, y, _ = self.object_position.to_np()[:3]
         with self.world.modify_world():
             connection = Connection6DoF.create_with_dofs(
                 parent=self.world.root, child=body, world=self.world
             )
             self.world.add_connection(connection)
-            connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-                x=x - middle[0],
-                y=y - middle[1],
-                z=self.table_top_height - lowest[2] + self.drop_height,
-                reference_frame=self.world.root,
-            )
             self.world.add_semantic_annotation(graspable)
         self._add_handle(graspable, geometry)
         return graspable

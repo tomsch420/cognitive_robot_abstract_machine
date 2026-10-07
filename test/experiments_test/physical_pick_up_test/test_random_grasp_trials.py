@@ -1,5 +1,5 @@
 """
-The PR2 tries grasps drawn from the statement of where the object's annotation may be
+A robot tries grasps drawn from the statement of where the object's annotation may be
 grasped.
 """
 
@@ -8,9 +8,9 @@ from __future__ import annotations
 import pytest
 
 from experiments.physical_pick_up.objects import PickUpObject
-from experiments.physical_pick_up.pr2_pick_up import PR2PickUpExperiment
-from experiments.physical_pick_up.random_grasp_trials import PR2GraspTrier
-from experiments.physical_pick_up.scene import ObjectOnTableScene
+from experiments.physical_pick_up.pick_up_experiment import PickUpExperiment
+from experiments.physical_pick_up.random_grasp_trials import PickUpGraspTrier
+from experiments.physical_pick_up.scene import PickUpScene
 from semantic_digital_twin.grasping.grasp_trials import GraspTrials
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Handle
 
@@ -21,12 +21,12 @@ def trials_on(pick_up_object: PickUpObject) -> GraspTrials:
     """
     :return: Trials of the PR2 grasping ``pick_up_object``.
     """
-    experiment = PR2PickUpExperiment(
-        scene=ObjectOnTableScene(object_description=pick_up_object.value)
+    experiment = PickUpExperiment(
+        scene=PickUpScene(object_description=pick_up_object.value)
     )
     return GraspTrials(
         graspable=experiment.scene.graspable,
-        trier=PR2GraspTrier(experiment=experiment),
+        trier=PickUpGraspTrier(experiment=experiment),
         number_of_trials=30,
     )
 
