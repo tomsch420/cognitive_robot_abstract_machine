@@ -89,6 +89,12 @@ class GraspTrials:
     Answers the statement; ``None`` draws uniformly within the stated regions.
     """
 
+    require_lifting: bool = False
+    """
+    Whether to ask the model only for grasps it expects to lift the object, which needs
+    a model learned over tried grasps and their results.
+    """
+
     @property
     def grasped_part(self) -> HasGraspCandidates:
         """
@@ -101,9 +107,10 @@ class GraspTrials:
         :return: :attr:`number_of_trials` grasps answering the statement of where
             :attr:`grasped_part` may be grasped.
         """
-        return SurfaceGraspStatement(self.grasped_part.surface_grasp_regions()).draw(
-            self.number_of_trials, self.model_registry
-        )
+        return SurfaceGraspStatement(
+            self.grasped_part.surface_grasp_regions(),
+            require_lifting=self.require_lifting,
+        ).draw(self.number_of_trials, self.model_registry)
 
     def run(self) -> Iterator[GraspTrialRecord]:
         """

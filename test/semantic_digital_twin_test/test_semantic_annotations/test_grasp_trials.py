@@ -5,6 +5,7 @@ Trying grasps drawn from the statement of where an object may be grasped.
 from dataclasses import dataclass, field
 
 import pytest
+from krrood.parametrization.exceptions import UnboundedParameterError
 import trimesh
 from typing_extensions import List
 
@@ -138,3 +139,15 @@ def test_an_object_with_a_handle_is_tried_at_its_handle(mug_with_handle):
         assert grasp.graspable is mug_with_handle.handle
     for record in records:
         assert record.grasped_part == Handle.__name__
+
+
+def test_trials_can_ask_only_for_lifting_grasps(carton):
+    trials = GraspTrials(
+        graspable=carton,
+        trier=RecordingTrier(),
+        number_of_trials=1,
+        require_lifting=True,
+    )
+
+    with pytest.raises(UnboundedParameterError):
+        trials.drawn_grasps()
