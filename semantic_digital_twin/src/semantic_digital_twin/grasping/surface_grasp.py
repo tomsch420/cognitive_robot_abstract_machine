@@ -329,25 +329,16 @@ class SurfaceGraspStatement:
             leaving every parameter free, and its result too if :attr:`require_lifting`
             asks for a lifting one.
         """
+        parameters = dict(azimuth=..., height=..., depth=..., pitch=..., roll=...)
         if self.require_lifting:
-            grasp = a(SurfaceGrasp)(
-                azimuth=...,
-                height=...,
-                depth=...,
-                pitch=...,
-                roll=...,
-                result=a(GraspResult)(
-                    lifted=True,
-                    object_rise=...,
-                    translational_slip=...,
-                    rotational_slip=...,
-                    motion_completed=...,
-                ),
+            parameters["result"] = a(GraspResult)(
+                lifted=True,
+                object_rise=...,
+                translational_slip=...,
+                rotational_slip=...,
+                motion_completed=...,
             )
-        else:
-            grasp = a(SurfaceGrasp)(
-                azimuth=..., height=..., depth=..., pitch=..., roll=...
-            )
+        grasp = a(SurfaceGrasp)(**parameters)
         conditions = [region.condition(grasp) for region in self.regions]
         grasp.where(conditions[0] if len(conditions) == 1 else or_(*conditions))
         return grasp

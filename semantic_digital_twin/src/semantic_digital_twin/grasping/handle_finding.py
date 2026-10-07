@@ -134,6 +134,65 @@ class ProtrudingHandleFinder(HandleFinder):
 
 
 @dataclass
+class ElongatedShape:
+    """
+    The points of a shape that is longer than it is wide, measured along its length and
+    across its width.
+    """
+
+    points: np.ndarray
+    """
+    The points, as rows of x, y and z.
+    """
+
+    length_axis: int
+    """
+    The axis the shape is longest along.
+    """
+
+    width_axis: int
+    """
+    The axis its width is measured along.
+    """
+
+    end_fraction: float = 0.15
+    """
+    How much of the shape's length, from each end, is compared to find the narrower end.
+    """
+
+    @property
+    def along(self) -> np.ndarray:
+        """
+        :return: Each point's distance from the end towards the negative length axis.
+        """
+        coordinates = self.points[:, self.length_axis]
+        return coordinates - coordinates.min()
+
+    @property
+    def across(self) -> np.ndarray:
+        """
+        :return: Each point's coordinate across the shape.
+        """
+        return self.points[:, self.width_axis]
+
+    @property
+    def length(self) -> float:
+        """
+        :return: The shape's length.
+        """
+        return float(np.ptp(self.points[:, self.length_axis]))
+
+    def narrower_end_is_positive(self) -> bool:
+        """
+        :return: Whether the end towards the positive length axis is the narrower one.
+        """
+        band = self.end_fraction * self.length
+        negative_end = self.across[self.along <= band]
+        positive_end = self.across[self.along >= self.length - band]
+        return np.ptp(positive_end) < np.ptp(negative_end)
+
+
+@dataclass
 class NarrowEndHandleFinder(HandleFinder):
     """
     Finds the handle of an elongated object lying flat, such as a piece of cutlery or a
@@ -161,33 +220,21 @@ class NarrowEndHandleFinder(HandleFinder):
         lowest, highest = shape.bounds
         extents = highest - lowest
         length_axis = 0 if extents[0] >= extents[1] else 1
-        width_axis = 1 - length_axis
-        length = float(extents[length_axis])
-        points = np.vstack([shape.vertices, shape.triangles_center])
-        across = points[:, width_axis]
-        along = points[:, length_axis] - lowest[length_axis]
+        elongated = ElongatedShape(
+            points=np.vstack([shape.vertices, shape.triangles_center]),
+            length_axis=length_axis,
+            width_axis=1 - length_axis,
+            end_fraction=self.end_fraction,
+        )
+        along = elongated.along
         face_along = shape.triangles_center[:, length_axis] - lowest[length_axis]
-        if self._narrower_end_is_far(across, along, length):
-            along = length - along
-            face_along = length - face_along
-        handle_length = self._handle_length(across, along)
+        if elongated.narrower_end_is_positive():
+            along = elongated.length - along
+            face_along = elongated.length - face_along
+        handle_length = self._handle_length(elongated.across, along)
         if handle_length is None:
             return None
         return shape.submesh([np.flatnonzero(face_along < handle_length)], append=True)
-
-    def _narrower_end_is_far(
-        self, across: np.ndarray, along: np.ndarray, length: float
-    ) -> bool:
-        """
-        :param across: The points' coordinates across the object.
-        :param along: The points' distances from the object's near end.
-        :param length: The object's length.
-        :return: Whether the far end is the narrower one.
-        """
-        band = self.end_fraction * length
-        near = across[along <= band]
-        far = across[along >= length - band]
-        return np.ptp(far) < np.ptp(near)
 
     def _handle_length(self, across: np.ndarray, along: np.ndarray) -> Optional[float]:
         """
