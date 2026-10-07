@@ -10,10 +10,8 @@ from semantic_digital_twin.exceptions import (
     ReferenceFrameMismatchError,
 )
 from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
-from semantic_digital_twin.grasping.grasp_candidates import (
-    GraspCandidate,
-    HasGraspCandidates,
-)
+from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
+from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
 from semantic_digital_twin.semantic_annotations.natural_language import (
     NaturalLanguageWithTypeDescription,
 )
@@ -24,6 +22,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Floor,
     Handle,
     Milk,
+    Mug,
     Spoon,
     Table,
 )
@@ -32,6 +31,7 @@ from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import Box, Mesh, Scale
+from semantic_digital_twin.world_description.inertial_properties import Inertial
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -155,39 +155,49 @@ def test_default_grasp_candidates_approach_along_evenly_spaced_yaws(milk):
 # %% rim grasp poses
 
 
-def test_bowl_grasps_sit_on_the_rim_wall(bowl):
-    wall_center_radius = (BOWL_INNER_RADIUS + BOWL_OUTER_RADIUS) / 2
+def test_bowl_grasps_sit_in_the_rim_wall(bowl):
     for grasp in bowl.grasp_candidates():
         position = grasp.grasp_pose.to_np()[:3, 3]
-        assert np.linalg.norm(position[:2]) == pytest.approx(
-            wall_center_radius, abs=1e-3
-        )
+        assert BOWL_INNER_RADIUS < np.linalg.norm(position[:2]) < BOWL_OUTER_RADIUS
 
 
-def test_bowl_grasps_sit_below_the_rim_by_the_configured_depth(bowl):
+def test_bowl_grasps_sit_in_a_band_below_the_rim_by_the_configured_depth(bowl):
     rim_height = BOWL_HEIGHT / 2 - bowl.rim_grasp_depth
     for grasp in bowl.grasp_candidates():
-        assert grasp.grasp_pose.to_np()[2, 3] == pytest.approx(rim_height)
-
-
-def test_bowl_grasps_approach_straight_down(bowl):
-    for grasp in bowl.grasp_candidates():
-        np.testing.assert_allclose(
-            axes_of(grasp.grasp_pose)[:, 0], [0, 0, -1], atol=1e-9
+        assert grasp.grasp_pose.to_np()[2, 3] == pytest.approx(
+            rim_height, abs=bowl.rim_grasp_depth / 2
         )
+
+
+def test_bowl_grasps_approach_from_above(bowl):
+    [region] = bowl.surface_grasp_regions()
+    for grasp in bowl.grasp_candidates():
+        approach = axes_of(grasp.grasp_pose)[:, 0]
+        assert -approach[2] >= np.cos(region.pitch.upper)
 
 
 def test_bowl_grasp_fingers_close_across_the_rim_wall(bowl):
     """
-    The finger axis must be radial, so the fingers straddle the wall rather than
-    pinching along it.
+    The finger axis must be close to radial, so the fingers straddle the wall rather
+    than pinching along it.
     """
+    [region] = bowl.surface_grasp_regions()
     for grasp in bowl.grasp_candidates():
         position = grasp.grasp_pose.to_np()[:3, 3]
         radial = position / np.linalg.norm(position[:2])
         radial[2] = 0
         finger_axis = axes_of(grasp.grasp_pose)[:, 1]
-        assert abs(float(np.dot(finger_axis, radial))) == pytest.approx(1.0, abs=1e-6)
+        assert abs(float(np.dot(finger_axis, radial))) >= np.cos(
+            region.roll.upper
+        ) * np.cos(region.pitch.upper)
+
+
+def test_bowl_grasps_close_on_the_middle_of_the_wall(bowl):
+    [region] = bowl.surface_grasp_regions()
+    wall_thickness = BOWL_OUTER_RADIUS - BOWL_INNER_RADIUS
+
+    assert region.depth.lower == pytest.approx(0.25 * wall_thickness, rel=0.02)
+    assert region.depth.upper == pytest.approx(0.75 * wall_thickness, rel=0.02)
 
 
 # %% cutlery grasp poses
@@ -221,16 +231,23 @@ def test_cutlery_is_grasped_from_above_across_its_length(length_axis):
     A piece of cutlery lies flat, so the fingers come down onto it and close across it,
     never along it.
     """
-    [grasp] = _spoon_lying_along(length_axis).grasp_candidates()
-    approach, closing = (
-        axes_of(grasp.grasp_pose)[:, 0],
-        axes_of(grasp.grasp_pose)[:, 1],
-    )
+    spoon = _spoon_lying_along(length_axis)
+    [region, _] = spoon.surface_grasp_regions()
+    azimuth_spread = (region.azimuth.upper - region.azimuth.lower) / 2
     length_direction = np.eye(3)[length_axis]
 
-    np.testing.assert_allclose(approach, [0, 0, -1], atol=1e-9)
-    assert float(np.dot(closing, length_direction)) == pytest.approx(0, abs=1e-9)
-    assert closing[2] == pytest.approx(0, abs=1e-9)
+    grasps = spoon.grasp_candidates()
+
+    assert grasps
+    for grasp in grasps:
+        approach, closing = (
+            axes_of(grasp.grasp_pose)[:, 0],
+            axes_of(grasp.grasp_pose)[:, 1],
+        )
+        assert -approach[2] >= np.cos(region.pitch.upper)
+        assert abs(float(np.dot(closing, length_direction))) <= np.sin(
+            region.roll.upper - np.pi / 2 + azimuth_spread
+        )
 
 
 def test_cutlery_without_a_shape_offers_no_grasp():
@@ -243,6 +260,91 @@ def test_cutlery_without_a_shape_offers_no_grasp():
 
     with pytest.raises(NoGraspGeometry):
         spoon.grasp_candidates()
+
+
+# %% grasping at a handle
+
+
+def _mug(with_handle: bool) -> Mug:
+    """
+    :param with_handle: Whether the mug is given its handle.
+    :return: A mug whose round body is a tube and whose handle is a box sticking out
+        towards positive x.
+    """
+    body_shape = trimesh.creation.annulus(
+        r_min=BOWL_INNER_RADIUS, r_max=BOWL_OUTER_RADIUS, height=BOWL_HEIGHT
+    )
+    handle_shape = trimesh.creation.box(extents=[0.03, 0.01, BOWL_HEIGHT / 2])
+    handle_shape.apply_translation([BOWL_OUTER_RADIUS + 0.015, 0.0, 0.0])
+    body = Body(name=PrefixedName(f"mug_{with_handle}", prefix="grasp_candidates"))
+    body.collision = ShapeCollection(
+        [
+            Mesh.from_trimesh(
+                mesh=trimesh.util.concatenate([body_shape, handle_shape]),
+                origin=HomogeneousTransformationMatrix(reference_frame=body),
+            )
+        ],
+        reference_frame=body,
+    )
+    mug = Mug(root=body)
+    world = World()
+    with world.modify_world():
+        world.add_kinematic_structure_entity(body)
+        world.add_semantic_annotation(mug)
+    if with_handle:
+        Handle.create_from_part_of_shape(mug, handle_shape)
+    return mug
+
+
+def test_an_object_with_a_handle_is_grasped_at_its_handle():
+    mug = _mug(with_handle=True)
+
+    grasps = mug.grasp_candidates()
+
+    assert grasps
+    for grasp in grasps:
+        assert grasp.graspable is mug.handle
+        assert grasp.grasp_pose.reference_frame is mug.handle.root
+
+
+def test_the_grasped_part_of_an_object_with_a_handle_is_its_handle():
+    mug = _mug(with_handle=True)
+
+    assert mug.grasped_part() is mug.handle
+
+
+def test_an_object_without_its_handle_is_grasped_as_it_offers_otherwise():
+    mug = _mug(with_handle=False)
+
+    grasps = mug.grasp_candidates()
+
+    assert grasps
+    for grasp in grasps:
+        assert grasp.graspable is mug
+    assert mug.grasped_part() is mug
+
+
+def test_a_handle_made_from_part_of_a_shape_is_fixed_to_its_whole():
+    mug = _mug(with_handle=True)
+
+    connection = mug.handle.root.parent_connection
+
+    assert connection.parent is mug.root
+    assert not mug.handle.root.collision
+
+
+def test_a_handle_made_from_part_of_a_shape_weighs_next_to_nothing():
+    """
+    Its material belongs to the whole. A body left with the default inertial would add a
+    kilogram to the object, and one without any would be weighed by its shape.
+    """
+    mug = _mug(with_handle=True)
+
+    inertial = mug.handle.root.inertial
+    negligible = Inertial.negligible()
+
+    assert inertial.mass == negligible.mass
+    np.testing.assert_array_equal(inertial.inertia.data, negligible.inertia.data)
 
 
 # %% the frame a grasp is expressed in
@@ -310,7 +412,7 @@ def test_only_annotations_that_can_be_held_offer_grasps():
     The mixin sits below :class:`HasRootBody` rather than above it precisely so that a
     dishwasher cannot be asked where to grasp it.
     """
-    for graspable in (Bowl, Milk, Spoon, Handle):
+    for graspable in (Bowl, Milk, Spoon, Handle, Mug):
         assert issubclass(graspable, HasGraspCandidates)
     for fixed in (Dishwasher, Cabinet, Table, Floor):
         assert issubclass(fixed, HasRootBody)

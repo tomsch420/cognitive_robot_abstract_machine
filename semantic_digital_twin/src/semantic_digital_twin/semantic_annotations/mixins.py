@@ -10,6 +10,7 @@ from trimesh.util import concatenate
 from krrood.class_diagrams.class_diagram import WrappedClass
 from krrood.entity_query_language.factories import variable_from, entity, variable, an
 from krrood.ormatic.utils import classproperty
+from krrood.parametrization.model_registries import ModelRegistry
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from krrood.utils import recursive_subclasses
 from probabilistic_model.distributions.gaussian import GaussianDistribution
@@ -51,8 +52,15 @@ from semantic_digital_twin.datastructures.variables import SpatialVariables
 from semantic_digital_twin.exceptions import (
     AmbiguousPart,
     CannotBeAPartOf,
+    NoGraspGeometry,
     NoSupportingSurfaceError,
     UnknownPartWholeRelationshipField,
+)
+from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
+from semantic_digital_twin.grasping.surface_grasp import (
+    ParameterRange,
+    SurfaceGraspRegion,
+    SurfaceGraspStatement,
 )
 from semantic_digital_twin.reasoning.predicates import SupportedBy
 from semantic_digital_twin.semantic_annotations.part_whole import (
@@ -63,6 +71,7 @@ from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
     Vector3,
 )
+from semantic_digital_twin.spatial_types.spatial_types import Pose, RotationMatrix
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
 )
@@ -416,6 +425,184 @@ class HasRootBody(HasRootKinematicStructureEntity[Body]):
 
 
 @dataclass(eq=False)
+class HasGraspCandidates(HasRootBody):
+    """
+    A mixin class for semantic annotations that can say where they may be grasped.
+
+    Only an annotation rooted in a body can be grasped at all, since a region carries no
+    collision geometry for fingers to close on.
+
+    Where an object may be grasped is stated as an underspecified statement over
+    :class:`~semantic_digital_twin.grasping.surface_grasp.SurfaceGrasp`, made of the
+    regions :meth:`surface_grasp_regions` returns. Annotations that know their object's
+    shape narrow these regions.
+    """
+
+    grasp_candidate_count: int = field(default=12, kw_only=True)
+    """
+    How many grasp candidates :meth:`grasp_candidates` generates.
+    """
+
+    def grasp_candidates(
+        self, model_registry: Optional[ModelRegistry] = None
+    ) -> List[GraspCandidate]:
+        """
+        The grasps this annotation offers, in no particular order.
+
+        The default grasps the object at its own origin, from evenly spaced directions
+        around its z-axis, and asks no model. Annotations whose shape admits a better
+        grip override this.
+
+        :param model_registry: Answers the statement of where the object may be grasped,
+            for annotations that draw their grasps from it.
+        """
+        return [
+            GraspCandidate(
+                self,
+                Pose(
+                    orientation=RotationMatrix.from_rpy(yaw=yaw).quaternion,
+                    reference_frame=self.root,
+                ),
+            )
+            for yaw in np.linspace(
+                0, 2 * np.pi, self.grasp_candidate_count, endpoint=False
+            )
+        ]
+
+    def grasp_surface(self) -> trimesh.Trimesh:
+        """
+        :return: The surface that surface grasps are placed on, in the root body's frame:
+            what the root body collides as, or else what it looks like.
+        :raises NoGraspGeometry: If the root body has neither.
+        """
+        if self.root.collision:
+            return self.root.collision.combined_mesh
+        if self.root.visual:
+            return self.root.visual.combined_mesh
+        raise NoGraspGeometry(self)
+
+    def surface_grasp_regions(self) -> List[SurfaceGraspRegion]:
+        """
+        :return: The regions of surface grasps the object allows. The default allows the
+            whole object, closing on it at most halfway through its narrower horizontal
+            extent.
+        """
+        lowest, highest = self.grasp_surface().bounds
+        narrower_extent = float(min(highest[:2] - lowest[:2]))
+        return [
+            SurfaceGraspRegion(
+                height=ParameterRange(0.05, 0.95),
+                depth=ParameterRange(0.0, narrower_extent / 2),
+            )
+        ]
+
+    def grasped_part(self) -> HasGraspCandidates:
+        """
+        :return: The annotation whose surface the object is grasped at; the object
+            itself unless one of its parts is grasped instead.
+        """
+        return self
+
+
+@dataclass(eq=False)
+class HasStatedGrasps(HasGraspCandidates):
+    """
+    A graspable annotation that knows where on its surface it may be grasped, and draws
+    its grasp candidates from the statement of it.
+    """
+
+    def grasp_candidates(
+        self, model_registry: Optional[ModelRegistry] = None
+    ) -> List[GraspCandidate]:
+        """
+        Draw grasps from the statement made of :meth:`surface_grasp_regions`.
+
+        :param model_registry: Answers the statement; ``None`` draws uniformly within
+            the regions.
+        :return: The drawn grasps that reach the object's surface, at most
+            :attr:`grasp_candidate_count` of them.
+        """
+        grasps = SurfaceGraspStatement(self.surface_grasp_regions()).draw(
+            self.grasp_candidate_count, model_registry
+        )
+        return [
+            grasp.grasp_candidate(self)
+            for grasp in grasps
+            if grasp.reaches_surface_of(self)
+        ]
+
+
+@dataclass(eq=False)
+class HasRim(HasStatedGrasps):
+    """
+    An open container whose rim is grasped by pinching its wall from above.
+    """
+
+    rim_grasp_depth: float = field(default=0.01, kw_only=True)
+    """
+    How far below the highest point of the container the fingers grip its wall.
+    """
+
+    rim_wall_probe_count: int = field(default=12, kw_only=True)
+    """
+    In how many directions around the container its wall is measured.
+    """
+
+    def surface_grasp_regions(self) -> List[SurfaceGraspRegion]:
+        """
+        :return: The band :attr:`rim_grasp_depth` below the rim, all around, closing on
+            the middle half of the wall's thickness, from above or tilted a little
+            towards the wall.
+        :raises NoGraspGeometry: If no wall is found below the rim.
+        """
+        mesh = self.grasp_surface()
+        lowest, highest = mesh.bounds
+        height = float(highest[2] - lowest[2])
+        grip_height = 1.0 - self.rim_grasp_depth / height
+        band = self.rim_grasp_depth / (2 * height)
+        thickness = self._rim_wall_thickness(mesh)
+        return [
+            SurfaceGraspRegion(
+                height=ParameterRange(grip_height - band, min(grip_height + band, 1.0)),
+                depth=ParameterRange(0.25 * thickness, 0.75 * thickness),
+                pitch=ParameterRange(0.0, 0.5),
+                roll=ParameterRange(-np.pi / 8, np.pi / 8),
+            )
+        ]
+
+    def _rim_wall_thickness(self, mesh: trimesh.Trimesh) -> float:
+        """
+        Cast rays outward from the middle of the container, :attr:`rim_grasp_depth`
+        below the rim, and take the distance between the first two surfaces each ray
+        passes, the inside and the outside of the wall, as the wall's thickness.
+
+        :param mesh: The container's grasp surface.
+        :return: The median thickness over the directions that hit the wall.
+        :raises NoGraspGeometry: If no direction hits a wall.
+        """
+        yaws = np.linspace(0, 2 * np.pi, self.rim_wall_probe_count, endpoint=False)
+        directions = np.column_stack([np.cos(yaws), np.sin(yaws), np.zeros(len(yaws))])
+        lowest, highest = mesh.bounds
+        axis_point = (lowest + highest) / 2
+        axis_point[2] = highest[2] - self.rim_grasp_depth
+        locations, ray_indices, _ = mesh.ray.intersects_location(
+            ray_origins=np.tile(axis_point, (len(yaws), 1)), ray_directions=directions
+        )
+        thicknesses = []
+        for index in range(len(yaws)):
+            distances = np.sort(
+                np.linalg.norm(
+                    locations[ray_indices == index][:, :2] - axis_point[:2], axis=1
+                )
+            )
+            if len(distances) > 1:
+                thicknesses.append(float(distances[1] - distances[0]))
+        if not thicknesses:
+            raise NoGraspGeometry(self)
+        return float(np.median(thicknesses))
+
+
+@dataclass(eq=False)
 class HasRootRegion(HasRootKinematicStructureEntity[Region]):
     """
     A mixin class for semantic annotations that have a region.
@@ -731,9 +918,10 @@ class HasDoors(PartWholeRelationship):
 
 
 @dataclass(eq=False)
-class HasHandle(HasRootBody, PartWholeRelationship):
+class HasHandle(HasGraspCandidates, PartWholeRelationship):
     """
-    A mixin class for semantic annotations that have a handle.
+    A mixin class for semantic annotations that have a handle, and are grasped at it
+    when they have one.
     """
 
     handle: Optional[Handle] = field(
@@ -743,6 +931,27 @@ class HasHandle(HasRootBody, PartWholeRelationship):
     """
     The handle of the semantic annotation.
     """
+
+    def grasp_candidates(
+        self, model_registry: Optional[ModelRegistry] = None
+    ) -> List[GraspCandidate]:
+        """
+        :param model_registry: Answers the statement of where the handle, or the object
+            without one, may be grasped.
+        :return: The grasps of the handle; without a handle, those the annotation offers
+            otherwise.
+        """
+        if self.handle is None:
+            return super().grasp_candidates(model_registry)
+        return self.handle.grasp_candidates(model_registry)
+
+    def grasped_part(self) -> HasGraspCandidates:
+        """
+        :return: The handle; without a handle, the annotation itself.
+        """
+        if self.handle is None:
+            return self
+        return self.handle
 
 
 THasRootBody = TypeVar("THasRootBody", bound=HasRootBody)

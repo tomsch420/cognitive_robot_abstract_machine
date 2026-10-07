@@ -1,8 +1,12 @@
+import math
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing_extensions import Type, Dict
+from typing_extensions import Dict, Optional, Type
 
-from krrood.parametrization.exceptions import RelationalCircuitRegistryRequiresMatch
+from krrood.parametrization.exceptions import (
+    RelationalCircuitRegistryRequiresMatch,
+    UnboundedParameterError,
+)
 from krrood.parametrization.parameterizer import (
     ModelQueryParameters,
     UnderspecifiedParameters,
@@ -19,10 +23,16 @@ from probabilistic_model.probabilistic_circuit.relational.rspn import (
     RelationalProbabilisticCircuit,
 )
 from probabilistic_model.probabilistic_circuit.rx.helper import fully_factorized
+from probabilistic_model.distributions.uniform import UniformDistribution
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit,
+    ProductUnit,
+    leaf,
 )
 from probabilistic_model.probabilistic_model import ProbabilisticModel
+from random_events.interval import SimpleInterval, closed
+from random_events.product_algebra import Event
+from random_events.variable import Continuous
 
 
 @dataclass
@@ -48,6 +58,68 @@ class FullyFactorizedRegistry(ModelRegistry):
 
     def get_model(self, parameters: ModelQueryParameters) -> ProbabilisticModel:
         return fully_factorized(parameters.variables.values())
+
+
+@dataclass
+class UniformPriorRegistry(ModelRegistry):
+    """
+    A registry that knows nothing but what a statement allows: every parameter is drawn
+    uniformly from where the statement's ``where`` conditions permit it.
+
+    The model it returns is uniform over each parameter's overall range, the smallest
+    interval holding every value the conditions allow. The backend then truncates it to
+    the conditions themselves, which leaves a distribution uniform over exactly the
+    allowed values, also when they form several separate regions.
+    """
+
+    def get_model(self, parameters: ModelQueryParameters) -> ProbabilisticCircuit:
+        """
+        :raises UnboundedParameterError: If the conditions leave a parameter without a
+            lower or an upper bound.
+        """
+        allowed = (
+            parameters.truncation_assignments_from_where_conditions
+            if isinstance(parameters, UnderspecifiedParameters)
+            else None
+        )
+        circuit = ProbabilisticCircuit()
+        root = ProductUnit(probabilistic_circuit=circuit)
+        for name, variable in parameters.variables.items():
+            root.add_subcircuit(
+                leaf(
+                    UniformDistribution(
+                        variable=variable,
+                        interval=self._overall_range(name, variable, allowed),
+                    ),
+                    circuit,
+                )
+            )
+        return circuit
+
+    @staticmethod
+    def _overall_range(
+        name: str, variable: Continuous, allowed: Optional[Event]
+    ) -> SimpleInterval:
+        """
+        :param name: The parameter's name.
+        :param variable: The parameter's variable.
+        :param allowed: The values the statement's conditions allow, if it has any.
+        :return: The smallest interval holding every value of the parameter that
+            ``allowed`` contains.
+        :raises UnboundedParameterError: If that interval is not bounded.
+        """
+        if allowed is None or variable not in allowed.variables:
+            raise UnboundedParameterError(parameter_name=name)
+        intervals = [
+            simple_interval
+            for simple_event in allowed.simple_sets
+            for simple_interval in simple_event[variable].simple_sets
+        ]
+        lowest = min(interval.lower for interval in intervals)
+        highest = max(interval.upper for interval in intervals)
+        if not (math.isfinite(lowest) and math.isfinite(highest)):
+            raise UnboundedParameterError(parameter_name=name)
+        return closed(lowest, highest).simple_sets[0]
 
 
 @dataclass

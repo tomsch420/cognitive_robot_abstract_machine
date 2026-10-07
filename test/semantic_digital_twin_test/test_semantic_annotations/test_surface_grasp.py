@@ -1,0 +1,182 @@
+"""
+Grasps described on an object's surface, and statements of where an object may be
+grasped.
+"""
+
+import math
+
+import numpy as np
+import pytest
+import trimesh
+
+from krrood.parametrization.exceptions import UnboundedParameterError
+from krrood.parametrization.model_registries import UniformPriorRegistry
+from krrood.entity_query_language.backends import ProbabilisticBackend
+from krrood.entity_query_language.factories import a
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.exceptions import SurfaceGraspNotOnSurfaceError
+from semantic_digital_twin.grasping.surface_grasp import (
+    ParameterRange,
+    SurfaceGrasp,
+    SurfaceGraspRegion,
+    SurfaceGraspStatement,
+)
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.geometry import Mesh
+from semantic_digital_twin.world_description.shape_collection import ShapeCollection
+from semantic_digital_twin.world_description.world_entity import Body
+
+# %% fixtures
+
+CARTON_EXTENTS = (0.06, 0.08, 0.2)
+"""
+Width, depth and height of the carton the grasps are placed on.
+"""
+
+
+@pytest.fixture
+def carton() -> Milk:
+    """
+    A box-shaped carton standing on its base, its middle at the origin.
+    """
+    body = Body(name=PrefixedName("carton", prefix="surface_grasp"))
+    body.collision = ShapeCollection(
+        [
+            Mesh.from_trimesh(
+                mesh=trimesh.creation.box(extents=CARTON_EXTENTS),
+                origin=HomogeneousTransformationMatrix(reference_frame=body),
+            )
+        ],
+        reference_frame=body,
+    )
+    annotation = Milk(root=body)
+    world = World()
+    with world.modify_world():
+        world.add_kinematic_structure_entity(body)
+        world.add_semantic_annotation(annotation)
+    return annotation
+
+
+def grasp_frame(carton: Milk, surface_grasp: SurfaceGrasp) -> np.ndarray:
+    """
+    :return: The grasp frame of ``surface_grasp`` in the carton's own frame.
+    """
+    return surface_grasp.grasp_candidate(carton).grasp_pose.to_np()
+
+
+# %% grasps on the surface
+
+
+def test_an_untilted_unrolled_grasp_comes_from_above_and_closes_along_the_line_of_sight(
+    carton,
+):
+    frame = grasp_frame(
+        carton, SurfaceGrasp(azimuth=0.0, height=0.9, depth=0.0, pitch=0.0, roll=0.0)
+    )
+
+    approach, closing = frame[:3, 0], frame[:3, 1]
+    assert approach == pytest.approx([0.0, 0.0, -1.0])
+    assert closing == pytest.approx([1.0, 0.0, 0.0])
+
+
+def test_a_grasp_without_depth_takes_the_first_point_of_the_surface(carton):
+    frame = grasp_frame(
+        carton, SurfaceGrasp(azimuth=0.0, height=0.5, depth=0.0, pitch=0.0, roll=0.0)
+    )
+
+    assert frame[:3, 3] == pytest.approx([CARTON_EXTENTS[0] / 2, 0.0, 0.0])
+
+
+def test_the_depth_runs_along_the_line_of_sight(carton):
+    """
+    The line of sight, not the surface normal, sets where the gripper closes, so a
+    handle seen from its end is grasped along its length.
+    """
+    azimuth = 0.3
+    depth = 0.01
+    surface = grasp_frame(
+        carton,
+        SurfaceGrasp(azimuth=azimuth, height=0.5, depth=0.0, pitch=0.0, roll=0.0),
+    )
+    deeper = grasp_frame(
+        carton,
+        SurfaceGrasp(azimuth=azimuth, height=0.5, depth=depth, pitch=0.0, roll=0.0),
+    )
+
+    assert deeper[:3, 3] - surface[:3, 3] == pytest.approx(
+        -depth * np.array([math.cos(azimuth), math.sin(azimuth), 0.0])
+    )
+
+
+def test_a_rolled_grasp_closes_along_a_turned_direction(carton):
+    unrolled = grasp_frame(
+        carton, SurfaceGrasp(azimuth=2.0, height=0.8, depth=0.0, pitch=0.3, roll=0.0)
+    )
+    rolled = grasp_frame(
+        carton,
+        SurfaceGrasp(azimuth=2.0, height=0.8, depth=0.0, pitch=0.3, roll=math.pi / 2),
+    )
+
+    assert rolled[:3, 0] == pytest.approx(unrolled[:3, 0])
+    assert float(np.dot(rolled[:3, 1], unrolled[:3, 1])) == pytest.approx(0.0, abs=1e-9)
+
+
+def test_a_point_above_the_object_is_not_on_its_surface(carton):
+    above = SurfaceGrasp(azimuth=0.0, height=1.5, depth=0.0, pitch=0.0, roll=0.0)
+
+    assert not above.reaches_surface_of(carton)
+    with pytest.raises(SurfaceGraspNotOnSurfaceError):
+        above.grasp_candidate(carton)
+
+
+# %% statements of where to grasp
+
+
+def test_drawn_grasps_lie_in_one_of_the_regions():
+    sides = (0.0, math.pi)
+    tolerance = 0.2
+    statement = SurfaceGraspStatement(
+        [
+            SurfaceGraspRegion(
+                height=ParameterRange(0.4, 0.6),
+                depth=ParameterRange(0.0, 0.01),
+                azimuth=ParameterRange(side - tolerance, side + tolerance),
+            )
+            for side in sides
+        ]
+    )
+    number_of_grasps = 60
+
+    grasps = statement.draw(number_of_grasps)
+
+    assert len(grasps) == number_of_grasps
+    nearest_side = [
+        min(sides, key=lambda side: abs(grasp.azimuth - side)) for grasp in grasps
+    ]
+    for grasp, side in zip(grasps, nearest_side):
+        assert abs(grasp.azimuth - side) < tolerance
+        assert 0.4 <= grasp.height < 0.6
+        assert grasp.result is None
+    assert set(nearest_side) == set(sides)
+
+
+def test_every_parameter_of_a_surface_grasp_needs_bounds():
+    statement = a(SurfaceGrasp)(azimuth=..., height=..., depth=..., pitch=..., roll=...)
+    statement.where(statement.azimuth < 1.0)
+
+    with pytest.raises(UnboundedParameterError):
+        list(
+            statement.evaluate(
+                backend=ProbabilisticBackend(
+                    UniformPriorRegistry(), number_of_samples=1
+                )
+            )
+        )
+
+
+def test_the_default_region_covers_the_object_up_to_half_its_narrower_side(carton):
+    [region] = carton.surface_grasp_regions()
+
+    assert region.depth.upper == pytest.approx(min(CARTON_EXTENTS[:2]) / 2)
