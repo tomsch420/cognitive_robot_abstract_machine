@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import Enum, StrEnum
 
 import numpy as np
 
@@ -15,6 +15,9 @@ from experiments.physical_pick_up.physical_simulation_preparation import (
     PR2PhysicalSimulationPreparation,
 )
 from semantic_digital_twin.api import RobotSpecification
+from semantic_digital_twin.collision_checking.collision_rules import (
+    AllowCollisionBetweenGroups,
+)
 from semantic_digital_twin.datastructures.definitions import (
     StaticJointState,
     TorsoState,
@@ -218,6 +221,22 @@ class PR2Setup(RobotSetup):
         )
 
 
+class ArmBody(StrEnum):
+    """
+    The ends of the names of the bodies of one of Tracy's UR10e arms.
+    """
+
+    BASE = "base_link_inertia"
+    """
+    The base the arm is mounted with.
+    """
+
+    FOREARM = "forearm_link"
+    """
+    The forearm.
+    """
+
+
 @dataclass
 class TracySetup(RobotSetup):
     """
@@ -240,11 +259,34 @@ class TracySetup(RobotSetup):
     """
 
     def spawn(self, world: World) -> Tracy:
+        """
+        In MuJoCo each arm's forearm touches the arm's own base in every pose, which
+        holds the shoulder and the elbow away from where their servos drive them; so
+        the two bodies are allowed to collide, which MuJoCo then does not check.
+        """
         robot = RobotSpecification(Tracy).spawn(world)
+        with world.modify_world():
+            for arm in robot.all_arms:
+                world.collision_manager.add_ignore_collision_rule(
+                    AllowCollisionBetweenGroups(
+                        body_group_a=[self._arm_body(arm, ArmBody.BASE)],
+                        body_group_b=[self._arm_body(arm, ArmBody.FOREARM)],
+                    )
+                )
         for arm in robot.all_arms:
             arm.get_joint_state_by_type(StaticJointState.PARK).apply_to(world)
         world.notify_state_change()
         return robot
+
+    @staticmethod
+    def _arm_body(arm: Arm, arm_body: ArmBody) -> Body:
+        """
+        :param arm: One of Tracy's arms.
+        :param arm_body: Which of its bodies.
+        :return: That body of the arm.
+        """
+        [body] = [body for body in arm.bodies if body.name.name.endswith(arm_body)]
+        return body
 
     def arm(self, robot: Tracy) -> Arm:
         return robot.left_arm
@@ -268,3 +310,7 @@ class PickUpRobot(Enum):
     A PR2 picking up from a table in front of it with its left arm.
     """
 
+    TRACY = TracySetup()
+    """
+    Tracy picking up from its own table with its left arm.
+    """
