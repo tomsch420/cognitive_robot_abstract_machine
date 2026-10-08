@@ -29,9 +29,14 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.semantic_annotations.mixins import (
     HasGraspCandidates,
     HasHandle,
+    HasRim,
 )
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, Arm
-from semantic_digital_twin.semantic_annotations.semantic_annotations import Handle
+from semantic_digital_twin.grasping.rim_finding import RimFinder
+from semantic_digital_twin.semantic_annotations.semantic_annotations import (
+    Handle,
+    Rim,
+)
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Point3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection6DoF
@@ -187,6 +192,7 @@ class PickUpScene:
             self.world.add_connection(connection)
             self.world.add_semantic_annotation(graspable)
         self._add_handle(graspable, geometry)
+        self._add_rim(graspable, geometry)
         return graspable
 
     def _add_handle(
@@ -212,6 +218,21 @@ class PickUpScene:
         if shape is None:
             return
         Handle.create_from_part_of_shape(graspable, shape)
+
+    @staticmethod
+    def _add_rim(graspable: HasGraspCandidates, geometry: ObjectGeometry) -> None:
+        """
+        Give an open container the rim found in its shape.
+
+        :param graspable: The object's annotation.
+        :param geometry: The object's geometry in its body's frame.
+        """
+        if not isinstance(graspable, HasRim):
+            return
+        shape = RimFinder().find(geometry.visual)
+        if shape is None:
+            return
+        Rim.create_from_part_of_shape(graspable, shape)
 
     @staticmethod
     def _shape(mesh: trimesh.Trimesh, body: Body) -> Mesh:
