@@ -12,7 +12,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
-from typing_extensions import Iterator, List, Optional
+from typing_extensions import Iterator, List, Optional, Type
 
 from krrood.parametrization.model_registries import ModelRegistry
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
@@ -23,19 +23,19 @@ from semantic_digital_twin.grasping.surface_grasp import (
 )
 from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
 
-# %% trying a grasp
+# %% performing a grasp
 
 
-class GraspTrier(ABC):
+class GraspPerformer(ABC):
     """
-    Tries grasps and tells what happened, for example a robot in a physics simulation or
-    in the real world.
+    Performs grasps and tells what happened, for example a robot in a physics simulation
+    or in the real world.
     """
 
     @abstractmethod
-    def try_grasp(self, grasp: GraspCandidate) -> GraspResult:
+    def perform(self, grasp: GraspCandidate) -> GraspResult:
         """
-        :param grasp: The grasp to try.
+        :param grasp: The grasp to perform.
         :return: What happened to the object.
         """
 
@@ -49,9 +49,9 @@ class GraspTrialRecord:
     One tried grasp as it is recorded.
     """
 
-    grasped_part: str
+    grasped_part: Type[HasGraspCandidates]
     """
-    The name of the annotation type of the part the grasp was placed on.
+    The annotation type of the part the grasp was placed on.
     """
 
     grasp: SurfaceGrasp
@@ -74,7 +74,7 @@ class GraspTrials:
     The object to grasp.
     """
 
-    trier: GraspTrier
+    performer: GraspPerformer
     """
     Tries each grasp.
     """
@@ -123,9 +123,7 @@ class GraspTrials:
         for surface_grasp in self.drawn_grasps():
             if not surface_grasp.reaches_surface_of(part):
                 continue
-            surface_grasp.result = self.trier.try_grasp(
+            surface_grasp.result = self.performer.perform(
                 surface_grasp.grasp_candidate(part)
             )
-            yield GraspTrialRecord(
-                grasped_part=type(part).__name__, grasp=surface_grasp
-            )
+            yield GraspTrialRecord(grasped_part=type(part), grasp=surface_grasp)

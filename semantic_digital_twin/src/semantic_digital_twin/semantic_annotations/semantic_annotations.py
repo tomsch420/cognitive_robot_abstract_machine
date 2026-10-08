@@ -45,8 +45,8 @@ from semantic_digital_twin.semantic_annotations.mixins import (
     HasRim,
     HasStatedGrasps,
 )
+from random_events.interval import closed_open
 from semantic_digital_twin.grasping.surface_grasp import (
-    ParameterRange,
     SurfaceGraspRegion,
 )
 from semantic_digital_twin.spatial_types import (
@@ -113,8 +113,8 @@ class Handle(HasStatedGrasps):
         thinnest_extent = float(min(self.grasp_surface().extents))
         return [
             SurfaceGraspRegion(
-                height=ParameterRange(0.1, 0.9),
-                depth=ParameterRange(0.0, thinnest_extent / 2),
+                height=closed_open(0.1, 0.9),
+                depth=closed_open(0.0, thinnest_extent / 2),
             )
         ]
 
@@ -1560,13 +1560,11 @@ class Cutlery(HasHandle, HasStatedGrasps, Tableware):
         tolerance = np.pi / 16
         return [
             SurfaceGraspRegion(
-                height=ParameterRange(0.2, 0.8),
-                depth=ParameterRange(0.2 * length, 0.6 * length),
-                azimuth=ParameterRange(
-                    end_azimuth - tolerance, end_azimuth + tolerance
-                ),
-                pitch=ParameterRange(0.0, 0.6),
-                roll=ParameterRange(np.pi / 2 - np.pi / 8, np.pi / 2 + np.pi / 8),
+                height=closed_open(0.2, 0.8),
+                depth=closed_open(0.2 * length, 0.6 * length),
+                azimuth=closed_open(end_azimuth - tolerance, end_azimuth + tolerance),
+                pitch=closed_open(0.0, 0.6),
+                roll=closed_open(np.pi / 2 - np.pi / 8, np.pi / 2 + np.pi / 8),
             )
             for end_azimuth in end_azimuths
         ]

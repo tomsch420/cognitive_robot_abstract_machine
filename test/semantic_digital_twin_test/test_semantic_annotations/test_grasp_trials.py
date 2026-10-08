@@ -11,7 +11,7 @@ from typing_extensions import List
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
-from semantic_digital_twin.grasping.grasp_trials import GraspTrier, GraspTrials
+from semantic_digital_twin.grasping.grasp_trials import GraspPerformer, GraspTrials
 from semantic_digital_twin.grasping.surface_grasp import GraspResult
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Handle,
@@ -28,9 +28,9 @@ from semantic_digital_twin.world_description.world_entity import Body
 
 
 @dataclass
-class RecordingTrier(GraspTrier):
+class RecordingPerformer(GraspPerformer):
     """
-    Lifts the object by every grasp, and remembers which grasps it was given.
+    Lifts the object by every grasp it performs, and remembers which grasps they were.
     """
 
     tried: List[GraspCandidate] = field(default_factory=list)
@@ -38,7 +38,7 @@ class RecordingTrier(GraspTrier):
     The grasps tried so far.
     """
 
-    def try_grasp(self, grasp: GraspCandidate) -> GraspResult:
+    def perform(self, grasp: GraspCandidate) -> GraspResult:
         self.tried.append(grasp)
         return GraspResult(
             lifted=True,
@@ -99,52 +99,56 @@ def mug_with_handle() -> Mug:
 
 
 def test_drawn_grasps_lie_in_the_regions_the_annotation_states(carton):
-    trials = GraspTrials(graspable=carton, trier=RecordingTrier(), number_of_trials=30)
+    trials = GraspTrials(
+        graspable=carton, performer=RecordingPerformer(), number_of_trials=30
+    )
     [region] = carton.surface_grasp_regions()
 
     grasps = trials.drawn_grasps()
 
     assert len(grasps) == trials.number_of_trials
     for grasp in grasps:
-        for value, parameter_range in (
+        for value, interval in (
             (grasp.azimuth, region.azimuth),
             (grasp.height, region.height),
             (grasp.depth, region.depth),
             (grasp.pitch, region.pitch),
             (grasp.roll, region.roll),
         ):
-            assert parameter_range.lower <= value < parameter_range.upper
+            assert interval.contains(value)
 
 
 def test_every_tried_grasp_is_recorded_with_its_result(carton):
-    trier = RecordingTrier()
-    trials = GraspTrials(graspable=carton, trier=trier, number_of_trials=5)
+    performer = RecordingPerformer()
+    trials = GraspTrials(graspable=carton, performer=performer, number_of_trials=5)
 
     records = list(trials.run())
 
-    assert len(records) == len(trier.tried)
+    assert len(records) == len(performer.tried)
     for record in records:
         assert record.grasp.result.lifted
-        assert record.grasped_part == type(carton).__name__
+        assert record.grasped_part is type(carton)
 
 
 def test_an_object_with_a_handle_is_tried_at_its_handle(mug_with_handle):
-    trier = RecordingTrier()
-    trials = GraspTrials(graspable=mug_with_handle, trier=trier, number_of_trials=5)
+    performer = RecordingPerformer()
+    trials = GraspTrials(
+        graspable=mug_with_handle, performer=performer, number_of_trials=5
+    )
 
     records = list(trials.run())
 
     assert records
-    for grasp in trier.tried:
+    for grasp in performer.tried:
         assert grasp.graspable is mug_with_handle.handle
     for record in records:
-        assert record.grasped_part == Handle.__name__
+        assert record.grasped_part is Handle
 
 
 def test_trials_can_ask_only_for_lifting_grasps(carton):
     trials = GraspTrials(
         graspable=carton,
-        trier=RecordingTrier(),
+        performer=RecordingPerformer(),
         number_of_trials=1,
         require_lifting=True,
     )

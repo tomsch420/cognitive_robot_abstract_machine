@@ -16,11 +16,13 @@ import math
 from dataclasses import dataclass, field
 
 import numpy as np
+from numpy.typing import NDArray
 from typing_extensions import TYPE_CHECKING, List, Optional
 
 from krrood.entity_query_language.backends import ProbabilisticBackend
 from krrood.entity_query_language.factories import a, and_, or_
 from krrood.entity_query_language.query.match import Match
+from random_events.interval import Bound, Interval, closed_open
 from krrood.parametrization.model_registries import (
     ModelRegistry,
     UniformPriorRegistry,
@@ -167,15 +169,15 @@ class SurfaceGrasp:
         """
         return self._surface_point(graspable, self._line_of_sight()) is not None
 
-    def _line_of_sight(self) -> np.ndarray:
+    def _line_of_sight(self) -> NDArray[np.float64]:
         """
         :return: The horizontal direction the surface point is seen from.
         """
         return np.array([math.cos(self.azimuth), math.sin(self.azimuth), 0.0])
 
     def _surface_point(
-        self, graspable: HasGraspCandidates, outward: np.ndarray
-    ) -> Optional[np.ndarray]:
+        self, graspable: HasGraspCandidates, outward: NDArray[np.float64]
+    ) -> Optional[NDArray[np.float64]]:
         """
         Cast a horizontal ray from outside the object towards its vertical axis.
 
@@ -196,7 +198,7 @@ class SurfaceGrasp:
             return None
         return locations[int(np.argmin(np.linalg.norm(locations - origin, axis=1)))]
 
-    def _approach_direction(self, outward: np.ndarray) -> np.ndarray:
+    def _approach_direction(self, outward: NDArray[np.float64]) -> NDArray[np.float64]:
         """
         :param outward: The horizontal direction the surface point was seen from.
         :return: The direction the gripper travels in towards the grasp.
@@ -205,8 +207,8 @@ class SurfaceGrasp:
         return math.cos(self.pitch) * down - math.sin(self.pitch) * outward
 
     def _closing_direction(
-        self, approach: np.ndarray, outward: np.ndarray
-    ) -> np.ndarray:
+        self, approach: NDArray[np.float64], outward: NDArray[np.float64]
+    ) -> NDArray[np.float64]:
         """
         :param approach: The direction the gripper travels in.
         :param outward: The horizontal direction the surface point was seen from.
@@ -224,28 +226,11 @@ class SurfaceGrasp:
 
 
 @dataclass
-class ParameterRange:
-    """
-    The values a parameter of a grasp may take: from :attr:`lower` up to, but not
-    including, :attr:`upper`.
-    """
-
-    lower: float
-    """
-    The smallest value.
-    """
-
-    upper: float
-    """
-    The bound the values stay below.
-    """
-
-
-@dataclass
 class SurfaceGraspRegion:
     """
-    One region of grasps an object allows: a range for every parameter of a
-    :class:`SurfaceGrasp`.
+    One region of grasps an object allows: an interval for every parameter of a
+    :class:`SurfaceGrasp`, each closed at its lower and open at its upper end unless
+    built otherwise.
 
     Which heights and depths make sense depends on the object's shape, so they have no
     defaults. The other defaults cover every direction around the object, approaches up
@@ -253,31 +238,29 @@ class SurfaceGraspRegion:
     turn off the line of sight.
     """
 
-    height: ParameterRange
+    height: Interval
     """
     See :attr:`SurfaceGrasp.height`.
     """
 
-    depth: ParameterRange
+    depth: Interval
     """
     See :attr:`SurfaceGrasp.depth`.
     """
 
-    azimuth: ParameterRange = field(
-        default_factory=lambda: ParameterRange(0.0, 2 * math.pi)
-    )
+    azimuth: Interval = field(default_factory=lambda: closed_open(0.0, 2 * math.pi))
     """
     See :attr:`SurfaceGrasp.azimuth`.
     """
 
-    pitch: ParameterRange = field(default_factory=lambda: ParameterRange(0.0, 1.2))
+    pitch: Interval = field(default_factory=lambda: closed_open(0.0, 1.2))
     """
     See :attr:`SurfaceGrasp.pitch`; stays below a quarter turn, where the approach would
     be horizontal.
     """
 
-    roll: ParameterRange = field(
-        default_factory=lambda: ParameterRange(-math.pi / 4, math.pi / 4)
+    roll: Interval = field(
+        default_factory=lambda: closed_open(-math.pi / 4, math.pi / 4)
     )
     """
     See :attr:`SurfaceGrasp.roll`.
@@ -290,20 +273,40 @@ class SurfaceGraspRegion:
         """
         return and_(
             *(
-                condition
-                for attribute, parameter_range in (
+                self._lies_within(attribute, interval)
+                for attribute, interval in (
                     (grasp.azimuth, self.azimuth),
                     (grasp.height, self.height),
                     (grasp.depth, self.depth),
                     (grasp.pitch, self.pitch),
                     (grasp.roll, self.roll),
                 )
-                for condition in (
-                    attribute >= parameter_range.lower,
-                    attribute < parameter_range.upper,
-                )
             )
         )
+
+    @staticmethod
+    def _lies_within(attribute, interval: Interval):
+        """
+        :param attribute: An attribute of the statement's grasp variable.
+        :param interval: The values the attribute may take.
+        :return: The condition that the attribute lies within the interval.
+        """
+        conditions = [
+            and_(
+                (
+                    attribute >= simple_interval.lower
+                    if simple_interval.left == Bound.CLOSED
+                    else attribute > simple_interval.lower
+                ),
+                (
+                    attribute <= simple_interval.upper
+                    if simple_interval.right == Bound.CLOSED
+                    else attribute < simple_interval.upper
+                ),
+            )
+            for simple_interval in interval.simple_sets
+        ]
+        return conditions[0] if len(conditions) == 1 else or_(*conditions)
 
 
 @dataclass

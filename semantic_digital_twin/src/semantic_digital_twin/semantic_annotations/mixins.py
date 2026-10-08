@@ -57,8 +57,8 @@ from semantic_digital_twin.exceptions import (
     UnknownPartWholeRelationshipField,
 )
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
+from random_events.interval import closed_open
 from semantic_digital_twin.grasping.surface_grasp import (
-    ParameterRange,
     SurfaceGraspRegion,
     SurfaceGraspStatement,
 )
@@ -518,8 +518,8 @@ class HasGraspCandidates(HasRootBody):
         narrower_extent = float(min(highest[:2] - lowest[:2]))
         return [
             SurfaceGraspRegion(
-                height=ParameterRange(0.05, 0.95),
-                depth=ParameterRange(0.0, narrower_extent / 2),
+                height=closed_open(0.05, 0.95),
+                depth=closed_open(0.0, narrower_extent / 2),
             )
         ]
 
@@ -587,10 +587,10 @@ class HasRim(HasStatedGrasps):
         thickness = self._rim_wall_thickness(mesh)
         return [
             SurfaceGraspRegion(
-                height=ParameterRange(grip_height - band, min(grip_height + band, 1.0)),
-                depth=ParameterRange(0.25 * thickness, 0.75 * thickness),
-                pitch=ParameterRange(0.0, 0.5),
-                roll=ParameterRange(-np.pi / 8, np.pi / 8),
+                height=closed_open(grip_height - band, min(grip_height + band, 1.0)),
+                depth=closed_open(0.25 * thickness, 0.75 * thickness),
+                pitch=closed_open(0.0, 0.5),
+                roll=closed_open(-np.pi / 8, np.pi / 8),
             )
         ]
 

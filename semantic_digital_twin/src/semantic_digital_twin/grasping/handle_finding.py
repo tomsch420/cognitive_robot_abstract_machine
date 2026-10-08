@@ -13,6 +13,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 import numpy as np
+from numpy.typing import NDArray
 import trimesh
 from scipy.spatial import ConvexHull
 from typing_extensions import Optional
@@ -39,7 +40,7 @@ class RoundOutline:
     A circle in the horizontal plane.
     """
 
-    center: np.ndarray
+    center: NDArray[np.float64]
     """
     The circle's center, as x and y.
     """
@@ -50,7 +51,7 @@ class RoundOutline:
     """
 
     @classmethod
-    def fitted_to(cls, points: np.ndarray) -> RoundOutline:
+    def fitted_to(cls, points: NDArray[np.float64]) -> RoundOutline:
         """
         :param points: At least three points in the horizontal plane, as rows of x
             and y.
@@ -67,7 +68,7 @@ class RoundOutline:
             radius=float(np.sqrt(coefficients[2] + center @ center)),
         )
 
-    def distances(self, points: np.ndarray) -> np.ndarray:
+    def distances(self, points: NDArray[np.float64]) -> NDArray[np.float64]:
         """
         :param points: Points in the horizontal plane, as rows of x and y.
         :return: Each point's distance from the circle's center.
@@ -140,7 +141,7 @@ class ElongatedShape:
     across its width.
     """
 
-    points: np.ndarray
+    points: NDArray[np.float64]
     """
     The points, as rows of x, y and z.
     """
@@ -161,7 +162,7 @@ class ElongatedShape:
     """
 
     @property
-    def along(self) -> np.ndarray:
+    def along(self) -> NDArray[np.float64]:
         """
         :return: Each point's distance from the end towards the negative length axis.
         """
@@ -169,7 +170,7 @@ class ElongatedShape:
         return coordinates - coordinates.min()
 
     @property
-    def across(self) -> np.ndarray:
+    def across(self) -> NDArray[np.float64]:
         """
         :return: Each point's coordinate across the shape.
         """
@@ -236,7 +237,9 @@ class NarrowEndHandleFinder(HandleFinder):
             return None
         return shape.submesh([np.flatnonzero(face_along < handle_length)], append=True)
 
-    def _handle_length(self, across: np.ndarray, along: np.ndarray) -> Optional[float]:
+    def _handle_length(
+        self, across: NDArray[np.float64], along: NDArray[np.float64]
+    ) -> Optional[float]:
         """
         :param across: The points' coordinates across the object.
         :param along: The points' distances from the narrow end.

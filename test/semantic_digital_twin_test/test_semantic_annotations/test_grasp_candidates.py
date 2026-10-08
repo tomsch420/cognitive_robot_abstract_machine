@@ -173,7 +173,7 @@ def test_bowl_grasps_approach_from_above(bowl):
     [region] = bowl.surface_grasp_regions()
     for grasp in bowl.grasp_candidates():
         approach = axes_of(grasp.grasp_pose)[:, 0]
-        assert -approach[2] >= np.cos(region.pitch.upper)
+        assert -approach[2] >= np.cos(region.pitch.simple_sets[-1].upper)
 
 
 def test_bowl_grasp_fingers_close_across_the_rim_wall(bowl):
@@ -188,16 +188,20 @@ def test_bowl_grasp_fingers_close_across_the_rim_wall(bowl):
         radial[2] = 0
         finger_axis = axes_of(grasp.grasp_pose)[:, 1]
         assert abs(float(np.dot(finger_axis, radial))) >= np.cos(
-            region.roll.upper
-        ) * np.cos(region.pitch.upper)
+            region.roll.simple_sets[-1].upper
+        ) * np.cos(region.pitch.simple_sets[-1].upper)
 
 
 def test_bowl_grasps_close_on_the_middle_of_the_wall(bowl):
     [region] = bowl.surface_grasp_regions()
     wall_thickness = BOWL_OUTER_RADIUS - BOWL_INNER_RADIUS
 
-    assert region.depth.lower == pytest.approx(0.25 * wall_thickness, rel=0.02)
-    assert region.depth.upper == pytest.approx(0.75 * wall_thickness, rel=0.02)
+    assert region.depth.simple_sets[0].lower == pytest.approx(
+        0.25 * wall_thickness, rel=0.02
+    )
+    assert region.depth.simple_sets[-1].upper == pytest.approx(
+        0.75 * wall_thickness, rel=0.02
+    )
 
 
 # %% cutlery grasp poses
@@ -233,7 +237,9 @@ def test_cutlery_is_grasped_from_above_across_its_length(length_axis):
     """
     spoon = _spoon_lying_along(length_axis)
     [region, _] = spoon.surface_grasp_regions()
-    azimuth_spread = (region.azimuth.upper - region.azimuth.lower) / 2
+    azimuth_spread = (
+        region.azimuth.simple_sets[-1].upper - region.azimuth.simple_sets[0].lower
+    ) / 2
     length_direction = np.eye(3)[length_axis]
 
     grasps = spoon.grasp_candidates()
@@ -244,9 +250,9 @@ def test_cutlery_is_grasped_from_above_across_its_length(length_axis):
             axes_of(grasp.grasp_pose)[:, 0],
             axes_of(grasp.grasp_pose)[:, 1],
         )
-        assert -approach[2] >= np.cos(region.pitch.upper)
+        assert -approach[2] >= np.cos(region.pitch.simple_sets[-1].upper)
         assert abs(float(np.dot(closing, length_direction))) <= np.sin(
-            region.roll.upper - np.pi / 2 + azimuth_spread
+            region.roll.simple_sets[-1].upper - np.pi / 2 + azimuth_spread
         )
 
 

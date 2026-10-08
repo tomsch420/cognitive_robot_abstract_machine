@@ -23,9 +23,9 @@ from krrood.entity_query_language.factories import a
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import SurfaceGraspNotOnSurfaceError
 from semantic_digital_twin.orm.ormatic_interface import SurfaceGraspDAO  # noqa: F401
+from random_events.interval import closed_open
 from semantic_digital_twin.grasping.surface_grasp import (
     GraspResult,
-    ParameterRange,
     SurfaceGrasp,
     SurfaceGraspRegion,
     SurfaceGraspStatement,
@@ -149,9 +149,9 @@ def test_drawn_grasps_lie_in_one_of_the_regions():
     statement = SurfaceGraspStatement(
         [
             SurfaceGraspRegion(
-                height=ParameterRange(0.4, 0.6),
-                depth=ParameterRange(0.0, 0.01),
-                azimuth=ParameterRange(side - tolerance, side + tolerance),
+                height=closed_open(0.4, 0.6),
+                depth=closed_open(0.0, 0.01),
+                azimuth=closed_open(side - tolerance, side + tolerance),
             )
             for side in sides
         ]
@@ -171,6 +171,31 @@ def test_drawn_grasps_lie_in_one_of_the_regions():
     assert set(nearest_side) == set(sides)
 
 
+def test_a_parameter_may_lie_in_one_of_several_intervals():
+    """
+    An interval of a region can have several pieces, such as the directions on either
+    side of an object.
+    """
+    left = closed_open(0.0, 0.5)
+    right = closed_open(3.0, 3.5)
+    statement = SurfaceGraspStatement(
+        [
+            SurfaceGraspRegion(
+                height=closed_open(0.4, 0.6),
+                depth=closed_open(0.0, 0.01),
+                azimuth=left | right,
+            )
+        ]
+    )
+
+    grasps = statement.draw(60)
+
+    in_left = [left.contains(grasp.azimuth) for grasp in grasps]
+    in_right = [right.contains(grasp.azimuth) for grasp in grasps]
+    assert all(a or b for a, b in zip(in_left, in_right))
+    assert any(in_left) and any(in_right)
+
+
 def test_every_parameter_of_a_surface_grasp_needs_bounds():
     statement = a(SurfaceGrasp)(azimuth=..., height=..., depth=..., pitch=..., roll=...)
     statement.where(statement.azimuth < 1.0)
@@ -188,7 +213,9 @@ def test_every_parameter_of_a_surface_grasp_needs_bounds():
 def test_the_default_region_covers_the_object_up_to_half_its_narrower_side(carton):
     [region] = carton.surface_grasp_regions()
 
-    assert region.depth.upper == pytest.approx(min(CARTON_EXTENTS[:2]) / 2)
+    assert region.depth.simple_sets[-1].upper == pytest.approx(
+        min(CARTON_EXTENTS[:2]) / 2
+    )
 
 
 # %% asking a learned model for lifting grasps
