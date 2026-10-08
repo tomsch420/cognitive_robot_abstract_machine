@@ -14,7 +14,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 
-from typing_extensions import List, Optional
+from typing_extensions import List, Optional, Type
 
 from experiments.grasp_learning.records import GraspAttempt, GraspLearningTask
 from krrood.parametrization.model_registries import RelationalCircuitRegistry
@@ -27,6 +27,7 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
 )
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.grasping.surface_grasp import SurfaceGrasp
+from semantic_digital_twin.robots.robot_parts import EndEffector
 from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
 
 # %% the model
@@ -136,11 +137,11 @@ class GraspModelLibrary:
     """
 
     def model_for(
-        self, graspable: HasGraspCandidates, gripper: str
+        self, graspable: HasGraspCandidates, gripper: Type[EndEffector]
     ) -> Optional[GraspModel]:
         """
         :param graspable: The object to grasp.
-        :param gripper: The name of the type of the gripper that grasps.
+        :param gripper: The type of the gripper that grasps.
         :return: The latest model learned for grasping the object's grasped part with
             that gripper; ``None`` if there is none.
         """
@@ -151,11 +152,11 @@ class GraspModelLibrary:
         return matching[-1]
 
     def grasp_candidates(
-        self, graspable: HasGraspCandidates, gripper: str
+        self, graspable: HasGraspCandidates, gripper: Type[EndEffector]
     ) -> List[GraspCandidate]:
         """
         :param graspable: The object to grasp.
-        :param gripper: The name of the type of the gripper that grasps.
+        :param gripper: The type of the gripper that grasps.
         :return: Grasps the learned model expects to lift the object; without a model,
             the grasps the annotation offers by itself.
         """

@@ -12,8 +12,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
 
+from typing_extensions import Type
+
 from experiments.physical_pick_up.robots import ObjectPlacement
 from semantic_digital_twin.grasping.surface_grasp import SurfaceGrasp
+from semantic_digital_twin.robots.robot_parts import AbstractRobot, EndEffector
 from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
 
 # %% tasks
@@ -26,34 +29,34 @@ class GraspLearningTask:
     of object, by one kind of gripper.
     """
 
-    annotation_type: str
+    annotation_type: Type[HasGraspCandidates]
     """
-    The name of the annotation type of the object, such as ``Mug``.
-    """
-
-    grasped_part: str
-    """
-    The name of the annotation type of the part the grasps are placed on, such as
-    ``Handle``; the object's own type when it is grasped as a whole.
+    The annotation type of the object, such as :class:`Mug`.
     """
 
-    gripper: str
+    grasped_part: Type[HasGraspCandidates]
     """
-    The name of the type of the gripper that grasps.
+    The annotation type of the part the grasps are placed on, such as :class:`Handle`;
+    the object's own type when it is grasped as a whole.
+    """
+
+    gripper: Type[EndEffector]
+    """
+    The type of the gripper that grasps.
     """
 
     @classmethod
     def of_graspable(
-        cls, graspable: HasGraspCandidates, gripper: str
+        cls, graspable: HasGraspCandidates, gripper: Type[EndEffector]
     ) -> GraspLearningTask:
         """
         :param graspable: The object to grasp.
-        :param gripper: The name of the type of the gripper that grasps.
+        :param gripper: The type of the gripper that grasps.
         :return: The task of grasping the object's grasped part with that gripper.
         """
         return cls(
-            annotation_type=type(graspable).__name__,
-            grasped_part=type(graspable.grasped_part()).__name__,
+            annotation_type=type(graspable),
+            grasped_part=type(graspable.grasped_part()),
             gripper=gripper,
         )
 
@@ -88,9 +91,9 @@ class GraspAttempt:
     The task the attempt belongs to.
     """
 
-    robot: str
+    robot: Type[AbstractRobot]
     """
-    The name of the type of the robot that tried the grasp.
+    The type of the robot that tried the grasp.
     """
 
     object_name: str

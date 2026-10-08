@@ -26,7 +26,7 @@ from experiments.grasp_learning.records import (
 )
 from experiments.physical_pick_up.pick_up_experiment import (
     PickUpExperiment,
-    PickUpGraspTrier,
+    PickUpGraspPerformer,
 )
 from experiments.physical_pick_up.scene import PickUpSceneChoice
 from krrood.parametrization.model_registries import ModelRegistry
@@ -97,7 +97,7 @@ class GraspLearningPipeline:
         """
         scene = self.experiment.scene
         return GraspLearningTask.of_graspable(
-            scene.graspable, type(scene.arm.end_effector).__name__
+            scene.graspable, type(scene.arm.end_effector)
         )
 
     def run(self) -> GraspModel:
@@ -135,14 +135,14 @@ class GraspLearningPipeline:
         :return: The attempts, in the order they were tried.
         """
         scene = self.experiment.scene
-        trier = PickUpGraspTrier(
+        performer = PickUpGraspPerformer(
             experiment=self.experiment,
             generator=self._generator,
             maximum_yaw=self.maximum_yaw,
         )
         trials = GraspTrials(
             graspable=scene.graspable,
-            trier=trier,
+            performer=performer,
             number_of_trials=number_of_attempts,
             model_registry=model_registry,
             require_lifting=source == GraspSource.LEARNED_MODEL,
@@ -152,10 +152,10 @@ class GraspLearningPipeline:
         for record in trials.run():
             attempt = GraspAttempt(
                 task=task,
-                robot=type(scene.robot).__name__,
+                robot=type(scene.robot),
                 object_name=scene.graspable.root.name.name,
                 source=source,
-                placement=trier.placements[-1],
+                placement=performer.placements[-1],
                 grasp=record.grasp,
             )
             self.database.add_attempts([attempt])

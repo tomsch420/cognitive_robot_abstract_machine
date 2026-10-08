@@ -24,6 +24,10 @@ from experiments.physical_pick_up.objects import PickUpObject
 from experiments.physical_pick_up.pick_up_experiment import PickUpExperiment
 from experiments.physical_pick_up.robots import ObjectPlacement
 from experiments.physical_pick_up.scene import PickUpScene
+from semantic_digital_twin.semantic_annotations.semantic_annotations import (
+    Handle,
+    Mug,
+)
 from semantic_digital_twin.grasping.surface_grasp import (
     GraspResult,
     SurfaceGraspStatement,
@@ -56,9 +60,7 @@ def task_of(scene: PickUpScene) -> GraspLearningTask:
     """
     :return: The task of the scene's robot grasping the object in it.
     """
-    return GraspLearningTask.of_graspable(
-        scene.graspable, type(scene.arm.end_effector).__name__
-    )
+    return GraspLearningTask.of_graspable(scene.graspable, type(scene.arm.end_effector))
 
 
 def synthetic_attempts(scene: PickUpScene, number: int) -> List[GraspAttempt]:
@@ -82,7 +84,7 @@ def synthetic_attempts(scene: PickUpScene, number: int) -> List[GraspAttempt]:
     return [
         GraspAttempt(
             task=task,
-            robot=type(scene.robot).__name__,
+            robot=type(scene.robot),
             object_name=scene.graspable.root.name.name,
             source=GraspSource.STATED_REGIONS,
             placement=scene.pick_up_area.middle(),
@@ -97,13 +99,13 @@ def synthetic_attempts(scene: PickUpScene, number: int) -> List[GraspAttempt]:
 
 def test_the_task_of_an_object_names_object_part_and_gripper(milk_scene):
     milk = milk_scene.graspable
-    gripper = "SomeGripper"
+    gripper = type(milk_scene.arm.end_effector)
 
     task = GraspLearningTask.of_graspable(milk, gripper)
 
     assert task == GraspLearningTask(
-        annotation_type=type(milk).__name__,
-        grasped_part=type(milk.grasped_part()).__name__,
+        annotation_type=type(milk),
+        grasped_part=type(milk.grasped_part()),
         gripper=gripper,
     )
 
@@ -111,7 +113,9 @@ def test_the_task_of_an_object_names_object_part_and_gripper(milk_scene):
 def test_stored_attempts_are_read_back_by_task(milk_scene, database):
     attempts = synthetic_attempts(milk_scene, 5)
     other_task = GraspLearningTask(
-        annotation_type="Mug", grasped_part="Handle", gripper="SomeGripper"
+        annotation_type=Mug,
+        grasped_part=Handle,
+        gripper=type(milk_scene.arm.end_effector),
     )
 
     database.add_attempts(attempts)
@@ -166,7 +170,9 @@ def test_the_library_hands_a_model_to_the_annotation_of_its_task(milk_scene):
 def test_without_a_model_the_annotation_offers_its_own_grasps(milk_scene):
     milk = milk_scene.graspable
 
-    grasps = GraspModelLibrary().grasp_candidates(milk, "SomeGripper")
+    grasps = GraspModelLibrary().grasp_candidates(
+        milk, type(milk_scene.arm.end_effector)
+    )
 
     assert [grasp.grasp_pose.to_np().tolist() for grasp in grasps] == [
         grasp.grasp_pose.to_np().tolist() for grasp in milk.grasp_candidates()

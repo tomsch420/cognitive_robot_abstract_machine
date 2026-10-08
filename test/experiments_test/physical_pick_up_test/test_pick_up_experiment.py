@@ -26,7 +26,7 @@ from experiments.physical_pick_up.objects import (
 )
 from experiments.physical_pick_up.pick_up_experiment import (
     PickUpExperiment,
-    PickUpGraspTrier,
+    PickUpGraspPerformer,
 )
 from experiments.physical_pick_up.robots import ObjectPlacement, PR2Setup
 from experiments.physical_pick_up.scene import PickUpScene
@@ -447,7 +447,7 @@ def trials_on(experiment: PickUpExperiment) -> GraspTrials:
     """
     return GraspTrials(
         graspable=experiment.scene.graspable,
-        trier=PickUpGraspTrier(experiment=experiment),
+        performer=PickUpGraspPerformer(experiment=experiment),
         number_of_trials=30,
     )
 

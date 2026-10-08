@@ -28,7 +28,7 @@ from semantic_digital_twin.grasping.surface_grasp import GraspResult
 from giskardpy.executor import SteppedSimulationPacer
 from semantic_digital_twin.adapters.multi_sim import MujocoCamera, MujocoSim
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
-from semantic_digital_twin.grasping.grasp_trials import GraspTrier
+from semantic_digital_twin.grasping.grasp_trials import GraspPerformer
 
 # %% the experiment
 
@@ -187,20 +187,20 @@ class PickUpExperiment:
         )
 
 
-# %% trying grasps with the experiment
+# %% performing grasps with the experiment
 
 
 @dataclass
-class PickUpGraspTrier(GraspTrier):
+class PickUpGraspPerformer(GraspPerformer):
     """
-    Tries every grasp with the robot of a pick-up experiment, starting each attempt from
-    the same state of the world, and with the object standing anywhere in its pick-up
-    area if a source of randomness is given.
+    Performs every grasp with the robot of a pick-up experiment, starting each attempt
+    from the same state of the world, and with the object standing anywhere in its
+    pick-up area if a source of randomness is given.
     """
 
     experiment: PickUpExperiment
     """
-    The robot and the object the grasps are tried with.
+    The robot and the object the grasps are performed with.
     """
 
     generator: Optional[np.random.Generator] = None
@@ -224,7 +224,7 @@ class PickUpGraspTrier(GraspTrier):
     Where the object stood in each attempt so far, in order.
     """
 
-    def try_grasp(self, grasp: GraspCandidate) -> GraspResult:
+    def perform(self, grasp: GraspCandidate) -> GraspResult:
         placement = self._placement()
         video_path = (
             None

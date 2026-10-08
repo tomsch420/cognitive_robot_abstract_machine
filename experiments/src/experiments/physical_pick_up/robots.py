@@ -23,7 +23,7 @@ from semantic_digital_twin.datastructures.definitions import (
     TorsoState,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.grasping.surface_grasp import ParameterRange
+from random_events.interval import SimpleInterval, closed
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, Arm
 from semantic_digital_twin.robots.tracy import Tracy
@@ -74,12 +74,12 @@ class PickUpArea:
     The height of the surface above the floor, in meters.
     """
 
-    x: ParameterRange
+    x: SimpleInterval
     """
     Where the middle of an object's footprint may be along the world's x-axis.
     """
 
-    y: ParameterRange
+    y: SimpleInterval
     """
     Where the middle of an object's footprint may be along the world's y-axis.
     """
@@ -176,15 +176,15 @@ class PR2Setup(RobotSetup):
     Where the middle of the table stands on the floor.
     """
 
-    reachable_x: ParameterRange = field(
-        default_factory=lambda: ParameterRange(0.62, 0.74)
+    reachable_x: SimpleInterval = field(
+        default_factory=lambda: closed(0.62, 0.74).simple_sets[0]
     )
     """
     Where along the x-axis the left arm reaches objects on the table.
     """
 
-    reachable_y: ParameterRange = field(
-        default_factory=lambda: ParameterRange(0.08, 0.22)
+    reachable_y: SimpleInterval = field(
+        default_factory=lambda: closed(0.08, 0.22).simple_sets[0]
     )
     """
     Where along the y-axis the left arm reaches objects on the table.
@@ -254,15 +254,15 @@ class TracySetup(RobotSetup):
     picking up with its left arm from that table.
     """
 
-    reachable_x: ParameterRange = field(
-        default_factory=lambda: ParameterRange(0.55, 0.75)
+    reachable_x: SimpleInterval = field(
+        default_factory=lambda: closed(0.55, 0.75).simple_sets[0]
     )
     """
     Where along the x-axis the left arm reaches objects on the table.
     """
 
-    reachable_y: ParameterRange = field(
-        default_factory=lambda: ParameterRange(0.15, 0.35)
+    reachable_y: SimpleInterval = field(
+        default_factory=lambda: closed(0.15, 0.35).simple_sets[0]
     )
     """
     Where along the y-axis the left arm reaches objects on the table.
