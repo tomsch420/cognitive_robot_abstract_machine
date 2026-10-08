@@ -233,21 +233,18 @@ def any_surface_grasp(require_lifting: bool = False) -> Match:
         an annotation to narrow down with ``where``.
     """
     if require_lifting:
-        return a(SurfaceGrasp)(
-            azimuth=...,
-            height=...,
-            depth=...,
-            pitch=...,
-            roll=...,
-            result=a(GraspResult)(
-                lifted=True,
-                object_rise=...,
-                translational_slip=...,
-                rotational_slip=...,
-                motion_completed=...,
-            ),
+        result = a(GraspResult)(
+            lifted=True,
+            object_rise=...,
+            translational_slip=...,
+            rotational_slip=...,
+            motion_completed=...,
         )
-    return a(SurfaceGrasp)(azimuth=..., height=..., depth=..., pitch=..., roll=...)
+    else:
+        result = None
+    return a(SurfaceGrasp)(
+        azimuth=..., height=..., depth=..., pitch=..., roll=..., result=result
+    )
 
 
 def from_any_side(grasp: Match) -> List[ConditionType]:
