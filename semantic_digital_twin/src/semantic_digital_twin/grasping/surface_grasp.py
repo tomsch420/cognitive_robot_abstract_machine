@@ -232,16 +232,22 @@ def any_surface_grasp(require_lifting: bool = False) -> Match:
     :return: A statement asking for a surface grasp with every parameter left free, for
         an annotation to narrow down with ``where``.
     """
-    parameters = dict(azimuth=..., height=..., depth=..., pitch=..., roll=...)
     if require_lifting:
-        parameters["result"] = a(GraspResult)(
-            lifted=True,
-            object_rise=...,
-            translational_slip=...,
-            rotational_slip=...,
-            motion_completed=...,
+        return a(SurfaceGrasp)(
+            azimuth=...,
+            height=...,
+            depth=...,
+            pitch=...,
+            roll=...,
+            result=a(GraspResult)(
+                lifted=True,
+                object_rise=...,
+                translational_slip=...,
+                rotational_slip=...,
+                motion_completed=...,
+            ),
         )
-    return a(SurfaceGrasp)(**parameters)
+    return a(SurfaceGrasp)(azimuth=..., height=..., depth=..., pitch=..., roll=...)
 
 
 def from_any_side(grasp: Match) -> List[ConditionType]:
@@ -269,16 +275,13 @@ def draw_surface_grasps(
 ) -> List[SurfaceGrasp]:
     """
     :param statement: A statement of where an object may be grasped.
-    :param number_of_grasps: How many grasps to draw.
+    :param number_of_grasps: How many grasps to draw, as the statement's limit.
     :param model_registry: Answers the statement; ``None`` draws uniformly from what it
         allows, which cannot answer a statement that requires lifting.
     :return: Grasps answering the statement.
     """
     return list(
-        statement.evaluate(
-            backend=ProbabilisticBackend(
-                model_registry or UniformPriorRegistry(),
-                number_of_samples=number_of_grasps,
-            )
+        statement.limit(number_of_grasps).evaluate(
+            backend=ProbabilisticBackend(model_registry or UniformPriorRegistry())
         )
     )

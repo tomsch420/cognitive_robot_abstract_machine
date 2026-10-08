@@ -23,9 +23,11 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Handle,
     Milk,
     Mug,
+    Rim,
     Spoon,
     Table,
 )
+from semantic_digital_twin.grasping.rim_finding import RimFinder
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world import World
@@ -80,6 +82,7 @@ def bowl(tmp_path) -> Bowl:
     with world.modify_world():
         world.add_kinematic_structure_entity(body)
         world.add_semantic_annotation(annotation)
+    Rim.create_on(annotation)
     return annotation
 
 
@@ -163,16 +166,18 @@ def test_bowl_grasps_sit_in_the_rim_wall(bowl):
         assert BOWL_INNER_RADIUS < np.linalg.norm(position[:2]) < BOWL_OUTER_RADIUS
 
 
-def test_bowl_grasps_sit_in_a_band_below_the_rim_by_the_configured_depth(bowl):
-    rim_height = BOWL_HEIGHT / 2 - bowl.rim_grasp_depth
+def test_bowl_grasps_sit_in_the_middle_of_the_rims_height(bowl):
+    lowest, highest = bowl.rim.grasp_surface().bounds
+    rim_height = highest[2] - lowest[2]
+
+    assert rim_height == pytest.approx(RimFinder().depth, abs=0.002)
     for grasp in bowl.grasp_candidates():
-        assert grasp.grasp_pose.to_np()[2, 3] == pytest.approx(
-            rim_height, abs=bowl.rim_grasp_depth / 2
-        )
+        height_on_rim = grasp.grasp_pose.to_np()[2, 3] - lowest[2]
+        assert 0.25 * rim_height - 1e-9 <= height_on_rim <= 0.75 * rim_height + 1e-9
 
 
 def test_bowl_grasps_approach_from_above(bowl):
-    allowed = allowed_intervals(bowl.surface_grasp_statement())
+    allowed = allowed_intervals(bowl.rim.surface_grasp_statement())
     for grasp in bowl.grasp_candidates():
         approach = axes_of(grasp.grasp_pose)[:, 0]
         assert -approach[2] >= np.cos(allowed["pitch"].simple_sets[-1].upper)
@@ -183,7 +188,7 @@ def test_bowl_grasp_fingers_close_across_the_rim_wall(bowl):
     The finger axis must be close to radial, so the fingers straddle the wall rather
     than pinching along it.
     """
-    allowed = allowed_intervals(bowl.surface_grasp_statement())
+    allowed = allowed_intervals(bowl.rim.surface_grasp_statement())
     for grasp in bowl.grasp_candidates():
         position = grasp.grasp_pose.to_np()[:3, 3]
         radial = position / np.linalg.norm(position[:2])
@@ -195,10 +200,10 @@ def test_bowl_grasp_fingers_close_across_the_rim_wall(bowl):
 
 
 def test_bowl_grasps_close_on_the_middle_of_the_wall(bowl):
-    allowed = allowed_intervals(bowl.surface_grasp_statement())
+    allowed = allowed_intervals(bowl.rim.surface_grasp_statement())
     wall_thickness = BOWL_OUTER_RADIUS - BOWL_INNER_RADIUS
 
-    assert bowl.rim().wall_thickness == pytest.approx(wall_thickness, rel=0.02)
+    assert bowl.rim.wall_thickness() == pytest.approx(wall_thickness, rel=0.02)
     assert allowed["depth"].simple_sets[0].lower == pytest.approx(
         0.25 * wall_thickness, rel=0.02
     )
@@ -439,3 +444,14 @@ def test_an_object_described_with_its_type_can_be_grasped(milk):
     assert [
         grasp.grasp_pose.to_np().tolist() for grasp in described.grasp_candidates()
     ] == [grasp.grasp_pose.to_np().tolist() for grasp in milk.grasp_candidates()]
+
+
+def test_a_bowl_is_grasped_at_its_rim(bowl):
+    assert bowl.grasped_part() is bowl.rim
+    assert isinstance(bowl.rim, Rim)
+
+
+def test_a_bowl_without_a_rim_is_grasped_as_a_whole(bowl):
+    bowl.rim = None
+
+    assert bowl.grasped_part() is bowl

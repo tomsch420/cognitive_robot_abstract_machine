@@ -4,6 +4,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Iterable, Iterator, Optional, Self, Tuple, TYPE_CHECKING, Union
 
+import math
+
 import numpy as np
 import trimesh
 from typing_extensions import List
@@ -43,11 +45,13 @@ from semantic_digital_twin.semantic_annotations.mixins import (
     HasShelfLayers,
     HasGraspCandidates,
     HasRim,
+    PartWholeRelationship,
     HasStatedGrasps,
 )
 from krrood.entity_query_language.factories import and_, or_
 from krrood.entity_query_language.query.match import Match
 from semantic_digital_twin.datastructures.definitions import Axis
+from semantic_digital_twin.grasping.rim_finding import RimFinder
 from semantic_digital_twin.grasping.surface_grasp import (
     any_surface_grasp,
     from_any_side,
@@ -102,7 +106,55 @@ class Furniture(SemanticAnnotation, ABC):
 
 
 @dataclass(eq=False)
-class Handle(HasStatedGrasps):
+class PartOfShape(HasRootBody):
+    """
+    A part of an annotation that is made of a part of the annotation's own shape, such
+    as the handle of a mug or the rim of a bowl.
+    """
+
+    @classmethod
+    def create_from_part_of_shape(
+        cls, whole: PartWholeRelationship, shape: trimesh.Trimesh
+    ) -> Self:
+        """
+        Create the part of ``whole`` from a part of the whole's own shape.
+
+        The part's body shows the part of the shape and is grasped at it, fixed to the
+        whole's root body. It carries no material of its own: it collides through the
+        whole's own shape and weighs next to nothing, so the whole keeps its mass and
+        its contacts.
+
+        :param whole: The annotation the part belongs to.
+        :param shape: The part of the whole's shape, in the frame of the whole's root
+            body.
+        :return: The part, added to the whole and to its world.
+        """
+        world = whole.root._world
+        body = Body(
+            name=PrefixedName(
+                f"{whole.root.name.name}_{cls.__name__.lower()}", whole.root.name.prefix
+            ),
+            inertial=Inertial.negligible(),
+        )
+        body.visual = ShapeCollection(
+            [
+                Mesh.from_trimesh(
+                    mesh=shape,
+                    origin=HomogeneousTransformationMatrix(reference_frame=body),
+                )
+            ],
+            reference_frame=body,
+        )
+        part = cls(root=body)
+        with world.modify_world():
+            world.add_connection(FixedConnection(parent=whole.root, child=body))
+            world.add_semantic_annotation(part)
+            whole.add(part)
+        return part
+
+
+@dataclass(eq=False)
+class Handle(PartOfShape, HasStatedGrasps):
     """
     A handle is a physical entity that can be grasped by a hand or a robotic gripper to
     open or close an object.
@@ -123,43 +175,6 @@ class Handle(HasStatedGrasps):
             grasp.depth < thinnest_extent / 2,
             *from_any_side(grasp),
         )
-
-    @classmethod
-    def create_from_part_of_shape(
-        cls, whole: HasHandle, shape: trimesh.Trimesh
-    ) -> Self:
-        """
-        Create the handle of ``whole`` from a part of the whole's own shape.
-
-        The handle's body shows the part and is grasped at it, fixed to the whole's root
-        body. It carries no material of its own: it collides through the whole's own
-        shape and weighs next to nothing, so the whole keeps its mass and its contacts.
-
-        :param whole: The annotation the handle belongs to.
-        :param shape: The part of the whole's shape that is its handle, in the frame of
-            the whole's root body.
-        :return: The handle, added to the whole and to its world.
-        """
-        world = whole.root._world
-        body = Body(
-            name=PrefixedName(f"{whole.root.name.name}_handle", whole.root.name.prefix),
-            inertial=Inertial.negligible(),
-        )
-        body.visual = ShapeCollection(
-            [
-                Mesh.from_trimesh(
-                    mesh=shape,
-                    origin=HomogeneousTransformationMatrix(reference_frame=body),
-                )
-            ],
-            reference_frame=body,
-        )
-        handle = cls(root=body)
-        with world.modify_world():
-            world.add_connection(FixedConnection(parent=whole.root, child=body))
-            world.add_semantic_annotation(handle)
-            whole.add(handle)
-        return handle
 
     @classmethod
     def _create_handle_geometry(
@@ -1175,6 +1190,89 @@ class Plate(HasSupportingSurface, Tableware):
     """
     A plate.
     """
+
+
+@dataclass(eq=False)
+class Rim(PartOfShape, HasStatedGrasps):
+    """
+    The upper edge of an open container's wall, which a gripper pinches from above.
+    """
+
+    wall_probe_count: int = field(default=12, kw_only=True)
+    """
+    In how many directions around the rim its wall is measured.
+    """
+
+    @classmethod
+    def create_on(
+        cls, container: HasRim, finder: Optional[RimFinder] = None
+    ) -> Optional[Rim]:
+        """
+        Find the rim in the container's shape and give it to the container.
+
+        :param container: The container.
+        :param finder: Finds the rim in the container's grasp surface; ``None`` uses a
+            :class:`~semantic_digital_twin.grasping.rim_finding.RimFinder` with its
+            defaults.
+        :return: The rim, added to the container and to its world; ``None`` if the
+            finder finds none.
+        """
+        shape = (finder or RimFinder()).find(container.grasp_surface())
+        if shape is None:
+            return None
+        return cls.create_from_part_of_shape(container, shape)
+
+    def surface_grasp_statement(self, require_lifting: bool = False) -> Match:
+        """
+        :param require_lifting: Whether to ask only for grasps that lift the container.
+        :return: The middle of the rim's height, all around, closing on the middle half
+            of the wall's thickness, from above or tilted a little towards the wall.
+        :raises NoGraspGeometry: If the rim has no wall to measure.
+        """
+        thickness = self.wall_thickness()
+        grasp = any_surface_grasp(require_lifting)
+        return grasp.where(
+            grasp.height >= 0.25,
+            grasp.height < 0.75,
+            grasp.depth >= 0.25 * thickness,
+            grasp.depth < 0.75 * thickness,
+            grasp.azimuth >= 0.0,
+            grasp.azimuth < 2 * math.pi,
+            grasp.pitch >= 0.0,
+            grasp.pitch < 0.5,
+            grasp.roll >= -math.pi / 8,
+            grasp.roll < math.pi / 8,
+        )
+
+    def wall_thickness(self) -> float:
+        """
+        Cast rays outward from the middle of the rim and take the distance between the
+        first two surfaces each ray passes, the inside and the outside of the wall, as
+        the wall's thickness.
+
+        :return: The median thickness over the directions that hit the wall.
+        :raises NoGraspGeometry: If no direction hits a wall.
+        """
+        shape = self.grasp_surface()
+        yaws = np.linspace(0, 2 * np.pi, self.wall_probe_count, endpoint=False)
+        directions = np.column_stack([np.cos(yaws), np.sin(yaws), np.zeros(len(yaws))])
+        lowest, highest = shape.bounds
+        middle = (lowest + highest) / 2
+        locations, ray_indices, _ = shape.ray.intersects_location(
+            ray_origins=np.tile(middle, (len(yaws), 1)), ray_directions=directions
+        )
+        thicknesses = []
+        for index in range(len(yaws)):
+            distances = np.sort(
+                np.linalg.norm(
+                    locations[ray_indices == index][:, :2] - middle[:2], axis=1
+                )
+            )
+            if len(distances) > 1:
+                thicknesses.append(float(distances[1] - distances[0]))
+        if not thicknesses:
+            raise NoGraspGeometry(self)
+        return float(np.median(thicknesses))
 
 
 @dataclass(eq=False)

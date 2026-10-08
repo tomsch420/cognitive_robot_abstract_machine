@@ -9,7 +9,7 @@ from coraplex.datastructures.dataclasses import Context
 from coraplex.plans.factories import sequential
 from coraplex.robot_plans.actions.composite.transporting import TransportAction
 from semantic_digital_twin.adapters.mesh import STLParser
-from semantic_digital_twin.semantic_annotations.semantic_annotations import Bowl
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Bowl, Rim
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 
@@ -41,6 +41,7 @@ def bowl() -> Bowl:
     annotation = Bowl(root=world.get_body_by_name("bowl.stl"))
     with world.modify_world():
         world.add_semantic_annotation(annotation)
+    Rim.create_on(annotation)
     return annotation
 
 
@@ -103,6 +104,7 @@ def pr2_and_bowl(simple_pr2_context):
     annotation = Bowl(root=world.get_body_by_name("bowl.stl"))
     with world.modify_world():
         world.add_semantic_annotations([annotation])
+    Rim.create_on(annotation)
     return world, robot, annotation
 
 

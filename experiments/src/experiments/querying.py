@@ -52,6 +52,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Drawer,
     Handle,
     Milk,
+    Rim,
     Spoon,
 )
 from semantic_digital_twin.spatial_types.spatial_types import (
@@ -206,6 +207,7 @@ def build_plan() -> Plan:
                 handle=Handle(root=world.get_body_by_name("handle_cab10_t")),
             )
         )
+    Rim.create_on(bowl_annotation)
 
     context.evaluate_conditions = False
 

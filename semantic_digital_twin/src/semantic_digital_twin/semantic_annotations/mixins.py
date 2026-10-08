@@ -58,7 +58,6 @@ from semantic_digital_twin.exceptions import (
 )
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from krrood.entity_query_language.query.match import Match
-from semantic_digital_twin.grasping.rim import Rim
 from semantic_digital_twin.grasping.surface_grasp import (
     any_surface_grasp,
     draw_surface_grasps,
@@ -102,6 +101,7 @@ if TYPE_CHECKING:
         Drawer,
         Door,
         Handle,
+        Rim,
         Aperture,
         MechanicalJoint,
         Leg,
@@ -451,8 +451,22 @@ class HasGraspCandidates(HasRootBody):
         require_lifting: bool = False,
     ) -> List[GraspCandidate]:
         """
-        The grasps this annotation offers, in no particular order.
+        The grasps this annotation offers, in no particular order: those of its
+        :meth:`grasped_part` when it is grasped at one of its parts.
 
+        :param model_registry: Answers the statement of where the object may be grasped.
+        :param require_lifting: Whether to ask the model only for grasps that lift the
+            object.
+        """
+        part = self.grasped_part()
+        if part is not self:
+            return part.grasp_candidates(model_registry, require_lifting)
+        return self._own_grasp_candidates(model_registry, require_lifting)
+
+    def _own_grasp_candidates(
+        self, model_registry: Optional[ModelRegistry], require_lifting: bool
+    ) -> List[GraspCandidate]:
+        """
         Given a model, the grasps are drawn from the statement of where the object may
         be grasped. Without one, the default grasps the object at its own origin, from
         evenly spaced directions around its z-axis; annotations whose shape admits a
@@ -461,6 +475,7 @@ class HasGraspCandidates(HasRootBody):
         :param model_registry: Answers the statement of where the object may be grasped.
         :param require_lifting: Whether to ask the model only for grasps that lift the
             object.
+        :return: The grasps the object offers when grasped as a whole.
         """
         if model_registry is not None:
             return self._drawn_grasp_candidates(model_registry, require_lifting)
@@ -545,10 +560,8 @@ class HasStatedGrasps(HasGraspCandidates):
     its grasp candidates from the statement of it.
     """
 
-    def grasp_candidates(
-        self,
-        model_registry: Optional[ModelRegistry] = None,
-        require_lifting: bool = False,
+    def _own_grasp_candidates(
+        self, model_registry: Optional[ModelRegistry], require_lifting: bool
     ) -> List[GraspCandidate]:
         """
         Draw grasps from :meth:`surface_grasp_statement`.
@@ -561,42 +574,6 @@ class HasStatedGrasps(HasGraspCandidates):
             :attr:`grasp_candidate_count` of them.
         """
         return self._drawn_grasp_candidates(model_registry, require_lifting)
-
-
-@dataclass(eq=False)
-class HasRim(HasStatedGrasps):
-    """
-    An open container whose rim is grasped by pinching its wall from above.
-    """
-
-    rim_grasp_depth: float = field(default=0.01, kw_only=True)
-    """
-    How far below the highest point of the container the fingers grip its wall.
-    """
-
-    rim_wall_probe_count: int = field(default=12, kw_only=True)
-    """
-    In how many directions around the container its wall is measured.
-    """
-
-    def rim(self) -> Rim:
-        """
-        :return: The container's rim, measured on its grasp surface.
-        :raises NoGraspGeometry: If no wall is found below the rim.
-        """
-        rim = Rim.measured_on(
-            self.grasp_surface(), self.rim_grasp_depth, self.rim_wall_probe_count
-        )
-        if rim is None:
-            raise NoGraspGeometry(self)
-        return rim
-
-    def surface_grasp_statement(self, require_lifting: bool = False) -> Match:
-        """
-        :return: The statement of grasps pinching the rim; see :meth:`Rim.grasp_statement`.
-        :raises NoGraspGeometry: If no wall is found below the rim.
-        """
-        return self.rim().grasp_statement(require_lifting)
 
 
 @dataclass(eq=False)
@@ -929,30 +906,39 @@ class HasHandle(HasGraspCandidates, PartWholeRelationship):
     The handle of the semantic annotation.
     """
 
-    def grasp_candidates(
-        self,
-        model_registry: Optional[ModelRegistry] = None,
-        require_lifting: bool = False,
-    ) -> List[GraspCandidate]:
+    def grasped_part(self) -> HasGraspCandidates:
         """
-        :param model_registry: Answers the statement of where the handle, or the object
-            without one, may be grasped.
-        :param require_lifting: Whether to ask the model only for grasps that lift the
-            object.
-        :return: The grasps of the handle; without a handle, those the annotation offers
+        :return: The handle; without a handle, the part the annotation is grasped at
             otherwise.
         """
         if self.handle is None:
-            return super().grasp_candidates(model_registry, require_lifting)
-        return self.handle.grasp_candidates(model_registry, require_lifting)
+            return super().grasped_part()
+        return self.handle
+
+
+@dataclass(eq=False)
+class HasRim(HasGraspCandidates, PartWholeRelationship):
+    """
+    A mixin class for open containers that have a rim, and are grasped at it when they
+    have one.
+    """
+
+    rim: Optional[Rim] = field(
+        default=None,
+        metadata=IsPartWholeRelationship().as_dict(),
+    )
+    """
+    The rim of the container.
+    """
 
     def grasped_part(self) -> HasGraspCandidates:
         """
-        :return: The handle; without a handle, the annotation itself.
+        :return: The rim; without a rim, the part the annotation is grasped at
+            otherwise.
         """
-        if self.handle is None:
-            return self
-        return self.handle
+        if self.rim is None:
+            return super().grasped_part()
+        return self.rim
 
 
 THasRootBody = TypeVar("THasRootBody", bound=HasRootBody)
