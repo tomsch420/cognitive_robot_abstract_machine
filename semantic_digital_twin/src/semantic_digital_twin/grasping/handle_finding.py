@@ -19,6 +19,7 @@ import trimesh
 from scipy.spatial import ConvexHull
 from typing_extensions import Optional
 
+from semantic_digital_twin.datastructures.definitions import Axis
 from semantic_digital_twin.spatial_types import Point2
 
 # %% finding handles
@@ -149,12 +150,12 @@ class ElongatedShape:
     The shape.
     """
 
-    length_axis: int
+    length_axis: Axis
     """
     The axis the shape is longest along.
     """
 
-    width_axis: int
+    width_axis: Axis
     """
     The axis its width is measured along.
     """
@@ -230,11 +231,11 @@ class NarrowEndHandleFinder(HandleFinder):
     def find(self, shape: trimesh.Trimesh) -> Optional[trimesh.Trimesh]:
         lowest, highest = shape.bounds
         extents = highest - lowest
-        length_axis = 0 if extents[0] >= extents[1] else 1
+        length_axis = Axis.X if extents[Axis.X] >= extents[Axis.Y] else Axis.Y
         elongated = ElongatedShape(
             shape=shape,
             length_axis=length_axis,
-            width_axis=1 - length_axis,
+            width_axis=Axis.Y if length_axis == Axis.X else Axis.X,
             end_fraction=self.end_fraction,
         )
         along = elongated.along

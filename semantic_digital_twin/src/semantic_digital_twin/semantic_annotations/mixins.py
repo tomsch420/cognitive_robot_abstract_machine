@@ -57,10 +57,12 @@ from semantic_digital_twin.exceptions import (
     UnknownPartWholeRelationshipField,
 )
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
-from random_events.interval import closed_open
+from krrood.entity_query_language.query.match import Match
+from semantic_digital_twin.grasping.rim import Rim
 from semantic_digital_twin.grasping.surface_grasp import (
-    SurfaceGraspRegion,
-    SurfaceGraspStatement,
+    any_surface_grasp,
+    draw_surface_grasps,
+    from_any_side,
 )
 from semantic_digital_twin.reasoning.predicates import SupportedBy
 from semantic_digital_twin.semantic_annotations.part_whole import (
@@ -433,9 +435,9 @@ class HasGraspCandidates(HasRootBody):
     collision geometry for fingers to close on.
 
     Where an object may be grasped is stated as an underspecified statement over
-    :class:`~semantic_digital_twin.grasping.surface_grasp.SurfaceGrasp`, made of the
-    regions :meth:`surface_grasp_regions` returns. Annotations that know their object's
-    shape narrow these regions.
+    :class:`~semantic_digital_twin.grasping.surface_grasp.SurfaceGrasp`, the one
+    :meth:`surface_grasp_statement` returns. Annotations that know their object's shape
+    narrow it down.
     """
 
     grasp_candidate_count: int = field(default=12, kw_only=True)
@@ -479,17 +481,19 @@ class HasGraspCandidates(HasRootBody):
         self, model_registry: Optional[ModelRegistry], require_lifting: bool
     ) -> List[GraspCandidate]:
         """
-        Draw grasps from the statement made of :meth:`surface_grasp_regions`.
+        Draw grasps from :meth:`surface_grasp_statement`.
 
-        :param model_registry: Answers the statement; ``None`` draws uniformly within
-            the regions.
+        :param model_registry: Answers the statement; ``None`` draws uniformly from what
+            it allows.
         :param require_lifting: Whether to ask only for grasps that lift the object.
         :return: The drawn grasps that reach the object's surface, at most
             :attr:`grasp_candidate_count` of them.
         """
-        grasps = SurfaceGraspStatement(
-            self.surface_grasp_regions(), require_lifting=require_lifting
-        ).draw(self.grasp_candidate_count, model_registry)
+        grasps = draw_surface_grasps(
+            self.surface_grasp_statement(require_lifting),
+            self.grasp_candidate_count,
+            model_registry,
+        )
         return [
             grasp.grasp_candidate(self)
             for grasp in grasps
@@ -508,20 +512,23 @@ class HasGraspCandidates(HasRootBody):
             return self.root.visual.combined_mesh
         raise NoGraspGeometry(self)
 
-    def surface_grasp_regions(self) -> List[SurfaceGraspRegion]:
+    def surface_grasp_statement(self, require_lifting: bool = False) -> Match:
         """
-        :return: The regions of surface grasps the object allows. The default allows the
-            whole object, closing on it at most halfway through its narrower horizontal
-            extent.
+        :param require_lifting: Whether to ask only for grasps that lift the object.
+        :return: The statement of where the object may be grasped. The default allows
+            the whole object, closing on it at most halfway through its narrower
+            horizontal extent.
         """
         lowest, highest = self.grasp_surface().bounds
         narrower_extent = float(min(highest[:2] - lowest[:2]))
-        return [
-            SurfaceGraspRegion(
-                height=closed_open(0.05, 0.95),
-                depth=closed_open(0.0, narrower_extent / 2),
-            )
-        ]
+        grasp = any_surface_grasp(require_lifting)
+        return grasp.where(
+            grasp.height >= 0.05,
+            grasp.height < 0.95,
+            grasp.depth >= 0.0,
+            grasp.depth < narrower_extent / 2,
+            *from_any_side(grasp),
+        )
 
     def grasped_part(self) -> HasGraspCandidates:
         """
@@ -544,10 +551,10 @@ class HasStatedGrasps(HasGraspCandidates):
         require_lifting: bool = False,
     ) -> List[GraspCandidate]:
         """
-        Draw grasps from the statement made of :meth:`surface_grasp_regions`.
+        Draw grasps from :meth:`surface_grasp_statement`.
 
-        :param model_registry: Answers the statement; ``None`` draws uniformly within
-            the regions.
+        :param model_registry: Answers the statement; ``None`` draws uniformly from what
+            it allows.
         :param require_lifting: Whether to ask only for grasps that lift the object,
             which needs a model learned over tried grasps and their results.
         :return: The drawn grasps that reach the object's surface, at most
@@ -572,58 +579,24 @@ class HasRim(HasStatedGrasps):
     In how many directions around the container its wall is measured.
     """
 
-    def surface_grasp_regions(self) -> List[SurfaceGraspRegion]:
+    def rim(self) -> Rim:
         """
-        :return: The band :attr:`rim_grasp_depth` below the rim, all around, closing on
-            the middle half of the wall's thickness, from above or tilted a little
-            towards the wall.
+        :return: The container's rim, measured on its grasp surface.
         :raises NoGraspGeometry: If no wall is found below the rim.
         """
-        mesh = self.grasp_surface()
-        lowest, highest = mesh.bounds
-        height = float(highest[2] - lowest[2])
-        grip_height = 1.0 - self.rim_grasp_depth / height
-        band = self.rim_grasp_depth / (2 * height)
-        thickness = self._rim_wall_thickness(mesh)
-        return [
-            SurfaceGraspRegion(
-                height=closed_open(grip_height - band, min(grip_height + band, 1.0)),
-                depth=closed_open(0.25 * thickness, 0.75 * thickness),
-                pitch=closed_open(0.0, 0.5),
-                roll=closed_open(-np.pi / 8, np.pi / 8),
-            )
-        ]
-
-    def _rim_wall_thickness(self, mesh: trimesh.Trimesh) -> float:
-        """
-        Cast rays outward from the middle of the container, :attr:`rim_grasp_depth`
-        below the rim, and take the distance between the first two surfaces each ray
-        passes, the inside and the outside of the wall, as the wall's thickness.
-
-        :param mesh: The container's grasp surface.
-        :return: The median thickness over the directions that hit the wall.
-        :raises NoGraspGeometry: If no direction hits a wall.
-        """
-        yaws = np.linspace(0, 2 * np.pi, self.rim_wall_probe_count, endpoint=False)
-        directions = np.column_stack([np.cos(yaws), np.sin(yaws), np.zeros(len(yaws))])
-        lowest, highest = mesh.bounds
-        axis_point = (lowest + highest) / 2
-        axis_point[2] = highest[2] - self.rim_grasp_depth
-        locations, ray_indices, _ = mesh.ray.intersects_location(
-            ray_origins=np.tile(axis_point, (len(yaws), 1)), ray_directions=directions
+        rim = Rim.measured_on(
+            self.grasp_surface(), self.rim_grasp_depth, self.rim_wall_probe_count
         )
-        thicknesses = []
-        for index in range(len(yaws)):
-            distances = np.sort(
-                np.linalg.norm(
-                    locations[ray_indices == index][:, :2] - axis_point[:2], axis=1
-                )
-            )
-            if len(distances) > 1:
-                thicknesses.append(float(distances[1] - distances[0]))
-        if not thicknesses:
+        if rim is None:
             raise NoGraspGeometry(self)
-        return float(np.median(thicknesses))
+        return rim
+
+    def surface_grasp_statement(self, require_lifting: bool = False) -> Match:
+        """
+        :return: The statement of grasps pinching the rim; see :meth:`Rim.grasp_statement`.
+        :raises NoGraspGeometry: If no wall is found below the rim.
+        """
+        return self.rim().grasp_statement(require_lifting)
 
 
 @dataclass(eq=False)

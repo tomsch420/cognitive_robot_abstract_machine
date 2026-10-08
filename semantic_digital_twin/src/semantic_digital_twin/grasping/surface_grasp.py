@@ -1,6 +1,6 @@
 """
 Grasps described by where on an object's surface they take hold and how the gripper
-comes in, the regions of such grasps an object allows, and what happened when one was
+comes in, statements of where an object may be grasped, and what happened when one was
 tried.
 
 Every field of :class:`SurfaceGrasp` and :class:`GraspResult` is a plain number or truth
@@ -20,9 +20,8 @@ from numpy.typing import NDArray
 from typing_extensions import TYPE_CHECKING, List, Optional
 
 from krrood.entity_query_language.backends import ProbabilisticBackend
-from krrood.entity_query_language.factories import a, and_, or_
+from krrood.entity_query_language.factories import ConditionType, a
 from krrood.entity_query_language.query.match import Match
-from random_events.interval import Bound, Interval, closed_open
 from krrood.parametrization.model_registries import (
     ModelRegistry,
     UniformPriorRegistry,
@@ -222,146 +221,64 @@ class SurfaceGrasp:
         )
 
 
-# %% where an object may be grasped
+# %% stating where an object may be grasped
 
 
-@dataclass
-class SurfaceGraspRegion:
+def any_surface_grasp(require_lifting: bool = False) -> Match:
     """
-    One region of grasps an object allows: an interval for every parameter of a
-    :class:`SurfaceGrasp`, each closed at its lower and open at its upper end unless
-    built otherwise.
+    :param require_lifting: Whether to ask only for grasps that lift the object, by
+        stating the grasp's result as well; only a model learned over tried grasps and
+        their results can answer that.
+    :return: A statement asking for a surface grasp with every parameter left free, for
+        an annotation to narrow down with ``where``.
+    """
+    parameters = dict(azimuth=..., height=..., depth=..., pitch=..., roll=...)
+    if require_lifting:
+        parameters["result"] = a(GraspResult)(
+            lifted=True,
+            object_rise=...,
+            translational_slip=...,
+            rotational_slip=...,
+            motion_completed=...,
+        )
+    return a(SurfaceGrasp)(**parameters)
 
-    Which heights and depths make sense depends on the object's shape, so they have no
-    defaults. The other defaults cover every direction around the object, approaches up
-    to about seventy degrees off vertical and closing directions up to an eighth of a
-    turn off the line of sight.
-    """
 
-    height: Interval
+def from_any_side(grasp: Match) -> List[ConditionType]:
     """
-    See :attr:`SurfaceGrasp.height`.
+    :param grasp: A statement's grasp.
+    :return: The conditions that the grasp comes from any direction around the object,
+        approaches it up to about seventy degrees off vertical, staying below a quarter
+        turn where the approach would be horizontal, and closes up to an eighth of a
+        turn off the line of sight.
     """
+    return [
+        grasp.azimuth >= 0.0,
+        grasp.azimuth < 2 * math.pi,
+        grasp.pitch >= 0.0,
+        grasp.pitch < 1.2,
+        grasp.roll >= -math.pi / 4,
+        grasp.roll < math.pi / 4,
+    ]
 
-    depth: Interval
-    """
-    See :attr:`SurfaceGrasp.depth`.
-    """
 
-    azimuth: Interval = field(default_factory=lambda: closed_open(0.0, 2 * math.pi))
+def draw_surface_grasps(
+    statement: Match,
+    number_of_grasps: int,
+    model_registry: Optional[ModelRegistry] = None,
+) -> List[SurfaceGrasp]:
     """
-    See :attr:`SurfaceGrasp.azimuth`.
+    :param statement: A statement of where an object may be grasped.
+    :param number_of_grasps: How many grasps to draw.
+    :param model_registry: Answers the statement; ``None`` draws uniformly from what it
+        allows, which cannot answer a statement that requires lifting.
+    :return: Grasps answering the statement.
     """
-
-    pitch: Interval = field(default_factory=lambda: closed_open(0.0, 1.2))
-    """
-    See :attr:`SurfaceGrasp.pitch`; stays below a quarter turn, where the approach would
-    be horizontal.
-    """
-
-    roll: Interval = field(
-        default_factory=lambda: closed_open(-math.pi / 4, math.pi / 4)
+    return list(
+        statement.evaluate(
+            backend=ProbabilisticBackend(
+                model_registry or UniformPriorRegistry(),
+                number_of_samples=number_of_grasps,
+            )
+        )
     )
-    """
-    See :attr:`SurfaceGrasp.roll`.
-    """
-
-    def condition(self, grasp: Match):
-        """
-        :param grasp: The statement's grasp variable.
-        :return: The condition that the grasp lies within this region.
-        """
-        return and_(
-            *(
-                self._lies_within(attribute, interval)
-                for attribute, interval in (
-                    (grasp.azimuth, self.azimuth),
-                    (grasp.height, self.height),
-                    (grasp.depth, self.depth),
-                    (grasp.pitch, self.pitch),
-                    (grasp.roll, self.roll),
-                )
-            )
-        )
-
-    @staticmethod
-    def _lies_within(attribute, interval: Interval):
-        """
-        :param attribute: An attribute of the statement's grasp variable.
-        :param interval: The values the attribute may take.
-        :return: The condition that the attribute lies within the interval.
-        """
-        conditions = [
-            and_(
-                (
-                    attribute >= simple_interval.lower
-                    if simple_interval.left == Bound.CLOSED
-                    else attribute > simple_interval.lower
-                ),
-                (
-                    attribute <= simple_interval.upper
-                    if simple_interval.right == Bound.CLOSED
-                    else attribute < simple_interval.upper
-                ),
-            )
-            for simple_interval in interval.simple_sets
-        ]
-        return conditions[0] if len(conditions) == 1 else or_(*conditions)
-
-
-@dataclass
-class SurfaceGraspStatement:
-    """
-    The underspecified statement that a grasp lies in one of several regions.
-    """
-
-    regions: List[SurfaceGraspRegion]
-    """
-    The regions a grasp may lie in.
-    """
-
-    require_lifting: bool = False
-    """
-    Whether to ask only for grasps that lift the object, by stating the grasp's result
-    as well; only a model learned over tried grasps and their results can answer that.
-    """
-
-    def match(self) -> Match:
-        """
-        :return: The statement asking for a surface grasp within one of the regions,
-            leaving every parameter free, and its result too if :attr:`require_lifting`
-            asks for a lifting one.
-        """
-        parameters = dict(azimuth=..., height=..., depth=..., pitch=..., roll=...)
-        if self.require_lifting:
-            parameters["result"] = a(GraspResult)(
-                lifted=True,
-                object_rise=...,
-                translational_slip=...,
-                rotational_slip=...,
-                motion_completed=...,
-            )
-        grasp = a(SurfaceGrasp)(**parameters)
-        conditions = [region.condition(grasp) for region in self.regions]
-        grasp.where(conditions[0] if len(conditions) == 1 else or_(*conditions))
-        return grasp
-
-    def draw(
-        self,
-        number_of_grasps: int,
-        model_registry: Optional[ModelRegistry] = None,
-    ) -> List[SurfaceGrasp]:
-        """
-        :param number_of_grasps: How many grasps to draw.
-        :param model_registry: Answers the statement; ``None`` draws uniformly within
-            the regions, which cannot answer a statement that requires lifting.
-        :return: Grasps answering :meth:`match`.
-        """
-        return list(
-            self.match().evaluate(
-                backend=ProbabilisticBackend(
-                    model_registry or UniformPriorRegistry(),
-                    number_of_samples=number_of_grasps,
-                )
-            )
-        )

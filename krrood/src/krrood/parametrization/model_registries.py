@@ -75,11 +75,11 @@ class UniformPriorRegistry(ModelRegistry):
         :raises UnboundedParameterError: If the conditions leave a parameter without a
             lower or an upper bound, which they always do when there are none.
         """
-        allowed = (
-            parameters.truncation_assignments_from_where_conditions
-            if isinstance(parameters, UnderspecifiedParameters)
-            else None
-        )
+        if not isinstance(parameters, UnderspecifiedParameters):
+            raise UnboundedParameterError(
+                parameter_name=", ".join(parameters.variables)
+            )
+        allowed = parameters.truncation_assignments_from_where_conditions
         if allowed is None:
             raise UnboundedParameterError(
                 parameter_name=", ".join(parameters.variables)

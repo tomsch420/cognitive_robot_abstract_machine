@@ -45,9 +45,12 @@ from semantic_digital_twin.semantic_annotations.mixins import (
     HasRim,
     HasStatedGrasps,
 )
-from random_events.interval import closed_open
+from krrood.entity_query_language.factories import and_, or_
+from krrood.entity_query_language.query.match import Match
+from semantic_digital_twin.datastructures.definitions import Axis
 from semantic_digital_twin.grasping.surface_grasp import (
-    SurfaceGraspRegion,
+    any_surface_grasp,
+    from_any_side,
 )
 from semantic_digital_twin.spatial_types import (
     Point3,
@@ -105,18 +108,21 @@ class Handle(HasStatedGrasps):
     open or close an object.
     """
 
-    def surface_grasp_regions(self) -> List[SurfaceGraspRegion]:
+    def surface_grasp_statement(self, require_lifting: bool = False) -> Match:
         """
+        :param require_lifting: Whether to ask only for grasps that lift the object.
         :return: The whole handle away from its ends, closing on it at most halfway
             through its thinnest extent.
         """
         thinnest_extent = float(min(self.grasp_surface().extents))
-        return [
-            SurfaceGraspRegion(
-                height=closed_open(0.1, 0.9),
-                depth=closed_open(0.0, thinnest_extent / 2),
-            )
-        ]
+        grasp = any_surface_grasp(require_lifting)
+        return grasp.where(
+            grasp.height >= 0.1,
+            grasp.height < 0.9,
+            grasp.depth >= 0.0,
+            grasp.depth < thinnest_extent / 2,
+            *from_any_side(grasp),
+        )
 
     @classmethod
     def create_from_part_of_shape(
@@ -1546,28 +1552,41 @@ class Cutlery(HasHandle, HasStatedGrasps, Tableware):
     its length.
     """
 
-    def surface_grasp_regions(self) -> List[SurfaceGraspRegion]:
+    def surface_grasp_statement(self, require_lifting: bool = False) -> Match:
         """
+        :param require_lifting: Whether to ask only for grasps that lift the object.
         :return: Seen along its length from either end, the stretch between a fifth and
             three fifths of its length, closing across it.
         :raises NoGraspGeometry: If the root body has no shape to measure.
         """
         lowest, highest = self.grasp_surface().bounds
         extents = highest - lowest
-        length_axis = 0 if extents[0] >= extents[1] else 1
+        length_axis = Axis.X if extents[Axis.X] >= extents[Axis.Y] else Axis.Y
         length = float(extents[length_axis])
-        end_azimuths = (0.0, np.pi) if length_axis == 0 else (np.pi / 2, 3 * np.pi / 2)
+        end_azimuths = (
+            (0.0, np.pi) if length_axis == Axis.X else (np.pi / 2, 3 * np.pi / 2)
+        )
         tolerance = np.pi / 16
-        return [
-            SurfaceGraspRegion(
-                height=closed_open(0.2, 0.8),
-                depth=closed_open(0.2 * length, 0.6 * length),
-                azimuth=closed_open(end_azimuth - tolerance, end_azimuth + tolerance),
-                pitch=closed_open(0.0, 0.6),
-                roll=closed_open(np.pi / 2 - np.pi / 8, np.pi / 2 + np.pi / 8),
-            )
-            for end_azimuth in end_azimuths
-        ]
+        grasp = any_surface_grasp(require_lifting)
+        return grasp.where(
+            grasp.height >= 0.2,
+            grasp.height < 0.8,
+            grasp.depth >= 0.2 * length,
+            grasp.depth < 0.6 * length,
+            or_(
+                *(
+                    and_(
+                        grasp.azimuth >= end_azimuth - tolerance,
+                        grasp.azimuth < end_azimuth + tolerance,
+                    )
+                    for end_azimuth in end_azimuths
+                )
+            ),
+            grasp.pitch >= 0.0,
+            grasp.pitch < 0.6,
+            grasp.roll >= np.pi / 2 - np.pi / 8,
+            grasp.roll < np.pi / 2 + np.pi / 8,
+        )
 
 
 @dataclass(eq=False)

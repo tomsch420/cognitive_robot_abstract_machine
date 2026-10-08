@@ -24,6 +24,8 @@ from semantic_digital_twin.world_description.geometry import Mesh
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
 
+from ._statements import allowed_intervals
+
 # %% fixtures
 
 
@@ -98,22 +100,22 @@ def mug_with_handle() -> Mug:
 # %% trials
 
 
-def test_drawn_grasps_lie_in_the_regions_the_annotation_states(carton):
+def test_drawn_grasps_lie_where_the_annotation_states(carton):
     trials = GraspTrials(
         graspable=carton, performer=RecordingPerformer(), number_of_trials=30
     )
-    [region] = carton.surface_grasp_regions()
+    allowed = allowed_intervals(carton.surface_grasp_statement())
 
     grasps = trials.drawn_grasps()
 
     assert len(grasps) == trials.number_of_trials
     for grasp in grasps:
         for value, interval in (
-            (grasp.azimuth, region.azimuth),
-            (grasp.height, region.height),
-            (grasp.depth, region.depth),
-            (grasp.pitch, region.pitch),
-            (grasp.roll, region.roll),
+            (grasp.azimuth, allowed["azimuth"]),
+            (grasp.height, allowed["height"]),
+            (grasp.depth, allowed["depth"]),
+            (grasp.pitch, allowed["pitch"]),
+            (grasp.roll, allowed["roll"]),
         ):
             assert interval.contains(value)
 

@@ -2,7 +2,7 @@
 Trying grasps on an object to collect the data a model of grasps is learned from.
 
 The grasps are drawn from the statement of where the object's annotation may be grasped,
-through a model registry: uniformly within the stated regions at first, from a learned
+through a model registry: uniformly from what it allows at first, from a learned
 model later. Each tried grasp is recorded together with what happened, so the records
 hold the grasp's parameters and its result as plain numbers and truth values.
 """
@@ -19,7 +19,7 @@ from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.grasping.surface_grasp import (
     GraspResult,
     SurfaceGrasp,
-    SurfaceGraspStatement,
+    draw_surface_grasps,
 )
 from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
 
@@ -86,7 +86,7 @@ class GraspTrials:
 
     model_registry: Optional[ModelRegistry] = field(default=None)
     """
-    Answers the statement; ``None`` draws uniformly within the stated regions.
+    Answers the statement; ``None`` draws uniformly from what it allows.
     """
 
     require_lifting: bool = False
@@ -107,10 +107,11 @@ class GraspTrials:
         :return: :attr:`number_of_trials` grasps answering the statement of where
             :attr:`grasped_part` may be grasped.
         """
-        return SurfaceGraspStatement(
-            self.grasped_part.surface_grasp_regions(),
-            require_lifting=self.require_lifting,
-        ).draw(self.number_of_trials, self.model_registry)
+        return draw_surface_grasps(
+            self.grasped_part.surface_grasp_statement(self.require_lifting),
+            self.number_of_trials,
+            self.model_registry,
+        )
 
     def run(self) -> Iterator[GraspTrialRecord]:
         """

@@ -35,6 +35,8 @@ from semantic_digital_twin.world_description.inertial_properties import Inertial
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
 
+from ._statements import allowed_intervals
+
 # %% fixtures
 
 BOWL_INNER_RADIUS = 0.09
@@ -170,10 +172,10 @@ def test_bowl_grasps_sit_in_a_band_below_the_rim_by_the_configured_depth(bowl):
 
 
 def test_bowl_grasps_approach_from_above(bowl):
-    [region] = bowl.surface_grasp_regions()
+    allowed = allowed_intervals(bowl.surface_grasp_statement())
     for grasp in bowl.grasp_candidates():
         approach = axes_of(grasp.grasp_pose)[:, 0]
-        assert -approach[2] >= np.cos(region.pitch.simple_sets[-1].upper)
+        assert -approach[2] >= np.cos(allowed["pitch"].simple_sets[-1].upper)
 
 
 def test_bowl_grasp_fingers_close_across_the_rim_wall(bowl):
@@ -181,25 +183,26 @@ def test_bowl_grasp_fingers_close_across_the_rim_wall(bowl):
     The finger axis must be close to radial, so the fingers straddle the wall rather
     than pinching along it.
     """
-    [region] = bowl.surface_grasp_regions()
+    allowed = allowed_intervals(bowl.surface_grasp_statement())
     for grasp in bowl.grasp_candidates():
         position = grasp.grasp_pose.to_np()[:3, 3]
         radial = position / np.linalg.norm(position[:2])
         radial[2] = 0
         finger_axis = axes_of(grasp.grasp_pose)[:, 1]
         assert abs(float(np.dot(finger_axis, radial))) >= np.cos(
-            region.roll.simple_sets[-1].upper
-        ) * np.cos(region.pitch.simple_sets[-1].upper)
+            allowed["roll"].simple_sets[-1].upper
+        ) * np.cos(allowed["pitch"].simple_sets[-1].upper)
 
 
 def test_bowl_grasps_close_on_the_middle_of_the_wall(bowl):
-    [region] = bowl.surface_grasp_regions()
+    allowed = allowed_intervals(bowl.surface_grasp_statement())
     wall_thickness = BOWL_OUTER_RADIUS - BOWL_INNER_RADIUS
 
-    assert region.depth.simple_sets[0].lower == pytest.approx(
+    assert bowl.rim().wall_thickness == pytest.approx(wall_thickness, rel=0.02)
+    assert allowed["depth"].simple_sets[0].lower == pytest.approx(
         0.25 * wall_thickness, rel=0.02
     )
-    assert region.depth.simple_sets[-1].upper == pytest.approx(
+    assert allowed["depth"].simple_sets[-1].upper == pytest.approx(
         0.75 * wall_thickness, rel=0.02
     )
 
@@ -236,10 +239,9 @@ def test_cutlery_is_grasped_from_above_across_its_length(length_axis):
     never along it.
     """
     spoon = _spoon_lying_along(length_axis)
-    [region, _] = spoon.surface_grasp_regions()
-    azimuth_spread = (
-        region.azimuth.simple_sets[-1].upper - region.azimuth.simple_sets[0].lower
-    ) / 2
+    allowed = allowed_intervals(spoon.surface_grasp_statement())
+    first_end = allowed["azimuth"].simple_sets[0]
+    azimuth_spread = (first_end.upper - first_end.lower) / 2
     length_direction = np.eye(3)[length_axis]
 
     grasps = spoon.grasp_candidates()
@@ -250,9 +252,9 @@ def test_cutlery_is_grasped_from_above_across_its_length(length_axis):
             axes_of(grasp.grasp_pose)[:, 0],
             axes_of(grasp.grasp_pose)[:, 1],
         )
-        assert -approach[2] >= np.cos(region.pitch.simple_sets[-1].upper)
+        assert -approach[2] >= np.cos(allowed["pitch"].simple_sets[-1].upper)
         assert abs(float(np.dot(closing, length_direction))) <= np.sin(
-            region.roll.simple_sets[-1].upper - np.pi / 2 + azimuth_spread
+            allowed["roll"].simple_sets[-1].upper - np.pi / 2 + azimuth_spread
         )
 
 

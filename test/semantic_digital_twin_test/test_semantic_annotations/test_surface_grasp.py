@@ -19,18 +19,18 @@ from probabilistic_model.probabilistic_circuit.relational.rspn import (
     RelationalProbabilisticCircuit,
 )
 from krrood.entity_query_language.backends import ProbabilisticBackend
-from krrood.entity_query_language.factories import a
+from krrood.entity_query_language.factories import a, and_, or_
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import SurfaceGraspNotOnSurfaceError
 from semantic_digital_twin.orm.ormatic_interface import SurfaceGraspDAO  # noqa: F401
-from random_events.interval import closed_open
 from semantic_digital_twin.grasping.surface_grasp import (
     GraspResult,
     SurfaceGrasp,
-    SurfaceGraspRegion,
-    SurfaceGraspStatement,
+    any_surface_grasp,
+    draw_surface_grasps,
 )
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
+from ._statements import allowed_intervals
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import Mesh
@@ -143,22 +143,31 @@ def test_a_point_above_the_object_is_not_on_its_surface(carton):
 # %% statements of where to grasp
 
 
-def test_drawn_grasps_lie_in_one_of_the_regions():
+def test_drawn_grasps_lie_where_the_statement_allows():
     sides = (0.0, math.pi)
     tolerance = 0.2
-    statement = SurfaceGraspStatement(
-        [
-            SurfaceGraspRegion(
-                height=closed_open(0.4, 0.6),
-                depth=closed_open(0.0, 0.01),
-                azimuth=closed_open(side - tolerance, side + tolerance),
+    grasp = any_surface_grasp()
+    grasp.where(
+        grasp.height >= 0.4,
+        grasp.height < 0.6,
+        grasp.depth >= 0.0,
+        grasp.depth < 0.01,
+        or_(
+            *(
+                and_(
+                    grasp.azimuth >= side - tolerance, grasp.azimuth < side + tolerance
+                )
+                for side in sides
             )
-            for side in sides
-        ]
+        ),
+        grasp.pitch >= 0.0,
+        grasp.pitch < 1.0,
+        grasp.roll >= -0.5,
+        grasp.roll < 0.5,
     )
     number_of_grasps = 60
 
-    grasps = statement.draw(number_of_grasps)
+    grasps = draw_surface_grasps(grasp, number_of_grasps)
 
     assert len(grasps) == number_of_grasps
     nearest_side = [
@@ -169,31 +178,6 @@ def test_drawn_grasps_lie_in_one_of_the_regions():
         assert 0.4 <= grasp.height < 0.6
         assert grasp.result is None
     assert set(nearest_side) == set(sides)
-
-
-def test_a_parameter_may_lie_in_one_of_several_intervals():
-    """
-    An interval of a region can have several pieces, such as the directions on either
-    side of an object.
-    """
-    left = closed_open(0.0, 0.5)
-    right = closed_open(3.0, 3.5)
-    statement = SurfaceGraspStatement(
-        [
-            SurfaceGraspRegion(
-                height=closed_open(0.4, 0.6),
-                depth=closed_open(0.0, 0.01),
-                azimuth=left | right,
-            )
-        ]
-    )
-
-    grasps = statement.draw(60)
-
-    in_left = [left.contains(grasp.azimuth) for grasp in grasps]
-    in_right = [right.contains(grasp.azimuth) for grasp in grasps]
-    assert all(a or b for a, b in zip(in_left, in_right))
-    assert any(in_left) and any(in_right)
 
 
 def test_every_parameter_of_a_surface_grasp_needs_bounds():
@@ -210,10 +194,12 @@ def test_every_parameter_of_a_surface_grasp_needs_bounds():
         )
 
 
-def test_the_default_region_covers_the_object_up_to_half_its_narrower_side(carton):
-    [region] = carton.surface_grasp_regions()
+def test_the_default_statement_covers_the_object_up_to_half_its_narrower_side(
+    carton,
+):
+    allowed = allowed_intervals(carton.surface_grasp_statement())
 
-    assert region.depth.simple_sets[-1].upper == pytest.approx(
+    assert allowed["depth"].simple_sets[-1].upper == pytest.approx(
         min(CARTON_EXTENTS[:2]) / 2
     )
 
@@ -233,7 +219,7 @@ def learned_carton_model(carton) -> RelationalCircuitRegistry:
     :return: A model learned from synthetic trials on the carton, in which the grasps
         above :data:`LIFTING_HEIGHT` lift it and the others do not.
     """
-    grasps = SurfaceGraspStatement(carton.surface_grasp_regions()).draw(300)
+    grasps = draw_surface_grasps(carton.surface_grasp_statement(), 300)
     for grasp in grasps:
         lifted = grasp.height > LIFTING_HEIGHT
         grasp.result = GraspResult(
@@ -251,9 +237,9 @@ def learned_carton_model(carton) -> RelationalCircuitRegistry:
 
 
 def test_a_learned_model_answers_with_lifting_grasps(carton, learned_carton_model):
-    grasps = SurfaceGraspStatement(
-        carton.surface_grasp_regions(), require_lifting=True
-    ).draw(50, learned_carton_model)
+    grasps = draw_surface_grasps(
+        carton.surface_grasp_statement(require_lifting=True), 50, learned_carton_model
+    )
 
     assert len(grasps) == 50
     for grasp in grasps:
@@ -263,9 +249,7 @@ def test_a_learned_model_answers_with_lifting_grasps(carton, learned_carton_mode
 
 def test_a_uniform_prior_cannot_require_lifting(carton):
     with pytest.raises(UnboundedParameterError):
-        SurfaceGraspStatement(
-            carton.surface_grasp_regions(), require_lifting=True
-        ).draw(1)
+        draw_surface_grasps(carton.surface_grasp_statement(require_lifting=True), 1)
 
 
 def test_an_annotation_given_a_model_draws_its_grasps_from_it(
