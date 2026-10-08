@@ -11,12 +11,15 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from functools import cached_property
 
 import numpy as np
 from numpy.typing import NDArray
 import trimesh
 from scipy.spatial import ConvexHull
 from typing_extensions import Optional
+
+from semantic_digital_twin.spatial_types import Point2
 
 # %% finding handles
 
@@ -40,9 +43,9 @@ class RoundOutline:
     A circle in the horizontal plane.
     """
 
-    center: NDArray[np.float64]
+    center: Point2
     """
-    The circle's center, as x and y.
+    The circle's center.
     """
 
     radius: float
@@ -62,10 +65,10 @@ class RoundOutline:
             np.sum(points**2, axis=1),
             rcond=None,
         )
-        center = coefficients[:2]
+        x, y, offset = coefficients
         return cls(
-            center=center,
-            radius=float(np.sqrt(coefficients[2] + center @ center)),
+            center=Point2(x, y),
+            radius=float(np.sqrt(offset + x**2 + y**2)),
         )
 
     def distances(self, points: NDArray[np.float64]) -> NDArray[np.float64]:
@@ -73,7 +76,7 @@ class RoundOutline:
         :param points: Points in the horizontal plane, as rows of x and y.
         :return: Each point's distance from the circle's center.
         """
-        return np.linalg.norm(points - self.center, axis=1)
+        return np.linalg.norm(points - self.center.to_np(), axis=1)
 
 
 @dataclass
@@ -137,13 +140,13 @@ class ProtrudingHandleFinder(HandleFinder):
 @dataclass
 class ElongatedShape:
     """
-    The points of a shape that is longer than it is wide, measured along its length and
-    across its width.
+    A shape that is longer than it is wide, measured along its length and across its
+    width at its vertices and the centers of its faces.
     """
 
-    points: NDArray[np.float64]
+    shape: trimesh.Trimesh
     """
-    The points, as rows of x, y and z.
+    The shape.
     """
 
     length_axis: int
@@ -160,6 +163,13 @@ class ElongatedShape:
     """
     How much of the shape's length, from each end, is compared to find the narrower end.
     """
+
+    @cached_property
+    def points(self) -> NDArray[np.float64]:
+        """
+        :return: The points the shape is measured at, as rows of x, y and z.
+        """
+        return np.vstack([self.shape.vertices, self.shape.triangles_center])
 
     @property
     def along(self) -> NDArray[np.float64]:
@@ -222,7 +232,7 @@ class NarrowEndHandleFinder(HandleFinder):
         extents = highest - lowest
         length_axis = 0 if extents[0] >= extents[1] else 1
         elongated = ElongatedShape(
-            points=np.vstack([shape.vertices, shape.triangles_center]),
+            shape=shape,
             length_axis=length_axis,
             width_axis=1 - length_axis,
             end_fraction=self.end_fraction,

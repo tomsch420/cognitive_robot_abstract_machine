@@ -1,4 +1,3 @@
-import math
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing_extensions import Dict, Type
@@ -29,9 +28,8 @@ from probabilistic_model.probabilistic_circuit.rx.helper import (
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit,
 )
+from probabilistic_model.exceptions import UnboundedEventError
 from probabilistic_model.probabilistic_model import ProbabilisticModel
-from random_events.product_algebra import SimpleEvent
-from random_events.variable import Continuous
 
 
 @dataclass
@@ -71,8 +69,11 @@ class UniformPriorRegistry(ModelRegistry):
 
     def get_model(self, parameters: ModelQueryParameters) -> ProbabilisticCircuit:
         """
+        :param parameters: The parameters of the statement. Only a ``Match`` brings
+            ``where`` conditions; the bare selection of ``average(...)`` and the
+            condition of ``probability_of(...)`` bring none.
         :raises UnboundedParameterError: If the conditions leave a parameter without a
-            lower or an upper bound.
+            lower or an upper bound, which they always do when there are none.
         """
         allowed = (
             parameters.truncation_assignments_from_where_conditions
@@ -83,27 +84,13 @@ class UniformPriorRegistry(ModelRegistry):
             raise UnboundedParameterError(
                 parameter_name=", ".join(parameters.variables)
             )
-        bounding_box = allowed.bounding_box()
         for name, variable in parameters.variables.items():
-            self._require_bounds(name, variable, bounding_box)
-        return uniform_measure_of_event(allowed)
-
-    @staticmethod
-    def _require_bounds(
-        name: str, variable: Continuous, bounding_box: SimpleEvent
-    ) -> None:
-        """
-        :param name: The parameter's name.
-        :param variable: The parameter's variable.
-        :param bounding_box: The smallest box holding every value the conditions allow.
-        :raises UnboundedParameterError: If the box does not bound the parameter from
-            below and above.
-        """
-        if variable not in bounding_box.variables:
-            raise UnboundedParameterError(parameter_name=name)
-        interval = bounding_box[variable].simple_sets
-        if not (math.isfinite(interval[0].lower) and math.isfinite(interval[-1].upper)):
-            raise UnboundedParameterError(parameter_name=name)
+            if variable not in allowed.variables:
+                raise UnboundedParameterError(parameter_name=name)
+        try:
+            return uniform_measure_of_event(allowed)
+        except UnboundedEventError as error:
+            raise UnboundedParameterError(parameter_name=error.variable.name) from error
 
 
 @dataclass

@@ -87,9 +87,19 @@ def test_equally_large_regions_are_equally_likely():
     assert first_region == pytest.approx(0.5)
 
 
-def test_a_parameter_without_bounds_is_refused():
+def test_a_parameter_without_conditions_is_refused():
     coin = a(Coin)(a=..., b=..., c=...)
     coin.where(coin.a >= 0.0, coin.a <= 1.0, coin.b >= 0.0, coin.b <= 1.0)
+
+    with pytest.raises(UnboundedParameterError):
+        draw(coin, number_of_draws=1)
+
+
+def test_a_parameter_bounded_from_one_side_only_is_refused():
+    coin = a(Coin)(a=..., b=..., c=...)
+    coin.where(
+        coin.a >= 0.0, coin.a <= 1.0, coin.b >= 0.0, coin.b <= 1.0, coin.c >= 0.0
+    )
 
     with pytest.raises(UnboundedParameterError):
         draw(coin, number_of_draws=1)
