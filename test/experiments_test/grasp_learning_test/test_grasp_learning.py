@@ -30,7 +30,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
 )
 from semantic_digital_twin.grasping.surface_grasp import (
     GraspResult,
-    SurfaceGraspStatement,
+    draw_surface_grasps,
 )
 
 simulates_physics = pytest.mark.skipif(
@@ -65,13 +65,13 @@ def task_of(scene: PickUpScene) -> GraspLearningTask:
 
 def synthetic_attempts(scene: PickUpScene, number: int) -> List[GraspAttempt]:
     """
-    :return: Attempts at grasps drawn from the regions the scene's object states, which
+    :return: Attempts at grasps drawn from the statement of the scene's object, which
         lift it exactly when they lie above :data:`LIFTING_HEIGHT`.
     """
     task = task_of(scene)
-    grasps = SurfaceGraspStatement(
-        scene.graspable.grasped_part().surface_grasp_regions()
-    ).draw(number)
+    grasps = draw_surface_grasps(
+        scene.graspable.grasped_part().surface_grasp_statement(), number
+    )
     for grasp in grasps:
         lifted = grasp.height > LIFTING_HEIGHT
         grasp.result = GraspResult(
@@ -140,9 +140,11 @@ def test_a_learned_model_asks_for_lifting_grasps_after_storage(milk_scene, datab
     )
 
     [model] = database.model_library().models
-    grasps = SurfaceGraspStatement(
-        milk_scene.graspable.surface_grasp_regions(), require_lifting=True
-    ).draw(30, model.model_registry())
+    grasps = draw_surface_grasps(
+        milk_scene.graspable.surface_grasp_statement(require_lifting=True),
+        30,
+        model.model_registry(),
+    )
 
     assert model.task == task
     assert model.number_of_attempts == len(attempts)

@@ -22,6 +22,7 @@ from typing_extensions import List, Optional, Type
 from semantic_digital_twin.adapters.robocasa_dataset.loader import (
     RoboCasaDatasetLoader,
 )
+from semantic_digital_twin.datastructures.definitions import Axis
 from semantic_digital_twin.grasping.handle_finding import (
     ElongatedShape,
     HandleFinder,
@@ -136,12 +137,12 @@ class HandleTowardsRobot(RestingOrientation):
 
     def rotation(self, geometry: ObjectGeometry) -> np.ndarray:
         shape = trimesh.util.concatenate(geometry.collision_parts)
-        length_axis = int(np.argmax(shape.extents))
-        thickness_axis = int(np.argmin(shape.extents))
+        length_axis = Axis(int(np.argmax(shape.extents)))
+        thickness_axis = Axis(int(np.argmin(shape.extents)))
         elongated = ElongatedShape(
             shape=shape,
             length_axis=length_axis,
-            width_axis=3 - length_axis - thickness_axis,
+            width_axis=Axis(3 - length_axis - thickness_axis),
             end_fraction=self.end_fraction,
         )
         along = np.eye(3)[length_axis]
