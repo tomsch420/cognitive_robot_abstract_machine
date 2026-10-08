@@ -135,12 +135,11 @@ class HandleTowardsRobot(RestingOrientation):
     """
 
     def rotation(self, geometry: ObjectGeometry) -> np.ndarray:
-        vertices = np.concatenate([part.vertices for part in geometry.collision_parts])
-        extents = vertices.max(axis=0) - vertices.min(axis=0)
-        length_axis = int(np.argmax(extents))
-        thickness_axis = int(np.argmin(extents))
+        shape = trimesh.util.concatenate(geometry.collision_parts)
+        length_axis = int(np.argmax(shape.extents))
+        thickness_axis = int(np.argmin(shape.extents))
         elongated = ElongatedShape(
-            points=vertices,
+            shape=shape,
             length_axis=length_axis,
             width_axis=3 - length_axis - thickness_axis,
             end_fraction=self.end_fraction,
