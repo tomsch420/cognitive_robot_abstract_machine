@@ -50,6 +50,7 @@ from krrood.entity_query_language.query.match import Match
 from semantic_digital_twin.datastructures.definitions import Axis
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.grasping.surface_grasp import (
+    SurfaceGrasp,
     any_surface_grasp,
     from_any_side,
 )
@@ -112,7 +113,9 @@ class Handle(HasGraspCandidates):
         """
         return self.drawn_grasp_candidates()
 
-    def surface_grasp_statement(self, require_lifting: bool = False) -> Match:
+    def surface_grasp_statement(
+        self, require_lifting: bool = False
+    ) -> Match[SurfaceGrasp]:
         """
         :param require_lifting: Whether to ask only for grasps that lift the object.
         :return: The whole handle away from its ends, closing on it at most halfway
@@ -1161,7 +1164,9 @@ class Rim(HasGraspCandidates):
         """
         return self.drawn_grasp_candidates()
 
-    def surface_grasp_statement(self, require_lifting: bool = False) -> Match:
+    def surface_grasp_statement(
+        self, require_lifting: bool = False
+    ) -> Match[SurfaceGrasp]:
         """
         :param require_lifting: Whether to ask only for grasps that lift the container.
         :return: The middle of the rim's height, all around, closing on the middle half
@@ -1595,7 +1600,9 @@ class Cutlery(HasHandle, Tableware):
         """
         return self.drawn_grasp_candidates()
 
-    def surface_grasp_statement(self, require_lifting: bool = False) -> Match:
+    def surface_grasp_statement(
+        self, require_lifting: bool = False
+    ) -> Match[SurfaceGrasp]:
         """
         :param require_lifting: Whether to ask only for grasps that lift the object.
         :return: Seen along its length from either end, the stretch between a fifth and

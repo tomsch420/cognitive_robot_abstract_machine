@@ -59,6 +59,7 @@ from semantic_digital_twin.exceptions import (
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from krrood.entity_query_language.query.match import Match
 from semantic_digital_twin.grasping.surface_grasp import (
+    SurfaceGrasp,
     any_surface_grasp,
     draw_surface_grasps,
     from_any_side,
@@ -522,12 +523,12 @@ class HasGraspCandidates(HasRootBody):
         """
         :return: The surface that surface grasps are placed on, in the root body's frame:
             that of every body the annotation references, its parts included, each as
-            what it collides as, or else what it looks like.
+            what it looks like, or else what it collides as.
         :raises NoGraspGeometry: If none of the bodies has either.
         """
         surfaces = []
-        for body in {id(body): body for body in self.bodies}.values():
-            shapes = body.collision or body.visual
+        for body in self._distinct_bodies():
+            shapes = body.visual or body.collision
             if not shapes:
                 continue
             surface = shapes.combined_mesh
@@ -540,7 +541,9 @@ class HasGraspCandidates(HasRootBody):
             raise NoGraspGeometry(self)
         return trimesh.util.concatenate(surfaces)
 
-    def surface_grasp_statement(self, require_lifting: bool = False) -> Match:
+    def surface_grasp_statement(
+        self, require_lifting: bool = False
+    ) -> Match[SurfaceGrasp]:
         """
         :param require_lifting: Whether to ask only for grasps that lift the object.
         :return: The statement of where the object may be grasped. The default allows
