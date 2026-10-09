@@ -45,6 +45,7 @@ dependencies = [
     "probabilistic_model",
     "python-fcl",
     "manifold3d",
+    "shapely",  # For capping meshes cut by trimesh slice_plane
     "polytope",
     "ortools",
     "fbxloader",

@@ -842,6 +842,25 @@ class SemanticAnnotation(WorldEntityWithSimulatorProperties):
     def bodies_with_collision(self) -> List[Body]:
         return [x for x in self.bodies if x.has_collision()]
 
+    @property
+    def mass(self) -> float:
+        """
+        :return: The mass of what the annotation references: the sum of the masses of
+            its bodies, the bodies of its parts included. A body that states no inertial
+            properties counts as weightless.
+        """
+        return sum(
+            body.inertial.mass
+            for body in self._distinct_bodies()
+            if body.inertial is not None
+        )
+
+    def _distinct_bodies(self) -> List[Body]:
+        """
+        :return: :attr:`bodies`, each once, told apart by their ids.
+        """
+        return list({body.id: body for body in self.bodies}.values())
+
     def as_bounding_box_collection_at_origin(
         self, origin: HomogeneousTransformationMatrix
     ) -> BoundingBoxCollection:

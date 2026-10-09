@@ -1,8 +1,11 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing_extensions import Type, Dict
+from typing_extensions import Dict, Type
 
-from krrood.parametrization.exceptions import RelationalCircuitRegistryRequiresMatch
+from krrood.parametrization.exceptions import (
+    RelationalCircuitRegistryRequiresMatch,
+    UnboundedParameterError,
+)
 from krrood.parametrization.parameterizer import (
     ModelQueryParameters,
     UnderspecifiedParameters,
@@ -18,10 +21,14 @@ from probabilistic_model.probabilistic_circuit.relational.rspn import (
     GroundingMode,
     RelationalProbabilisticCircuit,
 )
-from probabilistic_model.probabilistic_circuit.rx.helper import fully_factorized
+from probabilistic_model.probabilistic_circuit.rx.helper import (
+    fully_factorized,
+    uniform_measure_of_event,
+)
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit,
 )
+from probabilistic_model.exceptions import UnboundedEventError
 from probabilistic_model.probabilistic_model import ProbabilisticModel
 
 
@@ -48,6 +55,42 @@ class FullyFactorizedRegistry(ModelRegistry):
 
     def get_model(self, parameters: ModelQueryParameters) -> ProbabilisticModel:
         return fully_factorized(parameters.variables.values())
+
+
+@dataclass
+class UniformPriorRegistry(ModelRegistry):
+    """
+    A registry that knows nothing but what a statement allows: every parameter is drawn
+    uniformly from where the statement's ``where`` conditions permit it.
+
+    The model is the uniform measure of the values the conditions allow, also when they
+    form several separate regions.
+    """
+
+    def get_model(self, parameters: ModelQueryParameters) -> ProbabilisticCircuit:
+        """
+        :param parameters: The parameters of the statement. Only a ``Match`` brings
+            ``where`` conditions; the bare selection of ``average(...)`` and the
+            condition of ``probability_of(...)`` bring none.
+        :raises UnboundedParameterError: If the conditions leave a parameter without a
+            lower or an upper bound, which they always do when there are none.
+        """
+        if not isinstance(parameters, UnderspecifiedParameters):
+            raise UnboundedParameterError(
+                parameter_name=", ".join(parameters.variables)
+            )
+        allowed = parameters.truncation_assignments_from_where_conditions
+        if allowed is None:
+            raise UnboundedParameterError(
+                parameter_name=", ".join(parameters.variables)
+            )
+        for name, variable in parameters.variables.items():
+            if variable not in allowed.variables:
+                raise UnboundedParameterError(parameter_name=name)
+        try:
+            return uniform_measure_of_event(allowed)
+        except UnboundedEventError as error:
+            raise UnboundedParameterError(parameter_name=error.variable.name) from error
 
 
 @dataclass

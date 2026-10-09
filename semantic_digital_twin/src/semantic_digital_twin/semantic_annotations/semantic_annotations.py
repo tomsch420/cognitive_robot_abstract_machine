@@ -4,6 +4,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Iterable, Iterator, Optional, Self, Tuple, TYPE_CHECKING, Union
 
+import math
+
 import numpy as np
 from typing_extensions import List
 
@@ -40,11 +42,17 @@ from semantic_digital_twin.semantic_annotations.mixins import (
     HasLegs,
     HasSink,
     HasShelfLayers,
-)
-from semantic_digital_twin.grasping.grasp_candidates import (
-    GraspCandidate,
     HasGraspCandidates,
-    RimWallSection,
+    HasRim,
+)
+from krrood.entity_query_language.factories import and_, or_
+from krrood.entity_query_language.query.match import Match
+from semantic_digital_twin.datastructures.definitions import Axis
+from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
+from semantic_digital_twin.grasping.surface_grasp import (
+    SurfaceGrasp,
+    any_surface_grasp,
+    from_any_side,
 )
 from semantic_digital_twin.spatial_types import (
     Point3,
@@ -98,6 +106,30 @@ class Handle(HasGraspCandidates):
     A handle is a physical entity that can be grasped by a hand or a robotic gripper to
     open or close an object.
     """
+
+    def default_grasp_candidates(self) -> List[GraspCandidate]:
+        """
+        :return: Grasps drawn uniformly from :meth:`surface_grasp_statement`.
+        """
+        return self.drawn_grasp_candidates()
+
+    def surface_grasp_statement(
+        self, require_lifting: bool = False
+    ) -> Match[SurfaceGrasp]:
+        """
+        :param require_lifting: Whether to ask only for grasps that lift the object.
+        :return: The whole handle away from its ends, closing on it at most halfway
+            through its thinnest extent.
+        """
+        thinnest_extent = float(min(self.grasp_surface().extents))
+        grasp = any_surface_grasp(require_lifting)
+        return grasp.where(
+            grasp.height >= 0.1,
+            grasp.height < 0.9,
+            grasp.depth >= 0.0,
+            grasp.depth < thinnest_extent / 2,
+            *from_any_side(grasp),
+        )
 
     @classmethod
     def _create_handle_geometry(
@@ -1059,14 +1091,14 @@ class DrinkingContainer(Container, Tableware): ...
 
 
 @dataclass(eq=False)
-class Cup(DrinkingContainer, IsPerceivable):
+class Cup(HasHandle, HasRim, DrinkingContainer, IsPerceivable):
     """
     A cup.
     """
 
 
 @dataclass(eq=False)
-class Mug(DrinkingContainer):
+class Mug(HasHandle, HasRim, DrinkingContainer):
     """
     A mug.
     """
@@ -1116,79 +1148,83 @@ class Plate(HasSupportingSurface, Tableware):
 
 
 @dataclass(eq=False)
-class Bowl(HasSupportingSurface, Container, Tableware, IsPerceivable):
+class Rim(HasGraspCandidates):
     """
-    A bowl.
-    """
-
-    rim_grasp_depth: float = field(default=0.01, kw_only=True)
-    """
-    How far below the highest point of the bowl the fingers grip its wall.
+    The upper edge of an open container's wall, which a gripper pinches from above.
     """
 
-    def grasp_candidates(self) -> List[GraspCandidate]:
-        """
-        The grasps that straddle the bowl's wall, approaching it from above.
+    wall_probe_count: int = field(default=12, kw_only=True)
+    """
+    In how many directions around the rim its wall is measured.
+    """
 
-        A bowl offers nothing to grip at its own origin, which is inside it, so the wall
-        of its rim is grasped instead.
-
-        :raises NoGraspGeometry: If the root body has no mesh, or no wall where the rim
-            is traced, to grasp.
+    def default_grasp_candidates(self) -> List[GraspCandidate]:
         """
-        grasps = [
-            GraspCandidate(
-                self,
-                Pose(
-                    position=section.center,
-                    orientation=RotationMatrix.from_vectors(
-                        x=Vector3.NEGATIVE_Z(), y=section.outward
-                    ).quaternion,
-                    reference_frame=self.root,
-                ),
-            )
-            for section in self._rim_wall_sections()
-        ]
-        if not grasps:
-            raise NoGraspGeometry(self)
-        return grasps
-
-    def _rim_wall_sections(self) -> Iterator[RimWallSection]:
+        :return: Grasps drawn uniformly from :meth:`surface_grasp_statement`.
         """
-        Cast one ray per grasp direction outward from the bowl's axis, just below the
-        rim, and take the middle between its hits as the wall.
+        return self.drawn_grasp_candidates()
 
-        :return: The wall section hit in each direction; directions that miss the mesh
-            are skipped.
-        :raises NoGraspGeometry: If the root body has no mesh.
+    def surface_grasp_statement(
+        self, require_lifting: bool = False
+    ) -> Match[SurfaceGrasp]:
         """
-        mesh = self.root.combined_mesh
-        if mesh is None:
-            raise NoGraspGeometry(self)
-        yaws = np.linspace(0, 2 * np.pi, self.grasp_candidate_count, endpoint=False)
+        :param require_lifting: Whether to ask only for grasps that lift the container.
+        :return: The middle of the rim's height, all around, closing on the middle half
+            of the wall's thickness, from above or tilted a little towards the wall.
+        :raises NoGraspGeometry: If the rim has no wall to measure.
+        """
+        thickness = self.wall_thickness()
+        grasp = any_surface_grasp(require_lifting)
+        return grasp.where(
+            grasp.height >= 0.25,
+            grasp.height < 0.75,
+            grasp.depth >= 0.25 * thickness,
+            grasp.depth < 0.75 * thickness,
+            grasp.azimuth >= 0.0,
+            grasp.azimuth < 2 * math.pi,
+            grasp.pitch >= 0.0,
+            grasp.pitch < 0.5,
+            grasp.roll >= -math.pi / 8,
+            grasp.roll < math.pi / 8,
+        )
+
+    def wall_thickness(self) -> float:
+        """
+        Cast rays outward from the middle of the rim and take the distance between the
+        first two surfaces each ray passes, the inside and the outside of the wall, as
+        the wall's thickness.
+
+        :return: The median thickness over the directions that hit the wall.
+        :raises NoGraspGeometry: If no direction hits a wall.
+        """
+        shape = self.grasp_surface()
+        yaws = np.linspace(0, 2 * np.pi, self.wall_probe_count, endpoint=False)
         directions = np.column_stack([np.cos(yaws), np.sin(yaws), np.zeros(len(yaws))])
-        bowl_center = mesh.bounds.mean(axis=0)
-        axis_point = np.array(
-            [
-                bowl_center[0],
-                bowl_center[1],
-                mesh.bounds[1][2] - self.rim_grasp_depth,
-            ]
+        lowest, highest = shape.bounds
+        middle = (lowest + highest) / 2
+        locations, ray_indices, _ = shape.ray.intersects_location(
+            ray_origins=np.tile(middle, (len(yaws), 1)), ray_directions=directions
         )
-        locations, ray_indices, _ = mesh.ray.intersects_location(
-            ray_origins=np.tile(axis_point, (len(yaws), 1)), ray_directions=directions
-        )
-        for index, direction in enumerate(directions):
-            hits = locations[ray_indices == index]
-            if len(hits) == 0:
-                continue
-            distances = np.linalg.norm(hits[:, :2] - axis_point[:2], axis=1)
-            yield RimWallSection(
-                center=Point3.from_iterable(
-                    axis_point + direction * (distances.min() + distances.max()) / 2
-                ),
-                outward=Vector3.from_iterable(direction),
+        thicknesses = []
+        for index in range(len(yaws)):
+            distances = np.sort(
+                np.linalg.norm(
+                    locations[ray_indices == index][:, :2] - middle[:2], axis=1
+                )
             )
+            if len(distances) > 1:
+                thicknesses.append(float(distances[1] - distances[0]))
+        if not thicknesses:
+            raise NoGraspGeometry(self)
+        return float(np.median(thicknesses))
+
+
+@dataclass(eq=False)
+class Bowl(HasRim, HasSupportingSurface, Container, Tableware, IsPerceivable):
+    """
+    A bowl, grasped by pinching the wall of its rim: it offers nothing to grip at its
+    own origin, which is inside it.
+    """
 
 
 # Food Items
@@ -1550,36 +1586,57 @@ class SaltPepperShaker(SaltContainer):
 
 
 @dataclass(eq=False)
-class Cutlery(Tableware):
+class Cutlery(HasHandle, Tableware):
     """
-    A piece of cutlery.
+    A piece of cutlery, lying flat.
+
+    Without a handle it is grasped somewhere along its middle, from above and across
+    its length.
     """
 
-    def grasp_candidates(self) -> List[GraspCandidate]:
+    def default_grasp_candidates(self) -> List[GraspCandidate]:
         """
-        :return: The grasp from above that closes across the piece, which lies flat.
-        :raises NoGraspGeometry: If the root body has no collision geometry to tell
-            which way the piece lies.
+        :return: Grasps drawn uniformly from :meth:`surface_grasp_statement`.
         """
-        if not self.root.has_collision():
-            raise NoGraspGeometry(self)
-        bounding_box = self.root.collision.as_bounding_box_collection_in_frame(
-            self.root
-        ).bounding_box()
-        along_x = bounding_box.x_interval.upper - bounding_box.x_interval.lower
-        along_y = bounding_box.y_interval.upper - bounding_box.y_interval.lower
-        finger_axis = Vector3.NEGATIVE_Y() if along_x >= along_y else Vector3.X()
-        return [
-            GraspCandidate(
-                self,
-                Pose(
-                    orientation=RotationMatrix.from_vectors(
-                        x=Vector3.NEGATIVE_Z(), y=finger_axis
-                    ).quaternion,
-                    reference_frame=self.root,
-                ),
-            )
-        ]
+        return self.drawn_grasp_candidates()
+
+    def surface_grasp_statement(
+        self, require_lifting: bool = False
+    ) -> Match[SurfaceGrasp]:
+        """
+        :param require_lifting: Whether to ask only for grasps that lift the object.
+        :return: Seen along its length from either end, the stretch between a fifth and
+            three fifths of its length, closing across it.
+        :raises NoGraspGeometry: If the root body has no shape to measure.
+        """
+        lowest, highest = self.grasp_surface().bounds
+        extents = highest - lowest
+        length_axis = Axis.X if extents[Axis.X] >= extents[Axis.Y] else Axis.Y
+        length = float(extents[length_axis])
+        end_azimuths = (
+            (0.0, np.pi) if length_axis == Axis.X else (np.pi / 2, 3 * np.pi / 2)
+        )
+        tolerance = np.pi / 16
+        grasp = any_surface_grasp(require_lifting)
+        return grasp.where(
+            grasp.height >= 0.2,
+            grasp.height < 0.8,
+            grasp.depth >= 0.2 * length,
+            grasp.depth < 0.6 * length,
+            or_(
+                *(
+                    and_(
+                        grasp.azimuth >= end_azimuth - tolerance,
+                        grasp.azimuth < end_azimuth + tolerance,
+                    )
+                    for end_azimuth in end_azimuths
+                )
+            ),
+            grasp.pitch >= 0.0,
+            grasp.pitch < 0.6,
+            grasp.roll >= np.pi / 2 - np.pi / 8,
+            grasp.roll < np.pi / 2 + np.pi / 8,
+        )
 
 
 @dataclass(eq=False)

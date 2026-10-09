@@ -10,6 +10,7 @@ from trimesh.util import concatenate
 from krrood.class_diagrams.class_diagram import WrappedClass
 from krrood.entity_query_language.factories import variable_from, entity, variable, an
 from krrood.ormatic.utils import classproperty
+from krrood.parametrization.model_registries import ModelRegistry
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from krrood.utils import recursive_subclasses
 from probabilistic_model.distributions.gaussian import GaussianDistribution
@@ -51,8 +52,17 @@ from semantic_digital_twin.datastructures.variables import SpatialVariables
 from semantic_digital_twin.exceptions import (
     AmbiguousPart,
     CannotBeAPartOf,
+    NoGraspGeometry,
     NoSupportingSurfaceError,
     UnknownPartWholeRelationshipField,
+)
+from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
+from krrood.entity_query_language.query.match import Match
+from semantic_digital_twin.grasping.surface_grasp import (
+    SurfaceGrasp,
+    any_surface_grasp,
+    draw_surface_grasps,
+    from_any_side,
 )
 from semantic_digital_twin.reasoning.predicates import SupportedBy
 from semantic_digital_twin.semantic_annotations.part_whole import (
@@ -63,6 +73,7 @@ from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
     Vector3,
 )
+from semantic_digital_twin.spatial_types.spatial_types import Pose, RotationMatrix
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
 )
@@ -91,6 +102,7 @@ if TYPE_CHECKING:
         Drawer,
         Door,
         Handle,
+        Rim,
         Aperture,
         MechanicalJoint,
         Leg,
@@ -416,6 +428,148 @@ class HasRootBody(HasRootKinematicStructureEntity[Body]):
 
 
 @dataclass(eq=False)
+class HasGraspCandidates(HasRootBody):
+    """
+    A mixin class for semantic annotations that can say where they may be grasped.
+
+    Only an annotation rooted in a body can be grasped at all, since a region carries no
+    collision geometry for fingers to close on.
+
+    Where an object may be grasped is stated as an underspecified statement over
+    :class:`~semantic_digital_twin.grasping.surface_grasp.SurfaceGrasp`, the one
+    :meth:`surface_grasp_statement` returns. Given a model learned over tried grasps,
+    the grasp candidates are drawn from it; without one, the annotation offers its
+    :meth:`default_grasp_candidates`.
+
+    An annotation changes how it is grasped by overriding one of these:
+
+    - :meth:`surface_grasp_statement`, to state where on its surface it may be grasped;
+    - :meth:`default_grasp_candidates`, to offer other grasps while no model is given,
+      such as :meth:`drawn_grasp_candidates` for an annotation whose statement is
+      narrow enough to draw from uniformly;
+    - :meth:`grasped_part`, to be grasped at one of its parts instead of itself;
+    - :meth:`grasp_candidates`, to offer its grasps in another way altogether.
+    """
+
+    grasp_candidate_count: int = field(default=12, kw_only=True)
+    """
+    How many grasp candidates the annotation offers.
+    """
+
+    def grasp_candidates(
+        self,
+        model_registry: Optional[ModelRegistry] = None,
+        require_lifting: bool = False,
+    ) -> List[GraspCandidate]:
+        """
+        The grasps this annotation offers, in no particular order: those of its
+        :meth:`grasped_part` when it is grasped at one of its parts; otherwise grasps
+        drawn from the model, or the :meth:`default_grasp_candidates` without one.
+
+        :param model_registry: Answers the statement of where the object may be grasped.
+        :param require_lifting: Whether to ask only for grasps that lift the object,
+            which needs a model learned over tried grasps and their results.
+        """
+        part = self.grasped_part()
+        if part is not self:
+            return part.grasp_candidates(model_registry, require_lifting)
+        if model_registry is None and not require_lifting:
+            return self.default_grasp_candidates()
+        return self.drawn_grasp_candidates(model_registry, require_lifting)
+
+    def default_grasp_candidates(self) -> List[GraspCandidate]:
+        """
+        :return: The grasps offered while no model is given: the object at its own
+            origin, approached from evenly spaced directions around its z-axis, which
+            needs no knowledge of its shape.
+        """
+        return [
+            GraspCandidate(
+                self,
+                Pose(
+                    orientation=RotationMatrix.from_rpy(yaw=yaw).quaternion,
+                    reference_frame=self.root,
+                ),
+            )
+            for yaw in np.linspace(
+                0, 2 * np.pi, self.grasp_candidate_count, endpoint=False
+            )
+        ]
+
+    def drawn_grasp_candidates(
+        self,
+        model_registry: Optional[ModelRegistry] = None,
+        require_lifting: bool = False,
+    ) -> List[GraspCandidate]:
+        """
+        :param model_registry: Answers :meth:`surface_grasp_statement`; ``None`` draws
+            uniformly from what it allows.
+        :param require_lifting: Whether to ask only for grasps that lift the object.
+        :return: Grasps drawn from :meth:`surface_grasp_statement` that reach the
+            object's surface, at most :attr:`grasp_candidate_count` of them.
+        """
+        grasps = draw_surface_grasps(
+            self.surface_grasp_statement(require_lifting),
+            self.grasp_candidate_count,
+            model_registry,
+        )
+        return [
+            grasp.grasp_candidate(self)
+            for grasp in grasps
+            if grasp.reaches_surface_of(self)
+        ]
+
+    def grasp_surface(self) -> trimesh.Trimesh:
+        """
+        :return: The surface that surface grasps are placed on, in the root body's frame:
+            that of every body the annotation references, its parts included, each as
+            what it looks like, or else what it collides as.
+        :raises NoGraspGeometry: If none of the bodies has either.
+        """
+        surfaces = []
+        for body in self._distinct_bodies():
+            shapes = body.visual or body.collision
+            if not shapes:
+                continue
+            surface = shapes.combined_mesh
+            if body is not self.root:
+                surface.apply_transform(
+                    self._world.compute_forward_kinematics_np(self.root, body)
+                )
+            surfaces.append(surface)
+        if not surfaces:
+            raise NoGraspGeometry(self)
+        return trimesh.util.concatenate(surfaces)
+
+    def surface_grasp_statement(
+        self, require_lifting: bool = False
+    ) -> Match[SurfaceGrasp]:
+        """
+        :param require_lifting: Whether to ask only for grasps that lift the object.
+        :return: The statement of where the object may be grasped. The default allows
+            the whole object, closing on it at most halfway through its narrower
+            horizontal extent.
+        """
+        lowest, highest = self.grasp_surface().bounds
+        narrower_extent = float(min(highest[:2] - lowest[:2]))
+        grasp = any_surface_grasp(require_lifting)
+        return grasp.where(
+            grasp.height >= 0.05,
+            grasp.height < 0.95,
+            grasp.depth >= 0.0,
+            grasp.depth < narrower_extent / 2,
+            *from_any_side(grasp),
+        )
+
+    def grasped_part(self) -> HasGraspCandidates:
+        """
+        :return: The annotation whose surface the object is grasped at; the object
+            itself unless one of its parts is grasped instead.
+        """
+        return self
+
+
+@dataclass(eq=False)
 class HasRootRegion(HasRootKinematicStructureEntity[Region]):
     """
     A mixin class for semantic annotations that have a region.
@@ -731,9 +885,10 @@ class HasDoors(PartWholeRelationship):
 
 
 @dataclass(eq=False)
-class HasHandle(HasRootBody, PartWholeRelationship):
+class HasHandle(HasGraspCandidates, PartWholeRelationship):
     """
-    A mixin class for semantic annotations that have a handle.
+    A mixin class for semantic annotations that have a handle, and are grasped at it
+    when they have one.
     """
 
     handle: Optional[Handle] = field(
@@ -743,6 +898,40 @@ class HasHandle(HasRootBody, PartWholeRelationship):
     """
     The handle of the semantic annotation.
     """
+
+    def grasped_part(self) -> HasGraspCandidates:
+        """
+        :return: The handle; without a handle, the part the annotation is grasped at
+            otherwise.
+        """
+        if self.handle is None:
+            return super().grasped_part()
+        return self.handle
+
+
+@dataclass(eq=False)
+class HasRim(HasGraspCandidates, PartWholeRelationship):
+    """
+    A mixin class for open containers that have a rim, and are grasped at it when they
+    have one.
+    """
+
+    rim: Optional[Rim] = field(
+        default=None,
+        metadata=IsPartWholeRelationship().as_dict(),
+    )
+    """
+    The rim of the container.
+    """
+
+    def grasped_part(self) -> HasGraspCandidates:
+        """
+        :return: The rim; without a rim, the part the annotation is grasped at
+            otherwise.
+        """
+        if self.rim is None:
+            return super().grasped_part()
+        return self.rim
 
 
 THasRootBody = TypeVar("THasRootBody", bound=HasRootBody)

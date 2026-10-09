@@ -1,3 +1,5 @@
+import math
+
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import *
 from probabilistic_model.distributions.distributions import (
     SymbolicDistribution,
@@ -6,6 +8,7 @@ from probabilistic_model.distributions.distributions import (
 )
 from probabilistic_model.distributions.gaussian import GaussianDistribution
 from probabilistic_model.distributions.uniform import UniformDistribution
+from probabilistic_model.exceptions import UnboundedEventError
 from probabilistic_model.utils import MissingDict
 
 
@@ -15,6 +18,8 @@ def uniform_measure_of_event(event: Event) -> ProbabilisticCircuit:
 
     :param event: The event
     :return: The circuit describing the uniform measure
+    :raises UnboundedEventError: If the event does not bound a continuous variable from
+        below and above.
     """
     # calculate the bounding box of the event
     bounding_box = event.bounding_box()
@@ -33,6 +38,8 @@ def uniform_measure_of_simple_event(simple_event: SimpleEvent) -> ProbabilisticC
 
     :param simple_event: The simple event
     :return: The circuit describing the uniform measure over the simple event
+    :raises UnboundedEventError: If the simple event does not bound a continuous variable
+        from below and above.
     """
     # initialize the root of the circuit
     result = ProbabilisticCircuit()
@@ -41,6 +48,11 @@ def uniform_measure_of_simple_event(simple_event: SimpleEvent) -> ProbabilisticC
 
         # handle different variables
         if isinstance(variable, Continuous):
+            if not (
+                math.isfinite(assignment.simple_sets[0].lower)
+                and math.isfinite(assignment.simple_sets[-1].upper)
+            ):
+                raise UnboundedEventError(variable=variable)
 
             # create a uniform distribution for every interval in a continuous variables description
             distribution = SumUnit(probabilistic_circuit=result)

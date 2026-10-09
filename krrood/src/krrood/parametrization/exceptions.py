@@ -186,14 +186,15 @@ class JointQueryAcrossClassesNotSupported(DataclassException):
 @dataclass
 class RelationalCircuitRegistryRequiresMatch(DataclassException):
     """
-    Raised when a :class:`~krrood.parametrization.model_registries.RelationalCircuitRegistry`
-    is asked to resolve a model for parameters that aren't a
+    Raised when a
+    :class:`~krrood.parametrization.model_registries.RelationalCircuitRegistry` is asked
+    to resolve a model for parameters that aren't a
     :class:`~krrood.parametrization.parameterizer.UnderspecifiedParameters` (i.e. not a
-    ``Match``, directly or wrapped by ``distribution_of(...)``) -- ``probability_of(...)``
-    and a bare ``average(...)`` build the lighter
+    ``Match``, directly or wrapped by ``distribution_of(...)``) --
+    ``probability_of(...)`` and a bare ``average(...)`` build the lighter
     :class:`~krrood.parametrization.parameterizer.ConditionParameters`/
-    :class:`~krrood.parametrization.parameterizer.SelectedAttributesParameters`
-    instead, which carry no match statement to ground.
+    :class:`~krrood.parametrization.parameterizer.SelectedAttributesParameters` instead,
+    which carry no match statement to ground.
     """
 
     parameters: Any
@@ -211,4 +212,29 @@ class RelationalCircuitRegistryRequiresMatch(DataclassException):
         return (
             "Use RelationalCircuitRegistry only with distribution_of(...) (or a bare "
             "Match), not probability_of(...)/average(...)."
+        )
+
+
+@dataclass
+class UnboundedParameterError(DataclassException):
+    """
+    Raised when a uniform prior is asked for a parameter that the statement's ``where``
+    conditions do not bound from below and above.
+    """
+
+    parameter_name: str
+    """
+    The parameter without bounds.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"'{self.parameter_name}' is not bounded from below and above by the "
+            f"statement's where conditions, so no uniform distribution over it exists."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            f"Bound '{self.parameter_name}' from below and above in the statement's "
+            f"where conditions."
         )
