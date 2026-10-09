@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 import trimesh
+from trimesh.proximity import closest_point
 
 from experiments.physical_pick_up.robots import (
     ObjectPlacement,
@@ -20,7 +21,6 @@ from experiments.physical_pick_up.robots import (
 )
 from experiments.physical_pick_up.objects import (
     ObjectCannotHaveAHandleError,
-    convex_parts,
     ObjectChoice,
     ObjectDescription,
     ObjectGeometry,
@@ -39,10 +39,14 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Handle,
     Rim,
 )
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Point3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.geometry import Box, Color, Mesh, Scale
+from semantic_digital_twin.world_description.inertial_properties import (
+    Inertial,
+    InertiaTensor,
+)
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -179,6 +183,7 @@ class PickUpScene:
             [self._shape(part, body) for part in geometry.collision_parts],
             reference_frame=body,
         )
+        body.inertial = self._object_inertial(body)
         self._footprint_middle = geometry.visual.bounds.mean(axis=0)[:2]
         graspable = description.semantic_annotation_type(root=body)
         with self.world.modify_world():
@@ -188,9 +193,7 @@ class PickUpScene:
             self.world.add_connection(connection)
             self.world.add_semantic_annotation(graspable)
         if self._split_off_parts(graspable):
-            for split_body in graspable.bodies:
-                self._collide_as_convex_parts(split_body)
-        graspable.mass = description.mass
+            self._collide_as_nearest_convex_parts(graspable, geometry)
         self._lowest_point = min(
             float(split_body.collision.combined_mesh.bounds[0][2])
             for split_body in graspable.bodies
@@ -221,22 +224,51 @@ class PickUpScene:
         parts = [step.split(graspable) for step in steps]
         return any(part is not None for part in parts)
 
-    def _collide_as_convex_parts(self, body: Body) -> None:
+    def _collide_as_nearest_convex_parts(
+        self, graspable: HasGraspCandidates, geometry: ObjectGeometry
+    ) -> None:
         """
-        Let a body split off the object's shape collide as the convex parts its own piece
-        of the shape decomposes into, if the description decomposes it at all.
+        Let each of the object's bodies collide as the convex parts of the object that
+        lie nearest to its piece of the shape, so that the object as a whole collides
+        as before it was split.
 
-        :param body: One of the object's bodies, looking like its piece of the shape.
+        :param graspable: The object's annotation, its parts split off.
+        :param geometry: The object's geometry, its convex parts those of the whole.
         """
-        decomposition = self.object_description.decomposition_of_split_pieces()
-        if decomposition is None:
-            return
-        body.collision = ShapeCollection(
-            [
-                self._shape(part, body)
-                for part in convex_parts(decomposition, body.visual.combined_mesh)
-            ],
-            reference_frame=body,
+        bodies = graspable._distinct_bodies()
+        centers = np.array([part.centroid for part in geometry.collision_parts])
+        distances = np.array(
+            [closest_point(body.visual.combined_mesh, centers)[1] for body in bodies]
+        )
+        nearest = distances.argmin(axis=0)
+        for index, body in enumerate(bodies):
+            body.collision = ShapeCollection(
+                [
+                    self._shape(part, body)
+                    for part, body_index in zip(geometry.collision_parts, nearest)
+                    if body_index == index
+                ],
+                reference_frame=body,
+            )
+
+    def _object_inertial(self, body: Body) -> Inertial:
+        """
+        :param body: The object's body, with its collision shapes in place.
+        :return: The inertial properties of an object of the described mass whose
+            material is spread evenly over what it collides as: the convex hull of each
+            collision shape.
+        """
+        mass = self.object_description.mass
+        material = trimesh.util.concatenate(
+            [shape.mesh.convex_hull for shape in body.collision.shapes]
+        )
+        material.density = mass / material.volume
+        return Inertial(
+            mass=mass,
+            center_of_mass=Point3.from_iterable(
+                material.center_mass, reference_frame=body
+            ),
+            inertia=InertiaTensor(data=material.moment_inertia),
         )
 
     @staticmethod

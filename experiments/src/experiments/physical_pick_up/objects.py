@@ -296,14 +296,6 @@ class ObjectDescription(ABC):
         :return: The object's geometry, in meters, oriented as its source models it.
         """
 
-    @abstractmethod
-    def decomposition_of_split_pieces(self) -> Optional[COACDMeshDecomposer]:
-        """
-        :return: Decomposes each piece of the object's shape, once a part such as its
-            handle or rim is split off, into convex parts to collide with; ``None`` lets
-            each piece collide as itself.
-        """
-
 
 @dataclass(kw_only=True)
 class MeshFileObjectDescription(ObjectDescription):
@@ -330,9 +322,6 @@ class MeshFileObjectDescription(ObjectDescription):
     MuJoCo collides with the convex hull of a mesh, which fills a hollow object: no
     finger could reach inside to pinch its wall.
     """
-
-    def decomposition_of_split_pieces(self) -> Optional[COACDMeshDecomposer]:
-        return self.convex_decomposition
 
     def _load_modeled_geometry(self) -> ObjectGeometry:
         mesh = trimesh.load_mesh(self.mesh_file)
@@ -376,13 +365,6 @@ class RoboCasaObjectDescription(ObjectDescription):
             instance_index=instance_index,
             body_name=f"{self.body_name}_{instance_index}",
         )
-
-    def decomposition_of_split_pieces(self) -> Optional[COACDMeshDecomposer]:
-        """
-        :return: The decomposition of hollow objects: the dataset's own convex parts
-            belong to the whole object and cannot be divided among its pieces.
-        """
-        return hollow_object_decomposition()
 
     def _load_modeled_geometry(self) -> ObjectGeometry:
         world = self.loader.load_object(self.category, self.instance_index)
