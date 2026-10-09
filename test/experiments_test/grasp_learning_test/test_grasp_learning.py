@@ -13,7 +13,12 @@ from typing_extensions import List
 from ...pytest_environment import runs_in_continuous_integration
 
 from experiments.grasp_learning.database import GraspDatabase
-from experiments.grasp_learning.models import GraspModelLearner, GraspModelLibrary
+from experiments.grasp_learning.models import (
+    GraspModel,
+    GraspModelLearner,
+    GraspModelLibrary,
+)
+from experiments.grasp_learning.report import latest_models, report
 from experiments.grasp_learning.pipeline import GraspLearningPipeline
 from experiments.grasp_learning.records import (
     GraspAttempt,
@@ -229,3 +234,25 @@ def test_the_pipeline_stores_attempts_and_a_verified_model(database):
     assert 0 < sources.count(GraspSource.LEARNED_MODEL) <= 3
     assert 0.0 <= model.verified_lift_rate <= 1.0
     assert database.model_library().models[-1].task == pipeline.task
+
+
+# %% reporting
+
+
+def test_the_report_shows_the_latest_model_of_every_task(milk_scene):
+    task = task_of(milk_scene)
+    older = GraspModel(
+        task=task, circuit="{}", number_of_attempts=10, lift_rate_of_attempts=0.1
+    )
+    latest = GraspModel(
+        task=task,
+        circuit="{}",
+        number_of_attempts=20,
+        lift_rate_of_attempts=0.35,
+        verified_lift_rate=0.8,
+    )
+
+    rows = report(latest_models([older, latest])).splitlines()
+
+    assert len(rows) == 3
+    assert "| Milk | Milk | 20 | 35% | 80% |" in rows[2]

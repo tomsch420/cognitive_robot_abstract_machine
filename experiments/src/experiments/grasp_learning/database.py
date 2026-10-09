@@ -113,3 +113,19 @@ class GraspDatabase:
         return GraspModelLibrary(
             models=[dao.from_dao() for dao in self.session.scalars(query)]
         )
+
+
+# %% the command line
+
+
+def main() -> None:
+    """
+    Create the tables of the database
+    :attr:`GraspDatabaseEnvironmentVariable.URI` names, once, before several workers
+    use it at the same time.
+    """
+    GraspDatabase.from_environment()
+
+
+if __name__ == "__main__":
+    main()
