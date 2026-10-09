@@ -591,8 +591,8 @@ class Body(KinematicStructureEntity):
     def collision_material(self) -> Optional[trimesh.Trimesh]:
         """
         :return: What the body's material fills, in its own frame: each collision shape
-            itself where it is closed, its convex hull where it is not; ``None`` if the
-            body collides as nothing.
+            itself where it is closed, turned outward if it faces inward, and its convex
+            hull where it is not; ``None`` if the body collides as nothing.
         """
         if not self.collision:
             return None
@@ -600,7 +600,11 @@ class Body(KinematicStructureEntity):
         for shape in self.collision.shapes:
             mesh = shape.mesh.copy()
             mesh.apply_transform(shape.origin.to_np())
-            materials.append(mesh if mesh.is_watertight else mesh.convex_hull)
+            if not mesh.is_watertight:
+                mesh = mesh.convex_hull
+            elif mesh.volume < 0.0:
+                mesh.invert()
+            materials.append(mesh)
         return trimesh.util.concatenate(materials)
 
     def has_collision(

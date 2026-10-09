@@ -521,14 +521,24 @@ class HasGraspCandidates(HasRootBody):
     def grasp_surface(self) -> trimesh.Trimesh:
         """
         :return: The surface that surface grasps are placed on, in the root body's frame:
-            what the root body collides as, or else what it looks like.
-        :raises NoGraspGeometry: If the root body has neither.
+            that of every body the annotation references, its parts included, each as
+            what it collides as, or else what it looks like.
+        :raises NoGraspGeometry: If none of the bodies has either.
         """
-        if self.root.collision:
-            return self.root.collision.combined_mesh
-        if self.root.visual:
-            return self.root.visual.combined_mesh
-        raise NoGraspGeometry(self)
+        surfaces = []
+        for body in {id(body): body for body in self.bodies}.values():
+            shapes = body.collision or body.visual
+            if not shapes:
+                continue
+            surface = shapes.combined_mesh
+            if body is not self.root:
+                surface.apply_transform(
+                    self._world.compute_forward_kinematics_np(self.root, body)
+                )
+            surfaces.append(surface)
+        if not surfaces:
+            raise NoGraspGeometry(self)
+        return trimesh.util.concatenate(surfaces)
 
     def surface_grasp_statement(self, require_lifting: bool = False) -> Match:
         """
