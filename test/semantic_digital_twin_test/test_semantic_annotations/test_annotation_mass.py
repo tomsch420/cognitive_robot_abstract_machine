@@ -2,11 +2,9 @@
 The mass of an annotation is the mass of the bodies it references, its parts included.
 """
 
-import numpy as np
 import pytest
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.exceptions import NoMaterialToSpreadMassOver
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Handle,
     Mug,
@@ -79,38 +77,3 @@ def test_the_mass_of_an_annotation_includes_its_parts(mug):
 
     assert mug.mass == pytest.approx(0.4)
     assert mug.handle.mass == pytest.approx(0.1)
-
-
-def test_a_mass_is_spread_over_the_bodies_by_their_volume(mug):
-    mug.mass = 0.3
-
-    assert mug.mass == pytest.approx(0.3)
-    assert mug.root.inertial.mass == pytest.approx(0.2)
-    assert mug.handle.root.inertial.mass == pytest.approx(0.1)
-
-
-def test_each_body_weighs_where_its_material_is(mug):
-    mug.mass = 0.4
-
-    np.testing.assert_allclose(
-        mug.handle.root.inertial.center_of_mass.to_np()[:3],
-        [HANDLE_OFFSET, 0.0, 0.0],
-        atol=1e-9,
-    )
-
-
-def test_a_body_that_collides_as_nothing_weighs_next_to_nothing(mug):
-    mug.handle.root.collision = ShapeCollection([], reference_frame=mug.handle.root)
-
-    mug.mass = 0.4
-
-    assert mug.root.inertial.mass == pytest.approx(0.4)
-    assert mug.handle.root.inertial.mass == Inertial.negligible().mass
-
-
-def test_a_mass_needs_material_to_be_spread_over(mug):
-    for body in (mug.root, mug.handle.root):
-        body.collision = ShapeCollection([], reference_frame=body)
-
-    with pytest.raises(NoMaterialToSpreadMassOver):
-        mug.mass = 0.4

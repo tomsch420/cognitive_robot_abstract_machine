@@ -3,17 +3,11 @@ from dataclasses import dataclass, field
 from typing import Tuple, Optional, Dict, Any
 
 import numpy as np
-import trimesh
 from numpy._typing import NDArray
-from typing_extensions import TYPE_CHECKING, Self, TypeVar
+from typing_extensions import Self, TypeVar
 
 from krrood.adapters.json_serializer import SubclassJSONSerializer
 from semantic_digital_twin.spatial_types import Point3, RotationMatrix
-
-if TYPE_CHECKING:
-    from semantic_digital_twin.world_description.world_entity import (
-        KinematicStructureEntity,
-    )
 
 
 @dataclass
@@ -264,27 +258,4 @@ class Inertial:
         return cls(
             mass=1e-6,
             inertia=InertiaTensor.from_values(1e-12, 1e-12, 1e-12, 0.0, 0.0, 0.0),
-        )
-
-    @classmethod
-    def of_uniform_material(
-        cls,
-        material: trimesh.Trimesh,
-        density: float,
-        reference_frame: Optional[KinematicStructureEntity] = None,
-    ) -> Self:
-        """
-        :param material: The closed shape the material fills, in the body's frame.
-        :param density: The material's density, in kilograms per cubic meter.
-        :param reference_frame: The body the center of mass is stated in.
-        :return: The inertial of a body made of the material, evenly spread.
-        """
-        material = material.copy()
-        material.density = density
-        return cls(
-            mass=float(material.mass),
-            center_of_mass=Point3.from_iterable(
-                material.center_mass, reference_frame=reference_frame
-            ),
-            inertia=InertiaTensor(data=material.moment_inertia),
         )

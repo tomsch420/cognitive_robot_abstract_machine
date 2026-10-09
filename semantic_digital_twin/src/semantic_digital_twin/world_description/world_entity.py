@@ -46,7 +46,6 @@ from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import (
     AlreadyBelongsToAWorldError,
-    NoMaterialToSpreadMassOver,
     ReferenceFrameMismatchError,
 )
 from semantic_digital_twin.mixin import HasSimulatorProperties, UniqueSimulatorProperty
@@ -588,25 +587,6 @@ class Body(KinematicStructureEntity):
             return None
         return self.collision.combined_mesh
 
-    def collision_material(self) -> Optional[trimesh.Trimesh]:
-        """
-        :return: What the body's material fills, in its own frame: each collision shape
-            itself where it is closed, turned outward if it faces inward, and its convex
-            hull where it is not; ``None`` if the body collides as nothing.
-        """
-        if not self.collision:
-            return None
-        materials = []
-        for shape in self.collision.shapes:
-            mesh = shape.mesh.copy()
-            mesh.apply_transform(shape.origin.to_np())
-            if not mesh.is_watertight:
-                mesh = mesh.convex_hull
-            elif mesh.volume < 0.0:
-                mesh.invert()
-            materials.append(mesh)
-        return trimesh.util.concatenate(materials)
-
     def has_collision(
         self, volume_threshold: float = 1.001e-6, surface_threshold: float = 0.00061
     ) -> bool:
@@ -875,38 +855,11 @@ class SemanticAnnotation(WorldEntityWithSimulatorProperties):
             if body.inertial is not None
         )
 
-    @mass.setter
-    def mass(self, mass: float) -> None:
-        """
-        Spread ``mass`` over the annotation's bodies as one material that evenly fills
-        what each body collides as. A body that collides as nothing is given a
-        negligible mass.
-
-        :param mass: The mass of the whole annotation, in kilograms.
-        :raises NoMaterialToSpreadMassOver: If none of the bodies collides as anything.
-        """
-        materials = {
-            body: body.collision_material() for body in self._distinct_bodies()
-        }
-        volume = sum(
-            material.volume for material in materials.values() if material is not None
-        )
-        if volume <= 0.0:
-            raise NoMaterialToSpreadMassOver(self)
-        for body, material in materials.items():
-            body.inertial = (
-                Inertial.negligible()
-                if material is None
-                else Inertial.of_uniform_material(
-                    material, mass / volume, reference_frame=body
-                )
-            )
-
     def _distinct_bodies(self) -> List[Body]:
         """
-        :return: :attr:`bodies`, each once.
+        :return: :attr:`bodies`, each once, told apart by their ids.
         """
-        return list({id(body): body for body in self.bodies}.values())
+        return list({body.id: body for body in self.bodies}.values())
 
     def as_bounding_box_collection_at_origin(
         self, origin: HomogeneousTransformationMatrix

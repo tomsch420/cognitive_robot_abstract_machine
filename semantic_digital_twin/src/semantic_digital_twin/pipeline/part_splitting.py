@@ -3,8 +3,7 @@ Splitting a part, such as a handle or a rim, off the shape of an object into a b
 its own, annotated as that part of the object's annotation.
 
 A finder decides which piece of the object's shape the part is; the pipeline step cuts
-the shape there, gives each piece its own body and keeps the object's mass, now spread
-over both bodies. Shapes are taken in the frame of the object's root body, its z-axis
+the shape there and gives each piece its own body. Shapes are taken in the frame of the object's root body, its z-axis
 pointing up.
 """
 
@@ -23,6 +22,7 @@ from semantic_digital_twin.pipeline.pipeline import Step
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import Mesh
+from semantic_digital_twin.world_description.inertial_properties import Inertial
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -118,8 +118,11 @@ class SplitPartFromShape(Step):
     The piece of the annotation's root body that the finder finds is moved to a new
     body, fixed to the root body at its origin, and annotated as the part. Both bodies
     look and collide as their own piece of the shape; a physics simulator that needs
-    convex collision shapes decomposes them afterwards. The annotation keeps its mass,
-    spread over both bodies.
+    convex collision shapes decomposes them afterwards.
+
+    The root body keeps its inertial properties, which describe the whole object, and
+    the part's body is given a negligible one, so the object weighs and turns as it did
+    before the split.
     """
 
     whole_type: Type[PartWholeRelationship]
@@ -157,7 +160,6 @@ class SplitPartFromShape(Step):
         split = self.finder.split(geometry.combined_mesh)
         if split is None:
             return None
-        mass = whole.mass
         collides = bool(root.collision)
         root.visual = self._shapes(split.rest, root)
         if collides:
@@ -166,7 +168,8 @@ class SplitPartFromShape(Step):
             name=PrefixedName(
                 f"{root.name.name}_{self.part_type.__name__.lower()}",
                 root.name.prefix,
-            )
+            ),
+            inertial=Inertial.negligible(),
         )
         body.visual = self._shapes(split.part, body)
         if collides:
@@ -177,7 +180,6 @@ class SplitPartFromShape(Step):
             world.add_connection(FixedConnection(parent=root, child=body))
             world.add_semantic_annotation(part)
             whole.add(part)
-        whole.mass = mass
         return part
 
     @staticmethod

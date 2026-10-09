@@ -252,7 +252,7 @@ class SurfaceGrasp:
 # %% stating where an object may be grasped
 
 
-def any_surface_grasp(require_lifting: bool = False) -> Match:
+def any_surface_grasp(require_lifting: bool = False) -> Match[SurfaceGrasp]:
     """
     :param require_lifting: Whether to ask only for grasps that lift the object, by
         stating the grasp's result as well; only a model learned over tried grasps and
@@ -276,14 +276,14 @@ def any_surface_grasp(require_lifting: bool = False) -> Match:
     )
 
 
-def _any_vector() -> Match:
+def _any_vector() -> Match[Vector3]:
     """
     :return: A statement asking for a vector with every component left free.
     """
     return a(Vector3)(x=..., y=..., z=...)
 
 
-def from_any_side(grasp: Match) -> List[ConditionType]:
+def from_any_side(grasp: Match[SurfaceGrasp]) -> List[ConditionType]:
     """
     :param grasp: A statement's grasp.
     :return: The conditions that the grasp comes from any direction around the object,
@@ -302,7 +302,7 @@ def from_any_side(grasp: Match) -> List[ConditionType]:
 
 
 def draw_surface_grasps(
-    statement: Match,
+    statement: Match[SurfaceGrasp],
     number_of_grasps: int,
     model_registry: Optional[ModelRegistry] = None,
 ) -> List[SurfaceGrasp]:

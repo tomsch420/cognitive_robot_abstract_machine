@@ -37,6 +37,7 @@ from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import Box, Mesh, Scale
+from semantic_digital_twin.world_description.inertial_properties import Inertial
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -422,12 +423,16 @@ def test_a_handle_split_off_a_shape_is_fixed_to_its_whole():
     assert mug.handle.root.collision
 
 
-def test_a_handle_split_off_a_shape_leaves_the_whole_its_mass():
+def test_a_handle_split_off_a_shape_leaves_the_whole_its_inertia():
     whole = _mug(with_handle=False)
     split = _mug(with_handle=True)
 
-    assert split.mass == pytest.approx(whole.mass)
-    assert 0.0 < split.handle.mass < split.mass
+    assert split.mass == pytest.approx(whole.mass, abs=1e-5)
+    assert split.root.inertial.mass == whole.root.inertial.mass
+    np.testing.assert_array_equal(
+        split.root.inertial.inertia.data, whole.root.inertial.inertia.data
+    )
+    assert split.handle.root.inertial.mass == Inertial.negligible().mass
 
 
 def test_the_surface_of_an_object_includes_its_split_off_parts():
