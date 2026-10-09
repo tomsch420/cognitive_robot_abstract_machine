@@ -25,6 +25,7 @@ from experiments.physical_pick_up.pick_up_experiment import PickUpExperiment
 from experiments.physical_pick_up.robots import ObjectPlacement
 from experiments.physical_pick_up.scene import PickUpScene
 from semantic_digital_twin.spatial_types import Vector3
+from semantic_digital_twin.spatial_types.spatial_types import AxisAngle
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Handle,
     Mug,
@@ -79,9 +80,9 @@ def synthetic_attempts(scene: PickUpScene, number: int) -> List[GraspAttempt]:
             object_raised=raised,
             motion_completed=True,
             object_displacement=Vector3(0.0, 0.0, 0.2 if raised else 0.0),
-            object_rotation=Vector3(),
+            object_rotation=AxisAngle(),
             translational_slip=Vector3(0.0, 0.0, 0.0 if raised else -0.2),
-            rotational_slip=Vector3(),
+            rotational_slip=AxisAngle(),
         )
     return [
         GraspAttempt(
@@ -135,18 +136,20 @@ def test_stored_attempts_are_read_back_by_task(milk_scene, database):
 
 def result_values(result: GraspResult) -> List[float]:
     """
-    :return: Every value of ``result``, the components of its vectors one by one, since
-        vectors compare symbolically.
+    :return: Every value of ``result``, the components of its vectors and rotations
+        one by one, since they compare symbolically.
     """
     vectors = (
         result.object_displacement,
-        result.object_rotation,
+        result.object_rotation.axis,
         result.translational_slip,
-        result.rotational_slip,
+        result.rotational_slip.axis,
     )
     return [
         float(result.object_raised),
         float(result.motion_completed),
+        float(result.object_rotation.angle),
+        float(result.rotational_slip.angle),
         *(float(value) for vector in vectors for value in vector.to_np()[:3]),
     ]
 

@@ -446,8 +446,8 @@ def test_a_held_bowl_turns_in_the_world_as_it_turns_in_the_gripper():
     result = PickUpExperiment().run()
 
     assert float(result.object_displacement.z) > PhysicalPickUp.minimum_rise
-    assert length(result.object_rotation) == pytest.approx(
-        length(result.rotational_slip), abs=0.05
+    assert float(result.object_rotation.angle) == pytest.approx(
+        float(result.rotational_slip.angle), abs=0.05
     )
 
 

@@ -28,7 +28,7 @@ from semantic_digital_twin.adapters.mujoco_video_recording import (
     VideoResolution,
 )
 from semantic_digital_twin.datastructures.definitions import GripperState
-from semantic_digital_twin.grasping.surface_grasp import GraspResult
+from semantic_digital_twin.grasping.surface_grasp import GraspResult, axis_angle_of
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, Arm
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Vector3
@@ -241,13 +241,11 @@ class PhysicalPickUp:
             object_raised=bool(displacement[2] >= self.minimum_rise),
             motion_completed=motion_completed,
             object_displacement=Vector3(*displacement),
-            object_rotation=Vector3(
-                *self._rotation_vector(
-                    world_T_held_object[:3, :3] @ world_T_resting_object[:3, :3].T
-                )
+            object_rotation=axis_angle_of(
+                world_T_held_object[:3, :3] @ world_T_resting_object[:3, :3].T
             ),
             translational_slip=Vector3(*slip[:3, 3]),
-            rotational_slip=Vector3(*self._rotation_vector(slip[:3, :3])),
+            rotational_slip=axis_angle_of(slip[:3, :3]),
         )
 
     def _motion_statechart(self) -> MotionStatechart:
@@ -350,14 +348,6 @@ class PhysicalPickUp:
         """
         for _ in range(round(duration.total_seconds() * self.control_frequency)):
             self.pacer.sleep()
-
-    @staticmethod
-    def _rotation_vector(rotation: np.ndarray) -> np.ndarray:
-        """
-        :param rotation: A rotation matrix.
-        :return: Its rotation axis scaled by its angle in radians.
-        """
-        return Rotation.from_matrix(rotation).as_rotvec()
 
     def _gripper_T_grasp(self) -> np.ndarray:
         """
