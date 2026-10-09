@@ -35,10 +35,11 @@ from semantic_digital_twin.adapters.robocasa_dataset.loader import (
 )
 from semantic_digital_twin.api import RobotSpecification
 from semantic_digital_twin.grasping.grasp_trials import GraspTrials
-from semantic_digital_twin.grasping.handle_finding import ProtrudingHandleFinder
+from semantic_digital_twin.pipeline.handle_finding import ProtrudingHandleFinder
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Handle
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.pr2 import PR2, PR2Joint
+from semantic_digital_twin.spatial_types import Vector3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.world_entity import (
@@ -357,7 +358,7 @@ def test_an_object_without_decomposition_collides_as_its_mesh(milk_experiment):
 def test_the_object_weighs_its_described_mass(milk_experiment):
     scene = milk_experiment.scene
 
-    assert scene.graspable.root.inertial.mass == scene.object_description.mass
+    assert scene.graspable.mass == pytest.approx(scene.object_description.mass)
 
 
 # %% picking objects up
@@ -421,16 +422,38 @@ def test_a_bowl_left_behind_slips_out_of_the_gripper_by_the_whole_lift():
 
     result = experiment.run()
 
-    assert result.translational_slip == pytest.approx(
+    assert length(result.translational_slip) == pytest.approx(
         PhysicalPickUp.lift_height, abs=0.03
     )
+    assert length(result.object_displacement) < 0.03
 
 
 @simulates_physics
 def test_a_held_bowl_slips_by_much_less_than_the_lift():
     result = PickUpExperiment().run()
 
-    assert result.translational_slip < PhysicalPickUp.lift_height / 4
+    assert length(result.translational_slip) < PhysicalPickUp.lift_height / 4
+
+
+@simulates_physics
+def test_a_held_bowl_turns_in_the_world_as_it_turns_in_the_gripper():
+    """
+    The gripper lifts without turning, so whatever the object turns, it turns relative
+    to the gripper.
+    """
+    result = PickUpExperiment().run()
+
+    assert float(result.object_displacement.z) > PhysicalPickUp.minimum_rise
+    assert length(result.object_rotation) == pytest.approx(
+        length(result.rotational_slip), abs=0.05
+    )
+
+
+def length(vector: Vector3) -> float:
+    """
+    :return: The length of ``vector``.
+    """
+    return float(np.linalg.norm(vector.to_np()[:3]))
 
 
 # %% trying grasps drawn from the object's statement
@@ -456,6 +479,16 @@ def test_an_object_without_a_handle_is_grasped_as_a_whole(milk_experiment):
     trials = trials_on(milk_experiment)
 
     assert trials.grasped_part is trials.graspable
+
+
+def test_a_mugs_handle_is_split_off_into_a_body_colliding_as_its_own_parts(mug_scene):
+    mug = mug_scene.graspable
+    handle_body = mug.handle.root
+
+    assert handle_body.parent_connection.parent is mug.root
+    assert len(handle_body.collision.shapes) > 0
+    assert mug.mass == pytest.approx(mug_scene.object_description.mass)
+    assert 0.0 < mug.handle.mass < mug.mass
 
 
 def test_a_mug_is_grasped_at_the_handle_found_in_its_shape(mug_scene):

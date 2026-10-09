@@ -31,7 +31,7 @@ from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.grasping.surface_grasp import GraspResult
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, Arm
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Vector3
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 
 # %% filming
@@ -184,7 +184,7 @@ class PhysicalPickUp:
 
     minimum_rise: float = 0.05
     """
-    How far the object has to have risen to count as picked up, in meters.
+    How far the object has to have risen to count as raised, in meters.
     """
 
     control_frequency: float = 50
@@ -202,9 +202,9 @@ class PhysicalPickUp:
     The last step of the motion, which starts once the gripper has closed.
     """
 
-    _gripper_T_object_when_closed: np.ndarray = field(init=False)
+    _gripper_T_grasp_when_closed: np.ndarray = field(init=False)
     """
-    Where the object sat in the gripper when the lift started.
+    Where the grasp, fixed to the object, sat in the gripper when the lift started.
     """
 
     def perform(self) -> GraspResult:
@@ -214,7 +214,7 @@ class PhysicalPickUp:
         :return: What happened to the object.
         """
         world = self.robot._world
-        resting_height = self._object_height()
+        world_T_resting_object = self._world_T_object()
         motion_statechart = self._motion_statechart()
         executor = Executor(
             context=MotionStatechartContext(
@@ -232,14 +232,22 @@ class PhysicalPickUp:
             executor.compile(motion_statechart=motion_statechart)
             motion_completed = self._tick_until_end(executor)
         self._wait(self.hold_duration)
-        object_rise = self._object_height() - resting_height
-        translational_slip, rotational_slip = self._slip()
+        world_T_held_object = self._world_T_object()
+        displacement = world_T_held_object[:3, 3] - world_T_resting_object[:3, 3]
+        slip = (
+            np.linalg.inv(self._gripper_T_grasp_when_closed) @ self._gripper_T_grasp()
+        )
         return GraspResult(
-            lifted=object_rise >= self.minimum_rise,
-            object_rise=object_rise,
-            translational_slip=translational_slip,
-            rotational_slip=rotational_slip,
+            object_raised=bool(displacement[2] >= self.minimum_rise),
             motion_completed=motion_completed,
+            object_displacement=Vector3(*displacement),
+            object_rotation=Vector3(
+                *self._rotation_vector(
+                    world_T_held_object[:3, :3] @ world_T_resting_object[:3, :3].T
+                )
+            ),
+            translational_slip=Vector3(*slip[:3, 3]),
+            rotational_slip=Vector3(*self._rotation_vector(slip[:3, :3])),
         )
 
     def _motion_statechart(self) -> MotionStatechart:
@@ -326,12 +334,12 @@ class PhysicalPickUp:
                 not closed
                 and self._lift_step.life_cycle_state != LifeCycleValues.NOT_STARTED
             ):
-                self._gripper_T_object_when_closed = self._gripper_T_object()
+                self._gripper_T_grasp_when_closed = self._gripper_T_grasp()
                 closed = True
             if executor.motion_statechart.is_end_motion():
                 return True
         if not closed:
-            self._gripper_T_object_when_closed = self._gripper_T_object()
+            self._gripper_T_grasp_when_closed = self._gripper_T_grasp()
         return False
 
     def _wait(self, duration: timedelta) -> None:
@@ -343,25 +351,32 @@ class PhysicalPickUp:
         for _ in range(round(duration.total_seconds() * self.control_frequency)):
             self.pacer.sleep()
 
-    def _slip(self) -> tuple[float, float]:
+    @staticmethod
+    def _rotation_vector(rotation: np.ndarray) -> np.ndarray:
         """
-        :return: How far, in meters, and by what angle, in radians, the object moved in
-            the gripper since the lift started.
+        :param rotation: A rotation matrix.
+        :return: Its rotation axis scaled by its angle in radians.
         """
-        before_T_after = (
-            np.linalg.inv(self._gripper_T_object_when_closed) @ self._gripper_T_object()
-        )
-        translation = float(np.linalg.norm(before_T_after[:3, 3]))
-        rotation = float(Rotation.from_matrix(before_T_after[:3, :3]).magnitude())
-        return translation, rotation
+        return Rotation.from_matrix(rotation).as_rotvec()
 
-    def _gripper_T_object(self) -> np.ndarray:
+    def _gripper_T_grasp(self) -> np.ndarray:
         """
-        :return: The pose of the object in the tool frame, as simulated.
+        :return: The pose of the grasp frame, fixed to the object, in the tool frame, as
+            simulated.
         """
-        return np.linalg.inv(
-            self._simulated_pose(self.arm.end_effector.tool_frame.name.name)
-        ) @ self._simulated_pose(self.grasp.graspable.root.name.name)
+        return (
+            np.linalg.inv(
+                self._simulated_pose(self.arm.end_effector.tool_frame.name.name)
+            )
+            @ self._world_T_object()
+            @ self.grasp.grasp_pose.to_np()
+        )
+
+    def _world_T_object(self) -> np.ndarray:
+        """
+        :return: The pose of the body the grasp is placed on, as simulated.
+        """
+        return self._simulated_pose(self.grasp.graspable.root.name.name)
 
     def _simulated_pose(self, body_name: str) -> np.ndarray:
         """
@@ -376,12 +391,3 @@ class PhysicalPickUp:
             scalar_first=True,
         ).as_matrix()
         return pose
-
-    def _object_height(self) -> float:
-        """
-        :return: The height of the object's origin in the simulation, in meters.
-        """
-        position = self.pacer.simulation.simulator.get_body_position(
-            body_name=self.grasp.graspable.root.name.name
-        ).result
-        return float(position[2])

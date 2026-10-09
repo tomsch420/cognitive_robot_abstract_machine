@@ -24,6 +24,7 @@ from experiments.physical_pick_up.objects import PickUpObject
 from experiments.physical_pick_up.pick_up_experiment import PickUpExperiment
 from experiments.physical_pick_up.robots import ObjectPlacement
 from experiments.physical_pick_up.scene import PickUpScene
+from semantic_digital_twin.spatial_types import Vector3
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Handle,
     Mug,
@@ -73,13 +74,14 @@ def synthetic_attempts(scene: PickUpScene, number: int) -> List[GraspAttempt]:
         scene.graspable.grasped_part().surface_grasp_statement(), number
     )
     for grasp in grasps:
-        lifted = grasp.height > LIFTING_HEIGHT
+        raised = grasp.height > LIFTING_HEIGHT
         grasp.result = GraspResult(
-            lifted=lifted,
-            object_rise=0.2 if lifted else 0.0,
-            translational_slip=0.0 if lifted else 0.2,
-            rotational_slip=0.0,
+            object_raised=raised,
             motion_completed=True,
+            object_displacement=Vector3(0.0, 0.0, 0.2 if raised else 0.0),
+            object_rotation=Vector3(),
+            translational_slip=Vector3(0.0, 0.0, 0.0 if raised else -0.2),
+            rotational_slip=Vector3(),
         )
     return [
         GraspAttempt(
@@ -125,8 +127,28 @@ def test_stored_attempts_are_read_back_by_task(milk_scene, database):
         attempt.grasp.height for attempt in attempts
     ]
     assert read[0].placement == attempts[0].placement
-    assert read[0].grasp.result == attempts[0].grasp.result
+    assert result_values(read[0].grasp.result) == pytest.approx(
+        result_values(attempts[0].grasp.result)
+    )
     assert database.attempts(other_task) == []
+
+
+def result_values(result: GraspResult) -> List[float]:
+    """
+    :return: Every value of ``result``, the components of its vectors one by one, since
+        vectors compare symbolically.
+    """
+    vectors = (
+        result.object_displacement,
+        result.object_rotation,
+        result.translational_slip,
+        result.rotational_slip,
+    )
+    return [
+        float(result.object_raised),
+        float(result.motion_completed),
+        *(float(value) for vector in vectors for value in vector.to_np()[:3]),
+    ]
 
 
 # %% learning and handing out models

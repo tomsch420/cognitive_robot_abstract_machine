@@ -20,6 +20,7 @@ from experiments.physical_pick_up.robots import (
 )
 from experiments.physical_pick_up.objects import (
     ObjectCannotHaveAHandleError,
+    convex_parts,
     ObjectChoice,
     ObjectDescription,
     ObjectGeometry,
@@ -32,19 +33,16 @@ from semantic_digital_twin.semantic_annotations.mixins import (
     HasRim,
 )
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, Arm
-from semantic_digital_twin.grasping.rim_finding import RimFinder
+from semantic_digital_twin.pipeline.part_splitting import SplitPartFromShape
+from semantic_digital_twin.pipeline.rim_finding import RimFinder
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Handle,
     Rim,
 )
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Point3
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.geometry import Box, Color, Mesh, Scale
-from semantic_digital_twin.world_description.inertial_properties import (
-    Inertial,
-    InertiaTensor,
-)
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -181,9 +179,7 @@ class PickUpScene:
             [self._shape(part, body) for part in geometry.collision_parts],
             reference_frame=body,
         )
-        body.inertial = self._object_inertial(body)
         self._footprint_middle = geometry.visual.bounds.mean(axis=0)[:2]
-        self._lowest_point = float(body.collision.combined_mesh.bounds[0][2])
         graspable = description.semantic_annotation_type(root=body)
         with self.world.modify_world():
             connection = Connection6DoF.create_with_dofs(
@@ -191,48 +187,57 @@ class PickUpScene:
             )
             self.world.add_connection(connection)
             self.world.add_semantic_annotation(graspable)
-        self._add_handle(graspable, geometry)
-        self._add_rim(graspable, geometry)
+        if self._split_off_parts(graspable):
+            for split_body in graspable.bodies:
+                self._collide_as_convex_parts(split_body)
+        graspable.mass = description.mass
+        self._lowest_point = min(
+            float(split_body.collision.combined_mesh.bounds[0][2])
+            for split_body in graspable.bodies
+            if split_body.collision
+        )
         return graspable
 
-    def _add_handle(
-        self, graspable: HasGraspCandidates, geometry: ObjectGeometry
-    ) -> None:
+    def _split_off_parts(self, graspable: HasGraspCandidates) -> bool:
         """
-        Give the object the handle its description's handle finder finds in its shape,
-        if it finds one.
+        Split the handle that the description's handle finder finds, and an open
+        container's rim, off the object's shape, each into a body of its own.
 
         :param graspable: The object's annotation.
-        :param geometry: The object's geometry in its body's frame.
+        :return: Whether any part was split off.
         :raises ObjectCannotHaveAHandleError: If the description finds handles for an
             object whose annotation cannot have one.
         """
-        finder = self.object_description.handle_finder
-        if finder is None:
-            return
-        if not isinstance(graspable, HasHandle):
-            raise ObjectCannotHaveAHandleError(
-                object_description=self.object_description
-            )
-        shape = finder.find(geometry.visual)
-        if shape is None:
-            return
-        Handle.create_from_part_of_shape(graspable, shape)
+        steps = []
+        handle_finder = self.object_description.handle_finder
+        if handle_finder is not None:
+            if not isinstance(graspable, HasHandle):
+                raise ObjectCannotHaveAHandleError(
+                    object_description=self.object_description
+                )
+            steps.append(SplitPartFromShape(type(graspable), Handle, handle_finder))
+        if isinstance(graspable, HasRim):
+            steps.append(SplitPartFromShape(type(graspable), Rim, RimFinder()))
+        parts = [step.split(graspable) for step in steps]
+        return any(part is not None for part in parts)
 
-    @staticmethod
-    def _add_rim(graspable: HasGraspCandidates, geometry: ObjectGeometry) -> None:
+    def _collide_as_convex_parts(self, body: Body) -> None:
         """
-        Give an open container the rim found in its shape.
+        Let a body split off the object's shape collide as the convex parts its own piece
+        of the shape decomposes into, if the description decomposes it at all.
 
-        :param graspable: The object's annotation.
-        :param geometry: The object's geometry in its body's frame.
+        :param body: One of the object's bodies, looking like its piece of the shape.
         """
-        if not isinstance(graspable, HasRim):
+        decomposition = self.object_description.decomposition_of_split_pieces()
+        if decomposition is None:
             return
-        shape = RimFinder().find(geometry.visual)
-        if shape is None:
-            return
-        Rim.create_from_part_of_shape(graspable, shape)
+        body.collision = ShapeCollection(
+            [
+                self._shape(part, body)
+                for part in convex_parts(decomposition, body.visual.combined_mesh)
+            ],
+            reference_frame=body,
+        )
 
     @staticmethod
     def _shape(mesh: trimesh.Trimesh, body: Body) -> Mesh:
@@ -243,26 +248,6 @@ class PickUpScene:
         """
         return Mesh.from_trimesh(
             mesh=mesh, origin=HomogeneousTransformationMatrix(reference_frame=body)
-        )
-
-    def _object_inertial(self, body: Body) -> Inertial:
-        """
-        :param body: The object's body, with its collision shapes in place.
-        :return: The inertial properties of an object of the described mass whose
-            material is spread evenly over what it collides as: the convex hull of each
-            collision shape.
-        """
-        mass = self.object_description.mass
-        material = trimesh.util.concatenate(
-            [shape.mesh.convex_hull for shape in body.collision.shapes]
-        )
-        material.density = mass / material.volume
-        return Inertial(
-            mass=mass,
-            center_of_mass=Point3.from_iterable(
-                material.center_mass, reference_frame=body
-            ),
-            inertia=InertiaTensor(data=material.moment_inertia),
         )
 
 

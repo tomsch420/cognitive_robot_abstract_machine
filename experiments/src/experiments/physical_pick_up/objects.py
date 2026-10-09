@@ -6,7 +6,9 @@ how it rests on a surface, how its handle is found and a grasp known to lift it.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import math
+import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field, replace
 from enum import Enum
@@ -23,7 +25,7 @@ from semantic_digital_twin.adapters.robocasa_dataset.loader import (
     RoboCasaDatasetLoader,
 )
 from semantic_digital_twin.datastructures.definitions import Axis
-from semantic_digital_twin.grasping.handle_finding import (
+from semantic_digital_twin.pipeline.handle_finding import (
     ElongatedShape,
     HandleFinder,
     NarrowEndHandleFinder,
@@ -182,6 +184,52 @@ class ObjectCannotHaveAHandleError(DataclassException):
         return "Annotate the object with a type that has a handle, or find none."
 
 
+CONVEX_DECOMPOSITION_CACHE = (
+    Path.home() / ".cache" / "physical_pick_up" / "convex_decompositions"
+)
+"""
+Where the convex parts of decomposed meshes are kept, since decomposing a mesh takes up
+to minutes.
+"""
+
+
+def convex_parts(
+    decomposition: COACDMeshDecomposer, mesh: trimesh.Trimesh
+) -> List[trimesh.Trimesh]:
+    """
+    :param decomposition: The decomposition to apply.
+    :param mesh: The mesh to decompose.
+    :return: The convex parts ``decomposition`` decomposes ``mesh`` into, read from
+        :data:`CONVEX_DECOMPOSITION_CACHE` when this mesh was decomposed this way
+        before.
+    """
+    key = hashlib.sha256(
+        np.ascontiguousarray(mesh.vertices, dtype=np.float64).tobytes()
+        + np.ascontiguousarray(mesh.faces, dtype=np.int64).tobytes()
+        + repr(decomposition).encode()
+    ).hexdigest()
+    path = CONVEX_DECOMPOSITION_CACHE / f"{key}.npz"
+    if path.exists():
+        with np.load(path) as stored:
+            return [
+                trimesh.Trimesh(stored[f"vertices_{index}"], stored[f"faces_{index}"])
+                for index in range(len(stored.files) // 2)
+            ]
+    parts = [
+        part.mesh
+        for part in decomposition.apply_to_mesh(Mesh.from_trimesh(mesh=mesh.copy()))
+    ]
+    CONVEX_DECOMPOSITION_CACHE.mkdir(parents=True, exist_ok=True)
+    unfinished = path.with_suffix(f".{os.getpid()}.npz")
+    np.savez(
+        unfinished,
+        **{f"vertices_{index}": part.vertices for index, part in enumerate(parts)},
+        **{f"faces_{index}": part.faces for index, part in enumerate(parts)},
+    )
+    unfinished.replace(path)
+    return parts
+
+
 def hollow_object_decomposition() -> COACDMeshDecomposer:
     """
     :return: A decomposition into convex parts fine enough to keep the walls of a hollow
@@ -248,6 +296,14 @@ class ObjectDescription(ABC):
         :return: The object's geometry, in meters, oriented as its source models it.
         """
 
+    @abstractmethod
+    def decomposition_of_split_pieces(self) -> Optional[COACDMeshDecomposer]:
+        """
+        :return: Decomposes each piece of the object's shape, once a part such as its
+            handle or rim is split off, into convex parts to collide with; ``None`` lets
+            each piece collide as itself.
+        """
+
 
 @dataclass(kw_only=True)
 class MeshFileObjectDescription(ObjectDescription):
@@ -275,14 +331,16 @@ class MeshFileObjectDescription(ObjectDescription):
     finger could reach inside to pinch its wall.
     """
 
+    def decomposition_of_split_pieces(self) -> Optional[COACDMeshDecomposer]:
+        return self.convex_decomposition
+
     def _load_modeled_geometry(self) -> ObjectGeometry:
         mesh = trimesh.load_mesh(self.mesh_file)
         mesh.apply_scale(self.meters_per_mesh_unit)
         if self.convex_decomposition is None:
             return ObjectGeometry(visual=mesh, collision_parts=[mesh])
-        parts = self.convex_decomposition.apply_to_mesh(Mesh.from_trimesh(mesh=mesh))
         return ObjectGeometry(
-            visual=mesh, collision_parts=[part.mesh for part in parts]
+            visual=mesh, collision_parts=convex_parts(self.convex_decomposition, mesh)
         )
 
 
@@ -318,6 +376,13 @@ class RoboCasaObjectDescription(ObjectDescription):
             instance_index=instance_index,
             body_name=f"{self.body_name}_{instance_index}",
         )
+
+    def decomposition_of_split_pieces(self) -> Optional[COACDMeshDecomposer]:
+        """
+        :return: The decomposition of hollow objects: the dataset's own convex parts
+            belong to the whole object and cannot be divided among its pieces.
+        """
+        return hollow_object_decomposition()
 
     def _load_modeled_geometry(self) -> ObjectGeometry:
         world = self.loader.load_object(self.category, self.instance_index)
