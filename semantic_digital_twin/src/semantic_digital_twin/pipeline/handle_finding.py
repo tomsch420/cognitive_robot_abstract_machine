@@ -1,15 +1,14 @@
 """
-Finding the part of an object's shape that is its handle, so that the object's
-annotation can be given a
-:class:`~semantic_digital_twin.semantic_annotations.semantic_annotations.Handle` to be
-grasped at.
+Finding the piece of an object's shape that is its handle, so that it can be split off
+into a :class:`~semantic_digital_twin.semantic_annotations.semantic_annotations.Handle`
+of its own by :class:`~semantic_digital_twin.pipeline.part_splitting.SplitPartFromShape`.
 
 Shapes are taken in the frame of the object's root body, its z-axis pointing up.
 """
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
+from abc import ABC
 from dataclasses import dataclass
 from functools import cached_property
 
@@ -20,22 +19,16 @@ from scipy.spatial import ConvexHull
 from typing_extensions import Optional
 
 from semantic_digital_twin.datastructures.definitions import Axis
+from semantic_digital_twin.pipeline.part_splitting import PartFinder, ShapeSplit
 from semantic_digital_twin.spatial_types import Point2
 
 # %% finding handles
 
 
-class HandleFinder(ABC):
+class HandleFinder(PartFinder, ABC):
     """
-    Finds the part of a shape that is its handle.
+    Finds the piece of a shape that is its handle.
     """
-
-    @abstractmethod
-    def find(self, shape: trimesh.Trimesh) -> Optional[trimesh.Trimesh]:
-        """
-        :param shape: The object's shape, in its root body's frame.
-        :return: The part of ``shape`` that is its handle; ``None`` if it has none.
-        """
 
 
 @dataclass
@@ -106,15 +99,13 @@ class ProtrudingHandleFinder(HandleFinder):
     How often the circle is fitted again after leaving out the points outside of it.
     """
 
-    def find(self, shape: trimesh.Trimesh) -> Optional[trimesh.Trimesh]:
+    def split(self, shape: trimesh.Trimesh) -> Optional[ShapeSplit]:
         outline = self._round_body_outline(shape)
         outside = (
             outline.distances(shape.triangles_center[:, :2])
             > outline.radius + self.clearance
         )
-        if not outside.any():
-            return None
-        return shape.submesh([np.flatnonzero(outside)], append=True)
+        return ShapeSplit.by_faces(shape, outside)
 
     def _round_body_outline(self, shape: trimesh.Trimesh) -> RoundOutline:
         """
@@ -208,7 +199,8 @@ class ElongatedShape:
 class NarrowEndHandleFinder(HandleFinder):
     """
     Finds the handle of an elongated object lying flat, such as a piece of cutlery or a
-    tool: the stretch from its narrower end up to where it widens.
+    tool: the stretch from its narrower end up to where it widens, cut off across the
+    object's length.
     """
 
     widening: float = 1.8
@@ -228,7 +220,7 @@ class NarrowEndHandleFinder(HandleFinder):
     end.
     """
 
-    def find(self, shape: trimesh.Trimesh) -> Optional[trimesh.Trimesh]:
+    def split(self, shape: trimesh.Trimesh) -> Optional[ShapeSplit]:
         lowest, highest = shape.bounds
         extents = highest - lowest
         length_axis = Axis.X if extents[Axis.X] >= extents[Axis.Y] else Axis.Y
@@ -239,14 +231,18 @@ class NarrowEndHandleFinder(HandleFinder):
             end_fraction=self.end_fraction,
         )
         along = elongated.along
-        face_along = shape.triangles_center[:, length_axis] - lowest[length_axis]
-        if elongated.narrower_end_is_positive():
+        narrow_end_is_positive = elongated.narrower_end_is_positive()
+        if narrow_end_is_positive:
             along = elongated.length - along
-            face_along = elongated.length - face_along
         handle_length = self._handle_length(elongated.across, along)
         if handle_length is None:
             return None
-        return shape.submesh([np.flatnonzero(face_along < handle_length)], append=True)
+        towards_narrow_end = np.zeros(3)
+        towards_narrow_end[length_axis] = 1.0 if narrow_end_is_positive else -1.0
+        narrow_end = highest if narrow_end_is_positive else lowest
+        return ShapeSplit.by_plane(
+            shape, narrow_end - towards_narrow_end * handle_length, towards_narrow_end
+        )
 
     def _handle_length(
         self, across: NDArray[np.float64], along: NDArray[np.float64]

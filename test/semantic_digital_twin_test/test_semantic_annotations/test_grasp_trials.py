@@ -18,7 +18,9 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Milk,
     Mug,
 )
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.pipeline.handle_finding import ProtrudingHandleFinder
+from semantic_digital_twin.pipeline.part_splitting import SplitPartFromShape
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Vector3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import Mesh
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
@@ -43,11 +45,12 @@ class RecordingPerformer(GraspPerformer):
     def perform(self, grasp: GraspCandidate) -> GraspResult:
         self.tried.append(grasp)
         return GraspResult(
-            lifted=True,
-            object_rise=0.2,
-            translational_slip=0.0,
-            rotational_slip=0.0,
+            object_raised=True,
             motion_completed=True,
+            object_displacement=Vector3(0.0, 0.0, 0.2),
+            object_rotation=Vector3(),
+            translational_slip=Vector3(),
+            rotational_slip=Vector3(),
         )
 
 
@@ -93,7 +96,7 @@ def mug_with_handle() -> Mug:
         ),
         "mug",
     )
-    Handle.create_from_part_of_shape(mug, handle_shape)
+    SplitPartFromShape(Mug, Handle, ProtrudingHandleFinder()).split(mug)
     return mug
 
 

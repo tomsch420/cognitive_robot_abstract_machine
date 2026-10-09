@@ -3,8 +3,8 @@ Grasps described by where on an object's surface they take hold and how the grip
 comes in, statements of where an object may be grasped, and what happened when one was
 tried.
 
-Every field of :class:`SurfaceGrasp` and :class:`GraspResult` is a plain number or truth
-value, so a probabilistic model can be learned over tried grasps. Where an object may be
+Every field of :class:`SurfaceGrasp` and :class:`GraspResult` is a number, a truth value
+or a vector of numbers, so a probabilistic model can be learned over tried grasps. Where an object may be
 grasped is stated as an underspecified statement over :class:`SurfaceGrasp`; a model
 registry answers it, knowing nothing but the statement at first and what was learned
 later.
@@ -28,7 +28,10 @@ from krrood.parametrization.model_registries import (
 )
 from semantic_digital_twin.exceptions import SurfaceGraspNotOnSurfaceError
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.spatial_types import (
+    HomogeneousTransformationMatrix,
+    Vector3,
+)
 
 if TYPE_CHECKING:
     from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
@@ -41,39 +44,62 @@ class GraspResult:
     """
     What happened to an object when a robot tried to pick it up by a grasp.
 
+    The object's displacement and rotation compare where it rested before the grasp
+    with where it is held at the end, along the world's axes, so that a use that cares
+    about another goal than lifting, such as pulling the object out of a shelf, can ask
+    for it.
+
     The slip compares where the object sits in the gripper once the fingers have closed
     on it with where it sits after it was lifted and held: an object held firmly does
     not move relative to the fingers at all, one that was never held stays behind by the
-    whole lift.
+    whole lift. It is measured along the grasp's own axes, the direction of approach,
+    the closing direction and their normal, so that it means the same for every robot.
+
+    The vectors carry no reference frame; each field says which axes it is measured
+    along.
     """
 
-    lifted: bool
+    object_raised: bool
     """
-    Whether the object ended up clear of where it rested, whether or not the motion
-    completed.
-    """
-
-    object_rise: float
-    """
-    How far above where it rested the object ended up, in meters.
-    """
-
-    translational_slip: float
-    """
-    How far the object moved relative to the gripper while it was lifted and held, in
-    meters.
-    """
-
-    rotational_slip: float
-    """
-    How far the object turned relative to the gripper while it was lifted and held, in
-    radians.
+    Whether the object ended up clear of where it rested.
     """
 
     motion_completed: bool
     """
     Whether the robot went through every step of the pick-up within its time limit.
     """
+
+    object_displacement: Vector3
+    """
+    How far and in which direction the object moved from where it rested to where it
+    was held at the end, in meters, along the world's axes.
+    """
+
+    object_rotation: Vector3
+    """
+    How the object turned from where it rested to where it was held at the end, along
+    the world's axes, as its rotation axis scaled by the angle in radians.
+    """
+
+    translational_slip: Vector3
+    """
+    How far and in which direction the object moved relative to the grasp while it was
+    lifted and held, in meters, along the grasp's axes.
+    """
+
+    rotational_slip: Vector3
+    """
+    How the object turned relative to the grasp while it was lifted and held, along the
+    grasp's axes, as its rotation axis scaled by the angle in radians.
+    """
+
+    @property
+    def lifted(self) -> bool:
+        """
+        :return: Whether the object ended up clear of where it rested and the robot went
+            through every step of the pick-up.
+        """
+        return self.object_raised and self.motion_completed
 
 
 # %% grasps on an object's surface
@@ -139,7 +165,9 @@ class SurfaceGrasp:
     def grasp_candidate(self, graspable: HasGraspCandidates) -> GraspCandidate:
         """
         :param graspable: The object to take hold of.
-        :return: This grasp as a grasp frame on the object's root body.
+        :return: This grasp as a grasp frame on the object's root body, its x-axis
+            the direction of approach and its y-axis the closing direction; these are
+            the grasp's axes a :class:`GraspResult` measures slip along.
         :raises SurfaceGraspNotOnSurfaceError: If the object's grasp surface does not
             reach the point this grasp names.
         """
@@ -234,17 +262,25 @@ def any_surface_grasp(require_lifting: bool = False) -> Match:
     """
     if require_lifting:
         result = a(GraspResult)(
-            lifted=True,
-            object_rise=...,
-            translational_slip=...,
-            rotational_slip=...,
-            motion_completed=...,
+            object_raised=True,
+            motion_completed=True,
+            object_displacement=_any_vector(),
+            object_rotation=_any_vector(),
+            translational_slip=_any_vector(),
+            rotational_slip=_any_vector(),
         )
     else:
         result = None
     return a(SurfaceGrasp)(
         azimuth=..., height=..., depth=..., pitch=..., roll=..., result=result
     )
+
+
+def _any_vector() -> Match:
+    """
+    :return: A statement asking for a vector with every component left free.
+    """
+    return a(Vector3)(x=..., y=..., z=...)
 
 
 def from_any_side(grasp: Match) -> List[ConditionType]:

@@ -7,7 +7,6 @@ from typing import Iterable, Iterator, Optional, Self, Tuple, TYPE_CHECKING, Uni
 import math
 
 import numpy as np
-import trimesh
 from typing_extensions import List
 
 from krrood.ormatic.utils import classproperty
@@ -45,13 +44,11 @@ from semantic_digital_twin.semantic_annotations.mixins import (
     HasShelfLayers,
     HasGraspCandidates,
     HasRim,
-    PartWholeRelationship,
-    HasStatedGrasps,
 )
 from krrood.entity_query_language.factories import and_, or_
 from krrood.entity_query_language.query.match import Match
 from semantic_digital_twin.datastructures.definitions import Axis
-from semantic_digital_twin.grasping.rim_finding import RimFinder
+from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.grasping.surface_grasp import (
     any_surface_grasp,
     from_any_side,
@@ -72,10 +69,7 @@ from semantic_digital_twin.world_description.geometry import (
     VolumetricBoundingBox,
     Scale,
     Color,
-    Mesh,
 )
-from semantic_digital_twin.world_description.shape_collection import ShapeCollection
-from semantic_digital_twin.world_description.inertial_properties import Inertial
 from semantic_digital_twin.world_description.shape_collection import (
     BoundingBoxCollection,
 )
@@ -106,59 +100,17 @@ class Furniture(SemanticAnnotation, ABC):
 
 
 @dataclass(eq=False)
-class PartOfShape(HasRootBody):
-    """
-    A part of an annotation that is made of a part of the annotation's own shape, such
-    as the handle of a mug or the rim of a bowl.
-    """
-
-    @classmethod
-    def create_from_part_of_shape(
-        cls, whole: PartWholeRelationship, shape: trimesh.Trimesh
-    ) -> Self:
-        """
-        Create the part of ``whole`` from a part of the whole's own shape.
-
-        The part's body shows the part of the shape and is grasped at it, fixed to the
-        whole's root body. It carries no material of its own: it collides through the
-        whole's own shape and weighs next to nothing, so the whole keeps its mass and
-        its contacts.
-
-        :param whole: The annotation the part belongs to.
-        :param shape: The part of the whole's shape, in the frame of the whole's root
-            body.
-        :return: The part, added to the whole and to its world.
-        """
-        world = whole.root._world
-        body = Body(
-            name=PrefixedName(
-                f"{whole.root.name.name}_{cls.__name__.lower()}", whole.root.name.prefix
-            ),
-            inertial=Inertial.negligible(),
-        )
-        body.visual = ShapeCollection(
-            [
-                Mesh.from_trimesh(
-                    mesh=shape,
-                    origin=HomogeneousTransformationMatrix(reference_frame=body),
-                )
-            ],
-            reference_frame=body,
-        )
-        part = cls(root=body)
-        with world.modify_world():
-            world.add_connection(FixedConnection(parent=whole.root, child=body))
-            world.add_semantic_annotation(part)
-            whole.add(part)
-        return part
-
-
-@dataclass(eq=False)
-class Handle(PartOfShape, HasStatedGrasps):
+class Handle(HasGraspCandidates):
     """
     A handle is a physical entity that can be grasped by a hand or a robotic gripper to
     open or close an object.
     """
+
+    def default_grasp_candidates(self) -> List[GraspCandidate]:
+        """
+        :return: Grasps drawn uniformly from :meth:`surface_grasp_statement`.
+        """
+        return self.drawn_grasp_candidates()
 
     def surface_grasp_statement(self, require_lifting: bool = False) -> Match:
         """
@@ -1193,7 +1145,7 @@ class Plate(HasSupportingSurface, Tableware):
 
 
 @dataclass(eq=False)
-class Rim(PartOfShape, HasStatedGrasps):
+class Rim(HasGraspCandidates):
     """
     The upper edge of an open container's wall, which a gripper pinches from above.
     """
@@ -1203,24 +1155,11 @@ class Rim(PartOfShape, HasStatedGrasps):
     In how many directions around the rim its wall is measured.
     """
 
-    @classmethod
-    def create_on(
-        cls, container: HasRim, finder: Optional[RimFinder] = None
-    ) -> Optional[Rim]:
+    def default_grasp_candidates(self) -> List[GraspCandidate]:
         """
-        Find the rim in the container's shape and give it to the container.
-
-        :param container: The container.
-        :param finder: Finds the rim in the container's grasp surface; ``None`` uses a
-            :class:`~semantic_digital_twin.grasping.rim_finding.RimFinder` with its
-            defaults.
-        :return: The rim, added to the container and to its world; ``None`` if the
-            finder finds none.
+        :return: Grasps drawn uniformly from :meth:`surface_grasp_statement`.
         """
-        shape = (finder or RimFinder()).find(container.grasp_surface())
-        if shape is None:
-            return None
-        return cls.create_from_part_of_shape(container, shape)
+        return self.drawn_grasp_candidates()
 
     def surface_grasp_statement(self, require_lifting: bool = False) -> Match:
         """
@@ -1642,13 +1581,19 @@ class SaltPepperShaker(SaltContainer):
 
 
 @dataclass(eq=False)
-class Cutlery(HasHandle, HasStatedGrasps, Tableware):
+class Cutlery(HasHandle, Tableware):
     """
     A piece of cutlery, lying flat.
 
     Without a handle it is grasped somewhere along its middle, from above and across
     its length.
     """
+
+    def default_grasp_candidates(self) -> List[GraspCandidate]:
+        """
+        :return: Grasps drawn uniformly from :meth:`surface_grasp_statement`.
+        """
+        return self.drawn_grasp_candidates()
 
     def surface_grasp_statement(self, require_lifting: bool = False) -> Match:
         """

@@ -436,13 +436,23 @@ class HasGraspCandidates(HasRootBody):
 
     Where an object may be grasped is stated as an underspecified statement over
     :class:`~semantic_digital_twin.grasping.surface_grasp.SurfaceGrasp`, the one
-    :meth:`surface_grasp_statement` returns. Annotations that know their object's shape
-    narrow it down.
+    :meth:`surface_grasp_statement` returns. Given a model learned over tried grasps,
+    the grasp candidates are drawn from it; without one, the annotation offers its
+    :meth:`default_grasp_candidates`.
+
+    An annotation changes how it is grasped by overriding one of these:
+
+    - :meth:`surface_grasp_statement`, to state where on its surface it may be grasped;
+    - :meth:`default_grasp_candidates`, to offer other grasps while no model is given,
+      such as :meth:`drawn_grasp_candidates` for an annotation whose statement is
+      narrow enough to draw from uniformly;
+    - :meth:`grasped_part`, to be grasped at one of its parts instead of itself;
+    - :meth:`grasp_candidates`, to offer its grasps in another way altogether.
     """
 
     grasp_candidate_count: int = field(default=12, kw_only=True)
     """
-    How many grasp candidates :meth:`grasp_candidates` generates.
+    How many grasp candidates the annotation offers.
     """
 
     def grasp_candidates(
@@ -452,33 +462,26 @@ class HasGraspCandidates(HasRootBody):
     ) -> List[GraspCandidate]:
         """
         The grasps this annotation offers, in no particular order: those of its
-        :meth:`grasped_part` when it is grasped at one of its parts.
+        :meth:`grasped_part` when it is grasped at one of its parts; otherwise grasps
+        drawn from the model, or the :meth:`default_grasp_candidates` without one.
 
         :param model_registry: Answers the statement of where the object may be grasped.
-        :param require_lifting: Whether to ask the model only for grasps that lift the
-            object.
+        :param require_lifting: Whether to ask only for grasps that lift the object,
+            which needs a model learned over tried grasps and their results.
         """
         part = self.grasped_part()
         if part is not self:
             return part.grasp_candidates(model_registry, require_lifting)
-        return self._own_grasp_candidates(model_registry, require_lifting)
+        if model_registry is None and not require_lifting:
+            return self.default_grasp_candidates()
+        return self.drawn_grasp_candidates(model_registry, require_lifting)
 
-    def _own_grasp_candidates(
-        self, model_registry: Optional[ModelRegistry], require_lifting: bool
-    ) -> List[GraspCandidate]:
+    def default_grasp_candidates(self) -> List[GraspCandidate]:
         """
-        Given a model, the grasps are drawn from the statement of where the object may
-        be grasped. Without one, the default grasps the object at its own origin, from
-        evenly spaced directions around its z-axis; annotations whose shape admits a
-        better grip override this.
-
-        :param model_registry: Answers the statement of where the object may be grasped.
-        :param require_lifting: Whether to ask the model only for grasps that lift the
-            object.
-        :return: The grasps the object offers when grasped as a whole.
+        :return: The grasps offered while no model is given: the object at its own
+            origin, approached from evenly spaced directions around its z-axis, which
+            needs no knowledge of its shape.
         """
-        if model_registry is not None:
-            return self._drawn_grasp_candidates(model_registry, require_lifting)
         return [
             GraspCandidate(
                 self,
@@ -492,17 +495,17 @@ class HasGraspCandidates(HasRootBody):
             )
         ]
 
-    def _drawn_grasp_candidates(
-        self, model_registry: Optional[ModelRegistry], require_lifting: bool
+    def drawn_grasp_candidates(
+        self,
+        model_registry: Optional[ModelRegistry] = None,
+        require_lifting: bool = False,
     ) -> List[GraspCandidate]:
         """
-        Draw grasps from :meth:`surface_grasp_statement`.
-
-        :param model_registry: Answers the statement; ``None`` draws uniformly from what
-            it allows.
+        :param model_registry: Answers :meth:`surface_grasp_statement`; ``None`` draws
+            uniformly from what it allows.
         :param require_lifting: Whether to ask only for grasps that lift the object.
-        :return: The drawn grasps that reach the object's surface, at most
-            :attr:`grasp_candidate_count` of them.
+        :return: Grasps drawn from :meth:`surface_grasp_statement` that reach the
+            object's surface, at most :attr:`grasp_candidate_count` of them.
         """
         grasps = draw_surface_grasps(
             self.surface_grasp_statement(require_lifting),
@@ -551,29 +554,6 @@ class HasGraspCandidates(HasRootBody):
             itself unless one of its parts is grasped instead.
         """
         return self
-
-
-@dataclass(eq=False)
-class HasStatedGrasps(HasGraspCandidates):
-    """
-    A graspable annotation that knows where on its surface it may be grasped, and draws
-    its grasp candidates from the statement of it.
-    """
-
-    def _own_grasp_candidates(
-        self, model_registry: Optional[ModelRegistry], require_lifting: bool
-    ) -> List[GraspCandidate]:
-        """
-        Draw grasps from :meth:`surface_grasp_statement`.
-
-        :param model_registry: Answers the statement; ``None`` draws uniformly from what
-            it allows.
-        :param require_lifting: Whether to ask only for grasps that lift the object,
-            which needs a model learned over tried grasps and their results.
-        :return: The drawn grasps that reach the object's surface, at most
-            :attr:`grasp_candidate_count` of them.
-        """
-        return self._drawn_grasp_candidates(model_registry, require_lifting)
 
 
 @dataclass(eq=False)
