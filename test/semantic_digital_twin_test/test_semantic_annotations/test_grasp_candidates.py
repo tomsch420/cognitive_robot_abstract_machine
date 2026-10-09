@@ -196,6 +196,8 @@ class MilkGraspedLow(Milk):
 
 def test_an_annotation_can_state_where_it_may_be_grasped(milk):
     carton = MilkGraspedLow(root=milk.root)
+    with milk._world.modify_world():
+        milk._world.add_semantic_annotation(carton)
 
     grasps = carton.drawn_grasp_candidates()
 
@@ -217,6 +219,8 @@ class MilkDrawnUniformly(Milk):
 
 def test_an_annotation_can_offer_other_grasps_while_no_model_is_given(milk):
     carton = MilkDrawnUniformly(root=milk.root)
+    with milk._world.modify_world():
+        milk._world.add_semantic_annotation(carton)
     half_extents = BOX_SCALE.to_np()[:3] / 2
 
     grasps = carton.grasp_candidates()
@@ -424,6 +428,16 @@ def test_a_handle_split_off_a_shape_leaves_the_whole_its_mass():
 
     assert split.mass == pytest.approx(whole.mass)
     assert 0.0 < split.handle.mass < split.mass
+
+
+def test_the_surface_of_an_object_includes_its_split_off_parts():
+    whole = _mug(with_handle=False)
+    split = _mug(with_handle=True)
+
+    np.testing.assert_allclose(
+        split.grasp_surface().bounds, whole.grasp_surface().bounds, atol=1e-9
+    )
+    assert split.handle.grasp_surface().bounds[0][0] >= BOWL_OUTER_RADIUS - 1e-9
 
 
 # %% the frame a grasp is expressed in
