@@ -6,6 +6,7 @@ grasped.
 import math
 
 import numpy as np
+from scipy.spatial.transform import Rotation
 import pytest
 import trimesh
 
@@ -26,12 +27,14 @@ from semantic_digital_twin.orm.ormatic_interface import SurfaceGraspDAO  # noqa:
 from semantic_digital_twin.grasping.surface_grasp import (
     GraspResult,
     SurfaceGrasp,
+    axis_angle_of,
     any_surface_grasp,
     draw_surface_grasps,
 )
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 from ._statements import allowed_intervals
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Vector3
+from semantic_digital_twin.spatial_types.spatial_types import AxisAngle
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import Mesh
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
@@ -213,6 +216,13 @@ fraction of the carton's height.
 """
 
 
+def small_rotation(rng: np.random.Generator) -> AxisAngle:
+    """
+    :return: A rotation by a few degrees about a random axis.
+    """
+    return axis_angle_of(Rotation.from_rotvec(rng.normal(0.0, 0.05, 3)).as_matrix())
+
+
 @pytest.fixture
 def learned_carton_model(carton) -> RelationalCircuitRegistry:
     """
@@ -227,9 +237,9 @@ def learned_carton_model(carton) -> RelationalCircuitRegistry:
             object_raised=raised,
             motion_completed=True,
             object_displacement=Vector3(0.0, 0.0, 0.2 if raised else 0.0),
-            object_rotation=Vector3(*rng.normal(0.0, 0.05, 3)),
+            object_rotation=small_rotation(rng),
             translational_slip=Vector3(0.0, 0.0, 0.0 if raised else -0.2),
-            rotational_slip=Vector3(*rng.normal(0.0, 0.05, 3)),
+            rotational_slip=small_rotation(rng),
         )
     return RelationalCircuitRegistry(
         RelationalProbabilisticCircuit(
@@ -248,6 +258,7 @@ def test_a_learned_model_answers_with_lifting_grasps(carton, learned_carton_mode
         assert grasp.height > LIFTING_HEIGHT
         assert grasp.result.lifted
         assert isinstance(grasp.result.translational_slip, Vector3)
+        assert isinstance(grasp.result.rotational_slip, AxisAngle)
 
 
 def test_a_uniform_prior_cannot_require_lifting(carton):
@@ -270,3 +281,22 @@ def test_an_annotation_given_a_model_draws_its_grasps_from_it(
 def test_an_annotation_without_a_model_keeps_its_default_grasps(carton):
     for grasp in carton.grasp_candidates():
         assert grasp.grasp_pose.to_np()[:3, 3] == pytest.approx([0.0, 0.0, 0.0])
+
+
+# %% stating rotations
+
+
+def test_no_rotation_is_the_angle_zero_about_the_z_axis():
+    rotation = axis_angle_of(np.eye(3))
+
+    assert float(rotation.angle) == 0.0
+    np.testing.assert_allclose(rotation.axis.to_np()[:3], [0.0, 0.0, 1.0])
+
+
+def test_a_rotation_is_stated_by_an_angle_of_at_most_half_a_turn():
+    three_quarter_turn = Rotation.from_rotvec([1.5 * np.pi, 0.0, 0.0]).as_matrix()
+
+    rotation = axis_angle_of(three_quarter_turn)
+
+    assert float(rotation.angle) == pytest.approx(np.pi / 2)
+    np.testing.assert_allclose(rotation.axis.to_np()[:3], [-1.0, 0.0, 0.0], atol=1e-9)

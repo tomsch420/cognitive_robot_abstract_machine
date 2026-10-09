@@ -3,11 +3,11 @@ Grasps described by where on an object's surface they take hold and how the grip
 comes in, statements of where an object may be grasped, and what happened when one was
 tried.
 
-Every field of :class:`SurfaceGrasp` and :class:`GraspResult` is a number, a truth value
-or a vector of numbers, so a probabilistic model can be learned over tried grasps. Where an object may be
-grasped is stated as an underspecified statement over :class:`SurfaceGrasp`; a model
-registry answers it, knowing nothing but the statement at first and what was learned
-later.
+Every field of :class:`SurfaceGrasp` and :class:`GraspResult` is a number, a truth value,
+a vector or a rotation, so a probabilistic model can be learned over tried grasps. Where
+an object may be grasped is stated as an underspecified statement over
+:class:`SurfaceGrasp`; a model registry answers it, knowing nothing but the statement at
+first and what was learned later.
 """
 
 from __future__ import annotations
@@ -17,6 +17,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 from numpy.typing import NDArray
+from scipy.spatial.transform import Rotation
 from typing_extensions import TYPE_CHECKING, List, Optional
 
 from krrood.entity_query_language.backends import ProbabilisticBackend
@@ -32,6 +33,7 @@ from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
     Vector3,
 )
+from semantic_digital_twin.spatial_types.spatial_types import AxisAngle, Quaternion
 
 if TYPE_CHECKING:
     from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
@@ -55,8 +57,11 @@ class GraspResult:
     whole lift. It is measured along the grasp's own axes, the direction of approach,
     the closing direction and their normal, so that it means the same for every robot.
 
-    The vectors carry no reference frame; each field says which axes it is measured
-    along.
+    A rotation is stated as :func:`axis_angle_of` states it: an angle in [0, pi] about a
+    unit axis, no rotation being the angle zero about the z-axis.
+
+    The vectors and rotations carry no reference frame; each field says which axes it
+    is measured along.
     """
 
     object_raised: bool
@@ -75,10 +80,10 @@ class GraspResult:
     was held at the end, in meters, along the world's axes.
     """
 
-    object_rotation: Vector3
+    object_rotation: AxisAngle
     """
-    How the object turned from where it rested to where it was held at the end, along
-    the world's axes, as its rotation axis scaled by the angle in radians.
+    How the object turned from where it rested to where it was held at the end, its
+    axis along the world's axes.
     """
 
     translational_slip: Vector3
@@ -87,10 +92,10 @@ class GraspResult:
     lifted and held, in meters, along the grasp's axes.
     """
 
-    rotational_slip: Vector3
+    rotational_slip: AxisAngle
     """
-    How the object turned relative to the grasp while it was lifted and held, along the
-    grasp's axes, as its rotation axis scaled by the angle in radians.
+    How the object turned relative to the grasp while it was lifted and held, its axis
+    along the grasp's axes.
     """
 
     @property
@@ -265,9 +270,9 @@ def any_surface_grasp(require_lifting: bool = False) -> Match[SurfaceGrasp]:
             object_raised=True,
             motion_completed=True,
             object_displacement=_any_vector(),
-            object_rotation=_any_vector(),
+            object_rotation=_any_rotation(),
             translational_slip=_any_vector(),
-            rotational_slip=_any_vector(),
+            rotational_slip=_any_rotation(),
         )
     else:
         result = None
@@ -281,6 +286,28 @@ def _any_vector() -> Match[Vector3]:
     :return: A statement asking for a vector with every component left free.
     """
     return a(Vector3)(x=..., y=..., z=...)
+
+
+def _any_rotation() -> Match[AxisAngle]:
+    """
+    :return: A statement asking for a rotation with its axis and angle left free.
+    """
+    return a(AxisAngle)(axis=_any_vector(), angle=...)
+
+
+def axis_angle_of(rotation: NDArray[np.float64]) -> AxisAngle:
+    """
+    :param rotation: A rotation matrix.
+    :return: The rotation as an angle in [0, pi] about a unit axis. No rotation is the
+        angle zero about the z-axis, as
+        :meth:`~semantic_digital_twin.spatial_types.spatial_types.AxisAngle.from_quaternion`
+        reads it.
+    """
+    x, y, z, w = Rotation.from_matrix(rotation).as_quat(canonical=True)
+    axis_angle = AxisAngle.from_quaternion(Quaternion(x=x, y=y, z=z, w=w))
+    return AxisAngle(
+        axis=Vector3(*axis_angle.axis.to_np()[:3]), angle=float(axis_angle.angle)
+    )
 
 
 def from_any_side(grasp: Match[SurfaceGrasp]) -> List[ConditionType]:

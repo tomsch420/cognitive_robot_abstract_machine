@@ -21,6 +21,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
 from semantic_digital_twin.pipeline.handle_finding import ProtrudingHandleFinder
 from semantic_digital_twin.pipeline.part_splitting import SplitPartFromShape
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Vector3
+from semantic_digital_twin.spatial_types.spatial_types import AxisAngle
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import Mesh
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
@@ -48,9 +49,9 @@ class RecordingPerformer(GraspPerformer):
             object_raised=True,
             motion_completed=True,
             object_displacement=Vector3(0.0, 0.0, 0.2),
-            object_rotation=Vector3(),
+            object_rotation=AxisAngle(),
             translational_slip=Vector3(),
-            rotational_slip=Vector3(),
+            rotational_slip=AxisAngle(),
         )
 
 
