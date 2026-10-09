@@ -38,6 +38,9 @@ if TYPE_CHECKING:
         EndEffector,
     )
     from semantic_digital_twin.world import World
+    from semantic_digital_twin.world_description.world_entity import (
+        SemanticAnnotation,
+    )
     from semantic_digital_twin.world_description.geometry import Scale
     from semantic_digital_twin.datastructures.scan_pattern import ScanPattern
     from semantic_digital_twin.world_description.world_entity import (
@@ -2064,6 +2067,30 @@ class NoGraspGeometry(UsageError):
         return (
             "give the root body collision geometry, or annotate the object with a type "
             "whose grasps do not depend on its shape."
+        )
+
+
+@dataclass
+class NoMaterialToSpreadMassOver(UsageError):
+    """
+    Raised when an annotation is given a mass, but none of its bodies collides as
+    anything the mass could fill.
+    """
+
+    annotation: SemanticAnnotation
+    """
+    The annotation that was given the mass.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"'{self.annotation.name}' was given a mass, but none of its bodies collides "
+            f"as anything to spread it over."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "give the annotation's bodies collision geometry before giving it a mass."
         )
 
 

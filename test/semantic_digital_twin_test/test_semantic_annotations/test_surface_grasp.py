@@ -31,7 +31,7 @@ from semantic_digital_twin.grasping.surface_grasp import (
 )
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 from ._statements import allowed_intervals
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Vector3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import Mesh
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
@@ -220,14 +220,16 @@ def learned_carton_model(carton) -> RelationalCircuitRegistry:
         above :data:`LIFTING_HEIGHT` lift it and the others do not.
     """
     grasps = draw_surface_grasps(carton.surface_grasp_statement(), 300)
+    rng = np.random.default_rng(0)
     for grasp in grasps:
-        lifted = grasp.height > LIFTING_HEIGHT
+        raised = grasp.height > LIFTING_HEIGHT
         grasp.result = GraspResult(
-            lifted=lifted,
-            object_rise=0.2 if lifted else 0.0,
-            translational_slip=0.0 if lifted else 0.2,
-            rotational_slip=0.0,
+            object_raised=raised,
             motion_completed=True,
+            object_displacement=Vector3(0.0, 0.0, 0.2 if raised else 0.0),
+            object_rotation=Vector3(*rng.normal(0.0, 0.05, 3)),
+            translational_slip=Vector3(0.0, 0.0, 0.0 if raised else -0.2),
+            rotational_slip=Vector3(*rng.normal(0.0, 0.05, 3)),
         )
     return RelationalCircuitRegistry(
         RelationalProbabilisticCircuit(
@@ -245,6 +247,7 @@ def test_a_learned_model_answers_with_lifting_grasps(carton, learned_carton_mode
     for grasp in grasps:
         assert grasp.height > LIFTING_HEIGHT
         assert grasp.result.lifted
+        assert isinstance(grasp.result.translational_slip, Vector3)
 
 
 def test_a_uniform_prior_cannot_require_lifting(carton):

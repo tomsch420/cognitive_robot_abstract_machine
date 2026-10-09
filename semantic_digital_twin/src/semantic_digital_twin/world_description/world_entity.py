@@ -46,6 +46,7 @@ from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import (
     AlreadyBelongsToAWorldError,
+    NoMaterialToSpreadMassOver,
     ReferenceFrameMismatchError,
 )
 from semantic_digital_twin.mixin import HasSimulatorProperties, UniqueSimulatorProperty
@@ -587,6 +588,21 @@ class Body(KinematicStructureEntity):
             return None
         return self.collision.combined_mesh
 
+    def collision_material(self) -> Optional[trimesh.Trimesh]:
+        """
+        :return: What the body's material fills, in its own frame: each collision shape
+            itself where it is closed, its convex hull where it is not; ``None`` if the
+            body collides as nothing.
+        """
+        if not self.collision:
+            return None
+        materials = []
+        for shape in self.collision.shapes:
+            mesh = shape.mesh.copy()
+            mesh.apply_transform(shape.origin.to_np())
+            materials.append(mesh if mesh.is_watertight else mesh.convex_hull)
+        return trimesh.util.concatenate(materials)
+
     def has_collision(
         self, volume_threshold: float = 1.001e-6, surface_threshold: float = 0.00061
     ) -> bool:
@@ -841,6 +857,52 @@ class SemanticAnnotation(WorldEntityWithSimulatorProperties):
     @property
     def bodies_with_collision(self) -> List[Body]:
         return [x for x in self.bodies if x.has_collision()]
+
+    @property
+    def mass(self) -> float:
+        """
+        :return: The mass of what the annotation references: the sum of the masses of
+            its bodies, the bodies of its parts included. A body that states no inertial
+            properties counts as weightless.
+        """
+        return sum(
+            body.inertial.mass
+            for body in self._distinct_bodies()
+            if body.inertial is not None
+        )
+
+    @mass.setter
+    def mass(self, mass: float) -> None:
+        """
+        Spread ``mass`` over the annotation's bodies as one material that evenly fills
+        what each body collides as. A body that collides as nothing is given a
+        negligible mass.
+
+        :param mass: The mass of the whole annotation, in kilograms.
+        :raises NoMaterialToSpreadMassOver: If none of the bodies collides as anything.
+        """
+        materials = {
+            body: body.collision_material() for body in self._distinct_bodies()
+        }
+        volume = sum(
+            material.volume for material in materials.values() if material is not None
+        )
+        if volume <= 0.0:
+            raise NoMaterialToSpreadMassOver(self)
+        for body, material in materials.items():
+            body.inertial = (
+                Inertial.negligible()
+                if material is None
+                else Inertial.of_uniform_material(
+                    material, mass / volume, reference_frame=body
+                )
+            )
+
+    def _distinct_bodies(self) -> List[Body]:
+        """
+        :return: :attr:`bodies`, each once.
+        """
+        return list({id(body): body for body in self.bodies}.values())
 
     def as_bounding_box_collection_at_origin(
         self, origin: HomogeneousTransformationMatrix

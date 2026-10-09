@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 import numpy as np
 from numpy.typing import NDArray
 import pytest
@@ -27,13 +29,14 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Spoon,
     Table,
 )
-from semantic_digital_twin.grasping.rim_finding import RimFinder
+from semantic_digital_twin.pipeline.handle_finding import ProtrudingHandleFinder
+from semantic_digital_twin.pipeline.part_splitting import SplitPartFromShape
+from semantic_digital_twin.pipeline.rim_finding import RimFinder
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import Box, Mesh, Scale
-from semantic_digital_twin.world_description.inertial_properties import Inertial
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -82,7 +85,7 @@ def bowl(tmp_path) -> Bowl:
     with world.modify_world():
         world.add_kinematic_structure_entity(body)
         world.add_semantic_annotation(annotation)
-    Rim.create_on(annotation)
+    SplitPartFromShape(Bowl, Rim, RimFinder()).split(annotation)
     return annotation
 
 
@@ -157,6 +160,74 @@ def test_default_grasp_candidates_approach_along_evenly_spaced_yaws(milk):
     )
 
 
+# %% changing how an annotation is grasped
+
+
+@dataclass(eq=False)
+class FixedlyGraspedHandle(Handle):
+    """
+    A handle that offers one grasp at its origin, whatever its shape.
+    """
+
+    def grasp_candidates(self, model_registry=None, require_lifting=False):
+        return [GraspCandidate.from_body_origin(self)]
+
+
+def test_an_annotation_can_offer_its_grasps_its_own_way():
+    mug = _mug(with_handle=True, handle_type=FixedlyGraspedHandle)
+
+    grasps = mug.grasp_candidates()
+
+    assert len(grasps) == 1
+    assert grasps[0].graspable is mug.handle
+    np.testing.assert_allclose(grasps[0].grasp_pose.to_np(), np.eye(4), atol=1e-9)
+
+
+@dataclass(eq=False)
+class MilkGraspedLow(Milk):
+    """
+    A carton that may be grasped only at its lower half.
+    """
+
+    def surface_grasp_statement(self, require_lifting=False):
+        statement = super().surface_grasp_statement(require_lifting)
+        return statement.where(statement.height < 0.5)
+
+
+def test_an_annotation_can_state_where_it_may_be_grasped(milk):
+    carton = MilkGraspedLow(root=milk.root)
+
+    grasps = carton.drawn_grasp_candidates()
+
+    assert grasps
+    for grasp in grasps:
+        assert grasp.grasp_pose.to_np()[2, 3] < 0.0
+
+
+@dataclass(eq=False)
+class MilkDrawnUniformly(Milk):
+    """
+    A carton that offers grasps drawn uniformly from its statement while no model is
+    given.
+    """
+
+    def default_grasp_candidates(self):
+        return self.drawn_grasp_candidates()
+
+
+def test_an_annotation_can_offer_other_grasps_while_no_model_is_given(milk):
+    carton = MilkDrawnUniformly(root=milk.root)
+    half_extents = BOX_SCALE.to_np()[:3] / 2
+
+    grasps = carton.grasp_candidates()
+
+    assert len(grasps) == carton.grasp_candidate_count
+    for grasp in grasps:
+        position = grasp.grasp_pose.to_np()[:3, 3]
+        assert np.all(np.abs(position) <= half_extents + 1e-9)
+        assert not np.allclose(position, 0.0)
+
+
 # %% rim grasp poses
 
 
@@ -170,7 +241,7 @@ def test_bowl_grasps_sit_in_the_middle_of_the_rims_height(bowl):
     lowest, highest = bowl.rim.grasp_surface().bounds
     rim_height = highest[2] - lowest[2]
 
-    assert rim_height == pytest.approx(RimFinder().depth, abs=0.002)
+    assert rim_height == pytest.approx(RimFinder().depth)
     for grasp in bowl.grasp_candidates():
         height_on_rim = grasp.grasp_pose.to_np()[2, 3] - lowest[2]
         assert 0.25 * rim_height - 1e-9 <= height_on_rim <= 0.75 * rim_height + 1e-9
@@ -278,9 +349,10 @@ def test_cutlery_without_a_shape_offers_no_grasp():
 # %% grasping at a handle
 
 
-def _mug(with_handle: bool) -> Mug:
+def _mug(with_handle: bool, handle_type: type = Handle) -> Mug:
     """
     :param with_handle: Whether the mug is given its handle.
+    :param handle_type: The annotation its handle is given.
     :return: A mug whose round body is a tube and whose handle is a box sticking out
         towards positive x.
     """
@@ -305,7 +377,7 @@ def _mug(with_handle: bool) -> Mug:
         world.add_kinematic_structure_entity(body)
         world.add_semantic_annotation(mug)
     if with_handle:
-        Handle.create_from_part_of_shape(mug, handle_shape)
+        SplitPartFromShape(Mug, handle_type, ProtrudingHandleFinder()).split(mug)
     return mug
 
 
@@ -337,27 +409,21 @@ def test_an_object_without_its_handle_is_grasped_as_it_offers_otherwise():
     assert mug.grasped_part() is mug
 
 
-def test_a_handle_made_from_part_of_a_shape_is_fixed_to_its_whole():
+def test_a_handle_split_off_a_shape_is_fixed_to_its_whole():
     mug = _mug(with_handle=True)
 
     connection = mug.handle.root.parent_connection
 
     assert connection.parent is mug.root
-    assert not mug.handle.root.collision
+    assert mug.handle.root.collision
 
 
-def test_a_handle_made_from_part_of_a_shape_weighs_next_to_nothing():
-    """
-    Its material belongs to the whole. A body left with the default inertial would add a
-    kilogram to the object, and one without any would be weighed by its shape.
-    """
-    mug = _mug(with_handle=True)
+def test_a_handle_split_off_a_shape_leaves_the_whole_its_mass():
+    whole = _mug(with_handle=False)
+    split = _mug(with_handle=True)
 
-    inertial = mug.handle.root.inertial
-    negligible = Inertial.negligible()
-
-    assert inertial.mass == negligible.mass
-    np.testing.assert_array_equal(inertial.inertia.data, negligible.inertia.data)
+    assert split.mass == pytest.approx(whole.mass)
+    assert 0.0 < split.handle.mass < split.mass
 
 
 # %% the frame a grasp is expressed in
