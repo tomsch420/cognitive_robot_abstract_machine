@@ -8,15 +8,13 @@ Run it with ``python -m experiments.physical_pick_up.pick_up_experiment``; see
 from __future__ import annotations
 
 import argparse
-from contextlib import ExitStack
 from dataclasses import dataclass, field
 from datetime import timedelta
 from pathlib import Path
 
 import mujoco
 import numpy as np
-from typing_extensions import Dict, List, Optional
-from uuid import UUID
+from typing_extensions import List, Optional
 
 from experiments.physical_pick_up.pick_up import (
     FilmingSimulationPacer,
@@ -45,8 +43,9 @@ class PickUpExperiment:
     lockstep with Giskard's control loop.
 
     Unless told otherwise, the object is grasped by its description's default grasp
-    where the scene first put it. Every attempt starts from the same state of the
-    world, so attempts can follow one another.
+    where the scene first put it. Every attempt starts from the state the world was in
+    before it, so attempts can follow one another, and all of them run in one
+    simulation that is reset in between.
     """
 
     scene: PickUpScene = field(default_factory=PickUpScene)
@@ -74,14 +73,14 @@ class PickUpExperiment:
     The simulated time after which an attempt that is still moving is given up on.
     """
 
-    _start_state: Dict[UUID, np.ndarray] = field(init=False)
+    simulation: Optional[MujocoSim] = field(default=None, init=False)
     """
-    The state of every degree of freedom of the world before the first attempt.
+    The simulation the attempts run in, built from the world as it is before the first
+    attempt; ``None`` until then.
     """
 
     def __post_init__(self):
         self._add_camera()
-        self._start_state = dict(self.scene.world.state.items())
 
     def run(
         self,
@@ -99,28 +98,12 @@ class PickUpExperiment:
             where the scene first put it.
         :return: What happened to the object.
         """
-        self._restore_start_state()
-        if placement is not None:
-            self.scene.place_object(placement)
-        simulation = MujocoSim(
-            world=self.scene.world,
-            headless=self.headless,
-            step_size=self.step_size.total_seconds(),
-            # Bodies keep the mass and inertia they state; only those stating none
-            # are weighed by their geometry.
-            inertiafromgeom=mujoco.mjtInertiaFromGeom.mjINERTIAFROMGEOM_AUTO,
-            # An implicit integrator keeps the stiff servos stable at this step size;
-            # elliptic friction cones with a raised impedance ratio and a few no-slip
-            # iterations are what MuJoCo's documentation recommends against objects
-            # creeping out of a grasp.
-            integrator=mujoco.mjtIntegrator.mjINT_IMPLICITFAST,
-            cone=mujoco.mjtCone.mjCONE_ELLIPTIC,
-            impratio=10,
-            noslip_iterations=3,
-        )
-        simulation.start_stepped_simulation()
-        with ExitStack() as cleanup:
-            cleanup.callback(simulation.stop_simulation)
+        simulation = self._started_simulation()
+        with self.scene.world.reset_state_context():
+            simulation.reset_simulation()
+            if placement is not None:
+                self.scene.place_object(placement)
+            simulation.synchronizer.command_actuators_from_world_state()
             simulation.step_simulation(self.settling_duration)
             pacer = self._pacer(simulation, video_path)
             result = PhysicalPickUp(
@@ -140,14 +123,30 @@ class PickUpExperiment:
                 pacer.recorded_video.write(video_path)
         return result
 
-    def _restore_start_state(self) -> None:
+    def _started_simulation(self) -> MujocoSim:
         """
-        Put the robot and the object back where they were before the first attempt.
+        :return: :attr:`simulation`, built and started the first time it is asked for.
         """
-        world = self.scene.world
-        for degree_of_freedom_id, values in self._start_state.items():
-            world.state[degree_of_freedom_id] = values
-        world.notify_state_change()
+        if self.simulation is not None:
+            return self.simulation
+        self.simulation = MujocoSim(
+            world=self.scene.world,
+            headless=self.headless,
+            step_size=self.step_size.total_seconds(),
+            # Bodies keep the mass and inertia they state; only those stating none
+            # are weighed by their geometry.
+            inertiafromgeom=mujoco.mjtInertiaFromGeom.mjINERTIAFROMGEOM_AUTO,
+            # An implicit integrator keeps the stiff servos stable at this step size;
+            # elliptic friction cones with a raised impedance ratio and a few no-slip
+            # iterations are what MuJoCo's documentation recommends against objects
+            # creeping out of a grasp.
+            integrator=mujoco.mjtIntegrator.mjINT_IMPLICITFAST,
+            cone=mujoco.mjtCone.mjCONE_ELLIPTIC,
+            impratio=10,
+            noslip_iterations=3,
+        )
+        self.simulation.start_stepped_simulation()
+        return self.simulation
 
     def _pacer(
         self, simulation: MujocoSim, video_path: Optional[Path]

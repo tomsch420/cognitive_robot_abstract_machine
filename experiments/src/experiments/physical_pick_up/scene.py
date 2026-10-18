@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass, field
+from pathlib import Path
 
 import numpy as np
 import trimesh
@@ -19,6 +20,7 @@ from experiments.physical_pick_up.robots import (
     PR2Setup,
     RobotSetup,
 )
+from experiments.physical_pick_up.stored_parts import StoredPartLocator
 from experiments.physical_pick_up.objects import (
     ObjectChoice,
     ObjectDescription,
@@ -290,6 +292,12 @@ class PickUpSceneChoice:
         """
         self.object_choice.add_arguments()
         self.parser.add_argument(
+            "--stored-parts",
+            type=Path,
+            help="a directory of parts located before, answering the part queries of "
+            "the object instead of the part finding server",
+        )
+        self.parser.add_argument(
             "--robot",
             choices=[robot.name.lower() for robot in PickUpRobot],
             default=PickUpRobot.PR2.name.lower(),
@@ -301,7 +309,15 @@ class PickUpSceneChoice:
         :param arguments: The parsed command line.
         :return: The chosen scene.
         """
+        part_finder = (
+            AnnotationPartFinder()
+            if arguments.stored_parts is None
+            else AnnotationPartFinder(
+                locator=StoredPartLocator(directory=arguments.stored_parts)
+            )
+        )
         return PickUpScene(
             object_description=self.object_choice.description(arguments),
             robot_setup=PickUpRobot[arguments.robot.upper()].value,
+            part_finder=part_finder,
         )

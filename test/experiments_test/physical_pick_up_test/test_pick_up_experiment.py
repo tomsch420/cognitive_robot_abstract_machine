@@ -461,6 +461,38 @@ def test_a_held_bowl_turns_in_the_world_as_it_turns_in_the_gripper(part_finder):
     )
 
 
+# %% attempting one after another
+
+
+@simulates_physics
+def test_an_attempt_after_another_ends_as_the_first_did(part_finder):
+    """
+    Each attempt starts from the state the first one started from, although the
+    simulation is built only once.
+    """
+    experiment = PickUpExperiment(scene=PickUpScene(part_finder=part_finder))
+
+    first = experiment.run()
+    second = experiment.run()
+
+    assert second.lifted == first.lifted
+    np.testing.assert_allclose(
+        second.object_displacement.to_np(),
+        first.object_displacement.to_np(),
+        atol=0.005,
+    )
+
+
+@simulates_physics
+def test_an_attempt_leaves_the_world_in_the_state_it_started_from(milk_experiment):
+    world = milk_experiment.scene.world
+    before = world.state.data.copy()
+
+    milk_experiment.run()
+
+    np.testing.assert_array_equal(world.state.data, before)
+
+
 def length(vector: Vector3) -> float:
     """
     :return: The length of ``vector``.
