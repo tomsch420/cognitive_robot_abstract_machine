@@ -76,6 +76,21 @@ def test_a_stored_mesh_is_answered_also_once_its_vertices_are_rounded(directory,
     np.testing.assert_array_equal(part.faces, [0, 1, 2, 3])
 
 
+def test_a_stored_mesh_is_answered_also_once_its_duplicate_vertices_are_merged(
+    directory, mesh
+):
+    locator = StoredPartLocator(directory=directory)
+    unmerged = trimesh.Trimesh(
+        vertices=mesh.vertices[mesh.faces].reshape(-1, 3),
+        faces=np.arange(3 * len(mesh.faces)).reshape(-1, 3),
+        process=False,
+    )
+
+    [part] = locator.locate(PartQuery.from_mesh(unmerged, Mug, ["handle"]))
+
+    np.testing.assert_array_equal(part.faces, [0, 1, 2, 3])
+
+
 def test_only_the_parts_asked_for_are_answered(directory, mesh):
     locator = StoredPartLocator(directory=directory)
 

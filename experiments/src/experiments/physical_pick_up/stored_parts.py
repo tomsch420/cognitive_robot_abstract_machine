@@ -5,7 +5,6 @@ experiment splits its objects as the server would without asking it again.
 
 from __future__ import annotations
 
-import hashlib
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -96,8 +95,9 @@ class StoredPartLocator(PartLocator):
 
     The directory holds, for every object, ``<object>.json``, the server's answer, whose
     ``parts`` are :class:`StoredPart`, and ``<object>.npz``, the ``vertices`` and
-    ``faces`` of the mesh the answer was located in. A query is answered for a mesh with
-    the same faces whose edges are as long, so also once the mesh is moved or turned.
+    ``faces`` of the mesh the answer was located in. A query is answered for a mesh
+    whose faces, in the same order, have edges as long, so also once the mesh is moved
+    or turned or its duplicate vertices are merged.
     """
 
     directory: Path
@@ -116,20 +116,20 @@ class StoredPartLocator(PartLocator):
     one, in meters, for the two to be the same mesh.
     """
 
-    answers_by_faces: Dict[str, List[StoredAnswer]] = field(init=False, repr=False)
+    answers_by_face_count: Dict[int, List[StoredAnswer]] = field(init=False, repr=False)
     """
-    The stored answers, by :meth:`faces_key` of the mesh they were located in.
+    The stored answers, by the number of faces of the mesh they were located in.
     """
 
     def __post_init__(self):
-        self.answers_by_faces = {}
+        self.answers_by_face_count = {}
         for mesh_file in sorted(self.directory.glob("*.npz")):
             answer_file = mesh_file.with_suffix(".json")
             if not answer_file.is_file():
                 continue
             mesh = np.load(mesh_file)
             answer = json.loads(answer_file.read_text())
-            self.answers_by_faces.setdefault(self.faces_key(mesh["faces"]), []).append(
+            self.answers_by_face_count.setdefault(len(mesh["faces"]), []).append(
                 StoredAnswer(
                     edge_lengths=self.edge_lengths(mesh["vertices"], mesh["faces"]),
                     parts=[StoredPart.from_json(part) for part in answer["parts"]],
@@ -144,7 +144,7 @@ class StoredPartLocator(PartLocator):
         edge_lengths = self.edge_lengths(query.vertices, query.faces)
         answers = [
             answer
-            for answer in self.answers_by_faces.get(self.faces_key(query.faces), [])
+            for answer in self.answers_by_face_count.get(len(query.faces), [])
             if np.allclose(
                 answer.edge_lengths,
                 edge_lengths,
@@ -163,14 +163,6 @@ class StoredPartLocator(PartLocator):
             for part in answers[0].parts
             if part.relationship in query.relationship_names
         ]
-
-    @staticmethod
-    def faces_key(faces: NDArray[np.int64]) -> str:
-        """
-        :param faces: The faces of a mesh.
-        :return: A name that is the same exactly for the same faces.
-        """
-        return hashlib.sha256(np.asarray(faces, dtype=np.int64).tobytes()).hexdigest()
 
     @staticmethod
     def edge_lengths(
