@@ -10,6 +10,7 @@ import pytest
 
 from experiments.grasp_learning.robocasa import (
     ParallelRoboCasaGraspLearning,
+    ParallelRoboCasaPolicyIteration,
     RoboCasaModel,
 )
 from experiments.physical_pick_up.objects import GraspableRoboCasaObject
@@ -53,4 +54,29 @@ def test_a_model_is_chosen_on_the_pipelines_command_line_by_object_and_instance(
         GraspableRoboCasaObject.POT.name.lower(),
         "--instance",
         "3",
+    ]
+
+
+def test_an_iteration_runs_over_every_model_of_its_object_with_its_own_workers(
+    tmp_path: Path,
+):
+    iterating = ParallelRoboCasaPolicyIteration(
+        stored_parts=tmp_path,
+        log_directory=tmp_path,
+        workers_per_iteration=6,
+        results=tmp_path / "results",
+        iteration_arguments=["--stopping", "l1"],
+    )
+
+    arguments = iterating.arguments_of(GraspableRoboCasaObject.POT)
+
+    assert arguments == [
+        "--robocasa-object",
+        GraspableRoboCasaObject.POT.name.lower(),
+        "--workers",
+        "6",
+        "--results",
+        str(tmp_path / "results" / GraspableRoboCasaObject.POT.name.lower()),
+        "--stopping",
+        "l1",
     ]
