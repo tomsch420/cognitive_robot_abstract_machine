@@ -134,16 +134,28 @@ class RestingOrientation(ABC):
 @dataclass
 class FixedRestingOrientation(RestingOrientation):
     """
-    The same rotation for every geometry.
+    The same rotation for every geometry; no rotation rests the object as it is modeled.
     """
 
-    rotation_matrix: RotationMatrix = field(default_factory=RotationMatrix)
+    roll: float = 0.0
     """
-    The rotation; the identity rests the object as it is modeled.
+    The rotation about the x-axis, in radians.
+    """
+
+    pitch: float = 0.0
+    """
+    The rotation about the y-axis, in radians.
+    """
+
+    yaw: float = 0.0
+    """
+    The rotation about the z-axis, in radians.
     """
 
     def rotation(self, geometry: ObjectGeometry) -> np.ndarray:
-        return self.rotation_matrix.to_np()
+        return RotationMatrix.from_rpy(
+            roll=self.roll, pitch=self.pitch, yaw=self.yaw
+        ).to_np()
 
 
 @dataclass
@@ -627,9 +639,7 @@ class PickUpObject(Enum):
         default_grasp=SurfaceGrasp(
             azimuth=math.pi, height=0.5, depth=0.13, pitch=0.0, roll=math.pi / 2
         ),
-        resting_orientation=FixedRestingOrientation(
-            RotationMatrix.from_rpy(roll=math.pi / 2, pitch=0.0, yaw=0.0)
-        ),
+        resting_orientation=FixedRestingOrientation(roll=math.pi / 2),
         convex_decomposition=hollow_object_decomposition(),
     )
     """
