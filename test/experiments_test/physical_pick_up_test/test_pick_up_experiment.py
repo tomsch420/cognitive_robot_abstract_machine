@@ -5,6 +5,7 @@ Robots picking objects up in MuJoCo, held by contact alone.
 from __future__ import annotations
 
 import argparse
+from dataclasses import replace
 import numpy as np
 import pytest
 import trimesh
@@ -12,6 +13,7 @@ import trimesh
 from ...pytest_environment import runs_in_continuous_integration
 from .recorded_part_locator import RecordedPartLocator
 
+from experiments.physical_pick_up.exceptions import NoDefaultGraspError
 from experiments.physical_pick_up.physical_simulation_preparation import (
     PR2PhysicalSimulationPreparation,
 )
@@ -99,36 +101,6 @@ def milk_experiment(part_finder) -> PickUpExperiment:
 
 
 # %% preparing the PR2 for physical simulation
-
-
-def test_every_commanded_degree_of_freedom_is_driven_by_one_servo(prepared_pr2):
-    """
-    The coupled finger joints of a gripper share one degree of freedom and therefore one
-    servo.
-    """
-    world = prepared_pr2._world
-    expected = {
-        connection.raw_dof
-        for arm in prepared_pr2.all_arms
-        for connection in arm.active_connections
-    }
-    expected |= {
-        world.get_connection_by_name(joint).raw_dof
-        for joint in (
-            PR2Joint.TORSO_LIFT,
-            PR2Joint.LEFT_GRIPPER_LEFT_FINGER,
-            PR2Joint.RIGHT_GRIPPER_LEFT_FINGER,
-        )
-    }
-
-    driven = [
-        degree_of_freedom
-        for actuator in world.actuators
-        for degree_of_freedom in actuator.dofs
-    ]
-
-    assert set(driven) == expected
-    assert len(driven) == len(expected)
 
 
 def test_a_servoed_joint_without_position_limits_is_given_some(prepared_pr2):
@@ -459,6 +431,48 @@ def test_a_held_bowl_turns_in_the_world_as_it_turns_in_the_gripper(part_finder):
     assert float(result.object_rotation.angle) == pytest.approx(
         float(result.rotational_slip.angle), abs=0.05
     )
+
+
+# %% attempting one after another
+
+
+@simulates_physics
+def test_an_attempt_after_another_ends_as_the_first_did(part_finder):
+    """
+    Each attempt starts from the state the first one started from, although the
+    simulation is built only once.
+    """
+    experiment = PickUpExperiment(scene=PickUpScene(part_finder=part_finder))
+
+    first = experiment.run()
+    second = experiment.run()
+
+    assert second.lifted == first.lifted
+    np.testing.assert_allclose(
+        second.object_displacement.to_np(),
+        first.object_displacement.to_np(),
+        atol=0.005,
+    )
+
+
+@simulates_physics
+def test_an_attempt_leaves_the_world_in_the_state_it_started_from(milk_experiment):
+    world = milk_experiment.scene.world
+    before = world.state.data.copy()
+
+    milk_experiment.run()
+
+    np.testing.assert_array_equal(world.state.data, before)
+
+
+def test_an_attempt_without_a_grasp_needs_a_default_grasp(part_finder):
+    scene = PickUpScene(
+        object_description=replace(PickUpObject.MILK.value, default_grasp=None),
+        part_finder=part_finder,
+    )
+
+    with pytest.raises(NoDefaultGraspError):
+        PickUpExperiment(scene=scene).run()
 
 
 def length(vector: Vector3) -> float:

@@ -8,16 +8,15 @@ Run it with ``python -m experiments.physical_pick_up.pick_up_experiment``; see
 from __future__ import annotations
 
 import argparse
-from contextlib import ExitStack
 from dataclasses import dataclass, field
 from datetime import timedelta
 from pathlib import Path
 
 import mujoco
 import numpy as np
-from typing_extensions import Dict, List, Optional
-from uuid import UUID
+from typing_extensions import List, Optional
 
+from experiments.physical_pick_up.exceptions import NoDefaultGraspError
 from experiments.physical_pick_up.pick_up import (
     FilmingSimulationPacer,
     PhysicalPickUp,
@@ -45,8 +44,9 @@ class PickUpExperiment:
     lockstep with Giskard's control loop.
 
     Unless told otherwise, the object is grasped by its description's default grasp
-    where the scene first put it. Every attempt starts from the same state of the
-    world, so attempts can follow one another.
+    where the scene first put it. Every attempt starts from the state the world was in
+    before it, so attempts can follow one another, and all of them run in one
+    simulation that is reset in between.
     """
 
     scene: PickUpScene = field(default_factory=PickUpScene)
@@ -74,14 +74,14 @@ class PickUpExperiment:
     The simulated time after which an attempt that is still moving is given up on.
     """
 
-    _start_state: Dict[UUID, np.ndarray] = field(init=False)
+    simulation: Optional[MujocoSim] = field(default=None, init=False)
     """
-    The state of every degree of freedom of the world before the first attempt.
+    The simulation the attempts run in, built from the world as it is before the first
+    attempt; ``None`` until then.
     """
 
     def __post_init__(self):
         self._add_camera()
-        self._start_state = dict(self.scene.world.state.items())
 
     def run(
         self,
@@ -98,11 +98,40 @@ class PickUpExperiment:
         :param placement: Where the object stands for this attempt; ``None`` leaves it
             where the scene first put it.
         :return: What happened to the object.
+        :raises NoDefaultGraspError: If no grasp is given and the object's description
+            knows none that lifts it.
         """
-        self._restore_start_state()
-        if placement is not None:
-            self.scene.place_object(placement)
-        simulation = MujocoSim(
+        description = self.scene.object_description
+        if grasp is None and description.default_grasp is None:
+            raise NoDefaultGraspError(body_name=description.body_name)
+        if grasp is None:
+            grasp = description.default_grasp.grasp_candidate(self.scene.graspable)
+        simulation = self._started_simulation()
+        with self.scene.world.reset_state_context():
+            simulation.reset_simulation()
+            if placement is not None:
+                self.scene.place_object(placement)
+            simulation.synchronizer.command_actuators_from_world_state()
+            simulation.step_simulation(self.settling_duration)
+            pacer = self._pacer(simulation, video_path)
+            result = PhysicalPickUp(
+                robot=self.scene.robot,
+                arm=self.scene.arm,
+                grasp=grasp,
+                pacer=pacer,
+                time_limit=self.time_limit,
+            ).perform()
+            if isinstance(pacer, FilmingSimulationPacer):
+                pacer.recorded_video.write(video_path)
+        return result
+
+    def _started_simulation(self) -> MujocoSim:
+        """
+        :return: :attr:`simulation`, built and started the first time it is asked for.
+        """
+        if self.simulation is not None:
+            return self.simulation
+        self.simulation = MujocoSim(
             world=self.scene.world,
             headless=self.headless,
             step_size=self.step_size.total_seconds(),
@@ -118,36 +147,8 @@ class PickUpExperiment:
             impratio=10,
             noslip_iterations=3,
         )
-        simulation.start_stepped_simulation()
-        with ExitStack() as cleanup:
-            cleanup.callback(simulation.stop_simulation)
-            simulation.step_simulation(self.settling_duration)
-            pacer = self._pacer(simulation, video_path)
-            result = PhysicalPickUp(
-                robot=self.scene.robot,
-                arm=self.scene.arm,
-                grasp=(
-                    grasp
-                    if grasp is not None
-                    else self.scene.object_description.default_grasp.grasp_candidate(
-                        self.scene.graspable
-                    )
-                ),
-                pacer=pacer,
-                time_limit=self.time_limit,
-            ).perform()
-            if isinstance(pacer, FilmingSimulationPacer):
-                pacer.recorded_video.write(video_path)
-        return result
-
-    def _restore_start_state(self) -> None:
-        """
-        Put the robot and the object back where they were before the first attempt.
-        """
-        world = self.scene.world
-        for degree_of_freedom_id, values in self._start_state.items():
-            world.state[degree_of_freedom_id] = values
-        world.notify_state_change()
+        self.simulation.start_stepped_simulation()
+        return self.simulation
 
     def _pacer(
         self, simulation: MujocoSim, video_path: Optional[Path]

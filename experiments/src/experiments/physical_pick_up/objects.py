@@ -303,9 +303,9 @@ class ObjectDescription(ABC):
     Mass of the object in kilograms.
     """
 
-    default_grasp: SurfaceGrasp
+    default_grasp: SurfaceGrasp | None = None
     """
-    A grasp known to lift the object.
+    A grasp known to lift the object; ``None`` if none is known.
     """
 
     resting_orientation: RestingOrientation = field(
