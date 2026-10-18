@@ -1,3 +1,5 @@
+import math
+
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import *
 from probabilistic_model.distributions.distributions import (
     SymbolicDistribution,
@@ -6,7 +8,10 @@ from probabilistic_model.distributions.distributions import (
 )
 from probabilistic_model.distributions.gaussian import GaussianDistribution
 from probabilistic_model.distributions.uniform import UniformDistribution
-from probabilistic_model.exceptions import EventMixesPointsAndIntervalsError
+from probabilistic_model.exceptions import (
+    EventMixesPointsAndIntervalsError,
+    UnboundedEventError,
+)
 from probabilistic_model.utils import (
     MissingDict,
     event_compatible_for_truncation_with_singletons,
@@ -19,6 +24,8 @@ def uniform_measure_of_event(event: Event) -> ProbabilisticCircuit:
 
     :param event: The event
     :return: The circuit describing the uniform measure
+    :raises UnboundedEventError: If the event does not bound a continuous variable from
+        below and above.
     :raises EventMixesPointsAndIntervalsError: If a continuous variable takes points and
         intervals in the box bounding the event.
     """
@@ -39,6 +46,8 @@ def uniform_measure_of_simple_event(simple_event: SimpleEvent) -> ProbabilisticC
 
     :param simple_event: The simple event
     :return: The circuit describing the uniform measure over the simple event
+    :raises UnboundedEventError: If the simple event does not bound a continuous
+        variable from below and above.
     :raises EventMixesPointsAndIntervalsError: If a continuous variable takes points and
         intervals.
     """
@@ -54,6 +63,11 @@ def uniform_measure_of_simple_event(simple_event: SimpleEvent) -> ProbabilisticC
 
         # handle different variables
         if isinstance(variable, Continuous):
+            if not (
+                math.isfinite(assignment.simple_sets[0].lower)
+                and math.isfinite(assignment.simple_sets[-1].upper)
+            ):
+                raise UnboundedEventError(variable=variable)
 
             distribution = SumUnit(probabilistic_circuit=result)
             if all(assignment_.is_singleton() for assignment_ in assignment):
