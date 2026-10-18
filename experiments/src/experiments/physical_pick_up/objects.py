@@ -32,19 +32,39 @@ from semantic_digital_twin.pipeline.mesh_decomposition.coacd import (
     COACDMeshDecomposer,
 )
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
+    Apple,
+    Banana,
     Bottle,
     Bowl,
+    Bread,
+    Carrot,
     Cereal,
     CheezeIt,
     Container,
     Cookware,
     Cup,
     CuttingKnife,
+    Food,
+    Fruit,
+    Kettle,
     Knife,
     Milk,
     Mug,
+    MustardBottle,
+    Orange,
+    Pan,
+    Pot,
+    Potato,
+    SaltPepperShaker,
+    SoapBottle,
+    Sponge,
     Spoon,
+    SprayBottle,
+    Tomato,
+    Tool,
+    Vegetable,
     Whisk,
+    WineBottle,
 )
 from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
 from semantic_digital_twin.spatial_types import RotationMatrix
@@ -303,9 +323,9 @@ class ObjectDescription(ABC):
     Mass of the object in kilograms.
     """
 
-    default_grasp: SurfaceGrasp
+    default_grasp: SurfaceGrasp | None = None
     """
-    A grasp known to lift the object.
+    A grasp known to lift the object; ``None`` if none is known.
     """
 
     resting_orientation: RestingOrientation = field(
@@ -794,14 +814,175 @@ class PickUpObject(Enum):
     """
 
 
+# %% the graspable objects of RoboCasa
+
+
+@dataclass(frozen=True)
+class GraspableRoboCasaCategory:
+    """
+    A category of RoboCasa objects that RoboCasa marks as graspable, and the annotation
+    its objects are given.
+    """
+
+    category: str
+    """
+    The RoboCasa object category, the name of the directory its models lie in.
+    """
+
+    semantic_annotation_type: Type[HasGraspCandidates]
+    """
+    What the objects of the category are; categories without an annotation of their
+    own are given the nearest more general one.
+    """
+
+    def description(
+        self, instance_index: int = 0, density: float = 100.0
+    ) -> RoboCasaObjectDescription:
+        """
+        :param instance_index: Which of the category's models to take.
+        :param density: The density of the object in kilograms per cubic meter; RoboCasa
+            gives every object of its graspable categories the same.
+        :return: The description of the model, weighing its density times the volume
+            of its collision parts, with no default grasp.
+        """
+        description = RoboCasaObjectDescription(
+            body_name=f"robocasa_{self.category}_{instance_index}",
+            category=self.category,
+            instance_index=instance_index,
+            semantic_annotation_type=self.semantic_annotation_type,
+            mass=0.0,
+        )
+        volume = sum(
+            part.convex_hull.volume
+            for part in description.load_geometry().collision_parts
+        )
+        return replace(description, mass=density * volume)
+
+
+class GraspableRoboCasaObject(Enum):
+    """
+    Every category of RoboCasa objects that RoboCasa marks as graspable and whose models
+    are among the self-contained groups the dataset loader reads.
+    """
+
+    ALUMINUM_FOIL = GraspableRoboCasaCategory("aluminum_foil", Tool)
+    APPLE = GraspableRoboCasaCategory("apple", Apple)
+    AVOCADO = GraspableRoboCasaCategory("avocado", Fruit)
+    BAGUETTE = GraspableRoboCasaCategory("baguette", Food)
+    BANANA = GraspableRoboCasaCategory("banana", Banana)
+    BAR = GraspableRoboCasaCategory("bar", Food)
+    BAR_SOAP = GraspableRoboCasaCategory("bar_soap", Tool)
+    BEER = GraspableRoboCasaCategory("beer", Bottle)
+    BELL_PEPPER = GraspableRoboCasaCategory("bell_pepper", Vegetable)
+    BLENDER_JUG = GraspableRoboCasaCategory("blender_jug", Container)
+    BOTTLED_DRINK = GraspableRoboCasaCategory("bottled_drink", Bottle)
+    BOTTLED_WATER = GraspableRoboCasaCategory("bottled_water", Bottle)
+    BOWL = GraspableRoboCasaCategory("bowl", Bowl)
+    BOXED_DRINK = GraspableRoboCasaCategory("boxed_drink", Food)
+    BOXED_FOOD = GraspableRoboCasaCategory("boxed_food", Food)
+    BREAD = GraspableRoboCasaCategory("bread", Bread)
+    BROCCOLI = GraspableRoboCasaCategory("broccoli", Vegetable)
+    CAKE = GraspableRoboCasaCategory("cake", Food)
+    CAN = GraspableRoboCasaCategory("can", Container)
+    CANDLE = GraspableRoboCasaCategory("candle", Tool)
+    CANNED_FOOD = GraspableRoboCasaCategory("canned_food", Food)
+    CARROT = GraspableRoboCasaCategory("carrot", Carrot)
+    CEREAL = GraspableRoboCasaCategory("cereal", Cereal)
+    CHEESE = GraspableRoboCasaCategory("cheese", Food)
+    CHEESE_GRATER = GraspableRoboCasaCategory("cheese_grater", Tool)
+    CHICKEN_DRUMSTICK = GraspableRoboCasaCategory("chicken_drumstick", Food)
+    CINNAMON = GraspableRoboCasaCategory("cinnamon", Food)
+    COFFEE_CUP = GraspableRoboCasaCategory("coffee_cup", Cup)
+    COLANDER = GraspableRoboCasaCategory("colander", Container)
+    COOKIE_DOUGH_BALL = GraspableRoboCasaCategory("cookie_dough_ball", Food)
+    CORN = GraspableRoboCasaCategory("corn", Vegetable)
+    CREAM_CHEESE_STICK = GraspableRoboCasaCategory("cream_cheese_stick", Food)
+    CROISSANT = GraspableRoboCasaCategory("croissant", Food)
+    CUCUMBER = GraspableRoboCasaCategory("cucumber", Vegetable)
+    CUP = GraspableRoboCasaCategory("cup", Cup)
+    CUPCAKE = GraspableRoboCasaCategory("cupcake", Food)
+    DISH_BRUSH = GraspableRoboCasaCategory("dish_brush", Tool)
+    DONUT = GraspableRoboCasaCategory("donut", Food)
+    EGG = GraspableRoboCasaCategory("egg", Food)
+    EGGPLANT = GraspableRoboCasaCategory("eggplant", Vegetable)
+    FISH = GraspableRoboCasaCategory("fish", Food)
+    GARLIC = GraspableRoboCasaCategory("garlic", Vegetable)
+    GLASS_CUP = GraspableRoboCasaCategory("glass_cup", Cup)
+    HONEY_BOTTLE = GraspableRoboCasaCategory("honey_bottle", Bottle)
+    HOT_DOG = GraspableRoboCasaCategory("hot_dog", Food)
+    HOTDOG_BUN = GraspableRoboCasaCategory("hotdog_bun", Food)
+    ICE_CUBE = GraspableRoboCasaCategory("ice_cube", Food)
+    JAM = GraspableRoboCasaCategory("jam", Food)
+    JAR = GraspableRoboCasaCategory("jar", Container)
+    JUG = GraspableRoboCasaCategory("jug", Container)
+    JUICE = GraspableRoboCasaCategory("juice", Bottle)
+    KEBAB_SKEWER = GraspableRoboCasaCategory("kebab_skewer", Tool)
+    KETCHUP = GraspableRoboCasaCategory("ketchup", Bottle)
+    KIWI = GraspableRoboCasaCategory("kiwi", Fruit)
+    LADLE = GraspableRoboCasaCategory("ladle", Spoon)
+    LEMON = GraspableRoboCasaCategory("lemon", Fruit)
+    LEMON_WEDGE = GraspableRoboCasaCategory("lemon_wedge", Fruit)
+    LIME = GraspableRoboCasaCategory("lime", Fruit)
+    MANGO = GraspableRoboCasaCategory("mango", Fruit)
+    MARSHMALLOW = GraspableRoboCasaCategory("marshmallow", Food)
+    MAYONNAISE = GraspableRoboCasaCategory("mayonnaise", Bottle)
+    MEASURING_CUP = GraspableRoboCasaCategory("measuring_cup", Cup)
+    MILK = GraspableRoboCasaCategory("milk", Milk)
+    MUG = GraspableRoboCasaCategory("mug", Mug)
+    MUSHROOM = GraspableRoboCasaCategory("mushroom", Vegetable)
+    MUSTARD = GraspableRoboCasaCategory("mustard", MustardBottle)
+    OIL_AND_VINEGAR_BOTTLE = GraspableRoboCasaCategory("oil_and_vinegar_bottle", Bottle)
+    ONION = GraspableRoboCasaCategory("onion", Vegetable)
+    ORANGE = GraspableRoboCasaCategory("orange", Orange)
+    PAN = GraspableRoboCasaCategory("pan", Pan)
+    PAPRIKA = GraspableRoboCasaCategory("paprika", Food)
+    PEACH = GraspableRoboCasaCategory("peach", Fruit)
+    PEAR = GraspableRoboCasaCategory("pear", Fruit)
+    PEELER = GraspableRoboCasaCategory("peeler", Tool)
+    PITCHER = GraspableRoboCasaCategory("pitcher", Container)
+    PIZZA_CUTTER = GraspableRoboCasaCategory("pizza_cutter", Tool)
+    POT = GraspableRoboCasaCategory("pot", Pot)
+    POTATO = GraspableRoboCasaCategory("potato", Potato)
+    REAMER = GraspableRoboCasaCategory("reamer", Tool)
+    ROLLING_PIN = GraspableRoboCasaCategory("rolling_pin", Tool)
+    SALT_AND_PEPPER_SHAKER = GraspableRoboCasaCategory(
+        "salt_and_pepper_shaker", SaltPepperShaker
+    )
+    SAUCEPAN = GraspableRoboCasaCategory("saucepan", Pan)
+    SHAKER = GraspableRoboCasaCategory("shaker", SaltPepperShaker)
+    SHRIMP = GraspableRoboCasaCategory("shrimp", Food)
+    SOAP_DISPENSER = GraspableRoboCasaCategory("soap_dispenser", SoapBottle)
+    SPONGE = GraspableRoboCasaCategory("sponge", Sponge)
+    SPRAY = GraspableRoboCasaCategory("spray", SprayBottle)
+    SQUASH = GraspableRoboCasaCategory("squash", Vegetable)
+    STEAK = GraspableRoboCasaCategory("steak", Food)
+    STRAINER = GraspableRoboCasaCategory("strainer", Container)
+    STRAW = GraspableRoboCasaCategory("straw", Tool)
+    SUGAR_CUBE = GraspableRoboCasaCategory("sugar_cube", Food)
+    SWEET_POTATO = GraspableRoboCasaCategory("sweet_potato", Vegetable)
+    SYRUP_BOTTLE = GraspableRoboCasaCategory("syrup_bottle", Bottle)
+    TANGERINE = GraspableRoboCasaCategory("tangerine", Fruit)
+    TEAPOT = GraspableRoboCasaCategory("teapot", Kettle)
+    TOMATO = GraspableRoboCasaCategory("tomato", Tomato)
+    TONGS = GraspableRoboCasaCategory("tongs", Tool)
+    TUPPERWARE = GraspableRoboCasaCategory("tupperware", Container)
+    TURMERIC = GraspableRoboCasaCategory("turmeric", Food)
+    WATER_BOTTLE = GraspableRoboCasaCategory("water_bottle", Bottle)
+    WHISK = GraspableRoboCasaCategory("whisk", Whisk)
+    WINE = GraspableRoboCasaCategory("wine", WineBottle)
+    WOODEN_SPOON = GraspableRoboCasaCategory("wooden_spoon", Spoon)
+    YOGURT = GraspableRoboCasaCategory("yogurt", Food)
+
+
 # %% choosing an object on the command line
 
 
 @dataclass
 class ObjectChoice:
     """
-    Lets a command line choose the object to pick up: one of :class:`PickUpObject`, and
-    for a RoboCasa object optionally another model of its category.
+    Lets a command line choose the object to pick up: one of :class:`PickUpObject` or of
+    :class:`GraspableRoboCasaObject`, and for a RoboCasa object optionally another model
+    of its category.
     """
 
     parser: argparse.ArgumentParser
@@ -813,11 +994,17 @@ class ObjectChoice:
         """
         Add the arguments choosing the object to :attr:`parser`.
         """
-        self.parser.add_argument(
+        objects = self.parser.add_mutually_exclusive_group()
+        objects.add_argument(
             "--object",
             choices=[pick_up_object.name.lower() for pick_up_object in PickUpObject],
             default=PickUpObject.BOWL.name.lower(),
             help="the object to pick up",
+        )
+        objects.add_argument(
+            "--robocasa-object",
+            choices=[graspable.name.lower() for graspable in GraspableRoboCasaObject],
+            help="a graspable RoboCasa object to pick up instead",
         )
         self.parser.add_argument(
             "--instance",
@@ -831,6 +1018,10 @@ class ObjectChoice:
         :return: The description of the chosen object. Choosing a model of an object
             that is not a RoboCasa object ends the program with a usage error.
         """
+        if arguments.robocasa_object is not None:
+            return GraspableRoboCasaObject[
+                arguments.robocasa_object.upper()
+            ].value.description(instance_index=arguments.instance or 0)
         description = PickUpObject[arguments.object.upper()].value
         if arguments.instance is None:
             return description

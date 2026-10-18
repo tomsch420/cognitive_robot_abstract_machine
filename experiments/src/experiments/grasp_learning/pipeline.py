@@ -168,7 +168,8 @@ class GraspLearningPipeline:
 
 def main() -> None:
     """
-    Run the pipeline from the command line and report the stored model.
+    Run the pipeline from the command line and report the stored model, or only try
+    grasps and report how many lifted the object.
     """
     parser = argparse.ArgumentParser(description=__doc__)
     scene_choice = PickUpSceneChoice(parser)
@@ -186,6 +187,12 @@ def main() -> None:
         help="grasps drawn from the learned model",
     )
     parser.add_argument("--seed", type=int, default=GraspLearningPipeline.seed)
+    parser.add_argument(
+        "--attempts-only",
+        action="store_true",
+        help="only try and store the grasps drawn from the stated regions, without "
+        "learning a model",
+    )
     arguments = parser.parse_args()
     pipeline = GraspLearningPipeline(
         experiment=PickUpExperiment(
@@ -196,6 +203,13 @@ def main() -> None:
         number_of_verifying_attempts=arguments.verifying_attempts,
         seed=arguments.seed,
     )
+    if arguments.attempts_only:
+        attempts = pipeline.attempt(GraspSource.STATED_REGIONS, arguments.attempts)
+        lifted = sum(attempt.grasp.result.lifted for attempt in attempts)
+        print(
+            f"{pipeline.task}: {lifted} of {len(attempts)} attempts lifted the object"
+        )
+        return
     model = pipeline.run()
     print(
         f"{model.task}: learned from {model.number_of_attempts} attempts that lifted "

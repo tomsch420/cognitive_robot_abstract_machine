@@ -87,6 +87,11 @@ class StoredPartLocator(PartLocator):
     Where the stored answers are.
     """
 
+    require_stored_answer: bool = True
+    """
+    Whether a mesh needs a stored answer; one that does not is taken to have no parts.
+    """
+
     parts_by_mesh: Dict[str, List[StoredPart]] = field(init=False, repr=False)
     """
     The stored parts, by :meth:`mesh_key` of the mesh they were located in.
@@ -106,9 +111,12 @@ class StoredPartLocator(PartLocator):
 
     def locate(self, query: PartQuery) -> list[LocatedPart]:
         """
-        :raises NoStoredPartsError: If no answer is stored for the query's mesh.
+        :raises NoStoredPartsError: If no answer is stored for the query's mesh and
+            :attr:`require_stored_answer` says it has to be.
         """
         key = self.mesh_key(query.vertices, query.faces)
+        if key not in self.parts_by_mesh and not self.require_stored_answer:
+            return []
         if key not in self.parts_by_mesh:
             raise NoStoredPartsError(
                 whole_type=query.whole_type, directory=self.directory

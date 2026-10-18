@@ -115,6 +115,18 @@ def test_load_object_from_group_without_objaverse_assets(robocasa_loader):
     assert len(world.bodies) > 0
 
 
+def test_the_model_files_of_a_category_are_those_load_object_indexes(robocasa_loader):
+    model_files = robocasa_loader.object_model_files(RoboCasaObjectCategory.POT)
+
+    assert model_files == sorted(model_files)
+    assert all(
+        model_file.parts[-1] == "model.xml"
+        and RoboCasaObjectCategory.POT.value in model_file.parts
+        for model_file in model_files
+    )
+    assert len(model_files) > 1
+
+
 def test_load_task_binds_instruction_and_world(robocasa_loader):
     """
     The loaded task carries its natural-language instruction bound to the scene it plays

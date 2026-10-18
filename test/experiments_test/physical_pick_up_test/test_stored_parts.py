@@ -77,3 +77,12 @@ def test_a_mesh_without_a_stored_answer_cannot_be_answered(directory):
 
     with pytest.raises(NoStoredPartsError):
         locator.locate(PartQuery.from_mesh(other_mesh, Mug, ["handle"]))
+
+
+def test_a_mesh_without_a_stored_answer_has_no_parts_unless_an_answer_is_required(
+    directory,
+):
+    locator = StoredPartLocator(directory=directory, require_stored_answer=False)
+    other_mesh = trimesh.creation.box(extents=(0.2, 0.1, 0.1))
+
+    assert locator.locate(PartQuery.from_mesh(other_mesh, Mug, ["handle"])) == []

@@ -656,6 +656,23 @@ class RoboCasaDatasetLoader:
             if layout.name.startswith("LAYOUT")
         ]
 
+    def object_model_files(self, category: RoboCasaObjectCategory) -> List[Path]:
+        """
+        :param category: The object category, a key of
+            ``robocasa.models.objects.kitchen_objects.OBJ_CATEGORIES``.
+        :return: The model of every downloaded instance of the category among the
+            self-contained groups listed in :attr:`self_contained_object_groups`, in
+            the order :meth:`load_object` indexes them.
+        """
+        objects_directory = self.directory / "objects"
+        return sorted(
+            model_file
+            for group in self.self_contained_object_groups
+            for model_file in (objects_directory / group).glob(
+                f"{category}/**/model.xml"
+            )
+        )
+
     def load_object(
         self, category: RoboCasaObjectCategory, instance_index: int = 0
     ) -> World:
@@ -670,13 +687,7 @@ class RoboCasaDatasetLoader:
         :return: The loaded world, with a SemanticAnnotation attached to the object's root body.
         """
         objects_directory = self.directory / "objects"
-        model_files = sorted(
-            model_file
-            for group in self.self_contained_object_groups
-            for model_file in (objects_directory / group).glob(
-                f"{category}/**/model.xml"
-            )
-        )
+        model_files = self.object_model_files(category)
         if not model_files:
             raise RoboCasaObjectAssetsNotFoundError(
                 category, self.self_contained_object_groups, objects_directory

@@ -16,6 +16,7 @@ import mujoco
 import numpy as np
 from typing_extensions import List, Optional
 
+from experiments.physical_pick_up.exceptions import NoDefaultGraspError
 from experiments.physical_pick_up.pick_up import (
     FilmingSimulationPacer,
     PhysicalPickUp,
@@ -97,7 +98,14 @@ class PickUpExperiment:
         :param placement: Where the object stands for this attempt; ``None`` leaves it
             where the scene first put it.
         :return: What happened to the object.
+        :raises NoDefaultGraspError: If no grasp is given and the object's description
+            knows none that lifts it.
         """
+        description = self.scene.object_description
+        if grasp is None and description.default_grasp is None:
+            raise NoDefaultGraspError(body_name=description.body_name)
+        if grasp is None:
+            grasp = description.default_grasp.grasp_candidate(self.scene.graspable)
         simulation = self._started_simulation()
         with self.scene.world.reset_state_context():
             simulation.reset_simulation()
@@ -109,13 +117,7 @@ class PickUpExperiment:
             result = PhysicalPickUp(
                 robot=self.scene.robot,
                 arm=self.scene.arm,
-                grasp=(
-                    grasp
-                    if grasp is not None
-                    else self.scene.object_description.default_grasp.grasp_candidate(
-                        self.scene.graspable
-                    )
-                ),
+                grasp=grasp,
                 pacer=pacer,
                 time_limit=self.time_limit,
             ).perform()

@@ -295,7 +295,8 @@ class PickUpSceneChoice:
             "--stored-parts",
             type=Path,
             help="a directory of parts located before, answering the part queries of "
-            "the object instead of the part finding server",
+            "the object instead of the part finding server; an object without stored "
+            "parts is taken to have none",
         )
         self.parser.add_argument(
             "--robot",
@@ -313,7 +314,9 @@ class PickUpSceneChoice:
             AnnotationPartFinder()
             if arguments.stored_parts is None
             else AnnotationPartFinder(
-                locator=StoredPartLocator(directory=arguments.stored_parts)
+                locator=StoredPartLocator(
+                    directory=arguments.stored_parts, require_stored_answer=False
+                )
             )
         )
         return PickUpScene(
