@@ -78,7 +78,7 @@ from semantic_digital_twin.datastructures.definitions import (
     StaticJointState,
     TorsoState,
 )
-from semantic_digital_twin.grasping.grasp_candidates import HasGraspCandidates
+from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
 from semantic_digital_twin.reasoning.robot_predicates import is_body_gripped
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Floor

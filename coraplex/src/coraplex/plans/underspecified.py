@@ -17,7 +17,7 @@ from coraplex.plans.plan import Plan
 from coraplex.plans.plan_node import ActionNode, ExecutionBoundaryNode
 from coraplex.visualization import RvizVisualization
 from krrood.entity_query_language.query.match import Match
-from semantic_digital_twin.grasping.grasp_candidates import HasGraspCandidates
+from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
 from semantic_digital_twin.reasoning.robot_predicates import (
     fractions_of_rays_between_fingers_hitting_bodies,
 )

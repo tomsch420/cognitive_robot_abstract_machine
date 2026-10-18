@@ -80,7 +80,7 @@ with world.modify_world():
 drive.origin = task.robot_base_pose
 pr2 = PR2.from_world(world)
 
-from semantic_digital_twin.grasping.grasp_candidates import HasGraspCandidates
+from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
 cup = next(a for a in world.semantic_annotations if a.root == task.manipulated_objects[0] and isinstance(a, HasGraspCandidates))
 print("target object", type(cup).__name__, cup.root.name.name)
 sink = world.get_semantic_annotations_by_type(Sink)[0]

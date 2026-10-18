@@ -3,7 +3,7 @@ from collections import Counter
 
 from semantic_digital_twin.adapters.robocasa_dataset.loader import RoboCasaDatasetLoader
 from robocasa.models.scenes.scene_registry import LayoutType, StyleType
-from semantic_digital_twin.grasping.grasp_candidates import HasGraspCandidates
+from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
 
 task = RoboCasaDatasetLoader().load_task("PickPlaceCounterToSink", LayoutType.LAYOUT001, StyleType.STYLE001)
 world = task.world
