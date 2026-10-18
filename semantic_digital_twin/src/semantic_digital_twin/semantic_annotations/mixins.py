@@ -409,25 +409,8 @@ class HasRootBody(HasRootKinematicStructureEntity[Body]):
 @dataclass(eq=False)
 class HasGraspCandidates(HasRootBody):
     """
-    A mixin class for semantic annotations that can say where they may be grasped.
-
-    Only an annotation rooted in a body can be grasped at all, since a region carries no
-    collision geometry for fingers to close on.
-
-    Where an object may be grasped is stated as an underspecified statement over
-    :class:`~semantic_digital_twin.grasping.surface_grasp.SurfaceGrasp`, the one
-    :meth:`surface_grasp_statement` returns. Given a model learned over tried grasps,
-    the grasp candidates are drawn from it; without one, the annotation offers its
-    :meth:`default_grasp_candidates`.
-
-    An annotation changes how it is grasped by overriding one of these:
-
-    - :meth:`surface_grasp_statement`, to state where on its surface it may be grasped;
-    - :meth:`default_grasp_candidates`, to offer other grasps while no model is given,
-      such as :meth:`drawn_grasp_candidates` for an annotation whose statement is
-      narrow enough to draw from uniformly;
-    - :meth:`grasped_part`, to be grasped at one of its parts instead of itself;
-    - :meth:`grasp_candidates`, to offer its grasps in another way altogether.
+    A mixin class for semantic annotations that state where they may be grasped, in
+    :meth:`surface_grasp_statement`, and offer grasp candidates.
     """
 
     grasp_candidate_count: int = field(default=12, kw_only=True)

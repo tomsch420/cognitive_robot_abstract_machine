@@ -37,23 +37,19 @@ How far from the bowl's surface the fingers may close and still find material, i
 meters.
 """
 
-RIM_DEPTH = 0.02
-"""
-How far below the bowl's highest point its rim reaches, in meters.
-"""
 
-
-def split_off_rim(bowl: Bowl) -> Rim:
+def split_off_rim(bowl: Bowl, rim_depth: float = 0.02) -> Rim:
     """
-    Split the bowl's rim off its shape, at the faces a part locator would have found it
-    at: those whose centers lie within :data:`RIM_DEPTH` of its highest point.
+    Split the bowl's rim off its shape, at the faces whose centers lie within
+    ``rim_depth`` of its highest point.
 
     :param bowl: The bowl, its rim still part of its body's shape.
+    :param rim_depth: How far below the bowl's highest point its rim reaches, in meters.
     :return: The rim.
     """
     mesh = bowl.root.collision.combined_mesh
     centers = mesh.triangles_center
-    rim_centers = centers[centers[:, 2] > mesh.bounds[1][2] - RIM_DEPTH]
+    rim_centers = centers[centers[:, 2] > mesh.bounds[1][2] - rim_depth]
     return PartSplitter(
         part_type=Rim, finder=LocatedFacesFinder(face_centers=rim_centers)
     ).split(bowl)
