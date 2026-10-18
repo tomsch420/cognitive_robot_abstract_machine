@@ -675,6 +675,12 @@ class RoundState:
     The object whose part the rule asks the model about.
     """
 
+    lift_rates: list[float | None]
+    """
+    The share of the grasps each earlier round's policy chose that lifted the object, in
+    order; ``None`` for a round in which none was tried.
+    """
+
 
 class StoppingRule(ABC):
     """
@@ -877,6 +883,77 @@ class DistancesWithinFloors(StoppingRule):
         return self.converged_rounds >= self.required_converged_rounds
 
 
+@dataclass
+class LiftRateSettled(StoppingRule):
+    """
+    Stops once the lift rate of the policy's grasps no longer rises: the mean over the
+    latest rounds exceeds the mean over as many rounds before them by less than a
+    minimum gain.
+    """
+
+    rounds_compared: int = 4
+    """
+    How many of the latest rounds are compared with as many rounds before them.
+    """
+
+    minimum_gain: float = 0.02
+    """
+    The least rise of the lift rate that counts as still rising.
+    """
+
+    gain: float | None = field(default=None, init=False)
+    """
+    The rise of the lift rate in the latest round observed; ``None`` while too few
+    rounds tried grasps.
+    """
+
+    def observe(self, state: RoundState) -> Dict[str, Any]:
+        self.gain = self.gain_of(state.lift_rates)
+        return {"lift_rate_gain": self.gain}
+
+    def gain_of(self, lift_rates: list[float | None]) -> float | None:
+        """
+        :param lift_rates: The lift rates of the rounds so far, in order.
+        :return: The mean lift rate of the latest :attr:`rounds_compared` rounds minus
+            that of as many rounds before them; ``None`` while fewer rounds tried grasps.
+        """
+        tried = [lift_rate for lift_rate in lift_rates if lift_rate is not None]
+        if len(tried) < 2 * self.rounds_compared:
+            return None
+        latest = tried[-self.rounds_compared :]
+        before = tried[-2 * self.rounds_compared : -self.rounds_compared]
+        return float(np.mean(latest) - np.mean(before))
+
+    @property
+    def stops(self) -> bool:
+        return self.gain is not None and self.gain < self.minimum_gain
+
+
+@dataclass
+class PolicySettled(StoppingRule):
+    """
+    Stops once the model stays within the floors of :class:`DistancesWithinFloors` and
+    the lift rate of its grasps no longer rises.
+    """
+
+    distances: DistancesWithinFloors = field(default_factory=DistancesWithinFloors)
+    """
+    Tells when the model no longer changes.
+    """
+
+    lift_rate: LiftRateSettled = field(default_factory=LiftRateSettled)
+    """
+    Tells when the lift rate no longer rises.
+    """
+
+    def observe(self, state: RoundState) -> Dict[str, Any]:
+        return {**self.distances.observe(state), **self.lift_rate.observe(state)}
+
+    @property
+    def stops(self) -> bool:
+        return self.distances.stops and self.lift_rate.stops
+
+
 # %% the iteration
 
 
@@ -912,7 +989,7 @@ class PolicyIteration:
     How the policy chooses grasps from a model.
     """
 
-    stopping: StoppingRule = field(default_factory=DistancesWithinFloors)
+    stopping: StoppingRule = field(default_factory=PolicySettled)
     """
     Tells when the policy no longer changes.
     """
@@ -1018,6 +1095,7 @@ class PolicyIteration:
                     phases=self.phases,
                     densities=densities,
                     main_object=self.objects[0].name,
+                    lift_rates=[earlier.verified_lift_rate for earlier in self.models],
                 )
             )
             exploring_count = round(self.attempts_per_round * self.exploring_share)
@@ -1174,6 +1252,11 @@ class StoppingRuleName(Enum):
     The stopping rules the command line offers.
     """
 
+    SETTLED = PolicySettled
+    """
+    Both L1 distances within their floors and a lift rate that no longer rises.
+    """
+
     L1 = DistancesWithinFloors
     """
     Both L1 distances within their floors.
@@ -1243,7 +1326,7 @@ def main() -> None:
     parser.add_argument(
         "--stopping",
         choices=[member.name.lower() for member in StoppingRuleName],
-        default=StoppingRuleName.L1.name.lower(),
+        default=StoppingRuleName.SETTLED.name.lower(),
     )
     parser.add_argument("--workers", type=int, default=16)
     parser.add_argument(
