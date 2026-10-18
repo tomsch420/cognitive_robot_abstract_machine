@@ -5,11 +5,13 @@ them finds the objects it picks up.
 
 from __future__ import annotations
 
+import operator
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum, StrEnum
 
 import numpy as np
+from typing_extensions import Callable, Tuple
 
 from experiments.physical_pick_up.physical_simulation_preparation import (
     PR2PhysicalSimulationPreparation,
@@ -322,3 +324,10 @@ class PickUpRobot(Enum):
     """
     Tracy picking up from its own table with its left arm.
     """
+
+    def __reduce_ex__(self, protocol: int) -> Tuple[Callable, Tuple]:
+        """
+        Pickle the robot by its name: its setup holds symbolic expressions that cannot
+        be pickled, and another process builds the same setup anyway.
+        """
+        return operator.getitem, (type(self), self.name)

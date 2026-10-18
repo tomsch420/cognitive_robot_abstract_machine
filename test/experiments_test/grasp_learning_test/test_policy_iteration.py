@@ -7,6 +7,7 @@ from __future__ import annotations
 import inspect
 import json
 import math
+import pickle
 from pathlib import Path
 
 import numpy as np
@@ -32,7 +33,12 @@ from experiments.grasp_learning.policy_iteration import (
     graspable_annotation_types,
 )
 from experiments.grasp_learning.stopping_rules import FixedRounds, PolicyUnchanged
-from experiments.grasp_learning.workers import IterationObject, WorkerPool
+from experiments.grasp_learning.grasp_selection import DrawnFromModel
+from experiments.grasp_learning.workers import (
+    AttemptBatch,
+    IterationObject,
+    WorkerPool,
+)
 from experiments.grasp_learning.records import GraspSource
 from experiments.physical_pick_up.objects import PickUpObject
 from experiments.physical_pick_up.robots import PickUpRobot
@@ -242,6 +248,24 @@ def test_objects_share_workers_when_there_are_fewer_workers():
         [1],
         [0],
     ]
+
+
+def test_a_batch_of_grasps_reaches_a_worker_process_as_it_was_sent():
+    batch = AttemptBatch(
+        iteration_object=IterationObject(description=PickUpObject.MILK.value),
+        source=GraspSource.STATED_REGIONS,
+        model=None,
+        choice=DrawnFromModel(),
+        number_of_attempts=2,
+        maximum_yaw=0.5,
+        seed=7,
+    )
+
+    received = pickle.loads(pickle.dumps(batch))
+
+    assert received.iteration_object.robot is batch.iteration_object.robot
+    assert received.iteration_object.name == batch.iteration_object.name
+    assert (received.number_of_attempts, received.seed) == (2, 7)
 
 
 # %% a new object
