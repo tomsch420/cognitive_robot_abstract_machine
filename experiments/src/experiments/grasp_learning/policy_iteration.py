@@ -63,7 +63,11 @@ from experiments.grasp_learning.grasp_selection import (
     SelectedByLiftProbability,
 )
 from experiments.grasp_learning.models import GraspModel
-from experiments.grasp_learning.records import GraspLearningTask, GraspSource
+from experiments.grasp_learning.records import (
+    GraspAttempt,
+    GraspLearningTask,
+    GraspSource,
+)
 from experiments.grasp_learning.stopping_rules import (
     DistancesWithinFloors,
     FixedRounds,
@@ -240,7 +244,7 @@ class PolicyIteration:
         model = None
         for round_number in range(1, self.maximum_rounds + 1):
             start = time.monotonic()
-            attempts = self.database.numbered_attempts(task)
+            attempts = self.own_attempts(task)
             model = learner.learn(task, list(attempts.values()))
             stopping = self.stopping.observe(
                 RoundState(
@@ -283,6 +287,20 @@ class PolicyIteration:
             if self.stopping.stops:
                 break
         return model
+
+    def own_attempts(self, task: GraspLearningTask) -> Dict[int, GraspAttempt]:
+        """
+        :param task: The task of the iteration's objects.
+        :return: The stored attempts of the task on the iteration's objects, by the
+            number they were stored under; other iterations of the same task on other
+            objects store theirs alongside.
+        """
+        names = {iteration_object.name for iteration_object in self.objects}
+        return {
+            number: attempt
+            for number, attempt in self.database.numbered_attempts(task).items()
+            if attempt.object_name in names
+        }
 
     def attempt(
         self,
