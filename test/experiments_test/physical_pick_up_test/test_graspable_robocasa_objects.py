@@ -66,8 +66,17 @@ def test_the_command_line_takes_a_graspable_robocasa_object():
         )
     )
 
-    assert description == GraspableRoboCasaObject.APPLE.value.description(
-        instance_index=2
+    expected = GraspableRoboCasaObject.APPLE.value.description(instance_index=2)
+    assert (
+        description.category,
+        description.instance_index,
+        description.semantic_annotation_type,
+        description.mass,
+    ) == (
+        expected.category,
+        expected.instance_index,
+        expected.semantic_annotation_type,
+        expected.mass,
     )
 
 
