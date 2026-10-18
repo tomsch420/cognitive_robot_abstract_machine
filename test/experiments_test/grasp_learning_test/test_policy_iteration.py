@@ -32,7 +32,12 @@ from experiments.grasp_learning.policy_iteration import (
     PolicyIteration,
     graspable_annotation_types,
 )
-from experiments.grasp_learning.stopping_rules import FixedRounds, PolicyUnchanged
+from experiments.grasp_learning.stopping_rules import (
+    FixedRounds,
+    LiftRateSettled,
+    PolicySettled,
+    PolicyUnchanged,
+)
 from experiments.grasp_learning.grasp_selection import DrawnFromModel
 from experiments.grasp_learning.workers import (
     AttemptBatch,
@@ -128,6 +133,35 @@ def test_grasps_drawn_from_policies_far_apart_are_told_apart():
     assert p_value < rule.significance
 
 
+# %% a lift rate that no longer rises
+
+
+def test_a_lift_rate_is_not_judged_before_enough_rounds_tried_grasps():
+    rule = LiftRateSettled(rounds_compared=2)
+
+    assert rule.gain_of([0.2, None, 0.3, 0.4]) is None
+
+
+def test_the_gain_of_a_lift_rate_compares_the_latest_rounds_with_those_before():
+    rule = LiftRateSettled(rounds_compared=2)
+
+    assert rule.gain_of([0.0, 0.2, 0.4, 0.5, 0.7]) == pytest.approx(0.3)
+
+
+def test_a_policy_settles_only_with_both_rules_stopping():
+    rule = PolicySettled()
+    rule.distances.converged_rounds = rule.distances.required_converged_rounds
+    rule.lift_rate.gain = rule.lift_rate.minimum_gain
+
+    assert not rule.stops
+
+    rule.lift_rate.gain = rule.lift_rate.minimum_gain / 2
+    assert rule.stops
+
+    rule.distances.converged_rounds = 0
+    assert not rule.stops
+
+
 # %% distances between models
 
 
@@ -216,7 +250,9 @@ def test_an_empty_database_has_no_last_attempt(database):
     assert database.last_attempt_number() == 0
 
 
-def test_an_iteration_learns_only_from_attempts_on_its_own_objects(milk_scene, database):
+def test_an_iteration_learns_only_from_attempts_on_its_own_objects(
+    milk_scene, database
+):
     own = synthetic_attempts(milk_scene, 3)
     others = synthetic_attempts(milk_scene, 2)
     for attempt in others:

@@ -71,6 +71,7 @@ from experiments.grasp_learning.records import (
 from experiments.grasp_learning.stopping_rules import (
     DistancesWithinFloors,
     FixedRounds,
+    PolicySettled,
     PolicyUnchanged,
     RoundState,
     StoppingRule,
@@ -123,7 +124,7 @@ class PolicyIteration:
     How the policy chooses grasps from a model.
     """
 
-    stopping: StoppingRule = field(default_factory=DistancesWithinFloors)
+    stopping: StoppingRule = field(default_factory=PolicySettled)
     """
     Tells when the policy no longer changes.
     """
@@ -254,6 +255,7 @@ class PolicyIteration:
                     phases=self.phases,
                     densities=densities,
                     main_object=self.objects[0].name,
+                    lift_rates=[earlier.verified_lift_rate for earlier in self.models],
                 )
             )
             exploring_count = round(self.attempts_per_round * self.exploring_share)
@@ -410,6 +412,11 @@ class StoppingRuleName(Enum):
     The stopping rules the command line offers.
     """
 
+    SETTLED = PolicySettled
+    """
+    Both L1 distances within their floors and a lift rate that no longer rises.
+    """
+
     L1 = DistancesWithinFloors
     """
     Both L1 distances within their floors.
@@ -504,7 +511,7 @@ def main() -> None:
     parser.add_argument(
         "--stopping",
         choices=[member.name.lower() for member in StoppingRuleName],
-        default=StoppingRuleName.L1.name.lower(),
+        default=StoppingRuleName.SETTLED.name.lower(),
     )
     parser.add_argument("--workers", type=int, default=PolicyIteration.workers)
     parser.add_argument(
