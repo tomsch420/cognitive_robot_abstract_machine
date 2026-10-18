@@ -65,6 +65,17 @@ def test_a_stored_mesh_is_answered_also_once_it_is_turned(directory, mesh):
     np.testing.assert_array_equal(part.faces, [0, 1, 2, 3])
 
 
+def test_a_stored_mesh_is_answered_also_once_its_vertices_are_rounded(directory, mesh):
+    locator = StoredPartLocator(directory=directory)
+    rounded = trimesh.Trimesh(
+        vertices=mesh.vertices.astype(np.float32), faces=mesh.faces, process=False
+    )
+
+    [part] = locator.locate(PartQuery.from_mesh(rounded, Mug, ["handle"]))
+
+    np.testing.assert_array_equal(part.faces, [0, 1, 2, 3])
+
+
 def test_only_the_parts_asked_for_are_answered(directory, mesh):
     locator = StoredPartLocator(directory=directory)
 

@@ -82,8 +82,8 @@ class GraspResult:
 
     object_rotation: AxisAngle
     """
-    How the object turned from where it rested to where it was held at the end, its
-    axis along the world's axes.
+    How the object turned from where it rested to where it was held at the end, its axis
+    along the world's axes.
     """
 
     translational_slip: Vector3
@@ -338,8 +338,10 @@ def draw_surface_grasps(
     :param number_of_grasps: How many grasps to draw, as the statement's limit.
     :param model_registry: Answers the statement; ``None`` draws uniformly from what it
         allows, which cannot answer a statement that requires lifting.
-    :return: Grasps answering the statement.
+    :return: Grasps answering the statement; none when none are to be drawn.
     """
+    if number_of_grasps == 0:
+        return []
     return list(
         statement.limit(number_of_grasps).evaluate(
             backend=ProbabilisticBackend(model_registry or UniformPriorRegistry())

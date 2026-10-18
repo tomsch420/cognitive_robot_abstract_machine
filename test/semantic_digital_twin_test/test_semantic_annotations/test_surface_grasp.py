@@ -183,6 +183,10 @@ def test_drawn_grasps_lie_where_the_statement_allows():
     assert set(nearest_side) == set(sides)
 
 
+def test_drawing_no_grasps_draws_none(carton):
+    assert draw_surface_grasps(carton.surface_grasp_statement(), 0) == []
+
+
 def test_every_parameter_of_a_surface_grasp_needs_bounds():
     statement = a(SurfaceGrasp)(azimuth=..., height=..., depth=..., pitch=..., roll=...)
     statement.where(statement.azimuth < 1.0)
