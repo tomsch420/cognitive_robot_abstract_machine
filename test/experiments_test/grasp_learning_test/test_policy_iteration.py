@@ -13,8 +13,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from ...pytest_environment import runs_in_continuous_integration
-from ..physical_pick_up_test.recorded_part_locator import RecordedPartLocator
+from .mocked_pick_up import InProcessWorkerPool
 from .test_grasp_learning import synthetic_attempts, task_of
 
 from experiments.grasp_learning.convergence import (
@@ -24,7 +23,6 @@ from experiments.grasp_learning.convergence import (
     SamplingDensities,
     SamplingPhase,
 )
-from experiments.grasp_learning.database import GraspDatabase
 from experiments.grasp_learning.grasp_selection import turned
 from experiments.grasp_learning.grasp_variables import grasp_features
 from experiments.grasp_learning.models import GraspModelLearner
@@ -42,36 +40,16 @@ from experiments.grasp_learning.grasp_selection import DrawnFromModel
 from experiments.grasp_learning.workers import (
     AttemptBatch,
     IterationObject,
+    IterationWorker,
     WorkerPool,
 )
 from experiments.grasp_learning.records import GraspSource
 from experiments.physical_pick_up.objects import PickUpObject
 from experiments.physical_pick_up.robots import PickUpRobot
-from experiments.physical_pick_up.scene import PickUpScene
 from krrood.parametrization.parameterizer import UnderspecifiedParameters
-from semantic_digital_twin.part_finding.annotation_part_finder import (
-    AnnotationPartFinder,
-)
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Mug
 
-simulates_physics = pytest.mark.skipif(
-    not runs_in_continuous_integration(), reason="MuJoCo tests only run in CI"
-)
-
 # %% fixtures
-
-
-@pytest.fixture(scope="module")
-def milk_scene() -> PickUpScene:
-    return PickUpScene(
-        object_description=PickUpObject.MILK.value,
-        part_finder=AnnotationPartFinder(locator=RecordedPartLocator()),
-    )
-
-
-@pytest.fixture
-def database() -> GraspDatabase:
-    return GraspDatabase.connect("sqlite:///:memory:")
 
 
 @pytest.fixture(scope="module")
@@ -377,34 +355,35 @@ def test_the_command_line_offers_every_annotation_that_can_be_grasped():
 # %% the whole iteration
 
 
-@simulates_physics
-def test_an_iteration_stores_the_attempts_and_a_model_of_every_round(tmp_path):
-    milk = IterationObject.from_mesh(
-        PickUpObject.MILK.value.mesh_file,
-        PickUpObject.MILK.value.semantic_annotation_type,
-        mass=PickUpObject.MILK.value.mass,
-        meters_per_mesh_unit=PickUpObject.MILK.value.meters_per_mesh_unit,
-    )
-    database_uri = f"sqlite:///{tmp_path / 'grasps.sqlite'}"
+def test_an_iteration_stores_the_attempts_and_a_model_of_every_round(
+    tmp_path, database
+):
+    milk = IterationObject(description=PickUpObject.MILK.value)
     iteration = PolicyIteration(
         objects=[milk],
-        database_uri=database_uri,
+        database_uri="sqlite://",
         results=tmp_path / "results",
-        workers=2,
         stopping=FixedRounds(),
         initial_attempts=12,
         attempts_per_round=4,
         maximum_rounds=1,
     )
+    iteration.database = database
+    iteration.pool = InProcessWorkerPool(
+        objects=[milk],
+        size=1,
+        database_uri="sqlite://",
+        worker=IterationWorker(database=database),
+    )
 
-    model = iteration.run()
+    model = iteration.iterate()
 
     rounds = [
         json.loads(line) for line in iteration.rounds_file.read_text().splitlines()
     ]
     assert [report["round"] for report in rounds] == [0, 1]
     assert model.number_of_attempts == rounds[0]["exploring_attempts"]
-    stored = GraspDatabase.connect(database_uri).model_library().models
+    stored = database.model_library().models
     assert stored[-1].task == model.task
     first_phase = iteration.phases[0]
     assert (first_phase.source, first_phase.model_index) == (

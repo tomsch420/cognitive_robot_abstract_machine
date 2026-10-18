@@ -5,15 +5,11 @@ annotation.
 
 from __future__ import annotations
 
-from datetime import timedelta
-
 import pytest
 from typing_extensions import List
 
-from ...pytest_environment import runs_in_continuous_integration
-from ..physical_pick_up_test.recorded_part_locator import RecordedPartLocator
+from .mocked_pick_up import HeightJudgedPickUp
 
-from experiments.grasp_learning.database import GraspDatabase
 from experiments.grasp_learning.models import (
     GraspModel,
     GraspModelLearner,
@@ -27,12 +23,9 @@ from experiments.grasp_learning.records import (
     GraspSource,
 )
 from experiments.physical_pick_up.objects import PickUpObject
-from experiments.physical_pick_up.pick_up_experiment import PickUpExperiment
+from experiments.grasp_learning.workers import IterationObject
 from experiments.physical_pick_up.robots import ObjectPlacement
 from experiments.physical_pick_up.scene import PickUpScene
-from semantic_digital_twin.part_finding.annotation_part_finder import (
-    AnnotationPartFinder,
-)
 from semantic_digital_twin.spatial_types import Vector3
 from semantic_digital_twin.spatial_types.spatial_types import AxisAngle
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
@@ -44,30 +37,7 @@ from semantic_digital_twin.grasping.surface_grasp import (
     draw_surface_grasps,
 )
 
-simulates_physics = pytest.mark.skipif(
-    not runs_in_continuous_integration(), reason="MuJoCo tests only run in CI"
-)
-
-# %% fixtures
-
-LIFTING_HEIGHT = 0.5
-"""
-In the synthetic attempts, a grasp lifts the object exactly when it lies above this
-fraction of the object's height.
-"""
-
-
-@pytest.fixture(scope="module")
-def milk_scene() -> PickUpScene:
-    return PickUpScene(
-        object_description=PickUpObject.MILK.value,
-        part_finder=AnnotationPartFinder(locator=RecordedPartLocator()),
-    )
-
-
-@pytest.fixture
-def database() -> GraspDatabase:
-    return GraspDatabase.connect("sqlite:///:memory:")
+# %% synthetic attempts
 
 
 def task_of(scene: PickUpScene) -> GraspLearningTask:
@@ -80,14 +50,15 @@ def task_of(scene: PickUpScene) -> GraspLearningTask:
 def synthetic_attempts(scene: PickUpScene, number: int) -> List[GraspAttempt]:
     """
     :return: Attempts at grasps drawn from the statement of the scene's object, which
-        lift it exactly when they lie above :data:`LIFTING_HEIGHT`.
+        lift it exactly when they lie above the height
+        :class:`HeightJudgedPickUp` lifts the object from.
     """
     task = task_of(scene)
     grasps = draw_surface_grasps(
         scene.graspable.grasped_part().surface_grasp_statement(), number
     )
     for grasp in grasps:
-        raised = grasp.height > LIFTING_HEIGHT
+        raised = grasp.height > HeightJudgedPickUp.lifting_height
         grasp.result = GraspResult(
             object_raised=raised,
             motion_completed=True,
@@ -186,7 +157,7 @@ def test_a_learned_model_asks_for_lifting_grasps_after_storage(milk_scene, datab
     assert model.task == task
     assert model.number_of_attempts == len(attempts)
     for grasp in grasps:
-        assert grasp.height > LIFTING_HEIGHT
+        assert grasp.height > HeightJudgedPickUp.lifting_height
 
 
 def test_the_library_hands_a_model_to_the_annotation_of_its_task(milk_scene):
@@ -197,7 +168,9 @@ def test_the_library_hands_a_model_to_the_annotation_of_its_task(milk_scene):
     )
     milk = milk_scene.graspable
     lowest, highest = milk.grasp_surface().bounds
-    lifting_height = lowest[2] + LIFTING_HEIGHT * (highest[2] - lowest[2])
+    lifting_height = lowest[2] + HeightJudgedPickUp.lifting_height * (
+        highest[2] - lowest[2]
+    )
 
     grasps = library.grasp_candidates(milk, task.gripper)
 
@@ -221,15 +194,10 @@ def test_without_a_model_the_annotation_offers_its_own_grasps(milk_scene):
 # %% the whole pipeline
 
 
-@simulates_physics
 def test_the_pipeline_stores_attempts_and_a_verified_model(database):
     pipeline = GraspLearningPipeline(
-        experiment=PickUpExperiment(
-            scene=PickUpScene(
-                object_description=PickUpObject.MILK.value,
-                part_finder=AnnotationPartFinder(locator=RecordedPartLocator()),
-            ),
-            time_limit=timedelta(seconds=20),
+        experiment=HeightJudgedPickUp(
+            scene=IterationObject(description=PickUpObject.MILK.value).scene()
         ),
         database=database,
         number_of_attempts=12,
