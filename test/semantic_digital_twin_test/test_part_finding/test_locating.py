@@ -138,10 +138,13 @@ def stand_in_locator(
 # %% the parts an annotation calls for
 
 
-def test_a_mug_calls_for_one_optional_handle_and_one_optional_rim():
+@pytest.mark.parametrize("whole_type", [Mug, Cup])
+def test_a_drinking_vessel_calls_for_one_optional_handle_and_one_optional_rim(
+    whole_type,
+):
     relationships = {
         relationship.name: relationship
-        for relationship in PartRelationshipInspector.all_of_type(Mug)
+        for relationship in PartRelationshipInspector.all_of_type(whole_type)
     }
 
     assert relationships.keys() == {"handle", "rim"}
@@ -153,7 +156,7 @@ def test_a_mug_calls_for_one_optional_handle_and_one_optional_rim():
         assert not relationship.holds_many
 
 
-@pytest.mark.parametrize("whole_type", [Pan, Kettle, Cup])
+@pytest.mark.parametrize("whole_type", [Pan, Kettle])
 def test_cookware_held_by_a_handle_calls_for_one_optional_handle(whole_type):
     [relationship] = PartRelationshipInspector.all_of_type(whole_type)
 

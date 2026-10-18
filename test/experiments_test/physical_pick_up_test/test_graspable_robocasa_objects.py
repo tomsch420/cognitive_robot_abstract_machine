@@ -5,6 +5,7 @@ The graspable objects of RoboCasa, described for the pick-up experiment.
 from __future__ import annotations
 
 import argparse
+import inspect
 from dataclasses import replace
 
 import pytest
@@ -31,6 +32,13 @@ requires_robocasa_assets = pytest.mark.skipif(
 )
 
 # %% describing a graspable RoboCasa object
+
+
+@pytest.mark.parametrize(
+    "graspable", list(GraspableRoboCasaObject), ids=lambda graspable: graspable.name
+)
+def test_every_graspable_robocasa_object_is_given_an_annotation_it_can_have(graspable):
+    assert not inspect.isabstract(graspable.value.semantic_annotation_type)
 
 
 @requires_robocasa_assets

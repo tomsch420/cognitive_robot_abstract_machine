@@ -32,20 +32,26 @@ from semantic_digital_twin.pipeline.mesh_decomposition.coacd import (
     COACDMeshDecomposer,
 )
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
+    AluminumFoil,
     Apple,
     Banana,
+    BarSoap,
     Bottle,
     Bowl,
     Bread,
+    Candle,
     Carrot,
     Cereal,
+    CheeseGrater,
     CheezeIt,
     Container,
     Cookware,
     Cup,
     CuttingKnife,
+    DishBrush,
     Food,
     Fruit,
+    KebabSkewer,
     Kettle,
     Knife,
     Milk,
@@ -53,15 +59,20 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     MustardBottle,
     Orange,
     Pan,
+    Peeler,
+    PizzaCutter,
     Pot,
     Potato,
+    Reamer,
+    RollingPin,
     SaltPepperShaker,
     SoapBottle,
     Sponge,
     Spoon,
     SprayBottle,
+    Straw,
     Tomato,
-    Tool,
+    Tongs,
     Vegetable,
     Whisk,
     WineBottle,
@@ -865,13 +876,13 @@ class GraspableRoboCasaObject(Enum):
     are among the self-contained groups the dataset loader reads.
     """
 
-    ALUMINUM_FOIL = GraspableRoboCasaCategory("aluminum_foil", Tool)
+    ALUMINUM_FOIL = GraspableRoboCasaCategory("aluminum_foil", AluminumFoil)
     APPLE = GraspableRoboCasaCategory("apple", Apple)
     AVOCADO = GraspableRoboCasaCategory("avocado", Fruit)
     BAGUETTE = GraspableRoboCasaCategory("baguette", Food)
     BANANA = GraspableRoboCasaCategory("banana", Banana)
     BAR = GraspableRoboCasaCategory("bar", Food)
-    BAR_SOAP = GraspableRoboCasaCategory("bar_soap", Tool)
+    BAR_SOAP = GraspableRoboCasaCategory("bar_soap", BarSoap)
     BEER = GraspableRoboCasaCategory("beer", Bottle)
     BELL_PEPPER = GraspableRoboCasaCategory("bell_pepper", Vegetable)
     BLENDER_JUG = GraspableRoboCasaCategory("blender_jug", Container)
@@ -884,12 +895,12 @@ class GraspableRoboCasaObject(Enum):
     BROCCOLI = GraspableRoboCasaCategory("broccoli", Vegetable)
     CAKE = GraspableRoboCasaCategory("cake", Food)
     CAN = GraspableRoboCasaCategory("can", Container)
-    CANDLE = GraspableRoboCasaCategory("candle", Tool)
+    CANDLE = GraspableRoboCasaCategory("candle", Candle)
     CANNED_FOOD = GraspableRoboCasaCategory("canned_food", Food)
     CARROT = GraspableRoboCasaCategory("carrot", Carrot)
     CEREAL = GraspableRoboCasaCategory("cereal", Cereal)
     CHEESE = GraspableRoboCasaCategory("cheese", Food)
-    CHEESE_GRATER = GraspableRoboCasaCategory("cheese_grater", Tool)
+    CHEESE_GRATER = GraspableRoboCasaCategory("cheese_grater", CheeseGrater)
     CHICKEN_DRUMSTICK = GraspableRoboCasaCategory("chicken_drumstick", Food)
     CINNAMON = GraspableRoboCasaCategory("cinnamon", Food)
     COFFEE_CUP = GraspableRoboCasaCategory("coffee_cup", Cup)
@@ -901,7 +912,7 @@ class GraspableRoboCasaObject(Enum):
     CUCUMBER = GraspableRoboCasaCategory("cucumber", Vegetable)
     CUP = GraspableRoboCasaCategory("cup", Cup)
     CUPCAKE = GraspableRoboCasaCategory("cupcake", Food)
-    DISH_BRUSH = GraspableRoboCasaCategory("dish_brush", Tool)
+    DISH_BRUSH = GraspableRoboCasaCategory("dish_brush", DishBrush)
     DONUT = GraspableRoboCasaCategory("donut", Food)
     EGG = GraspableRoboCasaCategory("egg", Food)
     EGGPLANT = GraspableRoboCasaCategory("eggplant", Vegetable)
@@ -916,7 +927,7 @@ class GraspableRoboCasaObject(Enum):
     JAR = GraspableRoboCasaCategory("jar", Container)
     JUG = GraspableRoboCasaCategory("jug", Container)
     JUICE = GraspableRoboCasaCategory("juice", Bottle)
-    KEBAB_SKEWER = GraspableRoboCasaCategory("kebab_skewer", Tool)
+    KEBAB_SKEWER = GraspableRoboCasaCategory("kebab_skewer", KebabSkewer)
     KETCHUP = GraspableRoboCasaCategory("ketchup", Bottle)
     KIWI = GraspableRoboCasaCategory("kiwi", Fruit)
     LADLE = GraspableRoboCasaCategory("ladle", Spoon)
@@ -938,13 +949,13 @@ class GraspableRoboCasaObject(Enum):
     PAPRIKA = GraspableRoboCasaCategory("paprika", Food)
     PEACH = GraspableRoboCasaCategory("peach", Fruit)
     PEAR = GraspableRoboCasaCategory("pear", Fruit)
-    PEELER = GraspableRoboCasaCategory("peeler", Tool)
+    PEELER = GraspableRoboCasaCategory("peeler", Peeler)
     PITCHER = GraspableRoboCasaCategory("pitcher", Container)
-    PIZZA_CUTTER = GraspableRoboCasaCategory("pizza_cutter", Tool)
+    PIZZA_CUTTER = GraspableRoboCasaCategory("pizza_cutter", PizzaCutter)
     POT = GraspableRoboCasaCategory("pot", Pot)
     POTATO = GraspableRoboCasaCategory("potato", Potato)
-    REAMER = GraspableRoboCasaCategory("reamer", Tool)
-    ROLLING_PIN = GraspableRoboCasaCategory("rolling_pin", Tool)
+    REAMER = GraspableRoboCasaCategory("reamer", Reamer)
+    ROLLING_PIN = GraspableRoboCasaCategory("rolling_pin", RollingPin)
     SALT_AND_PEPPER_SHAKER = GraspableRoboCasaCategory(
         "salt_and_pepper_shaker", SaltPepperShaker
     )
@@ -957,14 +968,14 @@ class GraspableRoboCasaObject(Enum):
     SQUASH = GraspableRoboCasaCategory("squash", Vegetable)
     STEAK = GraspableRoboCasaCategory("steak", Food)
     STRAINER = GraspableRoboCasaCategory("strainer", Container)
-    STRAW = GraspableRoboCasaCategory("straw", Tool)
+    STRAW = GraspableRoboCasaCategory("straw", Straw)
     SUGAR_CUBE = GraspableRoboCasaCategory("sugar_cube", Food)
     SWEET_POTATO = GraspableRoboCasaCategory("sweet_potato", Vegetable)
     SYRUP_BOTTLE = GraspableRoboCasaCategory("syrup_bottle", Bottle)
     TANGERINE = GraspableRoboCasaCategory("tangerine", Fruit)
     TEAPOT = GraspableRoboCasaCategory("teapot", Kettle)
     TOMATO = GraspableRoboCasaCategory("tomato", Tomato)
-    TONGS = GraspableRoboCasaCategory("tongs", Tool)
+    TONGS = GraspableRoboCasaCategory("tongs", Tongs)
     TUPPERWARE = GraspableRoboCasaCategory("tupperware", Container)
     TURMERIC = GraspableRoboCasaCategory("turmeric", Food)
     WATER_BOTTLE = GraspableRoboCasaCategory("water_bottle", Bottle)

@@ -65,8 +65,8 @@ def test_the_pr2_starts_clear_of_the_kitchen(episode):
 
 def test_the_pr2_drives_its_base_with_servos(episode):
     """
-    A physical simulation moves the base of the PR2 only through the servos of its
-    drive.
+    A physical simulation moves the base of the PR2 only through the servos of the
+    degrees of freedom its drive is commanded with.
     """
     drive = episode.robot.drive
     driven = {
@@ -75,7 +75,7 @@ def test_the_pr2_drives_its_base_with_servos(episode):
         for degree_of_freedom in actuator.dofs
     }
 
-    assert {drive.x, drive.y, drive.yaw} <= driven
+    assert set(drive.active_dofs) <= driven
 
 
 # %% judging where the object is

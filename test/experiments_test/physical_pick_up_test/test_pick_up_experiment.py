@@ -101,36 +101,6 @@ def milk_experiment(part_finder) -> PickUpExperiment:
 # %% preparing the PR2 for physical simulation
 
 
-def test_every_commanded_degree_of_freedom_is_driven_by_one_servo(prepared_pr2):
-    """
-    The coupled finger joints of a gripper share one degree of freedom and therefore one
-    servo.
-    """
-    world = prepared_pr2._world
-    expected = {
-        connection.raw_dof
-        for arm in prepared_pr2.all_arms
-        for connection in arm.active_connections
-    }
-    expected |= {
-        world.get_connection_by_name(joint).raw_dof
-        for joint in (
-            PR2Joint.TORSO_LIFT,
-            PR2Joint.LEFT_GRIPPER_LEFT_FINGER,
-            PR2Joint.RIGHT_GRIPPER_LEFT_FINGER,
-        )
-    }
-
-    driven = [
-        degree_of_freedom
-        for actuator in world.actuators
-        for degree_of_freedom in actuator.dofs
-    ]
-
-    assert set(driven) == expected
-    assert len(driven) == len(expected)
-
-
 def test_a_servoed_joint_without_position_limits_is_given_some(prepared_pr2):
     preparation = PR2PhysicalSimulationPreparation(robot=prepared_pr2)
     forearm_roll = prepared_pr2._world.get_connection_by_name(

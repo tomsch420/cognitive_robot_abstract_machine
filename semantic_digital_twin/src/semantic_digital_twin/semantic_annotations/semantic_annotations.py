@@ -1903,6 +1903,90 @@ class Sponge(Tool):
 
 
 @dataclass(eq=False)
+class AluminumFoil(HasGraspCandidates):
+    """
+    A roll of aluminum foil in its box.
+    """
+
+
+@dataclass(eq=False)
+class BarSoap(HasGraspCandidates):
+    """
+    A bar of soap.
+    """
+
+
+@dataclass(eq=False)
+class Candle(HasGraspCandidates):
+    """
+    A candle.
+    """
+
+
+@dataclass(eq=False)
+class CheeseGrater(HasGraspCandidates):
+    """
+    A grater for cheese and other food.
+    """
+
+
+@dataclass(eq=False)
+class DishBrush(HasGraspCandidates):
+    """
+    A brush for washing dishes.
+    """
+
+
+@dataclass(eq=False)
+class KebabSkewer(HasGraspCandidates):
+    """
+    A skewer for kebabs.
+    """
+
+
+@dataclass(eq=False)
+class Peeler(HasGraspCandidates):
+    """
+    A peeler for fruit and vegetables.
+    """
+
+
+@dataclass(eq=False)
+class PizzaCutter(HasGraspCandidates):
+    """
+    A wheel for cutting pizza.
+    """
+
+
+@dataclass(eq=False)
+class Reamer(HasGraspCandidates):
+    """
+    A reamer for juicing citrus fruit.
+    """
+
+
+@dataclass(eq=False)
+class RollingPin(HasGraspCandidates):
+    """
+    A rolling pin for dough.
+    """
+
+
+@dataclass(eq=False)
+class Straw(HasGraspCandidates):
+    """
+    A drinking straw.
+    """
+
+
+@dataclass(eq=False)
+class Tongs(HasGraspCandidates):
+    """
+    Tongs for picking up food.
+    """
+
+
+@dataclass(eq=False)
 class Microwave(IsStorageSpace, HasDoors):
     """
     A microwave oven, a kitchen appliance with a door that heats food placed inside it
