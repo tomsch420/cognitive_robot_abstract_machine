@@ -209,6 +209,27 @@ def test_an_empty_database_has_no_last_attempt(database):
     assert database.last_attempt_number() == 0
 
 
+def test_an_iteration_learns_only_from_attempts_on_its_own_objects(milk_scene, database):
+    own = synthetic_attempts(milk_scene, 3)
+    others = synthetic_attempts(milk_scene, 2)
+    for attempt in others:
+        attempt.object_name = "another_milk"
+    database.add_attempts(own + others)
+    iteration = PolicyIteration(
+        objects=[IterationObject(description=PickUpObject.MILK.value, robot=PickUpRobot.PR2)],
+        pool=WorkerPool(objects=[], size=0),
+        database=database,
+        results=Path("unused"),
+    )
+
+    attempts = iteration.own_attempts(task_of(milk_scene))
+
+    assert len(attempts) == len(own)
+    assert {attempt.object_name for attempt in attempts.values()} == {
+        milk_scene.graspable.root.name.name
+    }
+
+
 # %% the workers
 
 
