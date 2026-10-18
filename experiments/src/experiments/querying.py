@@ -47,6 +47,9 @@ from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.datastructures.definitions import TorsoState
 from semantic_digital_twin.reasoning.world_reasoner import WorldReasoner
 from semantic_digital_twin.robots.pr2 import PR2
+from semantic_digital_twin.part_finding.annotation_part_finder import (
+    AnnotationPartFinder,
+)
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Bowl,
     Drawer,
@@ -206,6 +209,7 @@ def build_plan() -> Plan:
                 handle=Handle(root=world.get_body_by_name("handle_cab10_t")),
             )
         )
+    AnnotationPartFinder().find_parts(bowl_annotation)
 
     context.evaluate_conditions = False
 
