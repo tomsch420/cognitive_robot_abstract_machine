@@ -12,6 +12,28 @@ if TYPE_CHECKING:
 
 
 @dataclass
+class UnboundedEventError(DataclassException):
+    """
+    Raised when a uniform measure is asked for over an event that does not bound one of
+    its continuous variables from below and above.
+    """
+
+    variable: Variable
+    """
+    The variable without bounds.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The event does not bound '{self.variable.name}' from below and above, so "
+            f"no uniform measure over it exists."
+        )
+
+    def suggest_correction(self) -> str:
+        return f"Bound '{self.variable.name}' from below and above in the event."
+
+
+@dataclass
 class IntractableError(DataclassException):
     """
     Exception raised when an inference is intractable for a model.
@@ -231,3 +253,97 @@ class EventMixesPointsAndIntervalsError(DataclassException, ValueError):
 
     def suggest_correction(self) -> str:
         return "Make every continuous variable either points only or intervals only."
+
+
+@dataclass
+class MixtureOverDifferentVariablesError(DataclassException, ValueError):
+    """
+    Exception raised when a mixture is built of components that are not over the same
+    variables.
+
+    A mixture is only smooth if every component models the same variables, so a query
+    over a mixture of differing components has no well-defined answer.
+    """
+
+    variables_per_component: List[List[Variable]]
+    """
+    The variables of every component, in the order the components were given.
+    """
+
+    def error_message(self) -> str:
+        return (
+            "A mixture needs components over the same variables, received "
+            f"{[[str(variable) for variable in variables] for variables in self.variables_per_component]}."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Marginalize every component to the variables the mixture is over."
+
+
+@dataclass
+class ProductOverSharedVariablesError(DataclassException, ValueError):
+    """
+    Exception raised when a product is built of factors that share a variable.
+
+    A product is only decomposable if its factors are over disjoint variables, so a
+    shared variable would be counted twice.
+    """
+
+    shared_variables: List[Variable]
+    """
+    The variables that more than one factor is over.
+    """
+
+    def error_message(self) -> str:
+        return (
+            "A product needs factors over disjoint variables, but "
+            f"{[str(variable) for variable in self.shared_variables]} "
+            "appear in more than one factor."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Marginalize the factors to disjoint sets of variables."
+
+
+@dataclass
+class EmptyCompositionError(DataclassException, ValueError):
+    """
+    Exception raised when a mixture or a product is built of no components at all.
+    """
+
+    composition: Callable
+    """
+    The method that was called.
+    """
+
+    def error_message(self) -> str:
+        return f"{self.composition.__name__} needs at least one component."
+
+    def suggest_correction(self) -> str:
+        return "Leave the composition out instead of building it of nothing."
+
+
+@dataclass
+class NumberOfWeightsMismatchError(DataclassException, ValueError):
+    """
+    Exception raised when a mixture does not get exactly one weight per component.
+    """
+
+    number_of_weights: int
+    """
+    The number of weights given.
+    """
+
+    number_of_components: int
+    """
+    The number of components to mix.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"Got {self.number_of_weights} weights for "
+            f"{self.number_of_components} components."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Pass exactly one weight per component."

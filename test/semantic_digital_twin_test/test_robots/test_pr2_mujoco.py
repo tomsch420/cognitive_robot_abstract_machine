@@ -5,7 +5,10 @@ drive moving its base across the floor.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import timedelta
+
+from typing_extensions import List
 
 import mujoco
 import numpy as np
@@ -17,6 +20,10 @@ from ...pytest_environment import runs_in_continuous_integration
 from semantic_digital_twin.adapters.multi_sim import (
     ContactDimensionality,
     MujocoBuilder,
+    MujocoConnectionJoints,
+    MujocoConnectionJoint,
+    MujocoFixedConnectionJoints,
+    MujocoOmniDriveJoints,
     MujocoSim,
 )
 from semantic_digital_twin.datastructures.definitions import (
@@ -31,11 +38,16 @@ from semantic_digital_twin.spatial_types.spatial_types import (
 )
 from semantic_digital_twin.specifications.robots import RobotSpecification
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
+from semantic_digital_twin.world_description.connections import (
+    ActiveConnection1DOF,
+    FixedConnection,
+    RevoluteConnection,
+)
 from semantic_digital_twin.world_description.world_entity import (
     Body,
     GravityCompensation,
     PositionServo,
+    VelocityServo,
 )
 
 
@@ -75,8 +87,9 @@ def _simulated_base_pose(simulation: MujocoSim, pr2: PR2) -> tuple[float, float,
 
 def test_every_commanded_joint_the_fingers_and_the_drive_are_driven_by_one_servo(pr2):
     """
-    Each joint a controller commands, the finger joint of each gripper and the drive's
-    x, y and yaw are driven by exactly one position servo.
+    Each joint a controller commands and the finger joint of each gripper are driven by
+    exactly one position servo, and each degree of freedom the drive is commanded with
+    by exactly one velocity servo.
     """
     world = pr2._world
     drive = pr2.drive
@@ -90,16 +103,22 @@ def test_every_commanded_joint_the_fingers_and_the_drive_are_driven_by_one_servo
         arm.end_effector.thumb.root.parent_connection.raw_dof for arm in pr2.all_arms
     }
 
-    driven = [
-        degree_of_freedom
-        for actuator in world.actuators
-        for degree_of_freedom in actuator.dofs
-    ]
+    def driven_by(servo_type: type) -> List[str]:
+        return sorted(
+            str(degree_of_freedom.name)
+            for actuator in world.actuators
+            if type(actuator) is servo_type
+            for degree_of_freedom in actuator.dofs
+        )
 
-    assert all(isinstance(actuator, PositionServo) for actuator in world.actuators)
-    expected = commanded | fingers | {drive.x, drive.y, drive.yaw}
-    assert sorted(str(dof.name) for dof in driven) == sorted(
-        str(dof.name) for dof in expected
+    assert len(driven_by(PositionServo)) + len(driven_by(VelocityServo)) == len(
+        world.actuators
+    )
+    assert driven_by(PositionServo) == sorted(
+        str(dof.name) for dof in commanded | fingers
+    )
+    assert driven_by(VelocityServo) == sorted(
+        str(dof.name) for dof in (drive.x_velocity, drive.y_velocity, drive.yaw)
     )
 
 
@@ -114,8 +133,12 @@ def test_the_drive_servos_have_the_gains_the_base_declares(pr2):
         for degree_of_freedom in actuator.dofs
     }
 
-    assert gains_by_degree_of_freedom[drive.x] == drive_servos.translation_gains
-    assert gains_by_degree_of_freedom[drive.y] == drive_servos.translation_gains
+    assert gains_by_degree_of_freedom[drive.x_velocity] == (
+        drive_servos.translation_gains
+    )
+    assert gains_by_degree_of_freedom[drive.y_velocity] == (
+        drive_servos.translation_gains
+    )
     assert gains_by_degree_of_freedom[drive.yaw] == drive_servos.rotation_gains
 
 
@@ -157,6 +180,26 @@ def test_the_drive_joints_are_named_after_the_robot_and_the_axis_they_move(
     ]
 
 
+def test_each_connection_is_built_by_the_realisation_for_its_type(pr2):
+    world = pr2._world
+    revolute = next(
+        connection
+        for connection in world.connections
+        if type(connection) is RevoluteConnection
+    )
+    fixed = next(
+        connection
+        for connection in world.connections
+        if isinstance(connection, FixedConnection)
+    )
+
+    assert type(MujocoConnectionJoints.of(pr2.drive, world)) is MujocoOmniDriveJoints
+    assert type(MujocoConnectionJoints.of(revolute, world)) is MujocoConnectionJoint
+    assert type(MujocoConnectionJoints.of(fixed, world)) is (
+        MujocoFixedConnectionJoints
+    )
+
+
 def test_a_drive_without_servos_keeps_the_base_where_it_is_built(pr2, tmp_path):
     """
     A robot whose base is moved kinematically keeps it bolted to its ``odom`` in the
@@ -166,7 +209,7 @@ def test_a_drive_without_servos_keeps_the_base_where_it_is_built(pr2, tmp_path):
     drive = pr2.drive
     with world.modify_world():
         for actuator in list(world.actuators):
-            if set(actuator.dofs) & {drive.x, drive.y, drive.yaw}:
+            if set(actuator.dofs) & set(drive.active_dofs):
                 world.remove_actuator(actuator)
     builder = MujocoBuilder()
     builder.build_world(world=world, file_path=str(tmp_path / "scene.xml"))
@@ -306,28 +349,209 @@ def test_the_finger_servo_closes_the_gripper(pr2):
     )
 
 
+def _drive_at(
+    simulation: MujocoSim,
+    pr2: PR2,
+    base_velocity: tuple[float, float, float],
+    duration: timedelta,
+) -> None:
+    """
+    Command the drive with a velocity in the frame of the base for a while, then stop it
+    and let it come to a standstill.
+
+    :param base_velocity: The forward, sideways and angular velocity.
+    """
+    world = pr2._world
+    drive = pr2.drive
+    for degree_of_freedom, velocity in zip(
+        (drive.x_velocity, drive.y_velocity, drive.yaw), base_velocity
+    ):
+        world.state[degree_of_freedom.id].velocity = velocity
+    world.notify_state_change()
+    simulation.step_simulation(duration)
+    for degree_of_freedom in (drive.x_velocity, drive.y_velocity, drive.yaw):
+        world.state[degree_of_freedom.id].velocity = 0.0
+    world.notify_state_change()
+    simulation.step_simulation(timedelta(seconds=0.5))
+
+
 @pytest.mark.skipif(
     not runs_in_continuous_integration(), reason="MuJoCo tests only run in CI"
 )
-def test_the_drive_moves_the_base_to_the_commanded_pose(pr2):
-    world = pr2._world
-    drive = pr2.drive
-    commanded = (0.5, -0.3, 0.4)
-
-    simulation = MujocoSim(world=world, headless=True)
+def test_the_drive_moves_the_base_at_the_commanded_velocity(pr2):
+    simulation = MujocoSim(world=pr2._world, headless=True)
     simulation.start_stepped_simulation()
     try:
-        for degree_of_freedom, position in zip(
-            (drive.x, drive.y, drive.yaw), commanded
-        ):
-            world.state[degree_of_freedom.id].position = position
-        world.notify_state_change()
-        simulation.step_simulation(timedelta(seconds=3))
+        _drive_at(simulation, pr2, (0.2, -0.1, 0.0), timedelta(seconds=2))
         reached = _simulated_base_pose(simulation, pr2)
     finally:
         simulation.stop_simulation()
 
-    assert reached == pytest.approx(commanded, abs=0.02)
+    assert reached == pytest.approx((0.4, -0.2, 0.0), abs=0.02)
+
+
+@pytest.mark.skipif(
+    not runs_in_continuous_integration(), reason="MuJoCo tests only run in CI"
+)
+def test_the_drive_is_commanded_in_the_frame_of_the_base():
+    """
+    A base facing along the ``odom``'s y-axis drives along it when commanded forward.
+    """
+    pr2 = _spawn_pr2(
+        odom_T_robot_start=HomogeneousTransformationMatrix.from_xyz_rpy(yaw=np.pi / 2)
+    )
+
+    simulation = MujocoSim(world=pr2._world, headless=True)
+    simulation.start_stepped_simulation()
+    try:
+        _drive_at(simulation, pr2, (0.2, 0.0, 0.0), timedelta(seconds=2))
+        reached = _simulated_base_pose(simulation, pr2)
+    finally:
+        simulation.stop_simulation()
+
+    assert reached == pytest.approx((0.0, 0.4, np.pi / 2), abs=0.02)
+
+
+@pytest.mark.skipif(
+    not runs_in_continuous_integration(), reason="MuJoCo tests only run in CI"
+)
+def test_the_drive_turns_the_base_at_the_commanded_angular_velocity(pr2):
+    simulation = MujocoSim(world=pr2._world, headless=True)
+    simulation.start_stepped_simulation()
+    try:
+        _drive_at(simulation, pr2, (0.0, 0.0, 0.3), timedelta(seconds=2))
+        reached = _simulated_base_pose(simulation, pr2)
+    finally:
+        simulation.stop_simulation()
+
+    assert reached == pytest.approx((0.0, 0.0, 0.6), abs=0.02)
+
+
+@pytest.mark.skipif(
+    not runs_in_continuous_integration(), reason="MuJoCo tests only run in CI"
+)
+def test_the_odometry_is_where_the_simulated_base_got_to(pr2):
+    """
+    The drive's x, y and yaw are measured odometry, so the world holds where the
+    simulated base actually is rather than where it was commanded to be.
+    """
+    world = pr2._world
+    drive = pr2.drive
+
+    simulation = MujocoSim(world=world, headless=True)
+    simulation.start_stepped_simulation()
+    try:
+        _drive_at(simulation, pr2, (0.2, 0.1, 0.3), timedelta(seconds=2))
+        reached = _simulated_base_pose(simulation, pr2)
+        odometry = tuple(
+            world.state[degree_of_freedom.id].position
+            for degree_of_freedom in (drive.x, drive.y, drive.yaw)
+        )
+    finally:
+        simulation.stop_simulation()
+
+    assert odometry == pytest.approx(reached, abs=1e-3)
+
+
+@pytest.mark.skipif(
+    not runs_in_continuous_integration(), reason="MuJoCo tests only run in CI"
+)
+def test_a_base_too_weak_to_move_does_not_report_the_pose_it_was_commanded_to(pr2):
+    """
+    A base whose servos cannot push it stays put when commanded to drive, as one held up
+    by an obstacle would, and the odometry says so instead of following the command.
+    """
+    world = pr2._world
+    drive = pr2.drive
+    translation_servos = [
+        actuator
+        for actuator in world.actuators
+        if set(actuator.dofs) & {drive.x_velocity, drive.y_velocity}
+    ]
+    for servo in translation_servos:
+        servo.gains = replace(servo.gains, torque_limit=1e-6)
+
+    simulation = MujocoSim(world=world, headless=True)
+    simulation.start_stepped_simulation()
+    try:
+        _drive_at(simulation, pr2, (0.2, 0.0, 0.0), timedelta(seconds=1))
+        odometry_x = world.state[drive.x.id].position
+    finally:
+        simulation.stop_simulation()
+
+    assert odometry_x == pytest.approx(0.0, abs=0.01)
+
+
+# %% localization: the odom is not where the world's root is
+
+
+def _spawn_localized_pr2(
+    world_T_odom: HomogeneousTransformationMatrix,
+    odom_T_robot_start: HomogeneousTransformationMatrix | None = None,
+) -> PR2:
+    world = World()
+    with world.modify_world():
+        world.add_kinematic_structure_entity(Body(name=PrefixedName("floor")))
+    return RobotSpecification(
+        PR2, world_T_odom=world_T_odom, odom_T_robot_start=odom_T_robot_start
+    ).spawn(world)
+
+
+@pytest.mark.skipif(
+    not runs_in_continuous_integration(), reason="MuJoCo tests only run in CI"
+)
+def test_a_localized_base_starts_where_the_world_has_it():
+    world_T_odom = HomogeneousTransformationMatrix.from_xyz_rpy(
+        x=1.0, y=-0.5, yaw=np.pi / 2
+    )
+    odom_T_robot_start = HomogeneousTransformationMatrix.from_xyz_rpy(
+        x=0.5, y=0.2, yaw=0.3
+    )
+    pr2 = _spawn_localized_pr2(world_T_odom, odom_T_robot_start)
+
+    simulation = MujocoSim(world=pr2._world, headless=True)
+    simulation.start_stepped_simulation()
+    try:
+        simulation.step_simulation(timedelta(seconds=1))
+        reached = _simulated_base_pose(simulation, pr2)
+    finally:
+        simulation.stop_simulation()
+
+    # x = 1 - 0.2, y = -0.5 + 0.5, yaw = pi / 2 + 0.3
+    assert reached == pytest.approx((0.8, 0.0, np.pi / 2 + 0.3), abs=0.02)
+
+
+@pytest.mark.skipif(
+    not runs_in_continuous_integration(), reason="MuJoCo tests only run in CI"
+)
+def test_a_localized_base_drives_along_its_odom_and_reports_odometry_in_it():
+    """
+    The odom is turned by a quarter against the world's root, so driving forward moves
+    the base along the root's y-axis, while its odometry counts along the odom's x-axis.
+    """
+    world_T_odom = HomogeneousTransformationMatrix.from_xyz_rpy(
+        x=1.0, y=-0.5, yaw=np.pi / 2
+    )
+    pr2 = _spawn_localized_pr2(world_T_odom)
+    world = pr2._world
+    drive = pr2.drive
+
+    simulation = MujocoSim(world=world, headless=True)
+    simulation.start_stepped_simulation()
+    try:
+        _drive_at(simulation, pr2, (0.2, 0.0, 0.0), timedelta(seconds=2))
+        reached = _simulated_base_pose(simulation, pr2)
+        odometry = tuple(
+            world.state[degree_of_freedom.id].position
+            for degree_of_freedom in (drive.x, drive.y, drive.yaw)
+        )
+        world_T_base = world.compute_forward_kinematics_np(world.root, pr2.root)
+    finally:
+        simulation.stop_simulation()
+
+    assert reached == pytest.approx((1.0, -0.1, np.pi / 2), abs=0.02)
+    assert odometry == pytest.approx((0.4, 0.0, 0.0), abs=0.02)
+    assert world_T_base[:2, 3].tolist() == pytest.approx([1.0, -0.1], abs=0.02)
 
 
 @pytest.mark.skipif(

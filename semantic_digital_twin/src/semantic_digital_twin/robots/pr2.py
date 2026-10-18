@@ -58,6 +58,7 @@ from semantic_digital_twin.world_description.connection_properties import (
     DriveServos,
     JointServo,
     ServoGains,
+    VelocityServoGains,
 )
 from semantic_digital_twin.world_description.contact import (
     ContactFriction,
@@ -735,15 +736,11 @@ class PR2MobileBase(MobileBase[OmniDrive], HasTorso[PR2Torso], HasLidar[PR2BaseL
     def drive_servos(self) -> DriveServos:
         """
         Servos tuned for the base, which carries the whole robot, to follow its
-        commanded pose; they are not taken from the real robot.
+        commanded velocity; they are not taken from the real robot.
         """
         return DriveServos(
-            translation_gains=ServoGains(
-                stiffness=300000.0, damping=20000.0, torque_limit=10000.0
-            ),
-            rotation_gains=ServoGains(
-                stiffness=100000.0, damping=3500.0, torque_limit=5000.0
-            ),
+            translation_gains=VelocityServoGains(damping=20000.0, torque_limit=10000.0),
+            rotation_gains=VelocityServoGains(damping=5000.0, torque_limit=5000.0),
         )
 
     def _setup_servos(self) -> None:

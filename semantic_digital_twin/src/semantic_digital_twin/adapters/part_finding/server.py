@@ -223,11 +223,17 @@ class PartFindingServer:
             )
         with self._counter_lock:
             self.waiting_queries += 1
-        with self._locator_lock:
-            parts = self.locator.locate(query)
-        with self._counter_lock:
-            self.waiting_queries -= 1
-        self.cache.write(key, parts)
+        try:
+            with self._locator_lock:
+                # A query for the same shape may have been answered while this one waited.
+                parts = self.cache.read(key)
+                from_cache = parts is not None
+                if not from_cache:
+                    parts = self.locator.locate(query)
+                    self.cache.write(key, parts)
+        finally:
+            with self._counter_lock:
+                self.waiting_queries -= 1
         seconds = time.perf_counter() - start
         logger.info(
             "%s: %d faces, %d parts, %.1f s",
@@ -240,7 +246,7 @@ class PartFindingServer:
             parts=parts,
             locator=settings,
             duration=timedelta(seconds=seconds),
-            from_cache=False,
+            from_cache=from_cache,
         )
 
     def status(self) -> PartFindingServerStatus:

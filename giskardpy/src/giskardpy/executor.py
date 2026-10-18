@@ -23,8 +23,6 @@ from giskardpy.qp.exceptions import EmptyProblemException
 from giskardpy.qp.qp_controller import QPController
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from krrood.symbolic_math.symbolic_math import FloatVariable
-from semantic_digital_twin.world_description.connections import OmniDrive
-from semantic_digital_twin.world_description.world_entity import PositionServo
 from semantic_digital_twin.world_description.world_state_trajectory_plotter import (
     WorldStateTrajectoryPlotter,
 )
@@ -178,20 +176,22 @@ class SteppedSimulationPacer(Pacer):
         joints have got there. A joint held up by something it has run into counts as
         stopped too.
         """
-        joint_names = self._servoed_joint_names()
-        if not joint_names:
+        servo_names = [
+            actuator.name.name for actuator in self.simulation.world.actuators
+        ]
+        if not servo_names:
             return
         simulator = self.simulation.simulator
         standstill_travel = self.standstill_velocity / self.target_frequency
-        previous = simulator.get_joints_values(joint_names).result
+        previous = simulator.get_actuators_lengths(servo_names).result
         for _ in range(
             int(self.standstill_time_limit.total_seconds() * self.target_frequency)
         ):
             self.sleep()
-            current = simulator.get_joints_values(joint_names).result
+            current = simulator.get_actuators_lengths(servo_names).result
             travelled = max(
-                abs(current[joint_name] - previous[joint_name])
-                for joint_name in joint_names
+                abs(current[servo_name] - previous[servo_name])
+                for servo_name in servo_names
             )
             previous = current
             if travelled < standstill_travel:
@@ -200,26 +200,6 @@ class SteppedSimulationPacer(Pacer):
             "The robot was still moving after %s of simulated time.",
             self.standstill_time_limit,
         )
-
-    def _servoed_joint_names(self) -> list[str]:
-        """
-        :return: The name of the simulated joint each position servo moves: the joint
-            of the drive axis for a degree of freedom of an omnidirectional drive, and
-            the joint named after the degree of freedom otherwise.
-        """
-        world = self.simulation.world
-        drive_joint_names = {
-            degree_of_freedom.id: joint_name
-            for connection in world.connections
-            if isinstance(connection, OmniDrive)
-            for degree_of_freedom, joint_name in connection.single_axis_joint_names.items()
-        }
-        return [
-            drive_joint_names.get(degree_of_freedom.id, degree_of_freedom.name.name)
-            for actuator in world.actuators
-            if isinstance(actuator, PositionServo)
-            for degree_of_freedom in actuator.dofs
-        ]
 
 
 @dataclass

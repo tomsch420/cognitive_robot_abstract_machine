@@ -776,6 +776,33 @@ class MujocoSimulator(BaseSimulator):
         )
 
     @BaseSimulator.simulator_callback
+    def get_actuators_lengths(
+        self, actuator_names: List[str]
+    ) -> SimulatorCallbackResult:
+        """
+        Get the lengths of actuators by their names: for an actuator driving a joint,
+        the joint's position scaled by the actuator's gear.
+
+        :param actuator_names: The names of the actuators
+        :return: A SimulatorCallbackResult with the length per actuator name as the
+            result
+        """
+        result = {}
+        for actuator_name in actuator_names:
+            get_actuator = self.get_actuator(actuator_name)
+            if (
+                get_actuator.type
+                != SimulatorCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION
+            ):
+                return get_actuator
+            result[actuator_name] = float(get_actuator.result.length[0])
+        return SimulatorCallbackResult(
+            type=SimulatorCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION,
+            info=f"Getting actuators lengths of {actuator_names}",
+            result=result,
+        )
+
+    @BaseSimulator.simulator_callback
     def set_actuator_control(
         self, actuator_name: str, value: float
     ) -> SimulatorCallbackResult:

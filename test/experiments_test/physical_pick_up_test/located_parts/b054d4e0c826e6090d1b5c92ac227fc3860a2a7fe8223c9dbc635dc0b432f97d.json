@@ -1,0 +1,1 @@
+[{"__json_type__": "semantic_digital_twin.part_finding.locating.LocatedPart", "relationship_name": "rim", "faces": {"__json_type__": "numpy.ndarray", "type": "int64", "data": [4831, 4832, 4833, 4981, 4982]}, "confidence": 1.0}]

@@ -86,6 +86,20 @@ def test_a_repeated_query_is_answered_from_the_cache(server, mug_query):
     assert second.locator == server.locator_settings
 
 
+def test_a_query_the_locator_fails_on_is_no_longer_waiting(
+    server, mug_query, monkeypatch
+):
+    def fail(query: PartQuery):
+        raise RuntimeError("the locator failed")
+
+    monkeypatch.setattr(server.locator, "locate", fail)
+
+    with pytest.raises(RuntimeError):
+        server.answer(mug_query)
+
+    assert server.status().waiting_queries == 0
+
+
 def test_a_shape_with_too_many_faces_is_refused(server, mug_query):
     server.maximum_faces = len(mug_query.faces) - 1
 
