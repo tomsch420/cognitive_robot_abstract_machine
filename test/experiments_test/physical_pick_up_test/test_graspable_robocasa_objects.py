@@ -58,6 +58,20 @@ def test_a_graspable_robocasa_object_weighs_its_density_times_its_volume():
 
 
 @requires_robocasa_assets
+def test_a_robocasa_object_collides_also_as_boxes_and_cylinders():
+    graspable = GraspableRoboCasaObject.CEREAL.value
+    world = RoboCasaDatasetLoader().load_object(graspable.category, 0)
+    body = world.bodies_with_collision[0]
+    bodies = [body, *world.compute_descendent_child_kinematic_structure_entities(body)]
+    shapes = [shape for each in bodies for shape in each.collision]
+
+    geometry = graspable.description(instance_index=0).load_geometry()
+
+    assert len(geometry.collision_parts) == len(shapes)
+    assert sum(part.volume for part in geometry.collision_parts) > 0
+
+
+@requires_robocasa_assets
 def test_the_command_line_takes_a_graspable_robocasa_object():
     parser = argparse.ArgumentParser()
     object_choice = ObjectChoice(parser)

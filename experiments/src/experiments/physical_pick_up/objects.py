@@ -20,7 +20,7 @@ import experiments
 import numpy as np
 from numpy.typing import NDArray
 import trimesh
-from typing_extensions import List, Optional, Type
+from typing_extensions import Iterable, List, Optional, Type
 
 from semantic_digital_twin.adapters.robocasa_dataset.loader import (
     RoboCasaDatasetLoader,
@@ -79,8 +79,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
 )
 from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
 from semantic_digital_twin.spatial_types import RotationMatrix
-from semantic_digital_twin.world_description.geometry import Mesh
-from semantic_digital_twin.world_description.shape_collection import ShapeCollection
+from semantic_digital_twin.world_description.geometry import Mesh, Shape
 
 # %% the geometry of an object
 
@@ -440,29 +439,28 @@ class RoboCasaObjectDescription(ObjectDescription):
         collision_parts = []
         for body in bodies:
             object_T_body = world.compute_forward_kinematics_np(object_body, body)
-            visual_parts += self._meshes_in_object_frame(body.visual, object_T_body)
-            collision_parts += self._meshes_in_object_frame(
-                body.collision, object_T_body
+            visual_parts += self._in_object_frame(
+                [shape for shape in body.visual if isinstance(shape, Mesh)],
+                object_T_body,
             )
+            collision_parts += self._in_object_frame(body.collision, object_T_body)
         return ObjectGeometry(
             visual=trimesh.util.concatenate(visual_parts),
             collision_parts=collision_parts,
         )
 
     @staticmethod
-    def _meshes_in_object_frame(
-        shapes: ShapeCollection, object_T_body: np.ndarray
+    def _in_object_frame(
+        shapes: Iterable[Shape], object_T_body: np.ndarray
     ) -> List[trimesh.Trimesh]:
         """
-        :param shapes: The shapes of one body.
+        :param shapes: Shapes of one body.
         :param object_T_body: Where that body sits in the object's frame.
-        :return: The shapes that are meshes, in the object's frame. Other shapes, such
-            as the boxes RoboCasa marks regions with, are left out.
+        :return: The shapes as meshes, in the object's frame.
         """
         return [
             shape.mesh.copy().apply_transform(object_T_body @ shape.origin.to_np())
             for shape in shapes
-            if isinstance(shape, Mesh)
         ]
 
 
