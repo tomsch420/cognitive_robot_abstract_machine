@@ -8,9 +8,9 @@ import os
 from dataclasses import dataclass
 from enum import StrEnum
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
-from typing_extensions import Iterable, List
+from typing_extensions import Dict, Iterable, List
 
 from experiments.grasp_learning.models import GraspModel, GraspModelLibrary
 from experiments.grasp_learning.records import GraspAttempt, GraspLearningTask
@@ -84,6 +84,15 @@ class GraspDatabase:
         :param task: The task to read the attempts of.
         :return: Every stored attempt of that task, in the order they were stored.
         """
+        return list(self.numbered_attempts(task).values())
+
+    def numbered_attempts(self, task: GraspLearningTask) -> Dict[int, GraspAttempt]:
+        """
+        :param task: The task to read the attempts of.
+        :return: Every stored attempt of that task by the number it was stored under,
+            in the order they were stored.
+        """
+        self.session.expire_all()
         query = (
             select(GraspAttemptDAO)
             .join(GraspAttemptDAO.task)
@@ -94,7 +103,16 @@ class GraspDatabase:
             )
             .order_by(GraspAttemptDAO.database_id)
         )
-        return [dao.from_dao() for dao in self.session.scalars(query)]
+        return {dao.database_id: dao.from_dao() for dao in self.session.scalars(query)}
+
+    def last_attempt_number(self) -> int:
+        """
+        :return: The number the latest attempt of any task was stored under; 0 if none
+            is stored.
+        """
+        self.session.expire_all()
+        query = select(func.max(GraspAttemptDAO.database_id))
+        return self.session.scalar(query) or 0
 
     def add_model(self, model: GraspModel) -> None:
         """
