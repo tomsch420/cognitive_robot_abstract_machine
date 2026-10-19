@@ -209,14 +209,18 @@ def test_an_empty_database_has_no_last_attempt(database):
     assert database.last_attempt_number() == 0
 
 
-def test_an_iteration_learns_only_from_attempts_on_its_own_objects(milk_scene, database):
+def test_an_iteration_learns_only_from_attempts_on_its_own_objects(
+    milk_scene, database
+):
     own = synthetic_attempts(milk_scene, 3)
     others = synthetic_attempts(milk_scene, 2)
     for attempt in others:
         attempt.object_name = "another_milk"
     database.add_attempts(own + others)
     iteration = PolicyIteration(
-        objects=[IterationObject(description=PickUpObject.MILK.value, robot=PickUpRobot.PR2)],
+        objects=[
+            IterationObject(description=PickUpObject.MILK.value, robot=PickUpRobot.PR2)
+        ],
         pool=WorkerPool(objects=[], size=0),
         database=database,
         results=Path("unused"),
@@ -228,6 +232,63 @@ def test_an_iteration_learns_only_from_attempts_on_its_own_objects(milk_scene, d
     assert {attempt.object_name for attempt in attempts.values()} == {
         milk_scene.graspable.root.name.name
     }
+
+
+# %% starting from other objects' attempts
+
+
+def test_sampled_attempts_leave_out_the_excluded_objects(milk_scene, database):
+    own = synthetic_attempts(milk_scene, 3)
+    others = synthetic_attempts(milk_scene, 5)
+    for attempt in others:
+        attempt.object_name = "another_milk"
+    database.add_attempts(own + others)
+
+    sampled = database.sampled_attempts(
+        excluded_object_names={milk_scene.graspable.root.name.name},
+        attempts_per_object=4,
+        generator=np.random.default_rng(0),
+    )
+
+    assert [attempt.object_name for attempt in sampled] == ["another_milk"] * 4
+
+
+def test_a_starting_model_is_learned_from_attempts_on_other_objects_only(
+    milk_scene, database
+):
+    own = synthetic_attempts(milk_scene, 3)
+    others = synthetic_attempts(milk_scene, 20)
+    for attempt in others:
+        attempt.object_name = "another_milk"
+    database.add_attempts(own + others)
+    iteration = PolicyIteration(
+        objects=[
+            IterationObject(description=PickUpObject.MILK.value, robot=PickUpRobot.PR2)
+        ],
+        pool=WorkerPool(objects=[], size=0),
+        database=database,
+        results=Path("unused"),
+        starting_database=database,
+    )
+
+    model = iteration.learned_starting_model(task_of(milk_scene))
+
+    assert model.number_of_attempts == len(others)
+
+
+def test_an_iteration_without_a_starting_database_has_no_starting_model(
+    milk_scene, database
+):
+    iteration = PolicyIteration(
+        objects=[
+            IterationObject(description=PickUpObject.MILK.value, robot=PickUpRobot.PR2)
+        ],
+        pool=WorkerPool(objects=[], size=0),
+        database=database,
+        results=Path("unused"),
+    )
+
+    assert iteration.learned_starting_model(task_of(milk_scene)) is None
 
 
 # %% the workers
@@ -307,3 +368,47 @@ def test_an_iteration_stores_the_attempts_and_a_model_of_every_round(
         GraspSource.STATED_REGIONS,
         None,
     )
+
+
+@simulates_physics
+def test_an_iteration_draws_part_of_its_first_grasps_from_the_starting_model(
+    milk_scene, tmp_path, monkeypatch
+):
+    uri = f"sqlite:///{tmp_path / 'grasps.sqlite'}"
+    monkeypatch.setenv("GRASP_LEARNING_DATABASE_URI", uri)
+    database = GraspDatabase.connect(uri)
+    starting_database = GraspDatabase.connect(f"sqlite:///{tmp_path / 'others.sqlite'}")
+    others = synthetic_attempts(milk_scene, 40)
+    for attempt in others:
+        attempt.object_name = "another_milk"
+    starting_database.add_attempts(others)
+    no_stored_parts = tmp_path / "stored_parts"
+    no_stored_parts.mkdir()
+    objects = [
+        IterationObject(
+            description=PickUpObject.MILK.value,
+            robot=PickUpRobot.PR2,
+            stored_parts=no_stored_parts,
+        )
+    ]
+    with WorkerPool(objects=objects, size=2) as pool:
+        iteration = PolicyIteration(
+            objects=objects,
+            pool=pool,
+            database=database,
+            results=tmp_path / "results",
+            stopping=FixedRounds(),
+            initial_attempts=12,
+            attempts_per_round=4,
+            maximum_rounds=1,
+            starting_database=starting_database,
+        )
+        iteration.run()
+
+    first_phase = iteration.phases[0]
+    assert (first_phase.source, first_phase.model_index) == (
+        GraspSource.STARTING_MODEL,
+        0,
+    )
+    assert iteration.drawn_models[0].number_of_attempts == len(others)
+    assert iteration.drawn_models[1] is iteration.models[0]
