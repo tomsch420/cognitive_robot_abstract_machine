@@ -79,6 +79,12 @@ class GraspSource(StrEnum):
     From a learned model, asked for grasps that lift the object.
     """
 
+    STARTING_MODEL = "starting model"
+    """
+    From a model learned from attempts on other objects, asked for grasps that lift
+    the object.
+    """
+
 
 @dataclass
 class GraspAttempt:

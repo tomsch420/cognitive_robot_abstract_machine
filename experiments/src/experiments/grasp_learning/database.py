@@ -5,12 +5,14 @@ Storing grasp attempts and learned grasp models in a database, and reading them 
 from __future__ import annotations
 
 import os
+from collections import defaultdict
 from dataclasses import dataclass
 from enum import StrEnum
 
+import numpy as np
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
-from typing_extensions import Dict, Iterable, List
+from typing_extensions import Dict, Iterable, List, Set
 
 from experiments.grasp_learning.models import GraspModel, GraspModelLibrary
 from experiments.grasp_learning.records import GraspAttempt, GraspLearningTask
@@ -104,6 +106,49 @@ class GraspDatabase:
             .order_by(GraspAttemptDAO.database_id)
         )
         return {dao.database_id: dao.from_dao() for dao in self.session.scalars(query)}
+
+    def sampled_attempts(
+        self,
+        excluded_object_names: Set[str],
+        attempts_per_object: int,
+        generator: np.random.Generator,
+        numbers_per_query: int = 10000,
+    ) -> List[GraspAttempt]:
+        """
+        :param excluded_object_names: The objects whose attempts are left out.
+        :param attempts_per_object: The most attempts drawn on each object.
+        :param generator: Draws the attempts.
+        :param numbers_per_query: How many attempts are read in one query, which keeps
+            each query within the database's limit on parameters.
+        :return: Attempts of any task drawn without replacement on every other
+            object, in the order they were stored.
+        """
+        numbers_by_object = defaultdict(list)
+        for number, object_name in self.session.execute(
+            select(GraspAttemptDAO.database_id, GraspAttemptDAO.object_name)
+        ):
+            if object_name not in excluded_object_names:
+                numbers_by_object[object_name].append(number)
+        chosen = sorted(
+            number
+            for _, numbers in sorted(numbers_by_object.items())
+            for number in generator.choice(
+                numbers, min(len(numbers), attempts_per_object), replace=False
+            ).tolist()
+        )
+        attempts = []
+        for start in range(0, len(chosen), numbers_per_query):
+            query = (
+                select(GraspAttemptDAO)
+                .where(
+                    GraspAttemptDAO.database_id.in_(
+                        chosen[start : start + numbers_per_query]
+                    )
+                )
+                .order_by(GraspAttemptDAO.database_id)
+            )
+            attempts.extend(dao.from_dao() for dao in self.session.scalars(query))
+        return attempts
 
     def last_attempt_number(self) -> int:
         """

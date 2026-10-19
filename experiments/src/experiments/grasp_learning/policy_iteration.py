@@ -1030,9 +1030,30 @@ class PolicyIteration:
     Seeds the batches.
     """
 
+    starting_database: Optional[GraspDatabase] = None
+    """
+    Attempts on other objects that a starting model is learned from; ``None`` draws all
+    initial grasps from the stated regions.
+    """
+
+    starting_attempts_per_object: int = 50
+    """
+    The most attempts on each other object the starting model is learned from.
+    """
+
+    starting_share: float = 0.5
+    """
+    The share of the initial grasps drawn from the starting model, when there is one.
+    """
+
     models: List[GraspModel] = field(default_factory=list, init=False)
     """
     The models of the rounds so far.
+    """
+
+    drawn_models: List[GraspModel] = field(default_factory=list, init=False)
+    """
+    The models grasps were drawn from so far, at the index their phases name.
     """
 
     phases: List[SamplingPhase] = field(default_factory=list, init=False)
@@ -1072,15 +1093,38 @@ class PolicyIteration:
             parts={
                 name: scene.graspable.grasped_part() for name, scene in scenes.items()
             },
-            models=self.models,
+            models=self.drawn_models,
         )
         learner = self.choice.learner()
 
         start = time.monotonic()
-        exploring = self.attempt(
-            GraspSource.STATED_REGIONS, None, self.initial_attempts, 0
+        starting_model = self.learned_starting_model(task)
+        if (
+            starting_model is not None
+            and not PreparedModel(
+                model=starting_model, part=densities.parts[self.objects[0].name]
+            ).answers
+        ):
+            starting_model = None
+        starting_count = (
+            0
+            if starting_model is None
+            else round(self.initial_attempts * self.starting_share)
         )
-        self.report({"round": 0, **self.summary("exploring", exploring)}, start)
+        starting = self.attempt(
+            GraspSource.STARTING_MODEL, starting_model, starting_count, 0
+        )
+        exploring = self.attempt(
+            GraspSource.STATED_REGIONS, None, self.initial_attempts - starting_count, 0
+        )
+        self.report(
+            {
+                "round": 0,
+                **self.summary("starting", starting),
+                **self.summary("exploring", exploring),
+            },
+            start,
+        )
 
         model = None
         for round_number in range(1, self.maximum_rounds + 1):
@@ -1130,6 +1174,23 @@ class PolicyIteration:
                 break
         return model
 
+    def learned_starting_model(self, task: GraspLearningTask) -> Optional[GraspModel]:
+        """
+        :param task: The task of the iteration's objects.
+        :return: A model of the task learned from attempts on every object but the
+            iteration's own in :attr:`starting_database`; ``None`` without one.
+        """
+        if self.starting_database is None:
+            return None
+        attempts = self.starting_database.sampled_attempts(
+            excluded_object_names={
+                iteration_object.name for iteration_object in self.objects
+            },
+            attempts_per_object=self.starting_attempts_per_object,
+            generator=np.random.default_rng(self.seed),
+        )
+        return self.choice.learner().learn(task, attempts)
+
     def own_attempts(self, task: GraspLearningTask) -> Dict[int, GraspAttempt]:
         """
         :param task: The task of the iteration's objects.
@@ -1156,12 +1217,14 @@ class PolicyIteration:
         were drawn in.
 
         :param source: Where the grasps are drawn from.
-        :param model: The model the policy chooses them from, for
-            :attr:`GraspSource.LEARNED_MODEL`.
+        :param model: The model the policy chooses them from; ``None`` for
+            :attr:`GraspSource.STATED_REGIONS`.
         :param number_of_attempts: How many grasps are tried.
         :param round_number: The round, which seeds the batches.
         :return: What happened in every attempt that was not lost.
         """
+        if number_of_attempts == 0:
+            return []
         first_number = self.database.last_attempt_number() + 1
         sizes = [self.attempts_per_batch] * (
             number_of_attempts // self.attempts_per_batch
@@ -1186,7 +1249,11 @@ class PolicyIteration:
         last_number = self.database.last_attempt_number()
         if last_number < first_number:
             return outcomes
-        model_index = None if model is None else len(self.models)
+        model_index = None
+        if model is not None:
+            if not self.drawn_models or self.drawn_models[-1] is not model:
+                self.drawn_models.append(model)
+            model_index = len(self.drawn_models) - 1
         for name in sorted({outcome.object_name for outcome in outcomes}):
             phase = SamplingPhase(name, source, model_index, first_number, last_number)
             phase.append_to(self.phases_file)
@@ -1343,6 +1410,19 @@ def main() -> None:
     )
     parser.add_argument("--seed", type=int, default=PolicyIteration.seed)
     parser.add_argument("--results", type=Path, required=True)
+    parser.add_argument(
+        "--starting-database",
+        help="URI of a database whose attempts on other objects a starting model is "
+        "learned from",
+    )
+    parser.add_argument(
+        "--starting-attempts-per-object",
+        type=int,
+        default=PolicyIteration.starting_attempts_per_object,
+    )
+    parser.add_argument(
+        "--starting-share", type=float, default=PolicyIteration.starting_share
+    )
     arguments = parser.parse_args()
     chosen_objects = iteration_objects(arguments)
     with WorkerPool(objects=chosen_objects, size=arguments.workers) as pool:
@@ -1358,6 +1438,13 @@ def main() -> None:
             exploring_share=arguments.exploring_share,
             maximum_rounds=arguments.maximum_rounds,
             seed=arguments.seed,
+            starting_database=(
+                None
+                if arguments.starting_database is None
+                else GraspDatabase.connect(arguments.starting_database)
+            ),
+            starting_attempts_per_object=arguments.starting_attempts_per_object,
+            starting_share=arguments.starting_share,
         ).run()
 
 
