@@ -8,6 +8,8 @@ Done:
   removed l1_metric_but_with_uniform_measure and the tolerance parameter.
 - test/probabilistic_model_test/test_monte_carlo_estimator.py: 3 tests pass.
 - Pushed to origin, draft PR opened.
+- Review comment: references now cited via sphinxcontrib-bibtex
+  (:cite:p:, entries in probabilistic_model/doc/references.bib); replied, resolved.
 
 Next:
 - docformatter missing locally; run scripts/format_docstrings.py once installed.
