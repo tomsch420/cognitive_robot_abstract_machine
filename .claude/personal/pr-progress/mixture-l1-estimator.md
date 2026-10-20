@@ -10,6 +10,8 @@ Done:
 - Pushed to origin, draft PR opened.
 - Review comment: references now cited via sphinxcontrib-bibtex
   (:cite:p:, entries in probabilistic_model/doc/references.bib); replied, resolved.
+- User preferred [0, 1]: renamed l1_metric -> total_variation_distance
+  (half of L1); tests, PR title and description updated.
 
 Next:
 - docformatter missing locally; run scripts/format_docstrings.py once installed.
