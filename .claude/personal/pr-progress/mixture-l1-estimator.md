@@ -1,23 +1,14 @@
-PR #769 (draft): https://github.com/cram2/cognitive_robot_abstract_machine/pull/769
+PR #772 (draft, bug): https://github.com/cram2/cognitive_robot_abstract_machine/pull/772
 
-Plan: replace MonteCarloEstimator's L1 estimators with the importance sampling
-estimate under the mixture (p + q) / 2, averaging 2|p - q| / (p + q).
+Plan: make ShallowProbabilisticCircuit.from_probabilistic_circuit work on rx.
 
 Done:
-- Failing test first (nearly identical Gaussians), then the new l1_metric;
-  removed l1_metric_but_with_uniform_measure and the tolerance parameter.
-- test/probabilistic_model_test/test_monte_carlo_estimator.py: 3 tests pass.
-- Pushed to origin, draft PR opened.
-- Review comment: references now cited via sphinxcontrib-bibtex
-  (:cite:p:, entries in probabilistic_model/doc/references.bib); replied, resolved.
-- User preferred [0, 1]: renamed l1_metric -> total_variation_distance
-  (half of L1); tests, PR title and description updated.
-- Merged cram2/main (references.bib conflict, kept both sides).
-- ShallowProbabilisticCircuit.l1 -> total_variation_distance, [0, 1]; fixed
-  subgraph_of (passed Units to rx.descendants) via mount; new test file
-  test_rx/test_shallow_probabilistic_circuit.py.
-- Known, out of scope: from_probabilistic_circuit calls unimplemented __copy__.
+- Failing tests in test_rx/test_shallow_circuit_conversion.py (5).
+- Unit.weighted_leaf_products (leaf/sum/product) + WeightedLeafProduct dataclass;
+  from_probabilistic_circuit builds root sum of products from it; removed
+  shallowing and remove_node_and_successor_structure.
+- Pushed, draft PR opened with bug label.
 
 Next:
-- docformatter missing locally; run scripts/format_docstrings.py once installed.
-- Wait for CI and review; handle only when asked.
+- Wait for CI/review; handle only when asked.
+- After it lands, PR #769's shallow circuit tests could use the conversion.
