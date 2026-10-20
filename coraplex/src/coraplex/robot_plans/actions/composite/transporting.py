@@ -22,6 +22,7 @@ from coraplex.robot_plans.actions.core.pick_up import PickUpAction
 from coraplex.robot_plans.actions.core.placing import PlaceAction
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction
 from krrood.entity_query_language.query.match import Match
+from krrood.parametrization.model_registries import ModelRegistry
 from semantic_digital_twin.robots.robot_parts import Arm
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
@@ -238,6 +239,8 @@ class MoveAndPickUpAction(ActionDescription):
         arm: Arm,
         context: Context,
         number_of_grasps: int = IsAmongTheClosestGraspsTo.number_of_grasps,
+        model_registry: ModelRegistry | None = None,
+        require_lifting: bool = False,
     ) -> Match:
         """
         A pick-up of `graspable`, standing wherever it can be reached from and taking it
@@ -251,9 +254,13 @@ class MoveAndPickUpAction(ActionDescription):
         :param context: The context the standing poses are sampled in.
         :param number_of_grasps: How many of the object's grasps closest to a standing
             pose are tried from there.
+        :param model_registry: Answers where the object may be grasped, see
+            :meth:`~semantic_digital_twin.semantic_annotations.mixins.HasGraspCandidates.grasp_candidates`.
+        :param require_lifting: Whether only grasps expected to lift the object are
+            tried.
         :return: The pick-up, with the standing pose and the grasp left open.
         """
-        grasps = graspable.grasp_candidates()
+        grasps = graspable.grasp_candidates(model_registry, require_lifting)
         object_pose = Pose(reference_frame=graspable.root)
         step = a(cls)(
             navigate=a(NavigateAction)(

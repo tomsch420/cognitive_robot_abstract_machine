@@ -30,7 +30,7 @@ from __future__ import annotations
 
 import argparse
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import timedelta
 from enum import StrEnum
 
@@ -55,6 +55,7 @@ from coraplex.execution_environment import (
 )
 from coraplex.plans.plan_node import PlanNode
 from coraplex.plans.factories import sequential
+from experiments.grasp_learning.models import GraspModel
 from experiments.robocasa_task_execution.exceptions import NoClearStandingPose
 from coraplex.robot_plans.actions.composite.transporting import MoveAndPickUpAction
 from coraplex.robot_plans.actions.core.robot_body import (
@@ -119,6 +120,45 @@ class RoboCasaObjectName(StrEnum):
     """
 
 
+# %% how far an episode got
+
+
+class EpisodeStage(StrEnum):
+    """
+    The stages an episode of the counter to sink task goes through, in order.
+    """
+
+    COMPOSING = "composing"
+    """
+    The kitchen, the objects and the robot are being put together.
+    """
+
+    READY = "ready"
+    """
+    The episode is composed and the robot has not moved yet.
+    """
+
+    PICKING_UP = "picking up"
+    """
+    The robot is picking the target object up from the counter.
+    """
+
+    PLACING = "placing"
+    """
+    The robot is placing the target object into the sink.
+    """
+
+    SETTLING = "settling"
+    """
+    The target object is coming to rest after the robot let go of it.
+    """
+
+    FINISHED = "finished"
+    """
+    The episode has ended and its outcome is judged.
+    """
+
+
 # %% how an episode ended
 
 
@@ -172,6 +212,11 @@ class CounterToSinkEpisode:
     robot: PR2
     """
     The robot performing the task.
+    """
+
+    stage: EpisodeStage = field(default=EpisodeStage.READY, init=False)
+    """
+    How far the episode got.
     """
 
     @classmethod
@@ -261,6 +306,17 @@ class CounterToSinkEpisode:
         )
 
     @property
+    def target_category(self) -> str:
+        """
+        The RoboCasa object category of the target object.
+        """
+        return next(
+            str(configuration["info"]["cat"])
+            for configuration in self.environment.object_cfgs
+            if configuration["name"] == RoboCasaObjectName.TARGET
+        )
+
+    @property
     def target_object_released(self) -> bool:
         """
         Whether the target object no longer moves with the robot: it neither hangs off
@@ -305,9 +361,13 @@ class CounterToSinkEpisode:
             reference_frame=world.root,
         )
 
-    def pick_up_plan(self, sampling_seed: int) -> PlanNode:
+    def pick_up_plan(
+        self, sampling_seed: int, grasp_model: GraspModel | None = None
+    ) -> PlanNode:
         """
         :param sampling_seed: The seed the standing poses are sampled with.
+        :param grasp_model: A model of where grasps lift the target object; without one,
+            the grasps its annotation offers by itself are tried.
         :return: The plan picking the target object up from the counter with the right
             arm, standing wherever and grasping however a trial finds to work, and
             parking the arms afterwards.
@@ -315,7 +375,13 @@ class CounterToSinkEpisode:
         context = Context(self.task.world, self.robot, sampling_seed=sampling_seed)
         arms = self.robot.all_arms
         pick_up = MoveAndPickUpAction.from_graspable_by_closest_grasps(
-            graspable=self.target_object, arm=self.robot.right_arm, context=context
+            graspable=self.target_object,
+            arm=self.robot.right_arm,
+            context=context,
+            model_registry=(
+                None if grasp_model is None else grasp_model.model_registry()
+            ),
+            require_lifting=grasp_model is not None,
         )
         return sequential(
             [
@@ -340,7 +406,10 @@ class CounterToSinkEpisode:
         )
 
     def perform(
-        self, sampling_seed: int = 42, collision_avoidance: bool = True
+        self,
+        sampling_seed: int = 42,
+        collision_avoidance: bool = True,
+        grasp_model: GraspModel | None = None,
     ) -> CounterToSinkOutcome:
         """
         Have the PR2 carry the target object into the sink kinematically, and let
@@ -349,16 +418,35 @@ class CounterToSinkEpisode:
         :param sampling_seed: The seed the standing poses are sampled with.
         :param collision_avoidance: Whether the PR2 avoids colliding with the kitchen
             and with itself while moving.
+        :param grasp_model: A model of where grasps lift the target object, see
+            :meth:`pick_up_plan`.
         :return: How the episode ended.
         """
         with ExecutionEnvironment(
             ExecutionType.KINEMATICALLY_SIMULATED,
             collision_avoidance=collision_avoidance,
         ):
-            self.pick_up_plan(sampling_seed).perform()
-            self.placing_into_the_sink().plan().perform()
+            self.carry_into_the_sink(sampling_seed, grasp_model)
+        self.stage = EpisodeStage.SETTLING
         self.let_the_target_object_fall()
+        self.stage = EpisodeStage.FINISHED
         return self.outcome()
+
+    def carry_into_the_sink(
+        self, sampling_seed: int, grasp_model: GraspModel | None
+    ) -> None:
+        """
+        Have the PR2 pick the target object up and place it into the sink, in whatever
+        execution environment is active.
+
+        :param sampling_seed: The seed the standing poses are sampled with.
+        :param grasp_model: A model of where grasps lift the target object, see
+            :meth:`pick_up_plan`.
+        """
+        self.stage = EpisodeStage.PICKING_UP
+        self.pick_up_plan(sampling_seed, grasp_model).perform()
+        self.stage = EpisodeStage.PLACING
+        self.placing_into_the_sink().plan().perform()
 
     def start_physical_simulation(
         self,
@@ -395,6 +483,7 @@ class CounterToSinkEpisode:
         sampling_seed: int = 42,
         collision_avoidance: bool = True,
         settling_time: timedelta = timedelta(seconds=2),
+        grasp_model: GraspModel | None = None,
     ) -> CounterToSinkOutcome:
         """
         Have the PR2 carry the target object into the sink in a physical simulation,
@@ -408,14 +497,17 @@ class CounterToSinkEpisode:
             and with itself while moving.
         :param settling_time: How long the physics runs on after the plan, for the
             object to come to rest.
+        :param grasp_model: A model of where grasps lift the target object, see
+            :meth:`pick_up_plan`.
         :return: How the episode ended.
         """
         with PhysicallySimulatedRobot(
             simulation=simulation, collision_avoidance=collision_avoidance
         ):
-            self.pick_up_plan(sampling_seed).perform()
-            self.placing_into_the_sink().plan().perform()
+            self.carry_into_the_sink(sampling_seed, grasp_model)
+        self.stage = EpisodeStage.SETTLING
         simulation.step_simulation(settling_time)
+        self.stage = EpisodeStage.FINISHED
         return self.outcome()
 
     def let_the_target_object_fall(self, settling_time: float = 2.0) -> None:

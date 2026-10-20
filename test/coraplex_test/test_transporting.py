@@ -3,6 +3,7 @@ How a transport moves to an object, fetches it and puts it down.
 """
 
 import itertools
+from dataclasses import dataclass
 
 import numpy as np
 import pytest
@@ -10,6 +11,7 @@ from typing_extensions import Callable, List, Type
 
 from krrood.entity_query_language.factories import a, variable
 from krrood.entity_query_language.query.match import Match
+from krrood.parametrization.model_registries import FullyFactorizedRegistry
 from coraplex.datastructures.dataclasses import Context
 from coraplex.execution_environment import kinematically_simulated_robot
 from coraplex.locations.locations import ReachabilityLocation
@@ -540,6 +542,43 @@ def test_a_pick_up_of_a_graspable_tries_as_many_closest_grasps_as_asked_for(
     _assert_each_standing_pose_keeps_the_closest_grasps(
         pick_ups, milk, NON_DEFAULT_NUMBER_OF_GRASPS
     )
+
+
+@dataclass(eq=False)
+class GraspedOnlyWhereAModelExpectsLifting(Milk):
+    """
+    A carton that offers grasps only when a model is asked for grasps that lift it, and
+    then only the last of its default grasps.
+    """
+
+    def grasp_candidates(self, model_registry=None, require_lifting=False):
+        if model_registry is None or not require_lifting:
+            return []
+        return self.default_grasp_candidates()[-1:]
+
+
+def test_a_pick_up_of_a_graspable_tries_the_grasps_a_model_expects_to_lift_it(
+    pr2_apartment_context,
+):
+    world, robot, context = pr2_apartment_context
+    carton = GraspedOnlyWhereAModelExpectsLifting(
+        root=world.get_semantic_annotations_by_type(Milk)[0].root
+    )
+    model_registry = FullyFactorizedRegistry()
+    step = MoveAndPickUpAction.from_graspable_by_closest_grasps(
+        carton,
+        context.robot.right_arm,
+        context,
+        model_registry=model_registry,
+        require_lifting=True,
+    )
+
+    [pick_up] = itertools.islice(context.query_backend.evaluate(step), 1)
+
+    assert [_grasp_signature(pick_up.pick_up.grasp)] == [
+        _grasp_signature(grasp)
+        for grasp in carton.grasp_candidates(model_registry, require_lifting=True)
+    ]
 
 
 def test_a_transport_of_a_graspable_picks_it_up_by_the_closest_grasps(

@@ -16,6 +16,7 @@ from typing_extensions import Dict, Iterable, List, Set
 
 from experiments.grasp_learning.models import GraspModel, GraspModelLibrary
 from experiments.grasp_learning.records import GraspAttempt, GraspLearningTask
+from experiments.physical_pick_up.objects import GraspableRoboCasaCategory
 from experiments.orm.ormatic_interface import (
     Base,
     GraspAttemptDAO,
@@ -106,6 +107,29 @@ class GraspDatabase:
             .order_by(GraspAttemptDAO.database_id)
         )
         return {dao.database_id: dao.from_dao() for dao in self.session.scalars(query)}
+
+    def attempts_on_category(
+        self, category: GraspableRoboCasaCategory
+    ) -> List[GraspAttempt]:
+        """
+        :param category: A category of RoboCasa objects.
+        :return: Every stored attempt on the category's objects, in the order they were
+            stored.
+        """
+        self.session.expire_all()
+        object_names = [
+            object_name
+            for object_name in self.session.scalars(
+                select(GraspAttemptDAO.object_name).distinct()
+            )
+            if category.is_body_name_of(object_name)
+        ]
+        query = (
+            select(GraspAttemptDAO)
+            .where(GraspAttemptDAO.object_name.in_(object_names))
+            .order_by(GraspAttemptDAO.database_id)
+        )
+        return [dao.from_dao() for dao in self.session.scalars(query)]
 
     def sampled_attempts(
         self,

@@ -854,6 +854,23 @@ class GraspableRoboCasaCategory:
     own are given the nearest more general one.
     """
 
+    def body_name(self, instance_index: int) -> str:
+        """
+        :param instance_index: Which of the category's models it is.
+        :return: The name of the body of that model.
+        """
+        return f"robocasa_{self.category}_{instance_index}"
+
+    def is_body_name_of(self, object_name: str) -> bool:
+        """
+        :param object_name: The name of an object's body.
+        :return: Whether it is the body of one of the category's models.
+        """
+        _, _, instance_index = object_name.rpartition("_")
+        return instance_index.isdigit() and object_name == self.body_name(
+            int(instance_index)
+        )
+
     def description(
         self, instance_index: int = 0, density: float = 100.0
     ) -> RoboCasaObjectDescription:
@@ -865,7 +882,7 @@ class GraspableRoboCasaCategory:
             of its collision parts, with no default grasp.
         """
         description = RoboCasaObjectDescription(
-            body_name=f"robocasa_{self.category}_{instance_index}",
+            body_name=self.body_name(instance_index),
             category=self.category,
             instance_index=instance_index,
             semantic_annotation_type=self.semantic_annotation_type,

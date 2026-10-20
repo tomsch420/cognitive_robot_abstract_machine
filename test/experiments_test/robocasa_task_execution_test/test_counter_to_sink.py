@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import mujoco
 import pytest
 
@@ -12,6 +14,7 @@ pytest.importorskip("robosuite", reason="robosuite is not installed")
 from experiments.robocasa_task_execution.counter_to_sink import (
     CounterToSinkEpisode,
     CounterToSinkOutcome,
+    EpisodeStage,
     RoboCasaObjectName,
 )
 from coraplex.datastructures.enums import ExecutionType
@@ -54,6 +57,12 @@ def test_episodes_composed_with_the_same_seed_put_the_same_object_in_the_same_pl
         first.target_object.root.global_pose.to_np().tolist()
         == second.target_object.root.global_pose.to_np().tolist()
     )
+
+
+def test_the_target_category_is_the_category_of_the_target_objects_model(episode):
+    model_file = Path(episode.environment.objects[RoboCasaObjectName.TARGET].mjcf_path)
+
+    assert episode.target_category == model_file.parent.parent.name
 
 
 # %% where the PR2 starts
@@ -114,6 +123,14 @@ def test_an_object_let_go_of_at_the_placement_pose_falls_into_the_sink(episode):
 
 def test_the_pr2_puts_the_object_into_the_sink(episode):
     assert episode.perform().succeeded
+
+
+def test_an_episode_performed_to_the_end_has_finished(episode):
+    assert episode.stage == EpisodeStage.READY
+
+    episode.perform(collision_avoidance=False)
+
+    assert episode.stage == EpisodeStage.FINISHED
 
 
 # %% placing into the basin
