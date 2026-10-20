@@ -100,6 +100,7 @@ from semantic_digital_twin.spatial_types.spatial_types import (
     Pose,
 )
 from semantic_digital_twin.world_description.connections import OmniDrive
+from semantic_digital_twin.world_description.world_entity import Body
 
 if TYPE_CHECKING:
     from robocasa.environments.kitchen.atomic.kitchen_pick_place import (
@@ -289,7 +290,7 @@ class CounterToSinkEpisode:
         self.mirror = RoboCasaSimulationMirror(
             environment=self.environment, world=self.task.world
         )
-        target = self.target_object.root
+        target = self.target_body
         self.target_in_sink = ObjectInsideFixtureDetector(
             tracked_object=target,
             mirror=self.mirror,
@@ -398,17 +399,26 @@ class CounterToSinkEpisode:
         )
 
     @property
-    def target_object(self) -> HasGraspCandidates:
+    def target_body(self) -> Body:
         """
-        The object the task asks to be put into the sink.
+        The root body of the object the task asks to be put into the sink.
         """
-        world = self.task.world
-        body = world.get_body_by_name(
+        return self.task.world.get_body_by_name(
             self.environment.objects[RoboCasaObjectName.TARGET].root_body
         )
+
+    @property
+    def target_object(self) -> HasGraspCandidates:
+        """
+        The annotation of the object the task asks to be put into the sink, which says
+        where it may be grasped.
+        """
+        body = self.target_body
         return next(
             annotation
-            for annotation in world.get_semantic_annotations_by_type(HasGraspCandidates)
+            for annotation in self.task.world.get_semantic_annotations_by_type(
+                HasGraspCandidates
+            )
             if annotation.root is body
         )
 
@@ -429,7 +439,7 @@ class CounterToSinkEpisode:
         Whether the target object no longer moves with the robot: it neither hangs off
         the robot nor lies gripped between the fingers of one of its grippers.
         """
-        body = self.target_object.root
+        body = self.target_body
         hangs_off_the_robot = (
             body
             in self.task.world.get_kinematic_structure_entities_of_branch(
@@ -450,7 +460,7 @@ class CounterToSinkEpisode:
         """
         basin = SinkBasin.first_of(self.environment.sink)
         world = self.task.world
-        body = self.target_object.root
+        body = self.target_body
         object_pose = body.global_pose
         lowest_point = (
             body.collision.as_bounding_box_collection_in_frame(world.root)
@@ -507,7 +517,7 @@ class CounterToSinkEpisode:
         """
         return PlacingIntoTheBasin(
             basin=SinkBasin.first_of(self.environment.sink),
-            held_object=self.target_object.root,
+            held_object=self.target_body,
             arm=self.robot.right_arm,
             context=Context(self.task.world, self.robot),
         )
@@ -635,7 +645,7 @@ class CounterToSinkEpisode:
         x, y, z, quaternion_w, quaternion_x, quaternion_y, quaternion_z = (
             simulation.data.get_joint_qpos(joint)
         )
-        self.target_object.root.parent_connection.origin = (
+        self.target_body.parent_connection.origin = (
             HomogeneousTransformationMatrix.from_xyz_quaternion(
                 x,
                 y,

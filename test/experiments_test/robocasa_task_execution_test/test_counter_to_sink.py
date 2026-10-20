@@ -67,6 +67,32 @@ def test_the_target_category_is_the_category_of_the_target_objects_model(episode
     assert episode.target_category == model_file.parent.parent.name
 
 
+def test_an_episode_whose_target_object_offers_no_grasps_follows_its_goal():
+    """
+    Only grasping the target object needs it to say where it may be grasped; RoboCasa
+    samples objects whose category has no annotation that does.
+    """
+    if not RoboCasaDatasetLoader().directory.exists():
+        pytest.skip(
+            "RoboCasa assets not downloaded. Run "
+            "'python -m robocasa.scripts.download_kitchen_assets' first."
+        )
+    composed = CounterToSinkEpisode.compose(
+        LayoutType.LAYOUT001, StyleType.STYLE001, seed=10
+    )
+    world = composed.task.world
+    with world.modify_world():
+        world.remove_semantic_annotation(composed.target_object)
+
+    episode = CounterToSinkEpisode(
+        environment=composed.environment, task=composed.task, robot=composed.robot
+    )
+
+    assert episode.outcome() == CounterToSinkOutcome(
+        object_in_sink=False, object_released=True
+    )
+
+
 # %% where the PR2 starts
 
 
