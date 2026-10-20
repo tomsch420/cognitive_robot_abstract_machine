@@ -11,7 +11,9 @@ with robocasa_version_assertions_relaxed():
     pytest.importorskip("robocasa", reason="robocasa is not installed")
 pytest.importorskip("robosuite", reason="robosuite is not installed")
 
+from experiments.robocasa_goals.events import RoboCasaCondition
 from experiments.robocasa_task_execution.counter_to_sink import (
+    ConditionChange,
     CounterToSinkEpisode,
     CounterToSinkOutcome,
     EpisodeStage,
@@ -115,6 +117,49 @@ def test_an_object_let_go_of_at_the_placement_pose_falls_into_the_sink(episode):
 
     assert episode.outcome() == CounterToSinkOutcome(
         object_in_sink=True, object_released=True
+    )
+
+
+# %% following the goal of the task
+
+
+def test_an_object_that_fell_into_the_sink_reaches_the_goal_of_the_task(episode):
+    episode.target_object.root.parent_connection.origin = (
+        episode.placement_pose().homogeneous_matrix
+    )
+    episode.let_the_target_object_fall()
+
+    episode.outcome()
+
+    assert (
+        ConditionChange(
+            condition=RoboCasaCondition.TASK_SUCCEEDED,
+            holds=True,
+            stage=EpisodeStage.READY,
+        )
+        in episode.condition_changes
+    )
+
+
+def test_a_gripper_comes_near_the_object_while_the_pr2_picks_it_up():
+    if not RoboCasaDatasetLoader().directory.exists():
+        pytest.skip(
+            "RoboCasa assets not downloaded. Run "
+            "'python -m robocasa.scripts.download_kitchen_assets' first."
+        )
+    episode = CounterToSinkEpisode.compose(
+        LayoutType.LAYOUT001, StyleType.STYLE001, seed=10
+    )
+
+    episode.perform(collision_avoidance=False)
+
+    assert (
+        ConditionChange(
+            condition=RoboCasaCondition.GRIPPER_FAR_FROM_OBJECT,
+            holds=False,
+            stage=EpisodeStage.PICKING_UP,
+        )
+        in episode.condition_changes
     )
 
 

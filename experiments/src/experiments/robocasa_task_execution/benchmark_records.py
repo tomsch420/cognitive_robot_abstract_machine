@@ -5,7 +5,7 @@ What is recorded of an episode of the counter to sink benchmark.
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from semantic_digital_twin.adapters.robocasa_dataset.mujoco_compat import (
@@ -16,6 +16,7 @@ with robocasa_version_assertions_relaxed():
     from robocasa.models.scenes.scene_registry import LayoutType
 
 from experiments.robocasa_task_execution.counter_to_sink import (
+    ConditionChange,
     CounterToSinkOutcome,
     EpisodeStage,
 )
@@ -91,6 +92,12 @@ class EpisodeRecord:
     exit_code: int | None = None
     """
     The exit code of the episode's process; ``None`` while it runs.
+    """
+
+    condition_changes: list[ConditionChange] = field(default_factory=list)
+    """
+    The changes of the conditions of the task's goal during the episode, in the order
+    they happened.
     """
 
     @property

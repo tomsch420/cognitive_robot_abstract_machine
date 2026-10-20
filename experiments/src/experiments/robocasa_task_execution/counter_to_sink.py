@@ -8,7 +8,8 @@ left open; coraplex grounds them by trying candidates against a copy of the worl
 PR2 then stands in front of the sink and lowers the object into the basin along a path a
 graph of convex sets plans through the free space around the sink, and lets go of it
 just above the basin floor. Whether the task succeeded is decided by RoboCasa's own
-check.
+check, and the conditions of RoboCasa's goal of the task are followed through the
+episode as segmind events.
 
 The episode is performed either kinematically or in MuJoCo physics, where the PR2's
 servos and drive move it and its fingers hold the object by friction alone.
@@ -45,7 +46,6 @@ from semantic_digital_twin.adapters.robocasa_dataset.mujoco_compat import (
 
 with robocasa_version_assertions_relaxed():
     from robocasa.models.scenes.scene_registry import LayoutType, StyleType
-    from robocasa.utils import object_utils
 
 from coraplex.datastructures.dataclasses import Context
 from coraplex.datastructures.enums import ExecutionType
@@ -56,6 +56,17 @@ from coraplex.execution_environment import (
 from coraplex.plans.plan_node import PlanNode
 from coraplex.plans.factories import sequential
 from experiments.grasp_learning.models import GraspModel
+from experiments.robocasa_goals.conditions import (
+    ConditionObserver,
+    GripperFarFromObjectDetector,
+    ObjectInsideFixtureDetector,
+)
+from experiments.robocasa_goals.events import (
+    RoboCasaCondition,
+    RoboCasaConditionChangeEvent,
+)
+from experiments.robocasa_goals.goals import RoboCasaGoal
+from experiments.robocasa_goals.simulation_mirror import RoboCasaSimulationMirror
 from experiments.robocasa_task_execution.exceptions import NoClearStandingPose
 from coraplex.robot_plans.actions.composite.transporting import MoveAndPickUpAction
 from coraplex.robot_plans.actions.core.robot_body import (
@@ -188,6 +199,37 @@ class CounterToSinkOutcome:
         return self.object_in_sink and self.object_released
 
 
+@dataclass
+class ConditionChange:
+    """
+    A condition of the task's goal starting or stopping to hold during an episode.
+    """
+
+    condition: RoboCasaCondition
+    """
+    The condition that changed.
+    """
+
+    holds: bool
+    """
+    Whether the condition holds after the change.
+    """
+
+    stage: EpisodeStage
+    """
+    The stage of the episode the change happened in.
+    """
+
+    @classmethod
+    def of(cls, event: RoboCasaConditionChangeEvent, stage: EpisodeStage) -> Self:
+        """
+        :param event: The event reporting the change.
+        :param stage: The stage of the episode the change happened in.
+        :return: The change the event reports.
+        """
+        return cls(condition=event.condition, holds=event.condition_holds, stage=stage)
+
+
 # %% one episode of the task
 
 
@@ -218,6 +260,71 @@ class CounterToSinkEpisode:
     """
     How far the episode got.
     """
+
+    mirror: RoboCasaSimulationMirror = field(init=False, repr=False)
+    """
+    Keeps RoboCasa's simulation in the state of the world the PR2 acts in.
+    """
+
+    target_in_sink: ObjectInsideFixtureDetector = field(init=False, repr=False)
+    """
+    Detects the target object lying inside the sink.
+    """
+
+    goal_observer: ConditionObserver = field(init=False, repr=False)
+    """
+    Judges the conditions of the goal of the task.
+    """
+
+    condition_changes: list[ConditionChange] = field(default_factory=list, init=False)
+    """
+    The changes of the conditions of the goal so far, in the order they happened.
+    """
+
+    def __post_init__(self) -> None:
+        """
+        Set up following the goal of the task: the target object inside the sink, with
+        every gripper far from it.
+        """
+        self.mirror = RoboCasaSimulationMirror(
+            environment=self.environment, world=self.task.world
+        )
+        target = self.target_object.root
+        self.target_in_sink = ObjectInsideFixtureDetector(
+            tracked_object=target,
+            mirror=self.mirror,
+            fixture=self.task.world.get_body_by_name(self.environment.sink.root_body),
+            partial_check=True,
+        )
+        goal = RoboCasaGoal(
+            subject=target,
+            conditions=[
+                self.target_in_sink,
+                GripperFarFromObjectDetector(tracked_object=target),
+            ],
+        )
+        self.goal_observer = ConditionObserver(
+            world=self.task.world, detectors=goal.detectors()
+        )
+
+    def observe(self) -> None:
+        """
+        Judge the conditions of the goal in the current state of the world, and record
+        their changes since the last observation as changes in the current stage.
+        """
+        self.condition_changes.extend(
+            ConditionChange.of(event, self.stage)
+            for event in self.goal_observer.observe()
+        )
+
+    def begin(self, stage: EpisodeStage) -> None:
+        """
+        End the current stage, observing how it left the world, and begin the next.
+
+        :param stage: The stage to begin.
+        """
+        self.observe()
+        self.stage = stage
 
     @classmethod
     def compose(
@@ -427,9 +534,9 @@ class CounterToSinkEpisode:
             collision_avoidance=collision_avoidance,
         ):
             self.carry_into_the_sink(sampling_seed, grasp_model)
-        self.stage = EpisodeStage.SETTLING
+        self.begin(EpisodeStage.SETTLING)
         self.let_the_target_object_fall()
-        self.stage = EpisodeStage.FINISHED
+        self.begin(EpisodeStage.FINISHED)
         return self.outcome()
 
     def carry_into_the_sink(
@@ -443,9 +550,9 @@ class CounterToSinkEpisode:
         :param grasp_model: A model of where grasps lift the target object, see
             :meth:`pick_up_plan`.
         """
-        self.stage = EpisodeStage.PICKING_UP
+        self.begin(EpisodeStage.PICKING_UP)
         self.pick_up_plan(sampling_seed, grasp_model).perform()
-        self.stage = EpisodeStage.PLACING
+        self.begin(EpisodeStage.PLACING)
         self.placing_into_the_sink().plan().perform()
 
     def start_physical_simulation(
@@ -505,9 +612,9 @@ class CounterToSinkEpisode:
             simulation=simulation, collision_avoidance=collision_avoidance
         ):
             self.carry_into_the_sink(sampling_seed, grasp_model)
-        self.stage = EpisodeStage.SETTLING
+        self.begin(EpisodeStage.SETTLING)
         simulation.step_simulation(settling_time)
-        self.stage = EpisodeStage.FINISHED
+        self.begin(EpisodeStage.FINISHED)
         return self.outcome()
 
     def let_the_target_object_fall(self, settling_time: float = 2.0) -> None:
@@ -520,7 +627,7 @@ class CounterToSinkEpisode:
         if not self.target_object_released:
             return
         joint = self.environment.objects[RoboCasaObjectName.TARGET].joints[0]
-        self.copy_target_object_pose_into_robocasa()
+        self.mirror.synchronize()
         simulation = self.environment.sim
         simulation.data.set_joint_qvel(joint, np.zeros(6))
         for _ in range(round(settling_time / simulation.model.opt.timestep)):
@@ -541,35 +648,16 @@ class CounterToSinkEpisode:
             )
         )
 
-    def copy_target_object_pose_into_robocasa(self) -> None:
-        """
-        Put the target object in RoboCasa's simulation where it stands in the world.
-        """
-        world_T_object = self.target_object.root.global_pose
-        x, y, z, w = world_T_object.quaternion.to_np()
-        self.environment.sim.data.set_joint_qpos(
-            self.environment.objects[RoboCasaObjectName.TARGET].joints[0],
-            np.concatenate([world_T_object.to_np()[:3, 3], [w, x, y, z]]),
-        )
-        self.environment.sim.forward()
-
     def outcome(self) -> CounterToSinkOutcome:
         """
-        Judge the current state of the world by RoboCasa's own check, after copying the
-        pose of the target object into RoboCasa's simulation.
+        Judge the current state of the world by RoboCasa's own check, observing the
+        conditions of the goal.
 
         :return: How the episode stands.
         """
-        self.copy_target_object_pose_into_robocasa()
+        self.observe()
         return CounterToSinkOutcome(
-            object_in_sink=bool(
-                object_utils.obj_inside_of(
-                    self.environment,
-                    RoboCasaObjectName.TARGET,
-                    self.environment.sink,
-                    partial_check=True,
-                )
-            ),
+            object_in_sink=self.target_in_sink.holds,
             object_released=self.target_object_released,
         )
 

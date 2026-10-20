@@ -23,7 +23,9 @@ from experiments.robocasa_task_execution.benchmark_records import (
     BenchmarkEpisode,
     EpisodeRecord,
 )
+from experiments.robocasa_goals.events import RoboCasaCondition
 from experiments.robocasa_task_execution.counter_to_sink import (
+    ConditionChange,
     CounterToSinkOutcome,
     EpisodeStage,
 )
@@ -66,6 +68,29 @@ def test_an_episode_record_reads_back_as_it_was_written(tmp_path):
     record.failure = "CandidateLimitReached"
     record.seconds = 12.5
     record.exit_code = 1
+    path = tmp_path / "record.json"
+
+    record.write(path)
+
+    assert EpisodeRecord.read(path) == record
+
+
+def test_the_condition_changes_of_an_episode_read_back_as_they_were_written(
+    tmp_path,
+):
+    record = record_of(EpisodeStage.FINISHED, SUCCEEDED)
+    record.condition_changes = [
+        ConditionChange(
+            condition=RoboCasaCondition.GRIPPER_FAR_FROM_OBJECT,
+            holds=False,
+            stage=EpisodeStage.PICKING_UP,
+        ),
+        ConditionChange(
+            condition=RoboCasaCondition.TASK_SUCCEEDED,
+            holds=True,
+            stage=EpisodeStage.SETTLING,
+        ),
+    ]
     path = tmp_path / "record.json"
 
     record.write(path)

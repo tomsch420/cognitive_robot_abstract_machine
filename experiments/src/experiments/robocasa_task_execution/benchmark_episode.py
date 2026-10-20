@@ -134,10 +134,12 @@ class EpisodeRun:
 
     def write(self) -> None:
         """
-        Write the record with the stage the episode reached and the time it took so far.
+        Write the record with the stage the episode reached, the changes of the
+        conditions of its goal and the time it took so far.
         """
         if self.episode is not None:
             self.record.stage = self.episode.stage
+            self.record.condition_changes = self.episode.condition_changes
         self.record.seconds = time.monotonic() - self.start
         self.record.write(self.record_file)
 
