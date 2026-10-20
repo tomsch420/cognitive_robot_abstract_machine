@@ -12,6 +12,11 @@ Done:
   (:cite:p:, entries in probabilistic_model/doc/references.bib); replied, resolved.
 - User preferred [0, 1]: renamed l1_metric -> total_variation_distance
   (half of L1); tests, PR title and description updated.
+- Merged cram2/main (references.bib conflict, kept both sides).
+- ShallowProbabilisticCircuit.l1 -> total_variation_distance, [0, 1]; fixed
+  subgraph_of (passed Units to rx.descendants) via mount; new test file
+  test_rx/test_shallow_probabilistic_circuit.py.
+- Known, out of scope: from_probabilistic_circuit calls unimplemented __copy__.
 
 Next:
 - docformatter missing locally; run scripts/format_docstrings.py once installed.
