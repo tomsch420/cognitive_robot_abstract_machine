@@ -5,6 +5,11 @@ from numpy.typing import NDArray
 import pytest
 import trimesh
 
+from krrood.adapters.json_serializer import from_json, to_json
+
+from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
+    WorldEntityWithIDKwargsTracker,
+)
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import (
     MissingReferenceFrameError,
@@ -27,6 +32,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Milk,
     Mug,
     Rim,
+    ShapeSortingPiece,
     Spoon,
     Table,
 )
@@ -72,6 +78,16 @@ How far below the top of the synthetic bowl's wall its rim reaches.
 BOX_SCALE = Scale(0.1, 0.2, 0.3)
 """
 Extents of the box body used by the default grasp pose tests.
+"""
+
+PIECE_SCALE = Scale(0.03, 0.04, 0.03)
+"""
+Extents of the shape-sorting piece, a rectangular prism.
+"""
+
+PIECE_GRASP_HEIGHT = 0.0185
+"""
+How far above its bottom face the shape-sorting piece is gripped.
 """
 
 
@@ -344,6 +360,79 @@ def test_bowl_grasps_close_on_the_middle_of_the_wall(bowl):
     )
 
 
+def test_a_wall_is_pinched_as_deep_as_asked(bowl):
+    shallowest_depth, deepest_depth = 0.1, 0.9
+    allowed = allowed_intervals(
+        bowl.rim.wall_grasp_statement(
+            0.25,
+            0.75,
+            False,
+            shallowest_depth=shallowest_depth,
+            deepest_depth=deepest_depth,
+        )
+    )
+    wall_thickness = bowl.rim.wall_thickness()
+
+    assert allowed["depth"].simple_sets[0].lower == pytest.approx(
+        shallowest_depth * wall_thickness
+    )
+    assert allowed["depth"].simple_sets[-1].upper == pytest.approx(
+        deepest_depth * wall_thickness
+    )
+
+
+def test_a_wall_is_pinched_as_tilted_and_turned_as_asked(bowl):
+    largest_pitch, largest_roll = 0.3, 0.2
+    allowed = allowed_intervals(
+        bowl.rim.wall_grasp_statement(
+            0.25,
+            0.75,
+            False,
+            largest_pitch=largest_pitch,
+            largest_roll=largest_roll,
+        )
+    )
+
+    assert allowed["pitch"].simple_sets[-1].upper == pytest.approx(largest_pitch)
+    assert allowed["roll"].simple_sets[0].lower == pytest.approx(-largest_roll)
+    assert allowed["roll"].simple_sets[-1].upper == pytest.approx(largest_roll)
+
+
+def test_a_rim_is_pinched_between_the_heights_asked(bowl):
+    lowest_height, highest_height = 0.1, 0.9
+    allowed = allowed_intervals(
+        bowl.rim.surface_grasp_statement(
+            lowest_height=lowest_height, highest_height=highest_height
+        )
+    )
+
+    assert allowed["height"].simple_sets[0].lower == pytest.approx(lowest_height)
+    assert allowed["height"].simple_sets[-1].upper == pytest.approx(highest_height)
+
+
+def test_a_container_without_a_rim_is_pinched_as_far_into_its_rim_depth_as_asked(
+    bowl,
+):
+    bowl.rim = None
+    rim_depth, shallowest_rim_fraction, deepest_rim_fraction = 0.02, 0.1, 0.9
+    allowed = allowed_intervals(
+        bowl.surface_grasp_statement(
+            rim_depth=rim_depth,
+            shallowest_rim_fraction=shallowest_rim_fraction,
+            deepest_rim_fraction=deepest_rim_fraction,
+        )
+    )
+    lowest, highest = bowl.grasp_surface().bounds
+    rim_fraction = rim_depth / float(highest[2] - lowest[2])
+
+    assert allowed["height"].simple_sets[0].lower == pytest.approx(
+        1 - deepest_rim_fraction * rim_fraction
+    )
+    assert allowed["height"].simple_sets[-1].upper == pytest.approx(
+        1 - shallowest_rim_fraction * rim_fraction
+    )
+
+
 # %% cutlery grasp poses
 
 
@@ -393,6 +482,72 @@ def test_cutlery_is_grasped_from_above_across_its_length(length_axis):
         assert abs(float(np.dot(closing, length_direction))) <= np.sin(
             allowed["roll"].simple_sets[-1].upper - np.pi / 2 + azimuth_spread
         )
+
+
+@pytest.mark.parametrize("length_axis", [0, 1], ids=["along-x", "along-y"])
+def test_drawn_cutlery_grasps_come_from_above_across_its_length(length_axis):
+    """
+    Grasps drawn from the statement come down onto the piece within its allowed tilt
+    and close across it within its allowed turn.
+    """
+    spoon = _spoon_lying_along(length_axis)
+    allowed = allowed_intervals(spoon.surface_grasp_statement())
+    first_end = allowed["azimuth"].simple_sets[0]
+    azimuth_spread = (first_end.upper - first_end.lower) / 2
+    length_direction = np.eye(3)[length_axis]
+
+    grasps = spoon.drawn_grasp_candidates()
+
+    assert grasps
+    for grasp in grasps:
+        approach, closing = (
+            axes_of(grasp.grasp_pose)[:, 0],
+            axes_of(grasp.grasp_pose)[:, 1],
+        )
+        assert -approach[2] >= np.cos(allowed["pitch"].simple_sets[-1].upper)
+        assert abs(float(np.dot(closing, length_direction))) <= np.sin(
+            allowed["roll"].simple_sets[-1].upper - np.pi / 2 + azimuth_spread
+        )
+
+
+def test_cutlery_is_grasped_within_the_bounds_asked():
+    spoon = _spoon_lying_along(0)
+    lowest_height, highest_height = 0.3, 0.7
+    shallowest_depth, deepest_depth = 0.1, 0.4
+    azimuth_tolerance, largest_pitch, largest_roll = 0.05, 0.3, 0.2
+    allowed = allowed_intervals(
+        spoon.surface_grasp_statement(
+            lowest_height=lowest_height,
+            highest_height=highest_height,
+            shallowest_depth=shallowest_depth,
+            deepest_depth=deepest_depth,
+            azimuth_tolerance=azimuth_tolerance,
+            largest_pitch=largest_pitch,
+            largest_roll=largest_roll,
+        )
+    )
+    lowest, highest = spoon.grasp_surface().bounds
+    length = float(highest[0] - lowest[0])
+    first_end = allowed["azimuth"].simple_sets[0]
+
+    assert allowed["height"].simple_sets[0].lower == pytest.approx(lowest_height)
+    assert allowed["height"].simple_sets[-1].upper == pytest.approx(highest_height)
+    assert allowed["depth"].simple_sets[0].lower == pytest.approx(
+        shallowest_depth * length
+    )
+    assert allowed["depth"].simple_sets[-1].upper == pytest.approx(
+        deepest_depth * length
+    )
+    assert first_end.upper - first_end.lower == pytest.approx(
+        2 * azimuth_tolerance, rel=1e-5
+    )
+    assert allowed["pitch"].simple_sets[-1].upper == pytest.approx(largest_pitch)
+    assert allowed["roll"].simple_sets[0].lower == pytest.approx(
+        np.pi / 2 - largest_roll
+    )
+    assert allowed["roll"].simple_sets[-1].upper == pytest.approx(
+        np.pi / 2 + largest_roll
+    )
 
 
 def test_cutlery_without_a_shape_offers_no_grasp():
@@ -476,6 +631,30 @@ def test_an_object_without_its_handle_is_grasped_as_it_offers_otherwise():
     assert mug.grasped_part() is mug
 
 
+def test_a_handle_is_grasped_between_the_heights_and_depths_asked():
+    handle = _mug(with_handle=True).handle
+    lowest_height, highest_height = 0.3, 0.7
+    shallowest_depth, deepest_depth = 0.1, 0.4
+    allowed = allowed_intervals(
+        handle.surface_grasp_statement(
+            lowest_height=lowest_height,
+            highest_height=highest_height,
+            shallowest_depth=shallowest_depth,
+            deepest_depth=deepest_depth,
+        )
+    )
+    thinnest_extent = float(min(handle.grasp_surface().extents))
+
+    assert allowed["height"].simple_sets[0].lower == pytest.approx(lowest_height)
+    assert allowed["height"].simple_sets[-1].upper == pytest.approx(highest_height)
+    assert allowed["depth"].simple_sets[0].lower == pytest.approx(
+        shallowest_depth * thinnest_extent
+    )
+    assert allowed["depth"].simple_sets[-1].upper == pytest.approx(
+        deepest_depth * thinnest_extent
+    )
+
+
 def test_a_handle_split_off_a_shape_is_fixed_to_its_whole():
     mug = _mug(with_handle=True)
 
@@ -505,6 +684,93 @@ def test_the_surface_of_an_object_includes_its_split_off_parts():
         split.grasp_surface().bounds, whole.grasp_surface().bounds, atol=1e-9
     )
     assert split.handle.grasp_surface().bounds[0][0] >= BOWL_OUTER_RADIUS - 1e-9
+
+
+# %% shape-sorting piece grasp poses
+
+
+def _shape_sorting_piece(collision: ShapeCollection) -> ShapeSortingPiece:
+    """
+    :param collision: The piece's collision geometry.
+    :return: A shape-sorting piece standing alone in a world of its own.
+    """
+    body = Body(
+        name=PrefixedName("shape_sorting_piece", prefix="grasp_candidates"),
+        collision=collision,
+    )
+    annotation = ShapeSortingPiece(root=body, grasp_height=PIECE_GRASP_HEIGHT)
+    world = World()
+    with world.modify_world():
+        world.add_kinematic_structure_entity(body)
+        world.add_semantic_annotation(annotation)
+    return annotation
+
+
+@pytest.fixture
+def shape_sorting_piece() -> ShapeSortingPiece:
+    """
+    A shape-sorting piece whose box is centred on its origin, so its bottom face lies half
+    its height below the origin.
+    """
+    return _shape_sorting_piece(
+        ShapeCollection(
+            [Box(origin=HomogeneousTransformationMatrix(), scale=PIECE_SCALE)]
+        )
+    )
+
+
+def test_a_shape_sorting_piece_is_grasped_from_above_closing_along_its_own_x(
+    shape_sorting_piece,
+):
+    """
+    The fingers come down onto the piece and close along its own x, so a triangular
+    prism turned with a face across x is held by that face and the opposite edge.
+    """
+    [grasp] = shape_sorting_piece.grasp_candidates()
+    approach, closing = (
+        axes_of(grasp.grasp_pose)[:, 0],
+        axes_of(grasp.grasp_pose)[:, 1],
+    )
+
+    np.testing.assert_allclose(approach, [0, 0, -1], atol=1e-9)
+    np.testing.assert_allclose(closing, [1, 0, 0], atol=1e-9)
+
+
+def test_a_shape_sorting_piece_is_gripped_its_grasp_height_above_its_bottom_face(
+    shape_sorting_piece,
+):
+    [grasp] = shape_sorting_piece.grasp_candidates()
+    bottom_face = -PIECE_SCALE.z / 2
+
+    np.testing.assert_allclose(
+        grasp.grasp_pose.to_np()[:3, 3],
+        [0, 0, bottom_face + shape_sorting_piece.grasp_height],
+        atol=1e-9,
+    )
+
+
+def test_a_shape_sorting_piece_reaches_another_world_with_its_grasp_height(
+    shape_sorting_piece,
+):
+    """
+    A world kept in step with another one is sent its annotations as JSON, so a piece has
+    to arrive able to say where it is gripped.
+    """
+    [block] = (
+        shape_sorting_piece.root._world.get_world_model_manager().model_modification_blocks
+    )
+    other_world = World()
+    sent = from_json(to_json(block), **WorldEntityWithIDKwargsTracker().create_kwargs())
+    with other_world.modify_world():
+        sent.apply(other_world)
+
+    [arrived] = other_world.get_semantic_annotations_by_type(ShapeSortingPiece)
+    assert arrived.grasp_height == shape_sorting_piece.grasp_height
+
+
+def test_a_shape_sorting_piece_without_a_shape_offers_no_grasp():
+    with pytest.raises(NoGraspGeometry):
+        _shape_sorting_piece(ShapeCollection()).grasp_candidates()
 
 
 # %% the frame a grasp is expressed in
@@ -572,7 +838,7 @@ def test_only_annotations_that_can_be_held_offer_grasps():
     The mixin sits below :class:`HasRootBody` rather than above it precisely so that a
     dishwasher cannot be asked where to grasp it.
     """
-    for graspable in (Bowl, Milk, Spoon, Handle, Mug):
+    for graspable in (Bowl, Milk, Spoon, Handle, Mug, ShapeSortingPiece):
         assert issubclass(graspable, HasGraspCandidates)
     for fixed in (Dishwasher, Cabinet, Table, Floor):
         assert issubclass(fixed, HasRootBody)

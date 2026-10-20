@@ -2,9 +2,9 @@
 Trying grasps on an object to collect the data a model of grasps is learned from.
 
 The grasps are drawn from the statement of where the object's annotation may be grasped,
-through a model registry: uniformly from what it allows at first, from a learned
-model later. Each tried grasp is recorded together with what happened, so the records
-hold the grasp's parameters and its result as plain numbers and truth values.
+through a model registry: uniformly from what it allows at first, from a learned model
+later. Each tried grasp is recorded together with what happened, so the records hold the
+grasp's parameters and its result as plain numbers and truth values.
 """
 
 from __future__ import annotations
@@ -12,9 +12,12 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
-from typing_extensions import Iterator, List, Optional, Type
+from typing_extensions import Iterator, List
 
-from krrood.parametrization.model_registries import ModelRegistry
+from krrood.parametrization.model_registries import (
+    ModelRegistry,
+    UniformPriorRegistry,
+)
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.grasping.surface_grasp import (
     GraspResult,
@@ -49,9 +52,9 @@ class GraspTrialRecord:
     One tried grasp as it is recorded.
     """
 
-    grasped_part: Type[HasGraspCandidates]
+    grasped_part: HasGraspCandidates
     """
-    The annotation type of the part the grasp was placed on.
+    The part the grasp was placed on.
     """
 
     grasp: SurfaceGrasp
@@ -84,9 +87,9 @@ class GraspTrials:
     How many grasps are drawn.
     """
 
-    model_registry: Optional[ModelRegistry] = field(default=None)
+    model_registry: ModelRegistry = field(default_factory=UniformPriorRegistry)
     """
-    Answers the statement; ``None`` draws uniformly from what it allows.
+    Answers the statement.
     """
 
     require_lifting: bool = False
@@ -127,4 +130,4 @@ class GraspTrials:
             surface_grasp.result = self.performer.perform(
                 surface_grasp.grasp_candidate(part)
             )
-            yield GraspTrialRecord(grasped_part=type(part), grasp=surface_grasp)
+            yield GraspTrialRecord(grasped_part=part, grasp=surface_grasp)

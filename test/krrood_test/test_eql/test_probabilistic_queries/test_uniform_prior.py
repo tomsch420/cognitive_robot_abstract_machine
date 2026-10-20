@@ -10,6 +10,9 @@ from krrood.entity_query_language.backends import ProbabilisticBackend
 from krrood.entity_query_language.factories import a, and_, distribution_of, or_
 from krrood.parametrization.exceptions import UnboundedParameterError
 from krrood.parametrization.model_registries import UniformPriorRegistry
+from probabilistic_model.probabilistic_circuit.tensorized.layered_probabilistic_circuit import (
+    LayeredProbabilisticCircuit,
+)
 
 from ._fixtures import Coin
 
@@ -85,6 +88,14 @@ def test_equally_large_regions_are_equally_likely():
     )
 
     assert first_region == pytest.approx(0.5)
+
+
+def test_the_prior_is_a_tensorized_circuit():
+    distribution = distribution_of(two_separate_regions()).first(
+        backend=ProbabilisticBackend(UniformPriorRegistry())
+    )
+
+    assert isinstance(distribution, LayeredProbabilisticCircuit)
 
 
 def test_a_parameter_without_conditions_is_refused():

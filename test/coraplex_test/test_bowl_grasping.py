@@ -59,6 +59,23 @@ def split_off_rim(bowl: Bowl) -> Rim:
     ).split(bowl)
 
 
+def split_off_rim(bowl: Bowl, rim_depth: float = 0.02) -> Rim:
+    """
+    Split the bowl's rim off its shape, at the faces whose centers lie within
+    ``rim_depth`` of its highest point.
+
+    :param bowl: The bowl, its rim still part of its body's shape.
+    :param rim_depth: How far below the bowl's highest point its rim reaches, in meters.
+    :return: The rim.
+    """
+    mesh = bowl.root.collision.combined_mesh
+    centers = mesh.triangles_center
+    rim_centers = centers[centers[:, 2] > mesh.bounds[1][2] - rim_depth]
+    return PartSplitter(
+        part_type=Rim, finder=LocatedFacesFinder(face_centers=rim_centers)
+    ).split(bowl)
+
+
 @pytest.fixture
 def bowl() -> Bowl:
     world = STLParser(BOWL_MESH).parse()
@@ -69,6 +86,15 @@ def bowl() -> Bowl:
     return annotation
 
 
+@pytest.fixture
+def bowl_with_rim(bowl) -> Bowl:
+    """
+    The bowl with its rim split off as a part of its own.
+    """
+    split_off_rim(bowl)
+    return bowl
+
+
 def distances_to_surface(
     bowl: Bowl, positions: NDArray[np.float64]
 ) -> NDArray[np.float64]:
@@ -76,7 +102,7 @@ def distances_to_surface(
     :param bowl: The bowl whose surface to measure against.
     :param positions: Points in the bowl's own frame.
     :return: Each point's distance to the nearest point of the bowl's surface: that of
-        its body and of its rim, which shares the body's frame.
+        its body and of its rim, if split off, which shares the body's frame.
     """
     surface = trimesh.util.concatenate([body.combined_mesh for body in bowl.bodies])
     _, distances, _ = closest_point(surface, positions)
@@ -99,6 +125,15 @@ def test_bowl_grasps_close_on_the_bowls_wall(bowl):
 
     assert len(positions) == bowl.grasp_candidate_count
     assert np.all(distances_to_surface(bowl, positions) < GRIPPABLE_DISTANCE)
+
+
+def test_grasps_of_a_split_off_rim_close_on_the_bowls_wall(bowl_with_rim):
+    positions = np.array(
+        [grasp.grasp_pose.to_np()[:3, 3] for grasp in bowl_with_rim.grasp_candidates()]
+    )
+
+    assert len(positions) == bowl_with_rim.rim.grasp_candidate_count
+    assert np.all(distances_to_surface(bowl_with_rim, positions) < GRIPPABLE_DISTANCE)
 
 
 def test_the_bowls_origin_is_not_grippable(bowl):

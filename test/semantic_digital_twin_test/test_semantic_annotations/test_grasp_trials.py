@@ -136,7 +136,7 @@ def test_every_tried_grasp_is_recorded_with_its_result(carton):
     assert len(records) == len(performer.tried)
     for record in records:
         assert record.grasp.result.lifted
-        assert record.grasped_part is type(carton)
+        assert record.grasped_part is carton
 
 
 def test_an_object_with_a_handle_is_tried_at_its_handle(mug_with_handle):
@@ -151,7 +151,7 @@ def test_an_object_with_a_handle_is_tried_at_its_handle(mug_with_handle):
     for grasp in performer.tried:
         assert grasp.graspable is mug_with_handle.handle
     for record in records:
-        assert record.grasped_part is Handle
+        assert record.grasped_part is mug_with_handle.handle
 
 
 def test_trials_can_ask_only_for_lifting_grasps(carton):

@@ -1,15 +1,3 @@
-"""
-Grasps described by where on an object's surface they take hold and how the gripper
-comes in, statements of where an object may be grasped, and what happened when one was
-tried.
-
-Every field of :class:`SurfaceGrasp` and :class:`GraspResult` is a number, a truth value,
-a vector or a rotation, so a probabilistic model can be learned over tried grasps. Where
-an object may be grasped is stated as an underspecified statement over
-:class:`SurfaceGrasp`; a model registry answers it, knowing nothing but the statement at
-first and what was learned later.
-"""
-
 from __future__ import annotations
 
 import math
@@ -46,22 +34,7 @@ class GraspResult:
     """
     What happened to an object when a robot tried to pick it up by a grasp.
 
-    The object's displacement and rotation compare where it rested before the grasp
-    with where it is held at the end, along the world's axes, so that a use that cares
-    about another goal than lifting, such as pulling the object out of a shelf, can ask
-    for it.
-
-    The slip compares where the object sits in the gripper once the fingers have closed
-    on it with where it sits after it was lifted and held: an object held firmly does
-    not move relative to the fingers at all, one that was never held stays behind by the
-    whole lift. It is measured along the grasp's own axes, the direction of approach,
-    the closing direction and their normal, so that it means the same for every robot.
-
-    A rotation is stated as :func:`axis_angle_of` states it: an angle in [0, pi] about a
-    unit axis, no rotation being the angle zero about the z-axis.
-
-    The vectors and rotations carry no reference frame; each field says which axes it
-    is measured along.
+    Rotations are stated as :func:`axis_angle_of` states them.
     """
 
     object_raised: bool
@@ -113,24 +86,12 @@ class GraspResult:
 @dataclass
 class SurfaceGrasp:
     """
-    A grasp described relative to the surface of the object it takes, and independent of
+    A grasp of an object, described relative to the object's surface and independent of
     the robot taking it.
 
-    The point to take hold of lies on the outside of the object's grasp surface: looking
-    horizontally at the object's vertical axis from :attr:`azimuth`, at :attr:`height`
-    of its bounding box, it is the first point of the surface in that line of sight. The
-    gripper's center closes :attr:`depth` further along the line of sight, so that its
-    fingers straddle a wall as thick as twice that, or reach that far along a handle
-    seen from its end.
-
-    The gripper comes in from straight above when :attr:`pitch` is zero and tilts
-    towards the line of sight as it grows. With :attr:`roll` zero the fingers close
-    along the line of sight; a roll turns the closing direction about the direction of
-    approach.
-
-    The line of sight, not the surface normal, sets these directions, so that they stay
-    meaningful where a scanned mesh's normals are noisy or where the line meets the
-    surface at a slant.
+    The grasped point is the first point of the object's grasp surface seen horizontally
+    from :attr:`azimuth` at :attr:`height`; the gripper closes :attr:`depth` behind it,
+    approaching from above tilted by :attr:`pitch` and turned by :attr:`roll`.
     """
 
     azimuth: float
@@ -310,21 +271,26 @@ def axis_angle_of(rotation: NDArray[np.float64]) -> AxisAngle:
     )
 
 
-def from_any_side(grasp: Match[SurfaceGrasp]) -> List[ConditionType]:
+def from_any_side(
+    grasp: Match[SurfaceGrasp],
+    largest_pitch: float = 1.2,
+    largest_roll: float = math.pi / 4,
+) -> List[ConditionType]:
     """
     :param grasp: A statement's grasp.
+    :param largest_pitch: How far the approach may tilt off vertical, in radians.
+    :param largest_roll: How far the fingers may turn off closing along the line of
+        sight, either way, in radians.
     :return: The conditions that the grasp comes from any direction around the object,
-        approaches it up to about seventy degrees off vertical, staying below a quarter
-        turn where the approach would be horizontal, and closes up to an eighth of a
-        turn off the line of sight.
+        tilted and turned at most as far as given.
     """
     return [
         grasp.azimuth >= 0.0,
         grasp.azimuth < 2 * math.pi,
         grasp.pitch >= 0.0,
-        grasp.pitch < 1.2,
-        grasp.roll >= -math.pi / 4,
-        grasp.roll < math.pi / 4,
+        grasp.pitch < largest_pitch,
+        grasp.roll >= -largest_roll,
+        grasp.roll < largest_roll,
     ]
 
 

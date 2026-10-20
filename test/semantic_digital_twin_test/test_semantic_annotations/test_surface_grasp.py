@@ -30,6 +30,7 @@ from semantic_digital_twin.grasping.surface_grasp import (
     axis_angle_of,
     any_surface_grasp,
     draw_surface_grasps,
+    from_any_side,
 )
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 from ._statements import allowed_intervals
@@ -209,6 +210,49 @@ def test_the_default_statement_covers_the_object_up_to_half_its_narrower_side(
     assert allowed["depth"].simple_sets[-1].upper == pytest.approx(
         min(CARTON_EXTENTS[:2]) / 2
     )
+
+
+def test_the_default_statement_covers_the_heights_and_depths_asked(carton):
+    lowest_height, highest_height = 0.3, 0.7
+    shallowest_depth, deepest_depth = 0.1, 0.4
+    allowed = allowed_intervals(
+        carton.surface_grasp_statement(
+            lowest_height=lowest_height,
+            highest_height=highest_height,
+            shallowest_depth=shallowest_depth,
+            deepest_depth=deepest_depth,
+        )
+    )
+    narrower_extent = min(CARTON_EXTENTS[:2])
+
+    assert allowed["height"].simple_sets[0].lower == pytest.approx(lowest_height)
+    assert allowed["height"].simple_sets[-1].upper == pytest.approx(highest_height)
+    assert allowed["depth"].simple_sets[0].lower == pytest.approx(
+        shallowest_depth * narrower_extent
+    )
+    assert allowed["depth"].simple_sets[-1].upper == pytest.approx(
+        deepest_depth * narrower_extent
+    )
+
+
+def test_a_grasp_from_any_side_tilts_and_turns_as_far_as_asked():
+    largest_pitch, largest_roll = 0.3, 0.2
+    grasp = any_surface_grasp()
+    allowed = allowed_intervals(
+        grasp.where(
+            grasp.height >= 0.0,
+            grasp.height < 1.0,
+            grasp.depth >= 0.0,
+            grasp.depth < 1.0,
+            *from_any_side(
+                grasp, largest_pitch=largest_pitch, largest_roll=largest_roll
+            ),
+        )
+    )
+
+    assert allowed["pitch"].simple_sets[-1].upper == pytest.approx(largest_pitch)
+    assert allowed["roll"].simple_sets[0].lower == pytest.approx(-largest_roll)
+    assert allowed["roll"].simple_sets[-1].upper == pytest.approx(largest_roll)
 
 
 # %% asking a learned model for lifting grasps

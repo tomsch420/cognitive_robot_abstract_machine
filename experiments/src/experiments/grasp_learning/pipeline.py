@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from datetime import timedelta
 
 import numpy as np
-from typing_extensions import List, Optional
+from typing_extensions import List
 
 from experiments.grasp_learning.database import GraspDatabase
 from experiments.grasp_learning.models import GraspModel, GraspModelLearner
@@ -29,7 +29,10 @@ from experiments.physical_pick_up.pick_up_experiment import (
     PickUpGraspPerformer,
 )
 from experiments.physical_pick_up.scene import PickUpSceneChoice
-from krrood.parametrization.model_registries import ModelRegistry
+from krrood.parametrization.model_registries import (
+    ModelRegistry,
+    UniformPriorRegistry,
+)
 from semantic_digital_twin.grasping.grasp_trials import GraspTrials
 
 # %% the pipeline
@@ -107,7 +110,9 @@ class GraspLearningPipeline:
 
         :return: The stored model.
         """
-        self.attempt(GraspSource.STATED_REGIONS, self.number_of_attempts)
+        self.attempt(
+            GraspSource.STATED_REGIONS, self.number_of_attempts, UniformPriorRegistry()
+        )
         model = self.learner.learn(self.task, self.database.attempts(self.task))
         verifying = self.attempt(
             GraspSource.LEARNED_MODEL,
@@ -124,14 +129,14 @@ class GraspLearningPipeline:
         self,
         source: GraspSource,
         number_of_attempts: int,
-        model_registry: Optional[ModelRegistry] = None,
+        model_registry: ModelRegistry,
     ) -> List[GraspAttempt]:
         """
         Try grasps and store every attempt as soon as it is tried.
 
         :param source: Where the grasps are drawn from.
         :param number_of_attempts: How many grasps are drawn.
-        :param model_registry: The learned model, for grasps drawn from one.
+        :param model_registry: Answers the statement of where the object may be grasped.
         :return: The attempts, in the order they were tried.
         """
         scene = self.experiment.scene
@@ -204,7 +209,9 @@ def main() -> None:
         seed=arguments.seed,
     )
     if arguments.attempts_only:
-        attempts = pipeline.attempt(GraspSource.STATED_REGIONS, arguments.attempts)
+        attempts = pipeline.attempt(
+            GraspSource.STATED_REGIONS, arguments.attempts, UniformPriorRegistry()
+        )
         lifted = sum(attempt.grasp.result.lifted for attempt in attempts)
         print(
             f"{pipeline.task}: {lifted} of {len(attempts)} attempts lifted the object"

@@ -48,11 +48,11 @@ from semantic_digital_twin.semantic_annotations.mixins import (
     HasButtons,
     HasLevers,
     HasGraspCandidates,
+    HasPinchableWall,
     HasRim,
 )
 from krrood.entity_query_language.factories import and_, or_
 from krrood.entity_query_language.query.match import Match
-from semantic_digital_twin.datastructures.definitions import Axis
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.grasping.surface_grasp import (
     SurfaceGrasp,
@@ -115,20 +115,33 @@ class Handle(HasGraspCandidates):
         return self.drawn_grasp_candidates()
 
     def surface_grasp_statement(
-        self, require_lifting: bool = False
+        self,
+        require_lifting: bool = False,
+        lowest_height: float = 0.1,
+        highest_height: float = 0.9,
+        shallowest_depth: float = 0.0,
+        deepest_depth: float = 0.5,
     ) -> Match[SurfaceGrasp]:
         """
         :param require_lifting: Whether to ask only for grasps that lift the object.
-        :return: The whole handle away from its ends, closing on it at most halfway
-            through its thinnest extent.
+        :param lowest_height: The lowest height to grasp the handle at, as a fraction
+            of its bounding box from its bottom to its top.
+        :param highest_height: The height to grasp the handle below, as such a
+            fraction.
+        :param shallowest_depth: The least depth to close the fingers at, as a fraction
+            of the handle's thinnest extent.
+        :param deepest_depth: The depth to close the fingers short of, as such a
+            fraction.
+        :return: The handle between the two heights, closing on it between the two
+            depths.
         """
         thinnest_extent = float(min(self.grasp_surface().extents))
         grasp = any_surface_grasp(require_lifting)
         return grasp.where(
-            grasp.height >= 0.1,
-            grasp.height < 0.9,
-            grasp.depth >= 0.0,
-            grasp.depth < thinnest_extent / 2,
+            grasp.height >= lowest_height,
+            grasp.height < highest_height,
+            grasp.depth >= shallowest_depth * thinnest_extent,
+            grasp.depth < deepest_depth * thinnest_extent,
             *from_any_side(grasp),
         )
 
@@ -1019,14 +1032,9 @@ class Plate(HasSupportingSurface, Tableware):
 
 
 @dataclass(eq=False)
-class Rim(HasGraspCandidates):
+class Rim(HasPinchableWall):
     """
     The upper edge of an open container's wall, which a gripper pinches from above.
-    """
-
-    wall_probe_count: int = field(default=12, kw_only=True)
-    """
-    In how many directions around the rim its wall is measured.
     """
 
     def default_grasp_candidates(self) -> List[GraspCandidate]:
@@ -1036,58 +1044,20 @@ class Rim(HasGraspCandidates):
         return self.drawn_grasp_candidates()
 
     def surface_grasp_statement(
-        self, require_lifting: bool = False
+        self,
+        require_lifting: bool = False,
+        lowest_height: float = 0.25,
+        highest_height: float = 0.75,
     ) -> Match[SurfaceGrasp]:
         """
         :param require_lifting: Whether to ask only for grasps that lift the container.
-        :return: The middle of the rim's height, all around, closing on the middle half
-            of the wall's thickness, from above or tilted a little towards the wall.
+        :param lowest_height: The lowest height to pinch the rim at, as a fraction of
+            its height.
+        :param highest_height: The height to pinch the rim below, as such a fraction.
+        :return: The rim between the two heights, pinched across its wall.
         :raises NoGraspGeometry: If the rim has no wall to measure.
         """
-        thickness = self.wall_thickness()
-        grasp = any_surface_grasp(require_lifting)
-        return grasp.where(
-            grasp.height >= 0.25,
-            grasp.height < 0.75,
-            grasp.depth >= 0.25 * thickness,
-            grasp.depth < 0.75 * thickness,
-            grasp.azimuth >= 0.0,
-            grasp.azimuth < 2 * math.pi,
-            grasp.pitch >= 0.0,
-            grasp.pitch < 0.5,
-            grasp.roll >= -math.pi / 8,
-            grasp.roll < math.pi / 8,
-        )
-
-    def wall_thickness(self) -> float:
-        """
-        Cast rays outward from the middle of the rim and take the distance between the
-        first two surfaces each ray passes, the inside and the outside of the wall, as
-        the wall's thickness.
-
-        :return: The median thickness over the directions that hit the wall.
-        :raises NoGraspGeometry: If no direction hits a wall.
-        """
-        shape = self.grasp_surface()
-        yaws = np.linspace(0, 2 * np.pi, self.wall_probe_count, endpoint=False)
-        directions = np.column_stack([np.cos(yaws), np.sin(yaws), np.zeros(len(yaws))])
-        lowest, highest = shape.bounds
-        middle = (lowest + highest) / 2
-        locations, ray_indices, _ = shape.ray.intersects_location(
-            ray_origins=np.tile(middle, (len(yaws), 1)), ray_directions=directions
-        )
-        thicknesses = []
-        for index in range(len(yaws)):
-            distances = np.sort(
-                np.linalg.norm(
-                    locations[ray_indices == index][:, :2] - middle[:2], axis=1
-                )
-            )
-            if len(distances) > 1:
-                thicknesses.append(float(distances[1] - distances[0]))
-        if not thicknesses:
-            raise NoGraspGeometry(self)
-        return float(np.median(thicknesses))
+        return self.wall_grasp_statement(lowest_height, highest_height, require_lifting)
 
 
 @dataclass(eq=False)
@@ -1464,10 +1434,7 @@ class SaltPepperShaker(SaltContainer):
 @dataclass(eq=False)
 class Cutlery(HasHandle, Tableware):
     """
-    A piece of cutlery, lying flat.
-
-    Without a handle it is grasped somewhere along its middle, from above and across
-    its length.
+    A piece of cutlery, lying flat, grasped from above and across its length.
     """
 
     def default_grasp_candidates(self) -> List[GraspCandidate]:
@@ -1477,41 +1444,62 @@ class Cutlery(HasHandle, Tableware):
         return self.drawn_grasp_candidates()
 
     def surface_grasp_statement(
-        self, require_lifting: bool = False
+        self,
+        require_lifting: bool = False,
+        lowest_height: float = 0.2,
+        highest_height: float = 0.8,
+        shallowest_depth: float = 0.2,
+        deepest_depth: float = 0.6,
+        azimuth_tolerance: float = np.pi / 16,
+        largest_pitch: float = 0.6,
+        largest_roll: float = np.pi / 8,
     ) -> Match[SurfaceGrasp]:
         """
         :param require_lifting: Whether to ask only for grasps that lift the object.
-        :return: Seen along its length from either end, the stretch between a fifth and
-            three fifths of its length, closing across it.
+        :param lowest_height: The lowest height to grasp at, as a fraction of the grasp
+            surface's bounding box from its bottom to its top.
+        :param highest_height: The height to grasp below, as such a fraction.
+        :param shallowest_depth: The least depth to close the fingers at, as a fraction
+            of the piece's length.
+        :param deepest_depth: The depth to close the fingers short of, as such a
+            fraction.
+        :param azimuth_tolerance: How far off its length axis the piece may be seen
+            from, either way, in radians.
+        :param largest_pitch: How far the approach may tilt off vertical, in radians.
+        :param largest_roll: How far the fingers may turn off closing across the
+            length, either way, in radians.
+        :return: Seen along its length from either end, the stretch between the two
+            depths, closing across it.
         :raises NoGraspGeometry: If the root body has no shape to measure.
         """
         lowest, highest = self.grasp_surface().bounds
         extents = highest - lowest
-        length_axis = Axis.X if extents[Axis.X] >= extents[Axis.Y] else Axis.Y
-        length = float(extents[length_axis])
-        end_azimuths = (
-            (0.0, np.pi) if length_axis == Axis.X else (np.pi / 2, 3 * np.pi / 2)
+        length_axis = max(
+            (Vector3.X().to_np()[:3], Vector3.Y().to_np()[:3]),
+            key=lambda axis: np.dot(extents, axis),
         )
-        tolerance = np.pi / 16
+        length = float(np.dot(extents, length_axis))
+        azimuth_of_length_axis = math.atan2(length_axis[1], length_axis[0])
+        end_azimuths = (azimuth_of_length_axis, azimuth_of_length_axis + np.pi)
         grasp = any_surface_grasp(require_lifting)
         return grasp.where(
-            grasp.height >= 0.2,
-            grasp.height < 0.8,
-            grasp.depth >= 0.2 * length,
-            grasp.depth < 0.6 * length,
+            grasp.height >= lowest_height,
+            grasp.height < highest_height,
+            grasp.depth >= shallowest_depth * length,
+            grasp.depth < deepest_depth * length,
             or_(
                 *(
                     and_(
-                        grasp.azimuth >= end_azimuth - tolerance,
-                        grasp.azimuth < end_azimuth + tolerance,
+                        grasp.azimuth >= end_azimuth - azimuth_tolerance,
+                        grasp.azimuth < end_azimuth + azimuth_tolerance,
                     )
                     for end_azimuth in end_azimuths
                 )
             ),
             grasp.pitch >= 0.0,
-            grasp.pitch < 0.6,
-            grasp.roll >= np.pi / 2 - np.pi / 8,
-            grasp.roll < np.pi / 2 + np.pi / 8,
+            grasp.pitch < largest_pitch,
+            grasp.roll >= np.pi / 2 - largest_roll,
+            grasp.roll < np.pi / 2 + largest_roll,
         )
 
 
@@ -1545,6 +1533,55 @@ class Pen(HasGraspCandidates):
     """
     A pen.
     """
+
+
+@dataclass(eq=False)
+class ShapeSortingPiece(HasGraspCandidates):
+    """
+    A loose piece of a shape-sorting toy, which drops through the hole of its
+    own outline.
+    """
+
+    grasp_height: float = field(kw_only=True)
+    """
+    How far above its bottom face the piece is gripped.
+
+    Gripped low, the piece hangs as little as possible below the fingers when it is let
+    go of over its hole; how low depends on how far the closing fingers reach past the
+    point they are brought to.
+    """
+
+    def default_grasp_candidates(self) -> List[GraspCandidate]:
+        """
+        :return: The grasp from above, on the piece's vertical axis at
+            :attr:`grasp_height`, closing along the piece's own x.
+        :raises NoGraspGeometry: If the root body has no collision geometry to find the
+            bottom face in.
+        """
+        if not self.root.has_collision():
+            raise NoGraspGeometry(self)
+        bottom_face = (
+            self.root.collision.as_bounding_box_collection_in_frame(self.root)
+            .bounding_box()
+            .min_z
+        )
+        return [
+            GraspCandidate(
+                self,
+                Pose(
+                    position=Point3(
+                        0.0,
+                        0.0,
+                        bottom_face + self.grasp_height,
+                        reference_frame=self.root,
+                    ),
+                    orientation=RotationMatrix.from_vectors(
+                        x=Vector3.NEGATIVE_Z(), y=Vector3.X()
+                    ).quaternion,
+                    reference_frame=self.root,
+                ),
+            )
+        ]
 
 
 @dataclass(eq=False)
