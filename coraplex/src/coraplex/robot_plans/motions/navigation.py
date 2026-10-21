@@ -6,6 +6,9 @@ from giskardpy.motion_statechart.monitors.overwrite_state_monitors import (
     SetOdometry,
     SetSeedConfiguration,
 )
+from giskardpy.motion_statechart.goals.cartesian_goals import (
+    DifferentialDriveBaseGoal,
+)
 from giskardpy.motion_statechart.goals.templates import Parallel
 from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianPose,
@@ -18,6 +21,7 @@ from semantic_digital_twin.spatial_types.spatial_types import (
     Pose,
     Vector3,
 )
+from semantic_digital_twin.world_description.connections import DifferentialDrive
 
 
 @dataclass
@@ -36,17 +40,23 @@ class MoveMotion(BaseMotion):
 
     @property
     def _motion_chart(self):
-        return (
-            SetOdometry(
+        if GiskardExecutable.execution_type == ExecutionType.KINEMATICALLY_SIMULATED:
+            return SetOdometry(
                 base_pose=self.target.homogeneous_matrix,
                 odom_connection=self.robot.root.parent_connection,
             )
-            if GiskardExecutable.execution_type == ExecutionType.KINEMATICALLY_SIMULATED
-            else CartesianPose(
-                root_link=self.world.root,
-                tip_link=self.robot.root,
-                goal_pose=self.target,
+        drive = self.robot.drive
+        if isinstance(drive, DifferentialDrive):
+            # A differential drive only moves along its own heading, so it reaches a
+            # pose beside it by turning towards it, driving, and turning to face the
+            # way the pose states -- not by holding one pose goal it cannot satisfy.
+            return DifferentialDriveBaseGoal(
+                diff_drive_connection=drive, goal_pose=self.target
             )
+        return CartesianPose(
+            root_link=self.world.root,
+            tip_link=self.robot.root,
+            goal_pose=self.target,
         )
 
 

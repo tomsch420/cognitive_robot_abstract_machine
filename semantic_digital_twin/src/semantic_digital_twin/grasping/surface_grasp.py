@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 import numpy as np
 from numpy.typing import NDArray
@@ -154,6 +154,51 @@ class SurfaceGrasp:
                 root_T_grasp, reference_frame=graspable.root
             ).pose,
         )
+
+    def with_object_between_fingers(
+        self, graspable: HasGraspCandidates, finger_separation: float
+    ) -> SurfaceGrasp:
+        """
+        :param graspable: The object to take hold of.
+        :param finger_separation: How far apart the fingers stand as they close in, in
+            metres.
+        :return: A copy of this grasp at the depth nearest its own at which fingers that
+            far apart have the object's bounding box between them along the closing
+            direction; at the object's middle where it is wider than that.
+        :raises SurfaceGraspNotOnSurfaceError: If the object's grasp surface does not
+            reach the point this grasp names.
+        """
+        outward = self._line_of_sight()
+        surface_point = self._surface_point(graspable, outward)
+        if surface_point is None:
+            raise SurfaceGraspNotOnSurfaceError(surface_grasp=self, graspable=graspable)
+        closing = self._closing_direction(self._approach_direction(outward), outward)
+        shallower_per_metre_deeper = float(closing @ outward)
+        if np.isclose(shallower_per_metre_deeper, 0.0):
+            return self
+
+        lowest, highest = graspable.grasp_surface().bounds
+        middle, half_extent = (lowest + highest) / 2, (highest - lowest) / 2
+        object_middle = float(closing @ middle)
+        object_reach = float(np.abs(closing) @ half_extent)
+        finger_reach = finger_separation / 2
+        surface_along_closing = float(closing @ surface_point)
+        drawn = surface_along_closing - self.depth * shallower_per_metre_deeper
+        if object_reach > finger_reach:
+            between_fingers = object_middle
+        else:
+            between_fingers = float(
+                np.clip(
+                    drawn,
+                    object_middle + object_reach - finger_reach,
+                    object_middle - object_reach + finger_reach,
+                )
+            )
+        depth = (surface_along_closing - between_fingers) / shallower_per_metre_deeper
+        through_the_object = float(
+            outward @ surface_point - (outward @ middle - np.abs(outward) @ half_extent)
+        )
+        return replace(self, depth=float(np.clip(depth, 0.0, through_the_object)))
 
     def reaches_surface_of(self, graspable: HasGraspCandidates) -> bool:
         """

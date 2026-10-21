@@ -263,3 +263,105 @@ def test_starting_the_simulation_holds_a_servoed_joint_where_the_world_has_it():
         simulation.stop_simulation()
 
     assert held == pytest.approx(0.7, abs=0.02)
+
+
+# %% joints left to the physics
+
+
+@pytest.mark.skipif(
+    not runs_in_continuous_integration(), reason="MuJoCo tests only run in CI"
+)
+def test_a_joint_left_to_the_physics_is_not_moved_by_the_world():
+    pendulum = _pendulum_world()
+    world = pendulum.world
+
+    simulation = MujocoSim(world=world, headless=True)
+    simulation.start_stepped_simulation()
+    try:
+        simulator = simulation.simulator
+        with simulation.synchronizer.leave_to_the_physics(
+            [pendulum.hinge, pendulum.mirrored_hinge]
+        ):
+            world.state[pendulum.hinge.raw_dof.id].position = 0.5
+            world.notify_state_change()
+            simulation.step_simulation(timedelta(seconds=simulator.step_size))
+            simulated = simulator.get_joint_value("hinge").result
+    finally:
+        simulation.stop_simulation()
+
+    assert simulated == pytest.approx(0.0, abs=1e-6)
+
+
+@pytest.mark.skipif(
+    not runs_in_continuous_integration(), reason="MuJoCo tests only run in CI"
+)
+def test_the_world_keeps_its_own_position_of_a_joint_left_to_the_physics():
+    pendulum = _pendulum_world()
+    world = pendulum.world
+    position = 0.5
+
+    simulation = MujocoSim(world=world, headless=True)
+    simulation.start_stepped_simulation()
+    try:
+        with simulation.synchronizer.leave_to_the_physics(
+            [pendulum.hinge, pendulum.mirrored_hinge]
+        ):
+            world.state[pendulum.hinge.raw_dof.id].position = position
+            world.notify_state_change()
+            simulation.step_simulation(
+                timedelta(seconds=simulation.simulator.step_size)
+            )
+            kept = world.state[pendulum.hinge.raw_dof.id].position
+    finally:
+        simulation.stop_simulation()
+
+    assert kept == position
+
+
+@pytest.mark.skipif(
+    not runs_in_continuous_integration(), reason="MuJoCo tests only run in CI"
+)
+def test_the_world_takes_the_physics_position_of_a_joint_no_longer_left_to_it():
+    pendulum = _pendulum_world()
+    world = pendulum.world
+
+    simulation = MujocoSim(world=world, headless=True)
+    simulation.start_stepped_simulation()
+    try:
+        simulator = simulation.simulator
+        with simulation.synchronizer.leave_to_the_physics(
+            [pendulum.hinge, pendulum.mirrored_hinge]
+        ):
+            world.state[pendulum.hinge.raw_dof.id].position = 0.5
+            world.notify_state_change()
+            simulation.step_simulation(timedelta(seconds=simulator.step_size))
+        simulated = simulator.get_joint_value("hinge").result
+    finally:
+        simulation.stop_simulation()
+
+    assert world.state[pendulum.hinge.raw_dof.id].position == simulated
+
+
+@pytest.mark.skipif(
+    not runs_in_continuous_integration(), reason="MuJoCo tests only run in CI"
+)
+def test_a_joint_is_moved_by_the_world_again_once_no_longer_left_to_the_physics():
+    pendulum = _pendulum_world()
+    world = pendulum.world
+    set_point = 0.5
+
+    simulation = MujocoSim(world=world, headless=True)
+    simulation.start_stepped_simulation()
+    try:
+        simulator = simulation.simulator
+        with simulation.synchronizer.leave_to_the_physics(
+            [pendulum.hinge, pendulum.mirrored_hinge]
+        ):
+            simulation.step_simulation(timedelta(seconds=simulator.step_size))
+        world.state[pendulum.hinge.raw_dof.id].position = set_point
+        world.notify_state_change()
+        simulated = simulator.get_joint_value("hinge").result
+    finally:
+        simulation.stop_simulation()
+
+    assert simulated == pytest.approx(set_point)

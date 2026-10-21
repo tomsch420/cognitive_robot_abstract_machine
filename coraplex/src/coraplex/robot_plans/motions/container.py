@@ -52,6 +52,17 @@ class ClosingMotion(BaseMotion):
     Arm that should be used.
     """
 
+    closed_position: float = 0.01
+    """
+    The position of the mechanism's joint the container is closed to.
+    """
+
+    closing_tolerance: float = 0.01
+    """
+    How close the joint has to come to :attr:`closed_position` for the container to
+    count as closed.
+    """
+
     def perform(self):
         return
 
@@ -61,6 +72,7 @@ class ClosingMotion(BaseMotion):
         return Close(
             tip_link=tip,
             environment_link=self.object_part,
-            goal_joint_state=0.01,
+            goal_joint_state=self.closed_position,
+            threshold=self.closing_tolerance,
             mechanism_weight=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE,
         )

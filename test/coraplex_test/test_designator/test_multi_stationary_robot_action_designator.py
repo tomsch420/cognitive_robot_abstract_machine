@@ -24,6 +24,7 @@ from coraplex.robot_plans.actions.core.robot_body import (
     SetGripperAction,
     FollowToolCenterPointPathAction,
 )
+from coraplex.robot_plans.motions.robot_body import MoveJointsMotion
 from coraplex.testing import _make_sine_scan_poses
 from krrood.entity_query_language.factories import an, entity, variable
 
@@ -36,8 +37,15 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.daisy import DAiSy
 from semantic_digital_twin.robots.tracy import Tracy
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Point3
-from semantic_digital_twin.spatial_types.spatial_types import Pose
-from semantic_digital_twin.world_description.connections import Connection6DoF
+from semantic_digital_twin.spatial_types.spatial_types import Pose, Vector3
+from semantic_digital_twin.world_description.connections import (
+    Connection6DoF,
+    PrismaticConnection,
+)
+from semantic_digital_twin.world_description.degree_of_freedom import (
+    DegreeOfFreedom,
+    DegreeOfFreedomLimits,
+)
 from semantic_digital_twin.world_description.geometry import Box, Scale
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
@@ -461,3 +469,67 @@ def test_a_place_in_physics_leaves_the_box_to_the_release(
         plan.perform()
 
     assert box.parent_connection.parent is stood_on
+
+
+# %% the environment's joints in physics
+
+
+@pytest.fixture
+def physically_simulated_slider_context(stationary_block_context):
+    """
+    The block world with a box on a slider beside the robot and its physics running.
+    """
+    world, view, context = stationary_block_context
+    if not isinstance(view, Tracy):
+        pytest.skip("only Tracy is set up with the servos a physical simulation needs")
+    with world.modify_world():
+        slider_box = Body(
+            name=PrefixedName("slider_box"),
+            collision=ShapeCollection([Box(scale=Scale(0.1, 0.1, 0.1))]),
+        )
+        world.add_body(slider_box)
+        degree_of_freedom = DegreeOfFreedom(
+            name=PrefixedName("slider"),
+            limits=DegreeOfFreedomLimits.from_position_range_and_speed(
+                lower_position=0.0, upper_position=0.5, maximum_speed=0.2
+            ),
+        )
+        world.add_degree_of_freedom(degree_of_freedom)
+        slider = PrismaticConnection(
+            name=PrefixedName("slider"),
+            parent=world.root,
+            child=slider_box,
+            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                2.0, 2.0, 1.0
+            ),
+            axis=Vector3.X(reference_frame=slider_box),
+            raw_dof=degree_of_freedom,
+        )
+        world.add_connection(slider)
+    simulation = MujocoSim(world=world, headless=True)
+    simulation.start_stepped_simulation()
+    yield context, slider, simulation
+    simulation.stop_simulation()
+
+
+@pytest.mark.skipif(
+    not runs_in_continuous_integration(), reason="MuJoCo tests only run in CI"
+)
+def test_a_motion_in_physics_leaves_the_joints_of_the_environment_to_the_physics(
+    physically_simulated_slider_context,
+):
+    """
+    A motion driving a joint the robot has no hold on does not move it: only the
+    physics moves what is not the robot's, and the world takes where the physics left
+    it once the motion is over.
+    """
+    context, slider, simulation = physically_simulated_slider_context
+    plan = sequential(
+        [MoveJointsMotion(names=[slider.name.name], positions=[0.3])],
+        context=context,
+    ).plan
+
+    with PhysicallySimulatedRobot(simulation=simulation):
+        plan.perform()
+
+    assert slider.position == pytest.approx(0.0, abs=1e-6)

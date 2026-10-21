@@ -104,6 +104,7 @@ from semantic_digital_twin.world_description.connection_properties import (
 )
 from semantic_digital_twin.world_description.world_entity import (
     Body,
+    ContactExclusion,
     GravityCompensation,
     KinematicStructureEntity,
     Connection,
@@ -922,6 +923,13 @@ class MobileBase(
         """
 
     @property
+    def rolling_bodies(self) -> list[Body]:
+        """
+        The wheels and casters this base rolls on.
+        """
+        return []
+
+    @property
     def drive_servos(self) -> DriveServos | None:
         """
         The servos moving this base across the floor in a physical simulation, or
@@ -939,7 +947,8 @@ class MobileBase(
         """
         Drive every degree of freedom the drive attaching this base to its ``odom`` is
         commanded with, such as its translational velocities and its yaw, with the
-        velocity servos of :attr:`drive_servos`, if it has any.
+        velocity servos of :attr:`drive_servos`, if it has any. The base then slides on its
+        drive rather than rolling, so its :attr:`rolling_bodies` are kept out of contact.
 
         :param drive: The drive attaching this base's robot to its ``odom``.
         """
@@ -961,6 +970,9 @@ class MobileBase(
                 ),
                 degree_of_freedom,
             )
+        for body in self.rolling_bodies:
+            if body.get_simulator_property_of_type(ContactExclusion) is None:
+                body.add_simulator_property(ContactExclusion())
 
     @property
     def base_R_front(self) -> RotationMatrix:

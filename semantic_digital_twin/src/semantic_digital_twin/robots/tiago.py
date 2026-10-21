@@ -4,7 +4,7 @@ import math
 import os
 from abc import ABC
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import StrEnum
 from importlib.resources import files
 from pathlib import Path
@@ -52,6 +52,7 @@ from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.spatial_types import Vector3
 from semantic_digital_twin.world_description.connection_properties import (
     DriveServos,
+    JointDynamics,
     JointServo,
     ServoGains,
     VelocityServoGains,
@@ -647,6 +648,17 @@ class ServoedByItsMujocoModel(AbstractRobotPart, ABC):
     servos of :attr:`servo_of_each_joint`.
     """
 
+    joint_armature: float = field(default=0.1, kw_only=True)
+    """
+    The inertia of what spins behind each servoed joint, in kilogram metres squared.
+
+    The description states none, and a joint with none is only as heavy as the links
+    beyond it, which for a wrist is almost nothing. Held by a servo this stiff, such a
+    joint oscillates apart within a second of simulated time and takes the arm with it.
+    A geared robot joint carries the inertia of its rotor, and stating it is what makes
+    the arm steady.
+    """
+
     @classproperty
     def servo_of_each_joint(cls) -> dict[str, JointServo]:
         """
@@ -726,7 +738,11 @@ class ServoedByItsMujocoModel(AbstractRobotPart, ABC):
             if not isinstance(connection, ActiveConnection1DOF):
                 continue
             self._declare_servo(
-                connection, self.servo_of_each_joint[connection.name.name]
+                connection,
+                replace(
+                    self.servo_of_each_joint[connection.name.name],
+                    dynamics=JointDynamics(armature=self.joint_armature),
+                ),
             )
         self._compensate_gravity()
 

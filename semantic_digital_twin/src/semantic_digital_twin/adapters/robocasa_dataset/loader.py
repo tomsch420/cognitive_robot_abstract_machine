@@ -31,7 +31,10 @@ from semantic_digital_twin.adapters.robocasa_dataset.semantics import (
 from semantic_digital_twin.exceptions import WorldEntityNotFoundError
 from semantic_digital_twin.part_finding.relationships import PartRelationshipInspector
 from semantic_digital_twin.pipeline.pipeline import Pipeline
-from semantic_digital_twin.semantic_annotations.mixins import PartWholeRelationship
+from semantic_digital_twin.semantic_annotations.mixins import (
+    HasMovableJoint,
+    PartWholeRelationship,
+)
 from semantic_digital_twin.semantic_annotations.natural_language import (
     NaturalLanguageWithTypeDescription,
 )
@@ -40,6 +43,7 @@ from semantic_digital_twin.spatial_types.spatial_types import (
 )
 from semantic_digital_twin.utils import camel_case_split
 from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
 from semantic_digital_twin.world_description.world_entity import (
     Body,
     SemanticAnnotation,
@@ -56,6 +60,8 @@ try:
 
     with robocasa_version_assertions_relaxed():
         from robocasa.environments.kitchen.kitchen import Kitchen
+        from robocasa.models.objects.kitchen_objects import OBJ_CATEGORIES
+        from robocasa.models.objects.objects import MJCFObject
         from robocasa.models.scenes.kitchen_arena import KitchenArena
         from robocasa.models.scenes import scene_builder, scene_registry
     from robosuite.environments.base import REGISTERED_ENVS
@@ -109,6 +115,12 @@ class RoboCasaTask:
     for spawning the ``semantic_digital_twin``-owned robot.
     """
 
+    referenced_fixtures: dict[str, Body] = field(default_factory=dict)
+    """
+    The fixtures the task refers to, such as the drawer to open or the sink to place
+    into, as their bodies in :attr:`world`, by the name the task refers to them by.
+    """
+
 
 def _mjcf_document_from_element_copy(element: ET.Element) -> str:
     """
@@ -124,6 +136,21 @@ def _mjcf_document_from_element_copy(element: ET.Element) -> str:
     root = ET.Element("mujoco")
     worldbody = ET.SubElement(root, "worldbody")
     worldbody.append(copy.deepcopy(element))
+    return ET.tostring(root, encoding="unicode")
+
+
+def _mjcf_document_from_robocasa_object(robocasa_object: MJCFObject) -> str:
+    """
+    Wrap a RoboCasa object, free to move and scaled as RoboCasa places it in a kitchen,
+    into a standalone MJCF document.
+
+    :param robocasa_object: The object, as RoboCasa builds it from its model file.
+    :return: The MJCF document as a string.
+    """
+    root = ET.Element("mujoco")
+    root.append(copy.deepcopy(robocasa_object.asset))
+    worldbody = ET.SubElement(root, "worldbody")
+    worldbody.append(copy.deepcopy(robocasa_object.get_obj()))
     return ET.tostring(root, encoding="unicode")
 
 
@@ -321,6 +348,8 @@ class RoboCasaDatasetLoader:
         layout_id: LayoutType,
         style_id: StyleType,
         seed: int | None = None,
+        fixture_updates: dict[str, dict[str, Any]] | None = None,
+        task_parameters: dict[str, Any] | None = None,
     ) -> RoboCasaTask:
         """
         Compose a RoboCasa task scene and return it bound to its parsed World.
@@ -334,14 +363,18 @@ class RoboCasaDatasetLoader:
             ``"TurnOnMicrowave"``).
         :param layout_id: A member of ``robocasa.models.scenes.scene_registry.LayoutType``.
         :param style_id: A member of ``robocasa.models.scenes.scene_registry.StyleType``.
-        :param seed: The seed RoboCasa samples the scene with; ``None`` samples a
-            different scene every time.
+        :param seed: The seed RoboCasa samples the task's objects and their placement
+            with; ``None`` samples a different scene on every load.
+        :param fixture_updates: Changes to the layout's fixtures, by fixture name: the
+            entries of each replace those the layout file gives that fixture.
+        :param task_parameters: Arguments of the RoboCasa task itself, by name, for
+            example the object categories it samples from.
         :return: The task bound to the world it is defined over.
         :raises RoboCasaTaskNotFoundError: if ``task_name`` is not a registered RoboCasa kitchen
             task.
         """
         environment = self.build_task_environment(
-            task_name, layout_id, style_id, seed=seed
+            task_name, layout_id, style_id, seed, fixture_updates, task_parameters
         )
         return self.load_task_from_environment(environment)
 
@@ -351,6 +384,8 @@ class RoboCasaDatasetLoader:
         layout_id: LayoutType,
         style_id: StyleType,
         seed: int | None = None,
+        fixture_updates: dict[str, dict[str, Any]] | None = None,
+        task_parameters: dict[str, Any] | None = None,
     ) -> Any:
         """
         Build and reset the RoboCasa/robosuite environment a task's scene is composed
@@ -367,8 +402,12 @@ class RoboCasaDatasetLoader:
             (for example ``"TurnOnMicrowave"``).
         :param layout_id: A member of ``robocasa.models.scenes.scene_registry.LayoutType``.
         :param style_id: A member of ``robocasa.models.scenes.scene_registry.StyleType``.
-        :param seed: The seed RoboCasa samples the scene with; ``None`` samples a
-            different scene every time.
+        :param seed: The seed RoboCasa samples the task's objects and their placement
+            with; ``None`` samples a different scene on every build.
+        :param fixture_updates: Changes to the layout's fixtures, by fixture name: the
+            entries of each replace those the layout file gives that fixture.
+        :param task_parameters: Arguments of the RoboCasa task itself, by name, for
+            example the object categories it samples from.
         :return: The reset environment.
         :raises RoboCasaTaskNotFoundError: if ``task_name`` is not a registered RoboCasa kitchen
             task.
@@ -381,12 +420,14 @@ class RoboCasaDatasetLoader:
             robots=self.scene_composition_robot,
             layout_ids=int(layout_id),
             style_ids=int(style_id),
+            update_fxtr_cfg_dict=fixture_updates,
             has_renderer=False,
             has_offscreen_renderer=False,
             use_camera_obs=False,
             control_freq=20,
             ignore_done=True,
             seed=seed,
+            **(task_parameters or {}),
         )
         environment.reset()
         return environment
@@ -406,7 +447,13 @@ class RoboCasaDatasetLoader:
             environment.sim.model.get_xml(), object_world_poses
         )
 
-        world = _parse_robosuite_mjcf(MJCFParser.from_xml_string(stripped_document))
+        document = ET.fromstring(stripped_document)
+        self._bake_inertials(document, environment.sim.model)
+        mirrored_joints = self._mirror_joints_opening_towards_negative(document)
+        world = _parse_robosuite_mjcf(
+            MJCFParser.from_xml_string(ET.tostring(document, encoding="unicode"))
+        )
+        self._apply_joint_positions(world, environment, mirrored_joints)
         self._apply_kitchen_appliance_semantics(world, environment.fixtures)
         manipulated_objects = self._apply_task_object_semantics(
             world, environment.object_cfgs, environment.objects
@@ -417,11 +464,77 @@ class RoboCasaDatasetLoader:
             world=world,
             instruction=episode_metadata["lang"],
             manipulated_objects=manipulated_objects,
+            referenced_fixtures=self._referenced_fixtures(world, environment),
             robot_base_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
                 *episode_metadata["init_robot_base_pos"],
                 *episode_metadata["init_robot_base_ori"],
             ),
         )
+
+    def _referenced_fixtures(self, world: World, environment: Any) -> dict[str, Body]:
+        """
+        :param world: The world the task scene was parsed into.
+        :param environment: The reset environment the scene was composed in.
+        :return: The bodies of the fixtures the task refers to, by the name it refers
+            to them by.
+        """
+        bodies = {}
+        for reference, value in environment.fixture_refs.items():
+            fixture = value[0] if isinstance(value, tuple) else value
+            body = self._find_body(world, fixture.name)
+            if body is not None:
+                bodies[reference] = body
+        return bodies
+
+    @staticmethod
+    def _mirror_joints_opening_towards_negative(document: ET.Element) -> set[str]:
+        """
+        Mirror, in place, every joint of an MJCF document whose range runs from a
+        negative position up to 0, such as that of a RoboCasa drawer, so that it opens
+        towards positive positions instead, as semantic_digital_twin's joints do.
+
+        :param document: The MJCF document of a task scene.
+        :return: The names of the mirrored joints.
+        """
+        mirrored = set()
+        for joint in document.iter("joint"):
+            joint_range = joint.get("range")
+            if joint_range is None:
+                continue
+            lower, upper = (float(value) for value in joint_range.split())
+            if not lower < upper == 0.0:
+                continue
+            axis = [float(value) for value in joint.get("axis", "0 0 1").split()]
+            joint.set("axis", " ".join(str(-value) for value in axis))
+            joint.set("range", f"0 {-lower}")
+            mirrored.add(joint.get("name"))
+        return mirrored
+
+    @staticmethod
+    def _apply_joint_positions(
+        world: World, environment: Any, mirrored_joints: set[str]
+    ) -> None:
+        """
+        Set every joint of ``world`` that the environment's simulation also has to the
+        position the simulation holds it at, such as that of a drawer the task opened.
+
+        :param world: The world the task scene was parsed into.
+        :param environment: The reset environment the scene was composed in.
+        :param mirrored_joints: The names of the joints the world holds mirrored, see
+            :meth:`_mirror_joints_opening_towards_negative`.
+        """
+        model, data = environment.sim.model, environment.sim.data
+        joint_ids = {model.joint_id2name(joint): joint for joint in range(model.njnt)}
+        for connection in world.connections:
+            if not isinstance(connection, ActiveConnection1DOF):
+                continue
+            joint = joint_ids.get(connection.name.name)
+            if joint is None:
+                continue
+            position = float(data.qpos[model.jnt_qposadr[joint]])
+            connection.position = (
+                -position if connection.name.name in mirrored_joints else position
+            )
 
     @staticmethod
     def _available_task_names() -> List[str]:
@@ -502,6 +615,37 @@ class RoboCasaDatasetLoader:
             body.set("quat", cls._format_vector(orientation))
 
         return ET.tostring(root, encoding="unicode")
+
+    @classmethod
+    def _bake_inertials(cls, document: ET.Element, model: Any) -> None:
+        """
+        Give every body of ``document`` that RoboCasa simulates with a mass the inertial
+        properties it is simulated with.
+
+        The document RoboCasa's simulation gives back does not say which of a body's
+        geoms RoboCasa weighs, so weighed from its geoms alone a drawer would also weigh
+        the region marking its inside.
+
+        :param document: The task's MJCF document, changed in place.
+        :param model: The model of RoboCasa's simulation of the task.
+        """
+        for body in document.find("worldbody").iter("body"):
+            name = body.get("name")
+            if name not in model.body_names:
+                continue
+            index = model.body_name2id(name)
+            if model.body_mass[index] <= 0.0:
+                continue
+            for inertial in body.findall("inertial"):
+                body.remove(inertial)
+            inertial = ET.Element(
+                "inertial",
+                pos=cls._format_vector(model.body_ipos[index]),
+                quat=cls._format_vector(model.body_iquat[index]),
+                mass=cls._format_vector([model.body_mass[index]]),
+                diaginertia=cls._format_vector(model.body_inertia[index]),
+            )
+            body.insert(0, inertial)
 
     @staticmethod
     def _format_vector(vector: Any) -> str:
@@ -701,7 +845,18 @@ class RoboCasaDatasetLoader:
                 objects_directory,
             )
 
-        world = _parse_robosuite_mjcf(MJCFParser(str(model_files[instance_index])))
+        model_file = model_files[instance_index]
+        group = model_file.relative_to(objects_directory).parts[0]
+        robocasa_object = MJCFObject(
+            name=category,
+            mjcf_path=str(model_file),
+            scale=OBJ_CATEGORIES[category][group].scale,
+        )
+        world = _parse_robosuite_mjcf(
+            MJCFParser.from_xml_string(
+                _mjcf_document_from_robocasa_object(robocasa_object)
+            )
+        )
         self._apply_object_semantics(world, category)
         return self.preprocessing.apply(world)
 
@@ -759,6 +914,10 @@ class RoboCasaDatasetLoader:
             category
         ) or self.object_annotator.resolve(category)
 
+        if annotation_class is not None and issubclass(
+            annotation_class, HasMovableJoint
+        ):
+            body = self._moving_part_of(world, body)
         with world.modify_world():
             if annotation_class is not None:
                 annotation = annotation_class(root=body)
@@ -768,6 +927,28 @@ class RoboCasaDatasetLoader:
                 )
             world.add_semantic_annotation(annotation)
             self._attach_sub_part_annotations(world, annotation, body)
+
+    @staticmethod
+    def _moving_part_of(world: World, fixture_root: Body) -> Body:
+        """
+        :param world: The world the fixture belongs to.
+        :param fixture_root: The root body of a fixture, such as a drawer's housing.
+        :return: The fixture's part that moves, such as the drawer that slides out of
+            its housing: a body below ``fixture_root`` hanging from a joint of one
+            degree of freedom, or ``fixture_root`` itself if none does.
+        """
+        descendants = world.compute_descendent_child_kinematic_structure_entities(
+            fixture_root
+        )
+        return next(
+            (
+                body
+                for body in descendants
+                if isinstance(body, Body)
+                and isinstance(body.parent_connection, ActiveConnection1DOF)
+            ),
+            fixture_root,
+        )
 
     def _attach_sub_part_annotations(
         self, world: World, parent_annotation: SemanticAnnotation, parent_body: Body

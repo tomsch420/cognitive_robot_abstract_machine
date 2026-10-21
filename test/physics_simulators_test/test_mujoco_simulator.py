@@ -1,4 +1,5 @@
 import os
+import threading
 import time
 
 import mujoco
@@ -45,6 +46,24 @@ class TestMujocoSimulator:
             sim.stop()
         except Exception:
             pass
+
+    def test_stopping_waits_until_the_viewer_has_shut_down(self, simulator):
+        """
+        A viewer still drawing when a program ends has the window system torn down under
+        it at exit, which crashes the process.
+        """
+        if simulator.headless:
+            pytest.skip("Only a simulator drawn in a viewer has one to shut down.")
+        threads_before = set(threading.enumerate())
+        simulator.start(simulate_in_thread=False)
+
+        simulator.stop()
+
+        assert [
+            thread
+            for thread in threading.enumerate()
+            if thread not in threads_before and thread.is_alive()
+        ] == []
 
     def test_functions(self, simulator):
         simulator.start(simulate_in_thread=False, render_in_thread=True)

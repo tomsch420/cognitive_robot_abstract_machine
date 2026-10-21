@@ -307,6 +307,28 @@ class MovementType(Enum):
     TRANSLATION = auto()
     CARTESIAN = auto()
 
+    @property
+    def travels_in_a_straight_line(self) -> bool:
+        """
+        Whether the tool center point is held to the line from where it sets off to its
+        goal, rather than left to take whatever path the arm finds.
+        """
+        return self in (
+            MovementType.STRAIGHT_TRANSLATION,
+            MovementType.STRAIGHT_CARTESIAN,
+        )
+
+    @property
+    def leaves_the_orientation_free(self) -> bool:
+        """
+        Whether only where the tool center point ends up is a goal, leaving the tool
+        free to turn on the way and at the end.
+        """
+        return self in (
+            MovementType.TRANSLATION,
+            MovementType.STRAIGHT_TRANSLATION,
+        )
+
 
 class WaypointsMovementType(Enum):
     """

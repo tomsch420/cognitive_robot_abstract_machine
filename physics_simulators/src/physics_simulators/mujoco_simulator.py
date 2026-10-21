@@ -3,8 +3,10 @@
 import os
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field, InitVar
+from datetime import timedelta
 from enum import StrEnum
-from threading import RLock
+import threading
+from threading import RLock, Thread
 from typing import Optional, List, Dict, Union, Any
 
 import mujoco
@@ -48,6 +50,30 @@ class MujocoEnvironmentVariable(StrEnum):
     """
     Names the X display the windowed backend renders through.
     """
+
+
+VIEWER_SHUTDOWN_TIMEOUT = timedelta(seconds=5)
+"""
+How long stopping a simulator waits for its viewer to stop drawing.
+"""
+
+
+@dataclass
+class ViewerDidNotShutDownError(Exception):
+    """
+    Raised when a simulator's viewer is still drawing after it was asked to close.
+    """
+
+    timeout: timedelta
+    """
+    How long the viewer was waited for.
+    """
+
+    def __str__(self) -> str:
+        return (
+            f"The MuJoCo viewer was still drawing {self.timeout.total_seconds()} s after "
+            "it was asked to close."
+        )
 
 
 @dataclass
@@ -106,6 +132,14 @@ class MujocoSimulator(BaseSimulator):
     this lock provides the actual mutual exclusion.
     """
 
+    _viewer_threads: List[Thread] = field(
+        init=False, repr=False, compare=False, default_factory=list
+    )
+    """
+    The threads MuJoCo's passive viewer draws on, which closing the viewer only asks to
+    end.
+    """
+
     def __post_init__(self, file_path: str = ""):
         super().__post_init__()
         self._file_path = file_path
@@ -129,6 +163,9 @@ class MujocoSimulator(BaseSimulator):
             "cone", mujoco.mjtCone.mjCONE_PYRAMIDAL
         )
         self._mj_spec.option.impratio = float(self.config.get("impratio", 1))
+        self._mj_spec.option.solver = self.config.get(
+            "solver", mujoco.mjtSolver.mjSOL_NEWTON
+        )
         self._mj_spec.option.timestep = self.step_size
         if self.config.get("multiccd", False):
             self._mj_spec.option.enableflags |= mujoco.mjtEnableBit.mjENBL_MULTICCD
@@ -153,10 +190,31 @@ class MujocoSimulator(BaseSimulator):
         mujoco.mj_resetDataKeyframe(self._mj_model, self._mj_data, 0)
 
     def start_callback(self):
-        if not self.headless:
-            self._renderer = mujoco.viewer.launch_passive(self._mj_model, self._mj_data)
-        else:
+        if self.headless:
             self._renderer = SimulatorRenderer()
+            return
+        threads_before = set(threading.enumerate())
+        self._renderer = mujoco.viewer.launch_passive(self._mj_model, self._mj_data)
+        self._viewer_threads = [
+            thread for thread in threading.enumerate() if thread not in threads_before
+        ]
+
+    def stop(self):
+        """
+        Stop the simulator, and wait until its viewer has stopped drawing.
+
+        A viewer still drawing when the program ends has the window system torn down
+        under it at exit, which crashes the process.
+
+        :raises ViewerDidNotShutDownError: If the viewer is still drawing after
+            :data:`VIEWER_SHUTDOWN_TIMEOUT`.
+        """
+        super().stop()
+        for thread in self._viewer_threads:
+            thread.join(VIEWER_SHUTDOWN_TIMEOUT.total_seconds())
+            if thread.is_alive():
+                raise ViewerDidNotShutDownError(VIEWER_SHUTDOWN_TIMEOUT)
+        self._viewer_threads = []
 
     def step_callback(self):
         def _do_step():

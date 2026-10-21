@@ -1178,6 +1178,27 @@ class TestOpenClose:
 
         assert goal.goal_joint_state == goal.connection.dof.limits.upper.position
 
+    def test_close_counts_the_mechanism_closed_within_its_threshold(
+        self, prismatic_bot
+    ):
+        """
+        A mechanism that has to shut tighter than the default allows is given a
+        threshold of its own, which its joint goal is reached within.
+        """
+        grasped_part = prismatic_bot.get_body_by_name("robot")
+        goal = Close(
+            tip_link=prismatic_bot.root,
+            environment_link=grasped_part,
+            threshold=0.002,
+        )
+
+        nodes = self._expanded_nodes(goal, prismatic_bot)
+
+        mechanism_node = next(
+            node for node in nodes if isinstance(node, JointPositionList)
+        )
+        assert mechanism_node.threshold == goal.threshold
+
     def test_close_clamps_a_goal_below_the_lower_limit(self, prismatic_bot):
         """
         Closing clamps an unreachable commanded state against the opposite limit.

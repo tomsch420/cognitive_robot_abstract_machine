@@ -28,6 +28,7 @@ from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
     FixedConnection,
+    OmniDrive,
     RevoluteConnection,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import (
@@ -49,6 +50,7 @@ from semantic_digital_twin.world_description.world_entity import (
     Body,
     Region,
     Actuator,
+    ContactExclusion,
     GravityCompensation,
 )
 
@@ -57,10 +59,10 @@ from physics_simulators.base_simulator import SimulatorState
 from semantic_digital_twin.adapters.mjcf import MJCFParser
 from semantic_digital_twin.adapters.multi_sim import (
     ContactCategories,
+    ContactDimensionality,
     MujocoSim,
     MujocoActuator,
     MujocoBuilder,
-    ContactDimensionality,
     MujocoGeom,
     MujocoLight,
     MujocoSynchronizer,
@@ -579,6 +581,75 @@ def test_builder_writes_a_geoms_contact_bitmasks(tmp_path):
     ]
     assert geom.contype == 2
     assert geom.conaffinity == 4
+
+
+def test_builder_keeps_every_geom_of_a_body_excluded_from_contact_contactless(
+    tmp_path,
+):
+    world = World()
+    with world.modify_world():
+        root = Body(name=PrefixedName("root"))
+        world.add_body(root)
+        link = Body(
+            name=PrefixedName("link"),
+            collision=ShapeCollection(
+                [Box(scale=Scale(1, 1, 1)), Box(scale=Scale(0.5, 0.5, 0.5))]
+            ),
+        )
+        link.add_simulator_property(ContactExclusion())
+        world.add_kinematic_structure_entity(link)
+        world.add_connection(FixedConnection(parent=root, child=link))
+
+    builder = MujocoBuilder()
+    builder.build_world(world=world, file_path=str(tmp_path / "scene.xml"))
+
+    masks = [
+        (geom.contype, geom.conaffinity)
+        for body in builder.spec.bodies
+        for geom in body.geoms
+        if body.name == "link"
+    ]
+    assert masks == [(ContactCategories.NONE, ContactCategories.NONE)] * 2
+
+
+def _world_with_one_torsional_box() -> World:
+    """
+    A world whose only link is a box resolving torsional friction.
+    """
+    world = World()
+    with world.modify_world():
+        root = Body(name=PrefixedName("root"))
+        world.add_body(root)
+        box_shape = Box(scale=Scale(1, 1, 1))
+        box_shape.add_simulator_property(
+            MujocoGeom(
+                contact_dimensionality=ContactDimensionality.SLIDING_AND_TORSIONAL
+            )
+        )
+        link = Body(name=PrefixedName("link"), collision=ShapeCollection([box_shape]))
+        world.add_kinematic_structure_entity(link)
+        world.add_connection(FixedConnection(parent=root, child=link))
+    return world
+
+
+def test_builder_writes_a_geoms_contact_dimensionality(tmp_path):
+    """
+    MuJoCo resolves only the friction a geom's contact dimensionality covers, so a piece
+    held between two pads turns freely about the line between them unless its twisting
+    friction is resolved.
+    """
+    builder = MujocoBuilder()
+    builder.build_world(
+        world=_world_with_one_torsional_box(), file_path=str(tmp_path / "scene.xml")
+    )
+
+    [geom] = [
+        geom
+        for body in builder.spec.bodies
+        for geom in body.geoms
+        if body.name == "link"
+    ]
+    assert geom.condim == ContactDimensionality.SLIDING_AND_TORSIONAL
 
 
 def test_a_geoms_contact_dimensionality_survives_a_round_trip(tmp_path):
@@ -1919,3 +1990,56 @@ def test_a_stepped_simulation_leaves_the_world_where_the_physics_put_it(
         stop_multisim_if_running(multi_sim)
 
     assert list(box.global_pose.to_np()[:3, 3]) == pytest.approx(list(simulated))
+
+
+# %% a base standing where its drive puts it
+
+
+@pytest.fixture
+def driven_box_world() -> World:
+    """
+    A box hanging off an omni drive half a metre above the root, as a mobile robot's
+    base hangs off its drive.
+    """
+    world = World()
+    with world.modify_world():
+        root = Body(name=PrefixedName("root"))
+        world.add_body(root)
+        box = Body(name=PrefixedName("box"))
+        box.collision = ShapeCollection(
+            [Box(origin=HomogeneousTransformationMatrix(), scale=Scale(0.2, 0.2, 0.2))],
+            reference_frame=box,
+        )
+        world.add_connection(
+            OmniDrive.create_with_dofs(
+                world=world,
+                parent=root,
+                child=box,
+                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    z=0.5, reference_frame=root
+                ),
+            )
+        )
+    return world
+
+
+def test_a_drive_moved_before_the_simulation_starts_puts_its_body_there(
+    driven_box_world,
+):
+    """
+    MuJoCo has no joint for a drive to supply its position, so the body has to be built
+    where the drive holds it rather than where the drive's reference frame is.
+    """
+    box = driven_box_world.get_body_by_name("box")
+    box.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+        x=0.5, y=-0.3, yaw=0.4, reference_frame=driven_box_world.root
+    )
+    multi_sim = MujocoSim(world=driven_box_world, headless=headless)
+    multi_sim.start_stepped_simulation()
+    try:
+        multi_sim.step_simulation(timedelta(milliseconds=10))
+        position = multi_sim.simulator.get_body_position(body_name="box").result
+    finally:
+        stop_multisim_if_running(multi_sim)
+
+    assert position == pytest.approx(box.global_pose.to_np()[:3, 3], abs=1e-6)

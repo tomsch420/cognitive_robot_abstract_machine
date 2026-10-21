@@ -170,6 +170,11 @@ class Fingertips:
     The axis the fingers close along, in :attr:`tool_frame`.
     """
 
+    approach_axis: Vector3
+    """
+    The axis the hand travels along towards what it grasps, in :attr:`tool_frame`.
+    """
+
     @property
     def both(self) -> Tuple[Body, Body]:
         """
@@ -222,6 +227,20 @@ class Fingertips:
         wider than the surfaces do on either side.
         """
         return (self._frame_distance - self.separation) / 2
+
+    def reach_beyond(self, tool_P_point: Point3) -> float:
+        """
+        How far the tips stick out past a point, in metres, along :attr:`approach_axis`.
+
+        :param tool_P_point: The point to measure from, in :attr:`tool_frame`.
+        :return: The overhang, or zero where the tips stop short of the point.
+        """
+        furthest = max(
+            self._reach_along(tip, self.approach_axis)[1] for tip in self.both
+        )
+        return max(
+            furthest - self._coordinate_along(tool_P_point, self.approach_axis), 0.0
+        )
 
     def finger_P_thumb(self, separation: float) -> Point3:
         """
@@ -282,30 +301,47 @@ class Fingertips:
             self.tool_frame
         ).bounding_box()
 
-    def _reach_along_closing_axis(self, tip: Body) -> Tuple[float, float]:
+    def _reach_along(self, tip: Body, axis: Vector3) -> Tuple[float, float]:
         """
         :param tip: One of the two tips.
-        :return: How far its bounding box reaches along :attr:`closing_axis`, as its
-            nearest and furthest coordinate on that axis.
+        :param axis: The axis to measure along, in :attr:`tool_frame`.
+        :return: How far its bounding box reaches along that axis, as its nearest and
+            furthest coordinate on it.
         """
         box = self._bounding_box(tip)
         corners = product(
             (box.min_x, box.max_x), (box.min_y, box.max_y), (box.min_z, box.max_z)
         )
         coordinates = [
-            self._closing_axis_coordinate(
-                Point3(*corner, reference_frame=self.tool_frame)
+            self._coordinate_along(
+                Point3(*corner, reference_frame=self.tool_frame), axis
             )
             for corner in corners
         ]
         return min(coordinates), max(coordinates)
+
+    def _reach_along_closing_axis(self, tip: Body) -> Tuple[float, float]:
+        """
+        :param tip: One of the two tips.
+        :return: How far its bounding box reaches along :attr:`closing_axis`.
+        """
+        return self._reach_along(tip, self.closing_axis)
 
     def _closing_axis_coordinate(self, tool_P_point: Point3) -> float:
         """
         :param tool_P_point: A point in :attr:`tool_frame`.
         :return: Where it lies along :attr:`closing_axis`.
         """
-        return float(tool_P_point.vector3.dot(self.closing_axis))
+        return self._coordinate_along(tool_P_point, self.closing_axis)
+
+    @staticmethod
+    def _coordinate_along(tool_P_point: Point3, axis: Vector3) -> float:
+        """
+        :param tool_P_point: A point in :attr:`tool_frame`.
+        :param axis: The axis to measure along, in the same frame.
+        :return: Where the point lies along that axis.
+        """
+        return float(tool_P_point.vector3.dot(axis))
 
 
 @dataclass(eq=False)
@@ -355,6 +391,7 @@ class HasTwoFingers(
             finger=self.finger.tip,
             tool_frame=self.tool_frame,
             closing_axis=self.closing_axis,
+            approach_axis=self.approach_axis,
         )
 
     @cached_property
@@ -377,6 +414,18 @@ class HasTwoFingers(
         travelled = closed_P_grasp - open_P_grasp
         return float(travelled.dot(self.approach_axis))
 
+    @cached_property
+    def separation_when_open(self) -> float:
+        """
+        How far apart the fingertips' facing surfaces stand with the gripper open, in
+        metres: the widest object the open hand can close on.
+
+        A constant of the gripper's description, read once and kept.
+        """
+        with self._world.reset_state_context():
+            self.get_joint_state_by_type(GripperState.OPEN).apply_to(self._world)
+            return self.fingertips.separation
+
     def _meeting_point_in_state(
         self, fingertips: Fingertips, state_type: JointStateType
     ) -> Point3:
@@ -390,6 +439,22 @@ class HasTwoFingers(
         """
         self.get_joint_state_by_type(state_type).apply_to(self._world)
         return fingertips.tool_P_grasp
+
+    @cached_property
+    def fingers_reach_beyond_the_grasp(self) -> float:
+        """
+        How far the closed fingers stick out past the point they meet, in metres, along
+        :attr:`EndEffector.approach_axis`.
+
+        What an object has to stand clear of the grasp for the closed hand to be clear
+        of the object: a hand brought nearer than this with its fingers shut drives them
+        into the object rather than around it.
+
+        A constant of the gripper's description, read once and kept.
+        """
+        with self._world.reset_state_context():
+            self.get_joint_state_by_type(GripperState.CLOSE).apply_to(self._world)
+            return self.fingertips.reach_beyond(self.tool_P_grasp_when_closed)
 
     @cached_property
     def tool_P_grasp_when_closed(self) -> Point3:

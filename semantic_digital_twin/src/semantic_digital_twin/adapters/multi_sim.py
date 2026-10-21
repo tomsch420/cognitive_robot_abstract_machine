@@ -14,6 +14,7 @@ from functools import lru_cache
 import trimesh
 import PIL.ImageFile
 from abc import ABC, abstractmethod
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from enum import IntEnum, IntFlag
 from types import NoneType
@@ -23,6 +24,7 @@ from typing_extensions import (
     List,
     Any,
     ClassVar,
+    Iterable,
     Iterator,
     Type,
     TypeVar,
@@ -88,7 +90,6 @@ from semantic_digital_twin.world_description.geometry import (
     Color,
 )
 from semantic_digital_twin.world_description.contact import ContactParameters
-from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 from semantic_digital_twin.world_description.world_entity import (
     Region,
     Body,
@@ -98,6 +99,7 @@ from semantic_digital_twin.world_description.world_entity import (
     WorldEntity,
     WorldEntityWithID,
     Actuator,
+    ContactExclusion,
     PositionServo,
     VelocityServo,
 )
@@ -354,18 +356,21 @@ class KinematicStructureEntityConverter(EntityConverter, ABC):
 
         kinematic_structure_entity_props = EntityConverter._convert(self, entity)
         # The simulator joint supplies the variable part, so the static frame must
-        # exclude it (see Connection.reference_origin_expression).
-        [
-            px,
-            py,
-            pz,
-            qx,
-            qy,
-            qz,
-            qw,
-        ] = entity.parent_connection.reference_origin_as_position_quaternion().evaluate()[
-            0
-        ]
+        # exclude it (see Connection.reference_origin_expression). A drive that is not
+        # servoed has no simulator joint, so its body is built where the drive holds it.
+        parent_connection = entity.parent_connection
+        is_welded_drive = (
+            isinstance(parent_connection, WheeledDrive)
+            and not MujocoWheeledDriveJoints.of(
+                parent_connection, entity._world
+            ).servoed
+        )
+        static_frame = (
+            parent_connection.origin_as_position_quaternion()
+            if is_welded_drive
+            else parent_connection.reference_origin_as_position_quaternion()
+        )
+        [px, py, pz, qx, qy, qz, qw] = static_frame.evaluate()[0]
         kinematic_structure_entity_pos = [px, py, pz]
         kinematic_structure_entity_quat = [qw, qx, qy, qz]
         kinematic_structure_entity_props.update(
@@ -2724,6 +2729,9 @@ class MujocoBuilder(MultiSimBuilder):
                 mujoco_geom_props.pop("contype")
                 mujoco_geom_props.pop("conaffinity")
             geom_props.update(mujoco_geom_props)
+        if parent.get_simulator_property_of_type(ContactExclusion) is not None:
+            geom_props["contype"] = ContactCategories.NONE
+            geom_props["conaffinity"] = ContactCategories.NONE
         geom_spec = parent_body_spec.add_geom(**geom_props)
         if geom_spec.type == mujoco.mjtGeom.mjGEOM_BOX and geom_spec.size[2] == 0:
             geom_spec.type = mujoco.mjtGeom.mjGEOM_PLANE
@@ -3934,9 +3942,37 @@ class MujocoSynchronizer(MultiSimSynchronizer):
     only a changed one is handed over again.
     """
 
+    connections_left_to_the_physics: set[ActiveConnection1DOF] = field(
+        init=False, default_factory=set
+    )
+    """
+    The connections whose positions the world and the simulation each keep for
+    themselves, see :meth:`leave_to_the_physics`.
+    """
+
     def __post_init__(self):
         super().__post_init__()
         self.simulator.read_data_from_simulator = self._sim_to_world
+
+    @contextmanager
+    def leave_to_the_physics(
+        self, connections: Iterable[ActiveConnection1DOF]
+    ) -> Iterator[None]:
+        """
+        Within the context, the world and the simulation each keep their own positions
+        of ``connections``: the world's are not written into the simulation, so that
+        only the physics moves them there, and the simulation's are not read back. On
+        leaving, the world takes the positions the physics has moved them to.
+
+        :param connections: The connections to leave to the physics.
+        """
+        left = set(connections) - self.connections_left_to_the_physics
+        self.connections_left_to_the_physics |= left
+        try:
+            yield
+        finally:
+            self.connections_left_to_the_physics -= left
+            self.read_simulation_into_world()
 
     def _resolve_qpos_address(self, connection: Connection) -> Optional[int]:
         """
@@ -4037,6 +4073,8 @@ class MujocoSynchronizer(MultiSimSynchronizer):
                         # not overwrite.
                         if connection.raw_dof.id in actuator_name_by_dof_id:
                             continue
+                        if connection in self.connections_left_to_the_physics:
+                            continue
                         self._read_1dof_from_qpos(connection, joint_backed.qpos_address)
                         changed = True
                     case _:
@@ -4100,6 +4138,8 @@ class MujocoSynchronizer(MultiSimSynchronizer):
                         # An actuated joint is commanded by
                         # :meth:`_command_actuators` instead.
                         if connection.raw_dof.id in actuator_name_by_dof_id:
+                            continue
+                        if connection in self.connections_left_to_the_physics:
                             continue
                         self._write_1dof_to_qpos(
                             connection,

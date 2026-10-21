@@ -44,6 +44,12 @@ class Open(Goal):
     default is the limit this goal drives towards.
     """
 
+    threshold: float = field(default=0.01, kw_only=True)
+    """
+    How close the mechanism has to come to :attr:`goal_joint_state` for it to count as
+    reached.
+    """
+
     mechanism_weight: float = field(
         default=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE, kw_only=True
     )
@@ -78,6 +84,7 @@ class Open(Goal):
                     goal_state=JointState.from_mapping(
                         {self.connection: self.goal_joint_state}
                     ),
+                    threshold=self.threshold,
                     weight=self.mechanism_weight,
                 ),
                 CartesianPose(

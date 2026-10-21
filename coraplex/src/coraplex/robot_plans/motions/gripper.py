@@ -6,9 +6,11 @@ from giskardpy.motion_statechart.goals.templates import Parallel, Sequence
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode, Task
 from giskardpy.motion_statechart.binding_policy import GoalBindingPolicy
 from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
+from giskardpy.motion_statechart.goals.cartesian_goals import CartesianPoseStraight
 from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianPose,
     CartesianPosition,
+    CartesianPositionStraight,
     CartesianPositionTrajectory,
     CartesianPositionVelocityLimit,
     CartesianRotationVelocityLimit,
@@ -200,6 +202,17 @@ class MoveToolCenterPointMotion(
     The type of movement that should be performed.
     """
 
+    hold_gripper: Optional[GripperState] = None
+    """
+    The state the hand is held in while the tool center point moves.
+
+    ``None`` leaves the hand alone.
+
+    A hand that nothing holds is commanded to wherever it is measured, so its fingers
+    keep whatever drift they pick up along the way. Half a centimetre of that is enough
+    for a hand reaching around an object to close on it early and push it away.
+    """
+
     def perform(self):
         return
 
@@ -231,6 +244,42 @@ class MoveToolCenterPointMotion(
             )
         return nodes
 
+    def _goal_task(self, root: Body, tip: Body) -> MotionStatechartNode:
+        """
+        :param root: The link the motion is described against.
+        :param tip: The tool center point that is to reach the target.
+        :return: The task describing where the tool center point is to end up, and
+            whether it is held to a straight line getting there.
+        """
+        if self.movement_type.leaves_the_orientation_free:
+            position = (
+                CartesianPositionStraight
+                if self.movement_type.travels_in_a_straight_line
+                else CartesianPosition
+            )
+            return position(
+                root_link=root,
+                tip_link=tip,
+                goal_point=self.target.position,
+                name="MoveTCP",
+                weight=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE,
+                threshold=self.resolved_position_threshold(),
+            )
+        pose = (
+            CartesianPoseStraight
+            if self.movement_type.travels_in_a_straight_line
+            else CartesianPose
+        )
+        return pose(
+            root_link=root,
+            tip_link=tip,
+            goal_pose=self.target,
+            name="MoveTCP",
+            weight=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE,
+            translation_threshold=self.resolved_position_threshold(),
+            orientation_threshold=self.resolved_orientation_threshold(),
+        )
+
     @property
     def _motion_chart(self):
         tip = self.arm.end_effector.tool_frame
@@ -240,29 +289,20 @@ class MoveToolCenterPointMotion(
             and self.robot.mobile_base.full_body_controlled
             else self.robot.root
         )
-        if self.movement_type == MovementType.TRANSLATION:
-            task = CartesianPosition(
-                root_link=root,
-                tip_link=tip,
-                goal_point=self.target.position,
-                name="MoveTCP",
-                weight=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE,
-                threshold=self.resolved_position_threshold(),
-            )
-        else:
-            task = CartesianPose(
-                root_link=root,
-                tip_link=tip,
-                goal_pose=self.target,
-                name="MoveTCP",
-                weight=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE,
-                translation_threshold=self.resolved_position_threshold(),
-                orientation_threshold=self.resolved_orientation_threshold(),
-            )
+        task = self._goal_task(root, tip)
         accompanying_nodes: List[MotionStatechartNode] = list(
             self._velocity_limit_nodes(root, tip)
         )
         accompanying_nodes.extend(self.keep_base_still())
+        if self.hold_gripper is not None:
+            accompanying_nodes.append(
+                JointPositionList(
+                    goal_state=self.arm.end_effector.get_joint_state_by_type(
+                        self.hold_gripper
+                    ),
+                    name="HoldGripper",
+                )
+            )
         if self.allow_gripper_collision:
             accompanying_nodes.extend(
                 self._only_allow_gripper_collision_rules(self.arm.end_effector)

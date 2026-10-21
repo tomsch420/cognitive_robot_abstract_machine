@@ -486,3 +486,31 @@ def test_reading_the_travel_stands_the_world_back_up(tracy_world):
     gripper.travel_when_closing
 
     np.testing.assert_array_equal(tracy_world.state.positions, positions_before)
+
+
+# %% how wide an object the open gripper takes
+
+
+def test_the_open_separation_is_the_one_the_gripper_stands_at_when_open(pr2_gripper):
+    """
+    It is how far apart the fingertips' facing surfaces stand in the gripper's own open
+    state, which is the widest object the open hand can close on.
+    """
+    world = pr2_gripper._world
+    with world.reset_state_context():
+        pr2_gripper.get_joint_state_by_type(GripperState.OPEN).apply_to(world)
+        expected = pr2_gripper.fingertips.separation
+
+    assert pr2_gripper.separation_when_open == expected
+
+
+def test_reading_the_open_separation_stands_the_world_back_up(pr2_gripper):
+    """
+    The gripper is stood open to read it, and stands as it did afterwards.
+    """
+    world = pr2_gripper._world
+    positions_before = world.state.positions.copy()
+
+    pr2_gripper.separation_when_open
+
+    np.testing.assert_array_equal(world.state.positions, positions_before)

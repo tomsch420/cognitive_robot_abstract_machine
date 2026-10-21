@@ -82,7 +82,9 @@ def test_parse_simple_action(pr2_apartment_context):
     assert executable.pre_condition_node
     assert executable.post_condition_node
     assert len(executable.motion_mappings) == 1
-    assert type(list(executable.motion_mappings.values())[0]) == JointPositionList
+    [motion_chart] = executable.motion_mappings.values()
+    assert type(motion_chart) is Parallel
+    assert [type(node) for node in motion_chart.nodes].count(JointPositionList) == 1
 
 
 # %% the chart mirrors the plan tree

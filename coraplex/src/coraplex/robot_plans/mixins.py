@@ -292,7 +292,13 @@ class HasApproachesGraspPoses:
 
     approach_clearance: float = field(default=0.1, kw_only=True)
     """
-    The gap in meters between the object and the gripper at the pre-grasp pose.
+    The gap in meters between the object and the gripper's tool frame at the pre-grasp
+    pose.
+
+    Measured from the tool frame, so a hand whose fingers reach well past the point they
+    meet (see
+    :attr:`~semantic_digital_twin.robots.robot_part_mixins.HasTwoFingers.fingers_reach_beyond_the_grasp`)
+    needs more than the gap the fingers themselves are to leave.
     """
 
     retreat_distance: float = field(default=0.1, kw_only=True)

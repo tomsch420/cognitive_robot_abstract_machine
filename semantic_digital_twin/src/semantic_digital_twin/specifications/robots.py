@@ -83,7 +83,8 @@ class RobotSpecification:
 
         The robot is annotated while it still owns the world it was parsed into, so that
         the annotation's name-based lookups cannot be confused by an equally named joint
-        of a robot already present in ``world``.
+        of a robot already present in ``world``. The servos of an active drive are
+        declared once the drive exists.
 
         :param world: The world the robot is merged into.
         :return: The semantic annotation of the merged robot.

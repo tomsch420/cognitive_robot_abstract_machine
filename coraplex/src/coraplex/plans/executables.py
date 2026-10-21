@@ -42,6 +42,7 @@ from giskardpy.ros_executor import Ros2Executor
 from krrood.entity_query_language.factories import evaluate_condition
 from krrood.ormatic.utils import classproperty
 from krrood.symbolic_math.symbolic_math import Scalar, trinary_logic_not
+from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
 from semantic_digital_twin.world_description.world_entity import Body
 
 if TYPE_CHECKING:
@@ -409,7 +410,8 @@ class GiskardExecutable(Executable):
         that keeps converging is never cut off for taking many ticks.
 
         The recorded motion states are projected onto the motion nodes of the plan
-        while the chart runs.
+        while the chart runs. In a simulation, the joints that are not the robot's are
+        left to the physics, so that only what the robot does to them moves them.
 
         :raises NoProgressError: When the motion stops approaching its goal. The error
             names the tasks that stalled, and :meth:`execute` turns it into a
@@ -417,31 +419,54 @@ class GiskardExecutable(Executable):
         :raises MotionExceededSimulationTimeLimit: When the motion runs for longer than
             :attr:`simulation_time_limit`.
         """
+        simulation = GiskardExecutable.simulation
         if (
             GiskardExecutable.execution_type != ExecutionType.PHYSICALLY_SIMULATED
-            or GiskardExecutable.simulation is None
+            or simulation is None
         ):
             qp_controller_config = (
                 QPControllerConfig.create_with_fast_simulation_defaults()
             )
             pacer = NoPacing()
+            physics = nullcontext()
         else:
             qp_controller_config = (
                 QPControllerConfig.create_with_physical_simulation_defaults()
             )
-            pacer = SteppedSimulationPacer(GiskardExecutable.simulation)
-        self._tick_until_done(
-            Ros2Executor(
-                context=MotionStatechartContext(
-                    world=self.context.world,
-                    qp_controller_config=qp_controller_config,
+            pacer = SteppedSimulationPacer(simulation)
+            physics = simulation.synchronizer.leave_to_the_physics(
+                self._joints_of_the_environment
+            )
+        with physics:
+            self._tick_until_done(
+                Ros2Executor(
+                    context=MotionStatechartContext(
+                        world=self.context.world,
+                        qp_controller_config=qp_controller_config,
+                    ),
+                    ros_node=self.context.ros_node,
+                    pacer=pacer,
                 ),
-                ros_node=self.context.ros_node,
-                pacer=pacer,
-            ),
-            qp_controller_config,
-            pacer,
+                qp_controller_config,
+                pacer,
+            )
+
+    @property
+    def _joints_of_the_environment(self) -> list[ActiveConnection1DOF]:
+        """
+        The joints of the world that are not below the robot's root.
+        """
+        world = self.context.world
+        robot_parts = set(
+            world.compute_descendent_child_kinematic_structure_entities(
+                self.context.robot.root
+            )
         )
+        return [
+            connection
+            for connection in world.get_connections_by_type(ActiveConnection1DOF)
+            if connection.child not in robot_parts
+        ]
 
     def _tick_until_done(
         self,

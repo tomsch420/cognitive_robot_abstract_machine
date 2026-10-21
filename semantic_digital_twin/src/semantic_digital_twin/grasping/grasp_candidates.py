@@ -4,6 +4,7 @@ The grasps an object offers, independent of the robot performing them.
 
 from __future__ import annotations
 
+
 from dataclasses import dataclass, field
 
 import numpy as np

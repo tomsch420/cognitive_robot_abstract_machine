@@ -16,8 +16,7 @@ from coraplex.plans.factories import sequential
 from coraplex.plans.plan_node import PlanNode
 from coraplex.querying.predicates import GripperIsFree
 from coraplex.robot_plans.actions.base import ActionDescription
-from coraplex.robot_plans.actions.core.pick_up import GraspingAction
-from coraplex.robot_plans.mixins import HasApproachesGraspPoses
+from coraplex.robot_plans.actions.core.pick_up import TakesHoldOfAGrasp
 from coraplex.robot_plans.motions.base import BaseMotion
 from coraplex.robot_plans.motions.container import OpeningMotion, ClosingMotion
 from coraplex.robot_plans.motions.gripper import (
@@ -35,7 +34,7 @@ from semantic_digital_twin.world_description.connections import ActiveConnection
 
 
 @dataclass
-class ContainerAction(ActionDescription, HasApproachesGraspPoses):
+class ContainerAction(ActionDescription, TakesHoldOfAGrasp):
     """
     Moves a container like object by its handle.
 
@@ -59,6 +58,21 @@ class ContainerAction(ActionDescription, HasApproachesGraspPoses):
     The gap in meters between the handle and the gripper once it has let go.
     """
 
+    grasp: GraspCandidate | None = None
+    """
+    The grasp the handle is taken hold of by; ``None`` takes it at the handle's origin.
+    """
+
+    @property
+    def handle_grasp(self) -> GraspCandidate:
+        """
+        The grasp the handle is taken hold of by: :attr:`grasp`, or the one at the
+        handle's origin if none is given.
+        """
+        if self.grasp is not None:
+            return self.grasp
+        return GraspCandidate.from_body_origin(self.handle)
+
     @property
     @abstractmethod
     def _mechanism_motion(self) -> BaseMotion:
@@ -81,14 +95,10 @@ class ContainerAction(ActionDescription, HasApproachesGraspPoses):
 
     @property
     def _action_plan(self) -> PlanNode:
-        handle_grasp = GraspCandidate.from_body_origin(self.handle)
+        handle_grasp = self.handle_grasp
         return sequential(
             [
-                GraspingAction(
-                    handle_grasp,
-                    self.arm,
-                    approach_clearance=self.approach_clearance,
-                ),
+                self.grasping_of(handle_grasp, self.arm),
                 self._mechanism_motion,
                 MoveGripperMotion(
                     GripperState.OPEN,
@@ -99,6 +109,8 @@ class ContainerAction(ActionDescription, HasApproachesGraspPoses):
                     self.back_off_pose(handle_grasp.grasp_pose, self.arm.end_effector),
                     self.arm,
                     allow_gripper_collision=True,
+                    position_threshold=self.position_threshold,
+                    orientation_threshold=self.orientation_threshold,
                 ),
             ]
         )
@@ -146,9 +158,25 @@ class CloseAction(ContainerAction):
     Closes a container like object.
     """
 
+    closed_position: float = 0.01
+    """
+    The position of the mechanism's joint the container is closed to.
+    """
+
+    closing_tolerance: float = 0.01
+    """
+    How close the joint has to come to :attr:`closed_position` for the container to
+    count as closed.
+    """
+
     @property
     def _mechanism_motion(self) -> BaseMotion:
-        return ClosingMotion(self.handle.root, self.arm)
+        return ClosingMotion(
+            self.handle.root,
+            self.arm,
+            closed_position=self.closed_position,
+            closing_tolerance=self.closing_tolerance,
+        )
 
     @staticmethod
     def post_condition(

@@ -525,6 +525,14 @@ class GravityCompensation(UniqueSimulatorProperty):
     """
 
 
+@dataclass
+class ContactExclusion(UniqueSimulatorProperty):
+    """
+    Keeps a body out of every contact in a physical simulation: nothing collides with
+    it, though it keeps its mass.
+    """
+
+
 @dataclass(eq=False)
 class Body(KinematicStructureEntity):
     """

@@ -68,16 +68,16 @@ class MoveJointsMotion(BaseMotion, HasMaxJointVelocity):
         joint_task = JointPositionList(
             goal_state=JointState.from_mapping(dict(zip(dofs, self.positions))),
         )
-        if self.max_joint_velocity is None:
-            return joint_task
-        return Parallel(
-            [
-                joint_task,
+        accompanying_nodes = self.keep_base_still()
+        if self.max_joint_velocity is not None:
+            accompanying_nodes.append(
                 JointVelocityLimit(
                     connections=dofs, max_velocity=self.max_joint_velocity
-                ),
-            ]
-        )
+                )
+            )
+        if not accompanying_nodes:
+            return joint_task
+        return Parallel([joint_task, *accompanying_nodes])
 
 
 @dataclass

@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import os
 from collections import defaultdict
-from dataclasses import dataclass, field
+from abc import ABC, abstractmethod
+from dataclasses import dataclass, field, replace
 from enum import StrEnum
 from importlib.resources import files
 from pathlib import Path
 from typing import Self, List
+
+from typing_extensions import Dict
 
 from krrood.ormatic.utils import classproperty
 from semantic_digital_twin.adapters.sensors.lidar import Lidar, LidarSource
@@ -38,6 +41,7 @@ from semantic_digital_twin.robots.robot_part_mixins import (
 )
 from semantic_digital_twin.robots.robot_parts import (
     AbstractRobot,
+    AbstractRobotPart,
     Arm,
     Camera,
     Finger,
@@ -46,11 +50,20 @@ from semantic_digital_twin.robots.robot_parts import (
     MobileBase,
     EndEffector,
 )
-from semantic_digital_twin.spatial_types import Vector3
+from semantic_digital_twin.spatial_types import Quaternion, Vector3
+from semantic_digital_twin.world_description.connection_properties import (
+    DriveServos,
+    JointDynamics,
+    JointServo,
+    ServoGains,
+    VelocityServoGains,
+)
 from semantic_digital_twin.world_description.connections import (
+    ActiveConnection1DOF,
     OmniDrive,
 )
 from semantic_digital_twin.world_description.world_entity import (
+    Body,
     KinematicStructureEntity,
 )
 
@@ -91,6 +104,137 @@ class HSRBJoint(StrEnum):
     HAND_MOTOR = "hand_motor_joint"
     HAND_LEFT_PROXIMAL = "hand_l_proximal_joint"
     HAND_RIGHT_PROXIMAL = "hand_r_proximal_joint"
+
+
+class HSRBSpringJoint(StrEnum):
+    """
+    Names of the HSRB's passive finger joints, as spelled in its URDF: springs that let
+    a fingertip give way against what it grips, which no controller commands.
+    """
+
+    HAND_LEFT_SPRING_PROXIMAL = "hand_l_spring_proximal_joint"
+    HAND_RIGHT_SPRING_PROXIMAL = "hand_r_spring_proximal_joint"
+
+
+OPEN_HAND_ANGLE = 1.2
+"""
+How far the hand motor turns to open the HSRB's hand, in radians: near the end of its
+range, where the fingertips stand 13.5 cm apart, wide enough to close around a carton.
+"""
+
+# %% what drives the joints in a physical simulation
+
+
+@dataclass(frozen=True)
+class HSRBJointDrive:
+    """
+    What drives one degree of freedom of the HSRB in a physical simulation.
+
+    The HSRB's description carries effort limits but no servo gains, and no tuned MuJoCo
+    model of it exists to take gains from, so the gains are chosen to hold and track
+    poses under the tests in ``test_hsr_mujoco.py``.
+    """
+
+    torque_limit: float
+    """
+    The largest torque, or force for a prismatic joint, the servo may exert: the effort
+    limit of the HSRB's description.
+    """
+
+    stiffness: float
+    """
+    How hard the servo pulls towards its commanded position.
+    """
+
+    damping: float
+    """
+    How hard the servo resists the joint's velocity.
+    """
+
+    armature: float
+    """
+    The rotor inertia reflected through the joint's transmission.
+    """
+
+    def servo_for(self, connection: ActiveConnection1DOF) -> JointServo:
+        """
+        :param connection: A joint this drive moves.
+        :return: The servo driving ``connection``, keeping the passive damping and
+            friction its description gives it.
+        """
+        return JointServo(
+            gains=ServoGains(
+                stiffness=self.stiffness,
+                damping=self.damping,
+                torque_limit=self.torque_limit,
+            ),
+            dynamics=JointDynamics(
+                armature=self.armature,
+                damping=connection.dynamics.damping,
+                dry_friction=connection.dynamics.dry_friction,
+            ),
+        )
+
+
+HSRB_DRIVES_BY_DEGREE_OF_FREEDOM: Dict[str, HSRBJointDrive] = {
+    HSRBJoint.ARM_LIFT: HSRBJointDrive(
+        torque_limit=300.0, stiffness=10_000.0, damping=1_000.0, armature=1.0
+    ),
+    HSRBJoint.ARM_FLEX: HSRBJointDrive(
+        torque_limit=100.0, stiffness=2_000.0, damping=200.0, armature=0.1
+    ),
+    HSRBJoint.ARM_ROLL: HSRBJointDrive(
+        torque_limit=100.0, stiffness=500.0, damping=50.0, armature=0.1
+    ),
+    HSRBJoint.WRIST_FLEX: HSRBJointDrive(
+        torque_limit=100.0, stiffness=500.0, damping=50.0, armature=0.1
+    ),
+    HSRBJoint.WRIST_ROLL: HSRBJointDrive(
+        torque_limit=100.0, stiffness=500.0, damping=50.0, armature=0.1
+    ),
+    HSRBJoint.HEAD_PAN: HSRBJointDrive(
+        torque_limit=100.0, stiffness=300.0, damping=30.0, armature=0.1
+    ),
+    HSRBJoint.HEAD_TILT: HSRBJointDrive(
+        torque_limit=100.0, stiffness=300.0, damping=30.0, armature=0.1
+    ),
+    HSRBJoint.HAND_MOTOR: HSRBJointDrive(
+        torque_limit=100.0, stiffness=50.0, damping=5.0, armature=0.05
+    ),
+    HSRBSpringJoint.HAND_LEFT_SPRING_PROXIMAL: HSRBJointDrive(
+        torque_limit=10.0, stiffness=10.0, damping=1.0, armature=0.01
+    ),
+    HSRBSpringJoint.HAND_RIGHT_SPRING_PROXIMAL: HSRBJointDrive(
+        torque_limit=10.0, stiffness=10.0, damping=1.0, armature=0.01
+    ),
+}
+"""
+What drives each degree of freedom of the HSRB, by the degree of freedom's name.
+
+A joint that mimics another moves on the other's degree of freedom, and so with its
+drive.
+"""
+
+
+@dataclass(eq=False)
+class ServoedHSRBPart(AbstractRobotPart, ABC):
+    """
+    A part of the HSRB whose joints are driven by servos in a physical simulation, and
+    which carries its own weight there.
+    """
+
+    @property
+    @abstractmethod
+    def servoed_connections(self) -> List[ActiveConnection1DOF]:
+        """
+        The joints of this part that are driven in a physical simulation.
+        """
+
+    def _setup_servos(self) -> None:
+        for connection in self.servoed_connections:
+            drive = HSRB_DRIVES_BY_DEGREE_OF_FREEDOM[connection.raw_dof.name.name]
+            self._declare_servo(connection, drive.servo_for(connection))
+        self._compensate_gravity()
 
 
 @dataclass(eq=False)
@@ -140,7 +284,17 @@ class HSRBRightFinger(Finger):
 
 
 @dataclass(eq=False)
-class HSRBGripper(EndEffector, HasTwoFingers[HSRBLeftFinger, HSRBRightFinger]):
+class HSRBGripper(
+    ServoedHSRBPart, EndEffector, HasTwoFingers[HSRBLeftFinger, HSRBRightFinger]
+):
+
+    @property
+    def servoed_connections(self) -> List[ActiveConnection1DOF]:
+        return [
+            connection
+            for connection in self.active_connections
+            if isinstance(connection, ActiveConnection1DOF)
+        ]
 
     def setup_hardware_interfaces(self):
         return
@@ -155,7 +309,7 @@ class HSRBGripper(EndEffector, HasTwoFingers[HSRBLeftFinger, HSRBRightFinger]):
 
         gripper_open = JointState.from_mapping(
             name=PrefixedName("gripper_open", prefix=self.name.name),
-            mapping=dict(zip(gripper_joints, [0.3, 0.3, 0.3])),
+            mapping=dict(zip(gripper_joints, [OPEN_HAND_ANGLE] * len(gripper_joints))),
             state_type=GripperState.OPEN,
         )
 
@@ -217,18 +371,27 @@ class HSRBHandCamera(Camera):
 
 
 @dataclass(eq=False)
-class HSRBArm(Arm[HSRBGripper], HasSensors[HSRBHandCamera]):
+class HSRBArm(ServoedHSRBPart, Arm[HSRBGripper], HasSensors[HSRBHandCamera]):
+
+    @property
+    def servoed_connections(self) -> List[ActiveConnection1DOF]:
+        """
+        The joints the arm's controller commands, including the lift that carries the
+        arm along the torso.
+        """
+        return [
+            self._world.get_connection_by_name(joint_name)
+            for joint_name in (
+                HSRBJoint.ARM_FLEX,
+                HSRBJoint.ARM_LIFT,
+                HSRBJoint.ARM_ROLL,
+                HSRBJoint.WRIST_FLEX,
+                HSRBJoint.WRIST_ROLL,
+            )
+        ]
 
     def setup_hardware_interfaces(self):
-        controlled_joints = [
-            HSRBJoint.ARM_FLEX,
-            HSRBJoint.ARM_LIFT,
-            HSRBJoint.ARM_ROLL,
-            HSRBJoint.WRIST_FLEX,
-            HSRBJoint.WRIST_ROLL,
-        ]
-        for joint_name in controlled_joints:
-            connection = self._world.get_connection_by_name(joint_name)
+        for connection in self.servoed_connections:
             connection.has_hardware_interface = True
 
     def setup_joint_states(self) -> List[JointState]:
@@ -371,6 +534,7 @@ class HSRBHeadRGBDCamera(Camera):
 
 @dataclass(eq=False)
 class HSRBNeck(
+    ServoedHSRBPart,
     Neck[
         HSRBHeadCenterCamera,
         HSRBHeadLeftCamera,
@@ -379,10 +543,15 @@ class HSRBNeck(
     ],
 ):
 
+    @property
+    def servoed_connections(self) -> List[ActiveConnection1DOF]:
+        return [
+            self._world.get_connection_by_name(joint_name)
+            for joint_name in (HSRBJoint.HEAD_PAN, HSRBJoint.HEAD_TILT)
+        ]
+
     def setup_hardware_interfaces(self):
-        controlled_joints = [HSRBJoint.HEAD_PAN, HSRBJoint.HEAD_TILT]
-        for joint_name in controlled_joints:
-            connection = self._world.get_connection_by_name(joint_name)
+        for connection in self.servoed_connections:
             connection.has_hardware_interface = True
 
     def setup_joint_states(self) -> List[JointState]:
@@ -403,7 +572,18 @@ class HSRBNeck(
 
 
 @dataclass(eq=False)
-class HSRBTorso(Torso, HasOneArm[HSRBArm], HasNeck[HSRBNeck]):
+class HSRBTorso(ServoedHSRBPart, Torso, HasOneArm[HSRBArm], HasNeck[HSRBNeck]):
+
+    @property
+    def servoed_connections(self) -> List[ActiveConnection1DOF]:
+        """
+        The torso lift, which rises with the arm lift it mimics.
+        """
+        return [
+            connection
+            for connection in self.active_connections
+            if isinstance(connection, ActiveConnection1DOF)
+        ]
 
     def setup_hardware_interfaces(self):
         return
@@ -484,6 +664,61 @@ class HSRBMobileBase(
         return Vector3.X()
 
     full_body_controlled: bool = field(default=True, kw_only=True)
+
+    @classproperty
+    def passive_joint_armature(cls) -> float:
+        """
+        The rotor inertia given to the base's passive joints in a physical simulation.
+
+        The wheels are light and damped, and MuJoCo's RK4 integration of them diverges
+        within milliseconds when they have none; this much keeps them stable.
+        """
+        return 0.01
+
+    @property
+    def drive_servos(self) -> DriveServos:
+        """
+        Servos tuned for the base, which carries the whole robot, to follow its
+        commanded velocity; they are not taken from the real robot.
+        """
+        return DriveServos(
+            translation_gains=VelocityServoGains(
+                damping=20_000.0, torque_limit=3_000.0
+            ),
+            rotation_gains=VelocityServoGains(damping=1_000.0, torque_limit=1_000.0),
+        )
+
+    @property
+    def passive_connections(self) -> List[ActiveConnection1DOF]:
+        """
+        The joint the base rolls on and every wheel and caster joint below it.
+
+        No
+        controller drives them: the base is moved as a whole by its drive.
+        """
+        roll_link = self._world.get_body_in_branch_by_name(self.root, "base_roll_link")
+        return [
+            entity.parent_connection
+            for entity in self._world.get_kinematic_structure_entities_of_branch(
+                roll_link
+            )
+            if isinstance(entity.parent_connection, ActiveConnection1DOF)
+        ]
+
+    @property
+    def rolling_bodies(self) -> list[Body]:
+        return [
+            connection.child
+            for connection in self.passive_connections
+            if isinstance(connection.child, Body)
+        ]
+
+    def _setup_servos(self) -> None:
+        super()._setup_servos()
+        for connection in self.passive_connections:
+            connection.dynamics = replace(
+                connection.dynamics, armature=self.passive_joint_armature
+            )
 
     def setup_hardware_interfaces(self):
         pass
