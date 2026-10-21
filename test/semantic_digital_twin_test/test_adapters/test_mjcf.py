@@ -1,4 +1,5 @@
 import os.path
+import shutil
 
 import numpy
 import pytest
@@ -400,3 +401,23 @@ def test_a_body_without_an_inertial_weighs_what_its_geoms_weigh():
     density, edge_length = 100.0, 0.1
     assert box.inertial.mass == pytest.approx(density * edge_length**3)
     assert box.inertial.center_of_mass.to_np()[:3] == pytest.approx([0.02, 0.0, 0.0])
+
+
+# %% descriptions in ROS packages
+
+
+def test_a_scene_named_by_a_package_uri_is_read_from_that_package(
+    tmp_path, monkeypatch
+):
+    scene_file_name = "frame_wrapped_scene.xml"
+    package_directory = tmp_path / "scene_package"
+    package_directory.mkdir()
+    shutil.copy(os.path.join(DATASET_DIR, scene_file_name), package_directory)
+    monkeypatch.setenv("ROS_PACKAGE_PATH", str(package_directory))
+
+    from_package = MJCFParser(f"package://scene_package/{scene_file_name}").parse()
+
+    from_file = MJCFParser(os.path.join(DATASET_DIR, scene_file_name)).parse()
+    assert [body.name for body in from_package.kinematic_structure_entities] == [
+        body.name for body in from_file.kinematic_structure_entities
+    ]

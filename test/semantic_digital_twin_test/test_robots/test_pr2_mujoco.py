@@ -38,6 +38,11 @@ from semantic_digital_twin.spatial_types.spatial_types import (
 )
 from semantic_digital_twin.specifications.robots import RobotSpecification
 from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.connection_properties import (
+    JointDynamics,
+    JointServo,
+    ServoGains,
+)
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection1DOF,
     FixedConnection,
@@ -140,6 +145,23 @@ def test_the_drive_servos_have_the_gains_the_base_declares(pr2):
         drive_servos.translation_gains
     )
     assert gains_by_degree_of_freedom[drive.yaw] == drive_servos.rotation_gains
+
+
+def test_a_servo_that_states_no_dynamics_keeps_those_of_the_joint(pr2):
+    """
+    A description such as an MJCF states a joint's dynamics itself, and a servo that
+    states none leaves them as described.
+    """
+    connection = pr2.torso.active_connections[0]
+    described = JointDynamics(armature=0.25)
+    connection.dynamics = described
+
+    pr2.torso._declare_servo(
+        connection,
+        JointServo(gains=ServoGains(stiffness=1.0, damping=1.0, torque_limit=1.0)),
+    )
+
+    assert connection.dynamics is described
 
 
 def test_every_body_standing_on_the_base_carries_its_own_weight(pr2):
