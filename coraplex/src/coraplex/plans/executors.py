@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
+from contextlib import ExitStack
 from dataclasses import dataclass, field
 from datetime import timedelta
 
@@ -64,6 +65,7 @@ from giskardpy.middleware.ros2.giskard_client_executor import GiskardClientExecu
 from giskardpy.motion_statechart.ros_context import RosNodeAccess
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from krrood.symbolic_math.symbolic_math import logic_or
+from semantic_digital_twin.adapters.multi_sim import MujocoSynchronizer
 from semantic_digital_twin.robots.robot_part_mixins import HasTwoFingers
 from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
 
@@ -543,15 +545,20 @@ class PhysicallySimulatedPlanExecutor(SimulatedPlanExecutor):
     def _run(self) -> None:
         """
         Differs from :meth:`SimulatedPlanExecutor._run` in leaving the joints that are
-        not the robot's to the physics while the plan runs, if
-        :attr:`leaves_the_environment_to_the_physics`.
+        not the robot's to the physics of every MuJoCo model the world is synchronized
+        with while the plan runs, if :attr:`leaves_the_environment_to_the_physics`.
         """
         if not self.leaves_the_environment_to_the_physics:
             super()._run()
             return
-        with self.simulation.synchronizer.leave_to_the_physics(
-            self._joints_of_the_environment
-        ):
+        joints = self._joints_of_the_environment
+        with ExitStack() as physics:
+            for (
+                synchronizer
+            ) in MujocoSynchronizer.all_callbacks_of_this_type_from_world(
+                self.context.world
+            ):
+                physics.enter_context(synchronizer.leave_to_the_physics(joints))
             super()._run()
 
     @property

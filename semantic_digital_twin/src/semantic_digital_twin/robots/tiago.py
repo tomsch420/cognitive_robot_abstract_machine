@@ -4,7 +4,7 @@ from __future__ import annotations
 import os
 from abc import ABC, abstractmethod
 from collections import defaultdict
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from enum import StrEnum
 from importlib.resources import files
 from pathlib import Path
@@ -637,17 +637,6 @@ class ServoedByItsMujocoModel(ServoedRobotPart, ABC):
     drives of :attr:`drive_of_each_model_joint`.
     """
 
-    joint_armature: float = field(default=0.1, kw_only=True)
-    """
-    The inertia of what spins behind each servoed joint, in kilogram metres squared.
-
-    The description states none, and a joint with none is only as heavy as the links
-    beyond it, which for a wrist is almost nothing. Held by a servo this stiff, such a
-    joint oscillates apart within a second of simulated time and takes the arm with it.
-    A geared robot joint carries the inertia of its rotor, and stating it is what makes
-    the arm steady.
-    """
-
     @classproperty
     def drive_of_each_model_joint(cls) -> dict[str, JointDrive]:
         """
@@ -729,10 +718,7 @@ class ServoedByItsMujocoModel(ServoedRobotPart, ABC):
     @property
     def drive_of_each_joint(self) -> dict[str, JointDrive]:
         return {
-            connection.name.name: replace(
-                self.drive_of_each_model_joint[connection.name.name],
-                armature=self.joint_armature,
-            )
+            connection.name.name: self.drive_of_each_model_joint[connection.name.name]
             for connection in self.active_connections
             if isinstance(connection, ActiveConnection1DOF)
         }

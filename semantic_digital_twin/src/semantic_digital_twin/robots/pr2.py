@@ -12,10 +12,6 @@ from typing_extensions import Generic, Self
 
 
 from krrood.ormatic.utils import classproperty
-from semantic_digital_twin.adapters.multi_sim import (
-    ContactDimensionality,
-    MujocoGeom,
-)
 from semantic_digital_twin.adapters.sensors.lidar import Lidar, LidarSource
 from semantic_digital_twin.collision_checking.collision_matrix import (
     MaxAvoidedCollisionsOverride,
@@ -42,7 +38,6 @@ from semantic_digital_twin.robots.robot_part_mixins import (
     HasLeftRightArm,
     HasTorso,
     HasMobileBase,
-    HasTwoFingers,
     TGenericEndEffector,
     TGenericLeftFinger,
     TGenericRightFinger,
@@ -57,6 +52,7 @@ from semantic_digital_twin.robots.robot_parts import (
     RobotCamera,
     AbstractRobot,
     EndEffector,
+    HasFingerPads,
 )
 from semantic_digital_twin.spatial_types import Vector3
 from semantic_digital_twin.world_description.connection_properties import (
@@ -64,10 +60,6 @@ from semantic_digital_twin.world_description.connection_properties import (
     JointDrive,
     ServoGains,
     VelocityServoGains,
-)
-from semantic_digital_twin.world_description.contact import (
-    ContactFriction,
-    ContactParameters,
 )
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection,
@@ -281,7 +273,7 @@ class PR2LeftGripperRightFinger(Finger):
 @dataclass(eq=False)
 class PR2Gripper(
     EndEffector,
-    HasTwoFingers[TGenericLeftFinger, TGenericRightFinger],
+    HasFingerPads[TGenericLeftFinger, TGenericRightFinger],
     ServoedRobotPart,
     Generic[TGenericLeftFinger, TGenericRightFinger],
     ABC,
@@ -306,30 +298,6 @@ class PR2Gripper(
             for connection in self.active_connections
             if connection.raw_dof is thumb_degree_of_freedom
         }
-
-    @property
-    def finger_pad_contact(self) -> ContactParameters:
-        """
-        How the rubber pads of the fingertips grip: they resist the object sliding
-        between them and, over the patch they press into it with, turning about the axis
-        they pinch it along.
-        """
-        return ContactParameters(friction=ContactFriction(sliding=1.0, torsional=0.02))
-
-    def _setup_contact_surfaces(self) -> None:
-        """
-        Give the fingertips :attr:`finger_pad_contact`, in contacts that resolve its
-        torsional friction.
-        """
-        fingertips = [self.thumb.tip, self.finger.tip]
-        self.finger_pad_contact.apply_to(fingertips)
-        for fingertip in fingertips:
-            for shape in fingertip.collision:
-                shape.add_simulator_property(
-                    MujocoGeom(
-                        contact_dimensionality=ContactDimensionality.SLIDING_AND_TORSIONAL
-                    )
-                )
 
 
 @dataclass(eq=False)

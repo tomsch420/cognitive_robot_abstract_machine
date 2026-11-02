@@ -93,6 +93,7 @@ class RoboCasaKitchenApplianceCategory(StrEnum):
     COUNTER = "counter"
     SINK = "sink"
     STOVE = "stove"
+    STOVETOP = "stovetop"
     TOASTER = "toaster"
     COFFEE_MACHINE = "coffee_machine"
     FLOOR = "floor"
@@ -258,6 +259,7 @@ class RoboCasaKitchenApplianceResolver(RoboCasaCategoryResolver):
         RoboCasaKitchenApplianceCategory.COUNTER: CounterTop,
         RoboCasaKitchenApplianceCategory.SINK: Sink,
         RoboCasaKitchenApplianceCategory.STOVE: Cooktop,
+        RoboCasaKitchenApplianceCategory.STOVETOP: Cooktop,
         RoboCasaKitchenApplianceCategory.TOASTER: Toaster,
         RoboCasaKitchenApplianceCategory.COFFEE_MACHINE: CoffeeMachine,
         RoboCasaKitchenApplianceCategory.FLOOR: Floor,

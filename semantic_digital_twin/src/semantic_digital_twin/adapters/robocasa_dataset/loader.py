@@ -31,6 +31,9 @@ from semantic_digital_twin.adapters.robocasa_dataset.semantics import (
 from semantic_digital_twin.exceptions import WorldEntityNotFoundError
 from semantic_digital_twin.part_finding.relationships import PartRelationshipInspector
 from semantic_digital_twin.pipeline.pipeline import Pipeline
+from semantic_digital_twin.semantic_annotations.semantic_annotations import (
+    KnobWithHandle,
+)
 from semantic_digital_twin.semantic_annotations.mixins import (
     HasMovableJoint,
     PartWholeRelationship,
@@ -449,6 +452,7 @@ class RoboCasaDatasetLoader:
 
         document = ET.fromstring(stripped_document)
         self._bake_inertials(document, environment.sim.model)
+        self._give_every_joint_a_body_of_its_own(document)
         mirrored_joints = self._mirror_joints_opening_towards_negative(document)
         world = _parse_robosuite_mjcf(
             MJCFParser.from_xml_string(ET.tostring(document, encoding="unicode"))
@@ -646,6 +650,62 @@ class RoboCasaDatasetLoader:
                 diaginertia=cls._format_vector(model.body_inertia[index]),
             )
             body.insert(0, inertial)
+
+    @classmethod
+    def _give_every_joint_a_body_of_its_own(
+        cls, document: ET.Element, wrapper_mass: float = 1e-4
+    ) -> None:
+        """
+        Split, in place, every body of an MJCF document that moves on more than one
+        joint into a chain of bodies moving on one joint each, so that every joint
+        becomes a connection of the world; a RoboCasa faucet handle, for one, turns on
+        one joint to run the water and on another to set its temperature.
+
+        MuJoCo composes the joints of a body in the order they are listed, the first
+        nearest the parent, so each joint but the last moves a new body wrapped around
+        the rest. The innermost body keeps the original name, the geoms and the
+        children; a wrapper is named after the body and its joint, and weighs next to
+        nothing.
+
+        :param document: The task's MJCF document, changed in place.
+        :param wrapper_mass: The mass given to each new wrapping body.
+        """
+        parents = {
+            child: parent
+            for parent in document.find("worldbody").iter()
+            for child in parent
+        }
+        for body in list(document.find("worldbody").iter("body")):
+            joints = [
+                joint
+                for joint in body.findall("joint")
+                if joint.get("type", "hinge") != "free"
+            ]
+            for joint in joints[:-1]:
+                parent = parents[body]
+                wrapper = ET.Element(
+                    "body",
+                    name=f"{body.get('name')}_{joint.get('name')}_wrapper",
+                )
+                for attribute in ("pos", "quat"):
+                    if body.get(attribute) is not None:
+                        wrapper.set(attribute, body.get(attribute))
+                        del body.attrib[attribute]
+                wrapper.append(
+                    ET.Element(
+                        "inertial",
+                        pos="0 0 0",
+                        mass=cls._format_vector([wrapper_mass]),
+                        diaginertia=cls._format_vector([wrapper_mass] * 3),
+                    )
+                )
+                body.remove(joint)
+                wrapper.append(joint)
+                parent.insert(list(parent).index(body), wrapper)
+                parent.remove(body)
+                wrapper.append(body)
+                parents[wrapper] = parent
+                parents[body] = wrapper
 
     @staticmethod
     def _format_vector(vector: Any) -> str:
@@ -1006,7 +1066,11 @@ class RoboCasaDatasetLoader:
                 for part_type in part_types_with_room
             ):
                 continue
-            part = part_category.annotation_class(root=body)
+            part = None
+            if part_category is RoboCasaPartCategory.KNOB:
+                part = KnobWithHandle.split_from(body)
+            if part is None:
+                part = part_category.annotation_class(root=body)
             world.add_semantic_annotation(part)
             whole.add(part)
             return part

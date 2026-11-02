@@ -36,7 +36,6 @@ from semantic_digital_twin.robots.robot_part_mixins import (
     HasOneArm,
     HasTorso,
     HasMobileBase,
-    HasTwoFingers,
     HasSensors,
 )
 from semantic_digital_twin.robots.robot_parts import (
@@ -49,6 +48,7 @@ from semantic_digital_twin.robots.robot_parts import (
     MobileBase,
     EndEffector,
     ServoedRobotPart,
+    HasFingerPads,
 )
 from semantic_digital_twin.spatial_types import Vector3
 from semantic_digital_twin.world_description.connection_properties import (
@@ -155,14 +155,14 @@ class HSRBRightFinger(Finger):
 
 @dataclass(eq=False)
 class HSRBGripper(
-    EndEffector, HasTwoFingers[HSRBLeftFinger, HSRBRightFinger], ServoedRobotPart
+    EndEffector, HasFingerPads[HSRBLeftFinger, HSRBRightFinger], ServoedRobotPart
 ):
     @classproperty
     def squeeze(cls) -> float:
         """
-        Half the hand's widest opening of 13.7 cm, so the fingers are sent shut: the hand
-        grips with as much force as its motor builds up from how far it is sent past
-        what it holds, and its finger springs give way on top of that.
+        Half the hand's widest opening of 13.7 cm, so the fingers are sent shut: the
+        hand grips with as much force as its motor builds up from how far it is sent
+        past what it holds, and its finger springs give way on top of that.
         """
         return 0.07
 

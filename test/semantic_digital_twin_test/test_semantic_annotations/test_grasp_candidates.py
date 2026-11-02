@@ -464,13 +464,31 @@ def test_cutlery_is_grasped_from_above_across_its_length(length_axis):
     A piece of cutlery lies flat, so the fingers come down onto it and close across it,
     never along it.
     """
+    [grasp] = _spoon_lying_along(length_axis).grasp_candidates()
+    approach, closing = (
+        axes_of(grasp.grasp_pose)[:, 0],
+        axes_of(grasp.grasp_pose)[:, 1],
+    )
+    length_direction = np.eye(3)[length_axis]
+
+    np.testing.assert_allclose(approach, [0, 0, -1], atol=1e-9)
+    assert float(np.dot(closing, length_direction)) == pytest.approx(0, abs=1e-9)
+    assert closing[2] == pytest.approx(0, abs=1e-9)
+
+
+@pytest.mark.parametrize("length_axis", [0, 1], ids=["along-x", "along-y"])
+def test_drawn_cutlery_grasps_come_from_above_across_its_length(length_axis):
+    """
+    Grasps drawn from the statement come down onto the piece within its allowed tilt
+    and close across it within its allowed turn.
+    """
     spoon = _spoon_lying_along(length_axis)
     allowed = allowed_intervals(spoon.surface_grasp_statement())
     first_end = allowed["azimuth"].simple_sets[0]
     azimuth_spread = (first_end.upper - first_end.lower) / 2
     length_direction = np.eye(3)[length_axis]
 
-    grasps = spoon.grasp_candidates()
+    grasps = spoon.drawn_grasp_candidates()
 
     assert grasps
     for grasp in grasps:

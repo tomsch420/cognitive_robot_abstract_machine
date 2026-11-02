@@ -29,15 +29,14 @@ class SimulatorAdditionalProperty:
 
     def to_dict(self) -> dict[str, Any]:
         """
-        :return: The fields as a dictionary, each under the simulator's own name for it
-            if the field declares one (see :class:`SimulatorAttributeName`), else under
-            its own.
+        :return: The fields that are not ``None`` as a dictionary, each under the
+            simulator's own name for it if the field declares one (see
+            :class:`SimulatorAttributeName`), else under its own.
         """
         return {
-            self._attribute_name(declared_field.name): getattr(
-                self, declared_field.name
-            )
+            self._attribute_name(declared_field.name): value
             for declared_field in fields(self)
+            if (value := getattr(self, declared_field.name)) is not None
         }
 
     @classmethod

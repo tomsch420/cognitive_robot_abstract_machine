@@ -33,8 +33,9 @@ if TYPE_CHECKING:
 @dataclass
 class RoboCasaSimulationMirror:
     """
-    Copies the poses of the objects and the positions of the fixture joints of a world
-    into the RoboCasa simulation it was parsed from.
+    Copies the poses of the objects and of the loose parts of fixtures, and the
+    positions of the fixture joints, of a world into the RoboCasa simulation it was
+    parsed from.
     """
 
     environment: Kitchen
@@ -65,6 +66,45 @@ class RoboCasaSimulationMirror:
             and connection.name.name in joint_names
         }
 
+    @cached_property
+    def free_fixture_joints(self) -> dict[str, str]:
+        """
+        The free joints of RoboCasa's simulation that move a loose part of a fixture
+        rather than an object, such as the lid of a blender, each with the name of the
+        body it moves, for the bodies the world has.
+        """
+        model = self.environment.sim.model
+        object_bodies = {
+            robocasa_object.root_body
+            for robocasa_object in self.environment.objects.values()
+        }
+        world_bodies = {body.name.name for body in self.world.bodies}
+        joints = {}
+        for joint in range(model.njnt):
+            if model.jnt_type[joint] != 0:
+                continue
+            body_name = model.body_id2name(model.jnt_bodyid[joint])
+            if body_name in object_bodies or body_name not in world_bodies:
+                continue
+            joints[model.joint_id2name(joint)] = body_name
+        return joints
+
+    @cached_property
+    def mirrored_joint_names(self) -> set[str]:
+        """
+        The names of the fixture joints the world holds mirrored, opening towards
+        positive positions where RoboCasa's open towards negative ones: the loader
+        mirrors every joint whose range runs from a negative position up to 0.
+        """
+        model = self.environment.sim.model
+        mirrored = set()
+        for connection in self.fixture_joints:
+            name = connection.name.name
+            lower, upper = model.jnt_range[model.joint_name2id(name)]
+            if lower < upper == 0.0:
+                mirrored.add(name)
+        return mirrored
+
     def synchronize(self) -> None:
         """
         Put every object and fixture joint of RoboCasa's simulation where it is in the
@@ -82,8 +122,17 @@ class RoboCasaSimulationMirror:
                 robocasa_object.joints[0],
                 np.concatenate([world_T_object.to_np()[:3, 3], [w, x, y, z]]),
             )
+        for joint_name, body_name in self.free_fixture_joints.items():
+            world_T_body = self.world.get_body_by_name(body_name).global_pose
+            x, y, z, w = world_T_body.quaternion.to_np()
+            data.set_joint_qpos(
+                joint_name,
+                np.concatenate([world_T_body.to_np()[:3, 3], [w, x, y, z]]),
+            )
         for connection in self.fixture_joints:
-            data.set_joint_qpos(connection.name.name, connection.position)
+            name = connection.name.name
+            sign = -1.0 if name in self.mirrored_joint_names else 1.0
+            data.set_joint_qpos(name, sign * connection.position)
         self.environment.sim.forward()
         self.synchronized_state_version = self.world.state.version
 

@@ -483,8 +483,7 @@ class TiagoPickPlaceTask(TiagoRoboCasaTask):
     def pick_up_of(self, grasp: GraspCandidate) -> PickUpAction:
         """
         :param grasp: The grasp to take.
-        :return: The pick up taking it, with the hand creeping the last stretch onto it
-            and the fingers alone carrying what they close on.
+        :return: The pick up taking it, with the hand creeping the last stretch onto it.
         """
         arm = self.arm
         return PickUpAction(
@@ -500,7 +499,6 @@ class TiagoPickPlaceTask(TiagoRoboCasaTask):
             grasp_closing_velocity=self.closing_velocity,
             grasp_stall_minimum_time=self.stall_minimum_time,
             tolerate_grasp_stall=True,
-            held_by_contact_alone=True,
             position_threshold=self.arrival_tolerance,
             orientation_threshold=self.heading_tolerance,
         )
@@ -654,7 +652,9 @@ class TiagoPickPlaceTask(TiagoRoboCasaTask):
         given, so it neither turns in the hand nor rolls on once it is let go.
         """
         for shape in self.food.root.collision.shapes:
-            shape.get_simulator_property_of_type(MujocoGeom).contact_dimensionality = (
+            shape.get_simulator_property_of_type(
+                MujocoGeom
+            ).contact_dimensionality = (
                 ContactDimensionality.SLIDING_TORSIONAL_AND_ROLLING
             )
 

@@ -8,6 +8,17 @@ import math
 
 import numpy as np
 
+from typing_extensions import ClassVar, Sequence
+
+from semantic_digital_twin.world_description.connections import (
+    ActiveConnection1DOF,
+)
+from semantic_digital_twin.world_description.geometry import Shape
+from semantic_digital_twin.world_description.inertial_properties import Inertial
+from semantic_digital_twin.world_description.shape_collection import (
+    ShapeCollection,
+)
+
 from krrood.ormatic.utils import classproperty
 from krrood.symbolic_math import symbolic_math
 from random_events.interval import closed
@@ -238,6 +249,194 @@ class Knob(HasRootBody):
     A control that is turned to set a value, such as the heat of a burner or the time
     of a timer.
     """
+
+
+@dataclass(eq=False)
+class KnobWithHandle(Knob, HasHandle):
+    """
+    A knob turned by a bar on its face, such as a cooktop's: the bar is its handle, the
+    part a hand takes hold of. Fingers closing across the bar press on its flat sides,
+    so that turning the hand turns the knob; fingers closing along it slip off its ends.
+    """
+
+    minimum_bar_elongation: ClassVar[float] = 1.5
+    """
+    How many times longer than the next longest of its extents a shape of a knob is at
+    least to count as its bar.
+    """
+
+    @classmethod
+    def split_from(cls, body: Body) -> Self | None:
+        """
+        Annotate the body of a knob as a knob with a handle, splitting the shape of its
+        bar off into a body of its own, fixed to the knob, that the handle is
+        annotated on.
+
+        The bar is the collision shape of the knob that is longest for its other
+        extents; it has to be at least :attr:`minimum_bar_elongation` times longer one
+        way than the next. The new body lies where the knob's does, takes the bar's
+        collision shape alone and weighs next to nothing, as its material belongs to
+        the knob; the knob keeps how it looks.
+
+        :param body: The body of a knob, in a world.
+        :return: The knob, not yet added to the world, with its handle, which is; None
+            if no shape of the knob is a bar.
+        """
+        world = body._world
+
+        def elongation(shape: Shape) -> float:
+            extents = sorted(
+                np.ptp(np.asarray(shape.mesh.vertices, dtype=float), axis=0),
+                reverse=True,
+            )
+            return float(extents[0] / max(extents[1], 1e-9))
+
+        shapes = [shape for shape in body.collision.shapes if hasattr(shape, "mesh")]
+        if len(shapes) < 2:
+            return None
+        bar = max(shapes, key=elongation)
+        if elongation(bar) < cls.minimum_bar_elongation:
+            return None
+        # The handle's body lies where the knob's does, so the bar keeps its pose
+        # relative to the body that holds it.
+        body.collision.shapes.remove(bar)
+        bar.origin = HomogeneousTransformationMatrix(bar.origin.to_np())
+        handle_body = Body(
+            name=PrefixedName(f"{body.name.name}_handle", body.name.prefix),
+            collision=ShapeCollection([bar]),
+            inertial=Inertial.negligible(),
+        )
+        with world.modify_world():
+            world.add_kinematic_structure_entity(handle_body)
+            world.add_connection(FixedConnection(parent=body, child=handle_body))
+            handle = Handle(root=handle_body)
+            world.add_semantic_annotation(handle)
+        return cls(root=body, handle=handle)
+
+    @property
+    def turning_joint(self) -> ActiveConnection1DOF:
+        """
+        The joint the knob turns on.
+        """
+        return self.root.get_first_parent_connection_of_type(ActiveConnection1DOF)
+
+    @property
+    def turning_axis(self) -> np.ndarray:
+        """
+        The axis the knob turns about, in the world's root frame, the way a turn
+        towards greater positions of :attr:`turning_joint` goes.
+        """
+        joint = self.turning_joint
+        start = joint.position
+        limits = joint.dof.limits
+        # turned away from the nearer limit, so that the turn is not clipped there
+        step = (
+            1e-3
+            if start - limits.lower.position < limits.upper.position - start
+            else -1e-3
+        )
+        before = self.root.global_pose.to_np()[:3, :3]
+        joint.position = start + step
+        after = self.root.global_pose.to_np()[:3, :3]
+        joint.position = start
+        turn = after @ before.T if step > 0 else before @ after.T
+        axis = np.array(
+            [turn[2, 1] - turn[1, 2], turn[0, 2] - turn[2, 0], turn[1, 0] - turn[0, 1]]
+        )
+        return axis / np.linalg.norm(axis)
+
+    def turning_grasp_candidates(
+        self,
+        direction: np.ndarray | None = None,
+        tilts: Sequence[float] = (0.0, math.pi / 6, math.pi / 4, math.pi / 3),
+        depth: float = 0.25,
+    ) -> list[GraspCandidate]:
+        """
+        Grasps on the handle that turn the knob: the fingers close across the bar,
+        coming in along the knob's axis onto its face, or tilted from it about the
+        direction they close in or about the bar, both of which keep them across it.
+        Coming in along the axis, turning the wrist turns the knob.
+
+        :param direction: The horizontal direction the hand comes from, if it matters.
+        :param tilts: By how much the approach is tilted from the knob's axis, in
+            radians.
+        :param depth: How far below the middle of the bar towards the face it stands
+            on the grasp lies, as a share of the bar's height, so that the fingertips
+            cover the bar down to the face.
+        :return: The grasps, the least tilted first and of those the ones coming in
+            most along ``direction``.
+        """
+        world = self._world
+        axis = self.turning_axis
+
+        def points_of(body: Body) -> np.ndarray:
+            points = []
+            for shape in body.collision.shapes:
+                vertices = np.asarray(shape.mesh.vertices, dtype=float)
+                world_T_shape = (
+                    world.compute_forward_kinematics_np(
+                        world.root, shape.origin.reference_frame
+                    )
+                    @ shape.origin.to_np()
+                )
+                points.append(vertices @ world_T_shape[:3, :3].T + world_T_shape[:3, 3])
+            return np.concatenate(points)
+
+        bar = points_of(self.handle.root)
+        bar_center = bar.mean(axis=0)
+        across_the_axis = bar - bar_center
+        across_the_axis -= np.outer(across_the_axis @ axis, axis)
+        _, _, rows = np.linalg.svd(across_the_axis)
+        along_the_bar = rows[0] - (rows[0] @ axis) * axis
+        along_the_bar /= np.linalg.norm(along_the_bar)
+        closing = np.cross(axis, along_the_bar)
+        face = points_of(self.root).mean(axis=0)
+        onto_the_face = axis if (face - bar_center) @ axis > 0 else -axis
+        center = bar_center + depth * float(np.ptp(bar @ axis)) * onto_the_face
+        horizontal = (
+            np.zeros(3) if direction is None else np.asarray(direction, dtype=float)
+        )
+        scored = []
+        for tilt in tilts:
+            for sign in (1.0,) if tilt == 0.0 else (1.0, -1.0):
+                tilted = [
+                    (
+                        math.cos(tilt) * onto_the_face
+                        + sign * math.sin(tilt) * along_the_bar,
+                        closing,
+                    )
+                ]
+                if tilt != 0.0:
+                    tilted.append(
+                        (
+                            math.cos(tilt) * onto_the_face
+                            + sign * math.sin(tilt) * closing,
+                            math.cos(tilt) * closing
+                            - sign * math.sin(tilt) * onto_the_face,
+                        )
+                    )
+                for approach, fingers in tilted:
+                    world_T_grasp = np.eye(4)
+                    world_T_grasp[:3, 0] = approach / np.linalg.norm(approach)
+                    world_T_grasp[:3, 1] = fingers / np.linalg.norm(fingers)
+                    world_T_grasp[:3, 2] = np.cross(
+                        world_T_grasp[:3, 0], world_T_grasp[:3, 1]
+                    )
+                    world_T_grasp[:3, 3] = center
+                    grasp_pose = world.transform(
+                        HomogeneousTransformationMatrix(
+                            world_T_grasp, reference_frame=world.root
+                        ).pose,
+                        self.handle.root,
+                    )
+                    scored.append(
+                        (
+                            (tilt, -float(approach[:2] @ horizontal[:2])),
+                            GraspCandidate(self.handle, grasp_pose),
+                        )
+                    )
+        scored.sort(key=lambda entry: entry[0])
+        return [grasp for _, grasp in scored]
 
 
 @dataclass(eq=False)
@@ -1504,9 +1703,29 @@ class Cutlery(HasHandle, Tableware):
 
     def default_grasp_candidates(self) -> list[GraspCandidate]:
         """
-        :return: Grasps drawn uniformly from :meth:`surface_grasp_statement`.
+        :return: The grasp from above that closes across the piece, which lies flat.
+        :raises NoGraspGeometry: If the root body has no collision geometry to tell
+            which way the piece lies.
         """
-        return self.drawn_grasp_candidates()
+        if not self.root.has_collision():
+            raise NoGraspGeometry(self)
+        bounding_box = self.root.collision.as_bounding_box_collection_in_frame(
+            self.root
+        ).bounding_box()
+        along_x = bounding_box.x_interval.upper - bounding_box.x_interval.lower
+        along_y = bounding_box.y_interval.upper - bounding_box.y_interval.lower
+        finger_axis = Vector3.NEGATIVE_Y() if along_x >= along_y else Vector3.X()
+        return [
+            GraspCandidate(
+                self,
+                Pose(
+                    orientation=RotationMatrix.from_vectors(
+                        x=Vector3.NEGATIVE_Z(), y=finger_axis
+                    ).quaternion,
+                    reference_frame=self.root,
+                ),
+            )
+        ]
 
     def surface_grasp_statement(
         self,

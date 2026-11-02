@@ -37,6 +37,7 @@ from semantic_digital_twin.datastructures.camera_model import (
     CameraRange,
 )
 from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
+from semantic_digital_twin.adapters.multi_sim import ContactDimensionality, MujocoGeom
 from semantic_digital_twin.adapters.package_resolver import CompositePathResolver
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.definitions import (
@@ -80,8 +81,11 @@ from semantic_digital_twin.robots.robot_part_mixins import (
     HasMobileBase,
     HasSensors,
     RobotPartMixin,
+    HasTwoFingers,
     TGenericEndEffector,
     TGenericInputSource,
+    TGenericLeftFinger,
+    TGenericRightFinger,
     TGenericSensors,
 )
 from semantic_digital_twin.semantic_annotations.mixins import (
@@ -111,6 +115,10 @@ from semantic_digital_twin.world_description.degree_of_freedom import (
 from semantic_digital_twin.world_description.geometry import (
     Scale,
     VolumetricBoundingBox,
+)
+from semantic_digital_twin.world_description.contact import (
+    ContactFriction,
+    ContactParameters,
 )
 from semantic_digital_twin.world_description.connection_properties import (
     DriveServos,
@@ -954,6 +962,45 @@ class EndEffector(AbstractRobotPart, ABC):
             and isinstance(entity, Body)
             and entity.has_collision()
         ]
+
+
+@dataclass(eq=False)
+class HasFingerPads(
+    AbstractRobotPart,
+    HasTwoFingers[TGenericLeftFinger, TGenericRightFinger],
+    Generic[TGenericLeftFinger, TGenericRightFinger],
+    ABC,
+):
+    """
+    A gripper whose two fingertips carry rubber pads.
+
+    Pinched between two fingertips alone, an object turns freely about the axis it is
+    pinched along unless the pads resist it, and an object held off its centre of mass
+    swings out of the grip as soon as it leaves its support.
+    """
+
+    @property
+    def finger_pad_contact(self) -> ContactParameters:
+        """
+        How the pads grip: they resist the object sliding between them and, over the
+        patch they press into it with, turning about the axis they pinch it along.
+        """
+        return ContactParameters(friction=ContactFriction(sliding=1.0, torsional=0.02))
+
+    def _setup_contact_surfaces(self) -> None:
+        """
+        Give the fingertips :attr:`finger_pad_contact`, in contacts that resolve its
+        torsional friction.
+        """
+        fingertips = [self.thumb.tip, self.finger.tip]
+        self.finger_pad_contact.apply_to(fingertips)
+        for fingertip in fingertips:
+            for shape in fingertip.collision:
+                shape.add_simulator_property(
+                    MujocoGeom(
+                        contact_dimensionality=ContactDimensionality.SLIDING_AND_TORSIONAL
+                    )
+                )
 
 
 @dataclass(eq=False)

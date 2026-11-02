@@ -19,7 +19,6 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianPositionVelocityLimit,
     CartesianRotationVelocityLimit,
 )
-from giskardpy.motion_statechart.weights import DefaultWeights
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.robots.robot_parts import Arm, EndEffector
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
@@ -267,9 +266,6 @@ class MovesToolCenterPoint(Action, ABC):
             goal_pose=target,
             translation_threshold=self.position_threshold,
             orientation_threshold=self.orientation_threshold,
-            # Below collision avoidance whether straight or not, so a straight line is
-            # given up where the arm would otherwise drive through what is in its way.
-            weight=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE,
         )
 
     @staticmethod

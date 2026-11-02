@@ -1418,12 +1418,13 @@ class MujocoGeom(UniqueSimulatorProperty):
     ``conaffinity``. Clearing it makes nothing collide with the geom.
     """
 
-    contact_dimensionality: ContactDimensionality = field(
-        default=ContactDimensionality.SLIDING,
+    contact_dimensionality: ContactDimensionality | None = field(
+        default=None,
         metadata=SimulatorAttributeName("condim").as_dict(),
     )
     """
-    Which friction the geom's contacts resolve.
+    Which friction the geom's contacts resolve; ``None`` keeps MuJoCo's default,
+    :attr:`ContactDimensionality.SLIDING`.
     """
 
 
