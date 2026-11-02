@@ -1,23 +1,17 @@
 """
 A PR2 performs RoboCasa's microwave button tasks (``kitchen_microwave.py``): it presses
 the microwave's start or stop button with its fingertips.
-
-Run one with::
-
-    python -m experiments.robocasa_atomic_tasks.microwave TurnOnMicrowave
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 
-from typing_extensions import ClassVar
+from experiments.robocasa_atomic_tasks.episode import RoboCasaEpisode
+from experiments.robocasa_atomic_tasks.robocasa_names import MicrowaveButton
+from experiments.robocasa_atomic_tasks.tasks import PressTask
 
-from experiments.robocasa_atomic_tasks.episode import (
-    PressTask,
-    RoboCasaEpisode,
-    main,
-)
+# %% the microwave's buttons
 
 
 @dataclass
@@ -26,9 +20,9 @@ class TurnOnMicrowave(PressTask):
     Press the microwave's start button.
     """
 
-    button: ClassVar[str] = "start_button"
+    button: MicrowaveButton = MicrowaveButton.START
     """
-    The button pressed, as RoboCasa ends the name of its geom.
+    The button pressed.
     """
 
     def button_geom(self, episode: RoboCasaEpisode) -> str:
@@ -41,13 +35,4 @@ class TurnOffMicrowave(TurnOnMicrowave):
     Press the running microwave's stop button.
     """
 
-    button: ClassVar[str] = "stop_button"
-
-
-TASKS = [TurnOnMicrowave, TurnOffMicrowave]
-"""
-Every task of this module.
-"""
-
-if __name__ == "__main__":
-    main(__spec__.name)
+    button: MicrowaveButton = MicrowaveButton.STOP

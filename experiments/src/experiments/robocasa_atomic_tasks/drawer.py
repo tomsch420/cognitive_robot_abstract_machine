@@ -1,23 +1,20 @@
 """
 A PR2 performs RoboCasa's drawer tasks (``kitchen_drawer.py``): it pulls drawers and
 racks out, or pushes them in, by their handles or front edges.
-
-Run one with::
-
-    python -m experiments.robocasa_atomic_tasks.drawer OpenDrawer
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 
-from typing_extensions import List
-
-from experiments.robocasa_atomic_tasks.episode import (
-    DoorShareTask,
-    RoboCasaEpisode,
-    main,
+from experiments.robocasa_atomic_tasks.episode import RoboCasaEpisode
+from experiments.robocasa_atomic_tasks.robocasa_names import (
+    FixtureJointRole,
+    FridgeCompartment,
 )
+from experiments.robocasa_atomic_tasks.tasks import DoorShareTask
+
+# %% drawers
 
 
 @dataclass
@@ -26,41 +23,17 @@ class OpenDrawer(DoorShareTask):
     Pull the drawer RoboCasa picked fully open.
     """
 
-    share = 1.0
-
-    def joint_names(self, episode: RoboCasaEpisode) -> List[str]:
+    def joint_names(self, episode: RoboCasaEpisode) -> list[str]:
         return list(episode.environment.drawer.door_joint_names)
 
 
 @dataclass
-class CloseDrawer(DoorShareTask):
+class CloseDrawer(OpenDrawer):
     """
     Push the open drawer RoboCasa picked shut.
     """
 
-    share = 0.0
-
-    def joint_names(self, episode: RoboCasaEpisode) -> List[str]:
-        return list(episode.environment.drawer.door_joint_names)
-
-
-@dataclass
-class SlideDishwasherRack(DoorShareTask):
-    """
-    Pull the dishwasher's rack fully out, or push it fully in, as RoboCasa asks.
-    """
-
-    share = 1.0
-
-    def joint_names(self, episode: RoboCasaEpisode) -> List[str]:
-        return [episode.environment.dishwasher._joint_names["rack"]]
-
-    def joint_goals(self, episode: RoboCasaEpisode):
-        share = 1.0 if episode.environment.should_pull else 0.0
-        return [
-            (name, episode.world_position_at_share(name, share))
-            for name in self.joint_names(episode)
-        ]
+    share: float = 0.0
 
 
 @dataclass
@@ -69,38 +42,32 @@ class OpenFridgeDrawer(DoorShareTask):
     Pull the fridge's drawer RoboCasa checks fully open.
     """
 
-    share = 1.0
-
-    def joint_names(self, episode: RoboCasaEpisode) -> List[str]:
+    def joint_names(self, episode: RoboCasaEpisode) -> list[str]:
         return episode.environment.fridge._get_drawer_joints(
-            compartment="fridge", drawer_rack_index=-1
+            compartment=FridgeCompartment.FRIDGE, drawer_rack_index=-1
         )
 
 
 @dataclass
-class CloseFridgeDrawer(DoorShareTask):
+class CloseFridgeDrawer(OpenFridgeDrawer):
     """
     Push the fridge's open drawer shut.
     """
 
-    share = 0.0
-
-    def joint_names(self, episode: RoboCasaEpisode) -> List[str]:
-        return episode.environment.fridge._get_drawer_joints(
-            compartment="fridge", drawer_rack_index=-1
-        )
+    share: float = 0.0
 
 
-TASKS = [
-    OpenDrawer,
-    CloseDrawer,
-    SlideDishwasherRack,
-    OpenFridgeDrawer,
-    CloseFridgeDrawer,
-]
-"""
-Every task of this module.
-"""
+# %% racks
 
-if __name__ == "__main__":
-    main(__spec__.name)
+
+@dataclass
+class SlideDishwasherRack(DoorShareTask):
+    """
+    Pull the dishwasher's rack fully out, or push it fully in, as RoboCasa asks.
+    """
+
+    def joint_names(self, episode: RoboCasaEpisode) -> list[str]:
+        return [episode.environment.dishwasher._joint_names[FixtureJointRole.RACK]]
+
+    def target_share(self, episode: RoboCasaEpisode) -> float:
+        return 1.0 if episode.environment.should_pull else 0.0

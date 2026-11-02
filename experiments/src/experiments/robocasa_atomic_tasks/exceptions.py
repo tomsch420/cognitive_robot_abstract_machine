@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from coraplex.plans.failures import PlanFailure
-from giskardpy.qp.exceptions import InfeasibleException
 from krrood.exceptions import DataclassException
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -49,28 +47,53 @@ class ObjectNotPickedUp(DataclassException):
         return "Try other grasps, or a firmer grip."
 
 
-# %% moving
+# %% fixtures
 
 
 @dataclass
-class MotionWasInfeasible(PlanFailure):
+class NoRackAtLevel(DataclassException):
     """
-    Raised when the motion controller found no motion that satisfies every constraint at
-    once, such as when the robot starts a motion closer to something than collision
-    avoidance allows.
-
-    Like coraplex's :class:`~coraplex.plans.failures.MotionMadeNoProgress`, this says
-    that the attempt did not work from where it started rather than that the plan
-    cannot go on, so that another candidate is tried.
+    Raised when an oven has neither a rack nor a tray at the level asked for, nor at the
+    bottom.
     """
 
-    infeasibility: InfeasibleException
+    fixture_name: str
     """
-    The infeasibility the solver reported.
+    The name RoboCasa gives the oven.
+    """
+
+    level: int
+    """
+    The level asked for, 0 at the bottom.
     """
 
     def error_message(self) -> str:
-        return self.infeasibility.error_message()
+        return f"{self.fixture_name} has no rack or tray at level {self.level}."
 
     def suggest_correction(self) -> str:
-        return "Start the motion clear of the kitchen, or try another candidate."
+        return "Ask for a level the oven has a rack or a tray at."
+
+
+# %% driving
+
+
+@dataclass
+class NoPathThroughTheKitchen(DataclassException):
+    """
+    Raised when the free space of the kitchen's floor connects no spot near where the
+    robot stands with one near where it is to stand, however little clearance it keeps.
+    """
+
+    smallest_clearance: float
+    """
+    The least clearance from the kitchen, in metres, a path was searched for with.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"No path through the kitchen's free space keeps "
+            f"{self.smallest_clearance:.2f} m clear of the kitchen."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Compose another episode, or let the robot keep less clearance."

@@ -31,27 +31,36 @@ tasks run in layout 2: layout 1 has no oven, and its range has its knobs on a pa
 the back, beyond the reach of a PR2 standing clear of it; layout 2's cooktop has them
 along its front edge.
 
-`episode.py` holds what every task shares, and `skills.py` the actions coraplex does
-not ship: moving a fixture's joint by a part hanging from it, pressing and pushing with
-the fingertips, and standing somewhere picked from a list of candidates.
+The modules every task builds on:
+
+| Module | What it holds |
+|---|---|
+| `tasks.py` | `RoboCasaAtomicTask` and the kinds of tasks: moving joints, pushing, pressing, pick and place |
+| `episode.py` | `RoboCasaEpisode`: composing the kitchen, running plans, and what the PR2 does in it |
+| `skills.py` | the actions coraplex does not ship: moving a fixture's joint by a part hanging from it, pressing and pushing with the fingertips, standing somewhere picked from a list of candidates |
+| `joints.py`, `fixtures.py`, `geometry.py`, `grasps.py`, `stands.py`, `placement.py`, `free_space.py` | RoboCasa's joints, the fixtures' bodies, frames and boxes, grasps, stands, placement spots and paths through free space |
+| `judge.py` | RoboCasa's own success check |
+| `recording.py` | the video seen from the PR2's head camera |
+| `catalogue.py`, `command_line.py`, `robocasa_names.py` | every task by name, the scripts' options and files, and RoboCasa's names |
 
 ## Running
 
-One task:
+One task, from `experiments/scripts/robocasa_atomic_tasks/`; it exits with 0 if RoboCasa
+finds the task accomplished, 2 if not:
 
 ```bash
-python -m experiments.robocasa_atomic_tasks.drawer OpenDrawer
-python -m experiments.robocasa_atomic_tasks.pick_place PickPlaceCounterToSink --seed 3
-python -m experiments.robocasa_atomic_tasks.stove TurnOnStove --layout LAYOUT002
+python experiments/scripts/robocasa_atomic_tasks/run_task.py OpenDrawer
+python experiments/scripts/robocasa_atomic_tasks/run_task.py PickPlaceCounterToSink --seed 3
+python experiments/scripts/robocasa_atomic_tasks/run_task.py TurnOnStove --layout LAYOUT002
+python experiments/scripts/robocasa_atomic_tasks/run_task.py OpenDrawer --physics --video open_drawer.mp4
 ```
 
 Every task, each in a process of its own, with a table of which succeeded, and with
 `--videos` a video of each seen from the PR2's head camera:
 
 ```bash
-python -m experiments.robocasa_atomic_tasks --workers 8 --results ~/atomic_tasks
-python -m experiments.robocasa_atomic_tasks --workers 8 --videos --results ~/atomic_tasks
-python -m experiments.robocasa_atomic_tasks.drawer OpenDrawer --video open_drawer.mp4
+python experiments/scripts/robocasa_atomic_tasks/run_all_tasks.py --workers 8 --results ~/atomic_tasks
+python experiments/scripts/robocasa_atomic_tasks/run_all_tasks.py --workers 8 --videos --results ~/atomic_tasks
 ```
 
 A video is recorded without MuJoCo while the task runs (`recording.py`): the poses of
@@ -116,10 +125,10 @@ and the forearm by the counter it reaches across.
 
 ## Running into trouble
 
-coraplex discards a failed candidate without saying why. To see why every stand and
-grasp failed, run a task through a wrapper that logs the `PlanFailure` of each trial and
-the robot's links inside their collision buffer at that moment (see
-`ActionTrial.succeeds`).
+coraplex logs why each candidate failed its trial at the INFO level of
+`coraplex.plans.underspecified`. A plan that fails when performed is tried again, see
+`RoboCasaEpisode.perform` and `RoboCasaEpisode.perform_reaching`, each failure logged as
+a warning.
 
 ## Where it stands
 

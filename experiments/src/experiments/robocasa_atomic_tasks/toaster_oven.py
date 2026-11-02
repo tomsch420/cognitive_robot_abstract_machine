@@ -1,10 +1,6 @@
 """
 A PR2 performs RoboCasa's toaster oven tasks (``kitchen_toaster_oven.py``): it turns the
 toaster oven's knobs and slides its rack or tray.
-
-Run one with::
-
-    python -m experiments.robocasa_atomic_tasks.toaster_oven TurnOnToasterOven
 """
 
 from __future__ import annotations
@@ -12,15 +8,16 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import numpy as np
-from typing_extensions import ClassVar, List
 
-from experiments.robocasa_atomic_tasks.episode import (
+from experiments.robocasa_atomic_tasks.episode import RoboCasaEpisode
+from experiments.robocasa_atomic_tasks.robocasa_names import FixtureJointRole
+from experiments.robocasa_atomic_tasks.tasks import (
     DoorShareTask,
+    JointGoal,
     JointGoalTask,
-    RoboCasaEpisode,
-    main,
-    rack_joint_name,
 )
+
+# %% knobs
 
 
 @dataclass
@@ -30,17 +27,17 @@ class AdjustToasterOvenTemperature(JointGoalTask):
     RoboCasa asks.
     """
 
-    change: ClassVar[float] = 0.3
+    change: float = 0.3
     """
     How far the knob is turned, as a share of its range: RoboCasa asks for 0.15.
     """
 
-    def joint_goals(self, episode: RoboCasaEpisode) -> List[tuple[str, float]]:
+    def joint_goals(self, episode: RoboCasaEpisode) -> list[JointGoal]:
         environment = episode.environment
-        name = environment.toaster_oven._joint_names["temperature"]
+        name = environment.toaster_oven._joint_names[FixtureJointRole.TEMPERATURE]
         sign = 1.0 if environment.should_increase else -1.0
         share = float(np.clip(environment.initial_temp + sign * self.change, 0.0, 1.0))
-        return [(name, episode.world_position_along_range(name, share))]
+        return [JointGoal(name, episode.joints.world_position_along_range(name, share))]
 
 
 @dataclass
@@ -49,15 +46,22 @@ class TurnOnToasterOven(JointGoalTask):
     Turn the timer knob of the toaster oven on.
     """
 
-    timer_share: ClassVar[float] = 0.3
+    timer_share: float = 0.3
     """
     How far the timer knob is turned, as a share of its range: RoboCasa counts the
     toaster oven on from 0.1.
     """
 
-    def joint_goals(self, episode: RoboCasaEpisode) -> List[tuple[str, float]]:
-        name = episode.environment.toaster_oven._joint_names["time"]
-        return [(name, episode.world_position_along_range(name, self.timer_share))]
+    def joint_goals(self, episode: RoboCasaEpisode) -> list[JointGoal]:
+        name = episode.environment.toaster_oven._joint_names[FixtureJointRole.TIMER]
+        return [
+            JointGoal(
+                name, episode.joints.world_position_along_range(name, self.timer_share)
+            )
+        ]
+
+
+# %% racks
 
 
 @dataclass
@@ -67,26 +71,13 @@ class SlideToasterOvenRack(DoorShareTask):
     asks.
     """
 
-    share = 1.0
-
-    def joint_names(self, episode: RoboCasaEpisode) -> List[str]:
+    def joint_names(self, episode: RoboCasaEpisode) -> list[str]:
         environment = episode.environment
         return [
-            rack_joint_name(episode, environment.toaster_oven, environment.rack_level)
+            episode.joints.rack_joint_name(
+                environment.toaster_oven, environment.rack_level
+            )
         ]
 
-    def joint_goals(self, episode: RoboCasaEpisode) -> List[tuple[str, float]]:
-        share = 1.0 if episode.environment.should_pull else 0.0
-        return [
-            (name, episode.world_position_at_share(name, share))
-            for name in self.joint_names(episode)
-        ]
-
-
-TASKS = [AdjustToasterOvenTemperature, TurnOnToasterOven, SlideToasterOvenRack]
-"""
-Every task of this module.
-"""
-
-if __name__ == "__main__":
-    main(__spec__.name)
+    def target_share(self, episode: RoboCasaEpisode) -> float:
+        return 1.0 if episode.environment.should_pull else 0.0

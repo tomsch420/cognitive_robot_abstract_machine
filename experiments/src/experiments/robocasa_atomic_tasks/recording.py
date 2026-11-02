@@ -1,14 +1,11 @@
 """
 A video of an episode as the PR2 sees it, from the camera in its head.
 
-The episode runs without MuJoCo. While it runs, the pose of every body that shows
-something and may move, the robot's and the kitchen's doors, knobs and objects, is
+While the episode runs, the pose of every body that shows something and may move is
 recorded at every change of the world's state. Afterwards a forked process builds one
 MuJoCo scene of the kitchen as it stood at the start, in which those bodies hang freely,
-replays the recorded poses and renders them from the head camera.
-
-The PR2's head stays still while it acts; the camera turns towards the gripper as the
-head would, and looks ahead while the arms are parked.
+replays the recorded poses and renders them from the head camera, turned towards the
+gripper as the head would be, and ahead while the arms are parked.
 """
 
 from __future__ import annotations
@@ -18,11 +15,16 @@ import multiprocessing
 import time
 from copy import deepcopy
 from dataclasses import dataclass, field
+from enum import StrEnum
 from pathlib import Path
 
+import imageio.v2 as imageio
+import mujoco
 import numpy as np
-from typing_extensions import List
+from PIL import Image
+from scipy.spatial.transform import Rotation
 
+from semantic_digital_twin.adapters.multi_sim import MujocoBuilder, MujocoSim
 from semantic_digital_twin.callbacks.callback import StateChangeCallback
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.world import World
@@ -34,16 +36,28 @@ from semantic_digital_twin.world_description.world_entity import Body
 
 logger = logging.getLogger(__name__)
 
-HEAD_CAMERA_FRAME = "wide_stereo_optical_frame"
-"""
-The PR2's frame of the camera in its head.
-"""
 
-HEAD_LINK = "head_pan_link"
-"""
-The PR2's link that its head, and everything on it, hangs from; left out of the video,
-as the camera turns without it.
-"""
+# %% the PR2's head
+
+
+class PR2HeadLink(StrEnum):
+    """
+    The links of the PR2's head the video is seen from.
+    """
+
+    CAMERA = "wide_stereo_optical_frame"
+    """
+    The frame of the camera in the PR2's head.
+    """
+
+    PAN = "head_pan_link"
+    """
+    The link the head, and everything on it, hangs from; left out of the video, as the
+    camera turns without it.
+    """
+
+
+# %% recording
 
 
 @dataclass(eq=False)
@@ -53,14 +67,20 @@ class PoseRecorder(StateChangeCallback):
     moves any of them.
     """
 
-    bodies: List[Body] = field(kw_only=True)
+    bodies: list[Body] = field(kw_only=True)
     """
     The bodies whose poses are kept.
     """
 
-    poses: List[np.ndarray] = field(kw_only=True, default_factory=list)
+    poses: list[np.ndarray] = field(kw_only=True, default_factory=list)
     """
     The poses, one stack of the bodies' 4x4 transforms per change.
+    """
+
+    unmoved: float = field(kw_only=True, default=1e-5)
+    """
+    How little the poses may change for a change of the state to count as moving none
+    of the bodies.
     """
 
     def on_state_change(self, **kwargs) -> None:
@@ -71,9 +91,60 @@ class PoseRecorder(StateChangeCallback):
                 for body in self.bodies
             ]
         ).astype(np.float32)
-        if self.poses and np.abs(poses - self.poses[-1]).max() < 1e-5:
+        if self.poses and np.abs(poses - self.poses[-1]).max() < self.unmoved:
             return
         self.poses.append(poses)
+
+
+# %% a scene for rendering
+
+
+@dataclass
+class RenderingSceneBuilder(MujocoBuilder):
+    """
+    Builds a MuJoCo scene meant only to be rendered: MuJoCo balances the inertias of the
+    links that violate the triangle inequality, reads PNG copies of the JPEG textures
+    some of RoboCasa's objects use, as it reads PNG only, and checks no contacts.
+    """
+
+    converted_textures: Path = Path("/tmp/robocasa_png_textures")
+    """
+    Where the PNG copies of the JPEG textures are kept.
+    """
+
+    def _start_build(self, file_path: str) -> None:
+        super()._start_build(file_path)
+        self.spec.compiler.balanceinertia = True
+        self.spec.compiler.usethread = False
+
+    def _build_tendons(self) -> None:
+        super()._build_tendons()
+        self.converted_textures.mkdir(parents=True, exist_ok=True)
+        for texture in self.spec.textures:
+            source = Path(texture.file)
+            if source.suffix.lower() not in (".jpg", ".jpeg"):
+                continue
+            converted = self.converted_textures / f"{abs(hash(str(source)))}.png"
+            if not converted.exists():
+                Image.open(source).convert("RGB").save(converted)
+            texture.file = str(converted)
+
+    def _build_contact_exclusions(self) -> None:
+        """
+        Differs from :meth:`MujocoBuilder._build_contact_exclusions` in excluding
+        nothing, as a picture has no contacts.
+        """
+
+
+class RenderingSimulation(MujocoSim):
+    """
+    A MuJoCo simulation built by :class:`RenderingSceneBuilder`.
+    """
+
+    builder_class = RenderingSceneBuilder
+
+
+# %% the video
 
 
 @dataclass
@@ -122,32 +193,35 @@ class HeadCameraVideo:
     The camera's vertical field of view, in degrees.
     """
 
+    camera_distance: float = 0.3
+    """
+    How far in front of the camera the point it orbits lies, in metres.
+    """
+
     start_world: World = field(init=False, repr=False)
     """
     A copy of the world as it stood when recording began.
     """
 
-    shown_bodies: List[Body] = field(init=False, repr=False)
+    shown_bodies: list[Body] = field(init=False, repr=False)
     """
     The bodies that show something and may move.
     """
 
-    hidden_bodies: List[Body] = field(init=False, repr=False)
+    hidden_bodies: list[Body] = field(init=False, repr=False)
     """
     The bodies of the head, which the camera would see from inside.
     """
 
     recorder: PoseRecorder = field(init=False, repr=False)
     """
-    Keeps the poses of the shown bodies, of the camera and of the tool frame.
+    Keeps the poses of the shown bodies, then of the camera, the tool frame and the
+    robot's root.
     """
 
     def __post_init__(self) -> None:
         world = self.world
-        robot_entities = world.get_kinematic_structure_entities_of_branch(
-            self.robot.root
-        )
-        movable = set(robot_entities)
+        movable = set(world.get_kinematic_structure_entities_of_branch(self.robot.root))
         for connection in world.connections:
             if isinstance(connection, FixedConnection) or connection.child in movable:
                 continue
@@ -157,7 +231,7 @@ class HeadCameraVideo:
                     connection.child
                 )
             )
-        head = world.get_body_by_name(HEAD_LINK)
+        head = world.get_body_by_name(PR2HeadLink.PAN)
         hidden = {head} | set(
             world.compute_descendent_child_kinematic_structure_entities(head)
         )
@@ -177,7 +251,7 @@ class HeadCameraVideo:
             _world=world,
             bodies=[
                 *self.shown_bodies,
-                world.get_body_by_name(HEAD_CAMERA_FRAME),
+                world.get_body_by_name(PR2HeadLink.CAMERA),
                 self.tool_frame,
                 self.robot.root,
             ],
@@ -202,7 +276,7 @@ class HeadCameraVideo:
         """
         self.stop()
         child = multiprocessing.get_context("fork").Process(
-            target=self._render_in_this_process, args=(path,)
+            target=self.render_in_this_process, args=(path,)
         )
         child.start()
         child.join(timeout)
@@ -226,40 +300,44 @@ class HeadCameraVideo:
             [poses, np.repeat(poses[-1:], self.frames_per_second, axis=0)]
         )
 
-    def gaze_points(self, poses: np.ndarray, smoothing: float = 0.12) -> np.ndarray:
+    def gaze_points(
+        self,
+        poses: np.ndarray,
+        smoothing: float = 0.12,
+        reach_away_from_the_body: float = 0.55,
+        look_ahead: float = 1.2,
+        counter_height: float = 0.8,
+    ) -> np.ndarray:
         """
         :param poses: The recorded poses of each frame.
         :param smoothing: How far the gaze moves towards where it is drawn each frame.
-        :return: The point the camera looks at in each frame: the gripper once it is
-            away from the body, otherwise ahead of the robot at a counter's height.
+        :param reach_away_from_the_body: How far from the base, horizontally, the
+            gripper draws the gaze, in metres.
+        :param look_ahead: How far ahead of the robot the gaze rests otherwise, in
+            metres.
+        :param counter_height: How high up it rests then, in metres.
+        :return: The point the camera looks at in each frame.
         """
         tool, base = poses[:, -2, :3, 3], poses[:, -1]
-        ahead = base[:, :3, 3] + 1.2 * base[:, :3, 0]
-        ahead[:, 2] = 0.8
+        ahead = base[:, :3, 3] + look_ahead * base[:, :3, 0]
+        ahead[:, 2] = counter_height
         reach = np.linalg.norm(tool[:, :2] - base[:, :2, 3], axis=1)
-        drawn = np.where((reach > 0.55)[:, None], tool, ahead)
+        drawn = np.where((reach > reach_away_from_the_body)[:, None], tool, ahead)
         gaze = np.empty_like(drawn)
         gaze[0] = drawn[0]
         for index in range(1, len(drawn)):
             gaze[index] = gaze[index - 1] + smoothing * (drawn[index] - gaze[index - 1])
         return gaze
 
-    def _render_in_this_process(self, path: Path) -> None:
-        import imageio.v2 as imageio
-        import mujoco
-        from scipy.spatial.transform import Rotation
-
-        from semantic_digital_twin.adapters.multi_sim import MujocoSim
-
-        install_rendering_patches()
-        began = time.time()
-        poses = self.frame_poses()
-        gaze = self.gaze_points(poses)
+    def replay_world(self) -> World:
+        """
+        :return: :attr:`start_world`, made into a scene to replay the recording in: the
+            shown bodies hang freely, everything else is fixed where it stands, nothing
+            is driven or collides, and the head shows nothing.
+        """
         replay = self.start_world
-        names = [body.name for body in self.shown_bodies]
-        bodies = [replay.get_body_by_name(name) for name in names]
+        bodies = [replay.get_body_by_name(body.name) for body in self.shown_bodies]
         with replay.modify_world():
-            # nothing is driven in a replay, and the joints the actuators drive go
             for actuator in list(replay.actuators):
                 replay.remove_actuator(actuator)
             for body in bodies:
@@ -267,7 +345,6 @@ class HeadCameraVideo:
                 replay.add_connection(
                     Connection6DoF.create_with_dofs(replay, replay.root, body)
                 )
-        # everything else stays where it stands; MuJoCo would start its joints at zero
         frozen = [
             connection
             for connection in replay.connections
@@ -288,12 +365,22 @@ class HeadCameraVideo:
                         parent_T_connection_expression=transform,
                     )
                 )
-        # a picture needs no collision geometry, whose convex hulls MuJoCo takes long for
         for body in replay.bodies:
             body.collision.shapes.clear()
         for body in self.hidden_bodies:
             replay.get_body_by_name(body.name).visual.shapes.clear()
-        simulation = MujocoSim(world=replay, headless=True)
+        return replay
+
+    def render_in_this_process(self, path: Path) -> None:
+        """
+        Render the recording into a video file in this process.
+
+        :param path: The video file written.
+        """
+        began = time.time()
+        poses = self.frame_poses()
+        gaze = self.gaze_points(poses)
+        simulation = RenderingSimulation(world=self.replay_world(), headless=True)
         simulation.start_stepped_simulation()
         model, data = simulation.simulator._mj_model, simulation.simulator._mj_data
         model.vis.global_.offwidth = max(model.vis.global_.offwidth, self.width)
@@ -301,10 +388,18 @@ class HeadCameraVideo:
         model.vis.global_.fovy = self.field_of_view
         model.vis.headlight.ambient[:] = [0.45, 0.45, 0.45]
         model.vis.headlight.diffuse[:] = [0.7, 0.7, 0.7]
-        addresses = []
-        for name in names:
-            body_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, name.name)
-            addresses.append(int(model.jnt_qposadr[model.body_jntadr[body_id]]))
+        addresses = [
+            int(
+                model.jnt_qposadr[
+                    model.body_jntadr[
+                        mujoco.mj_name2id(
+                            model, mujoco.mjtObj.mjOBJ_BODY, body.name.name
+                        )
+                    ]
+                ]
+            )
+            for body in self.shown_bodies
+        ]
         renderer = mujoco.Renderer(model, self.height, self.width)
         camera = mujoco.MjvCamera()
         camera.type = mujoco.mjtCamera.mjCAMERA_FREE
@@ -317,10 +412,9 @@ class HeadCameraVideo:
             mujoco.mj_kinematics(model, data)
             eye = frame_poses[-3, :3, 3]
             looking = looked_at - eye
-            distance = max(float(np.linalg.norm(looking)), 0.05)
-            looking = looking / distance
-            camera.lookat[:] = eye + 0.3 * looking
-            camera.distance = 0.3
+            looking = looking / np.linalg.norm(looking)
+            camera.lookat[:] = eye + self.camera_distance * looking
+            camera.distance = self.camera_distance
             camera.azimuth = float(np.degrees(np.arctan2(looking[1], looking[0])))
             camera.elevation = float(np.degrees(np.arcsin(np.clip(looking[2], -1, 1))))
             renderer.update_scene(data, camera)
@@ -330,43 +424,3 @@ class HeadCameraVideo:
         logger.info(
             "Wrote %s, %d frames, in %.0f s", path, len(frames), time.time() - began
         )
-
-
-def install_rendering_patches(
-    converted_textures: Path = Path("/tmp/robocasa_png_textures"),
-) -> None:
-    """
-    Make the MuJoCo scene buildable for rendering: let MuJoCo balance the inertias of
-    the PR2's links that violate the triangle inequality, give it PNG copies of the
-    JPEG textures some of RoboCasa's objects use, as it reads PNG only, and leave out
-    the contacts collision rules exclude, which a picture has none of.
-
-    :param converted_textures: Where the PNG copies are kept.
-    """
-    from PIL import Image
-
-    from semantic_digital_twin.adapters.multi_sim import MujocoBuilder
-
-    start_build = MujocoBuilder._start_build
-    build_tendons = MujocoBuilder._build_tendons
-
-    def start_build_for_rendering(self, file_path):
-        start_build(self, file_path)
-        self.spec.compiler.balanceinertia = True
-        self.spec.compiler.usethread = False
-
-    def build_tendons_then_convert_jpeg_textures(self):
-        build_tendons(self)
-        converted_textures.mkdir(parents=True, exist_ok=True)
-        for texture in self.spec.textures:
-            source = Path(texture.file)
-            if source.suffix.lower() not in (".jpg", ".jpeg"):
-                continue
-            converted = converted_textures / f"{abs(hash(str(source)))}.png"
-            if not converted.exists():
-                Image.open(source).convert("RGB").save(converted)
-            texture.file = str(converted)
-
-    MujocoBuilder._build_contact_exclusions = lambda self, *args, **kwargs: None
-    MujocoBuilder._start_build = start_build_for_rendering
-    MujocoBuilder._build_tendons = build_tendons_then_convert_jpeg_textures

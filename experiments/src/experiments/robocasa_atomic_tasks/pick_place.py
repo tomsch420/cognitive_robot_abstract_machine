@@ -5,22 +5,23 @@ another object.
 
 Where the object may go is read off RoboCasa's own description of the kitchen: the
 inside of a fixture as RoboCasa bounds it, the regions of a counter's top RoboCasa
-places objects in, and the top of a receptacle. A kinematic simulation has no gravity,
-so the object is let go of just above its spot and lowered until it touches what it
-lands on.
-
-Run one with::
-
-    python -m experiments.robocasa_atomic_tasks.pick_place PickPlaceCounterToCabinet
+places objects in, and the top of a receptacle.
 """
 
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 import numpy as np
-from typing_extensions import ClassVar, List, Sequence
+from typing_extensions import TYPE_CHECKING, Sequence
 
+from experiments.robocasa_atomic_tasks.episode import RoboCasaEpisode
+from experiments.robocasa_atomic_tasks.robocasa_names import (
+    FixtureRegionPrefix,
+    RoboCasaObjectName,
+)
+from experiments.robocasa_atomic_tasks.tasks import PickAndPlaceTask
 from semantic_digital_twin.adapters.robocasa_dataset.mujoco_compat import (
     robocasa_version_assertions_relaxed,
 )
@@ -28,63 +29,49 @@ from semantic_digital_twin.adapters.robocasa_dataset.mujoco_compat import (
 with robocasa_version_assertions_relaxed():
     from robocasa.models.scenes.scene_registry import LayoutType
 
-from experiments.robocasa_atomic_tasks.episode import (
-    PickAndPlaceTask,
-    RoboCasaEpisode,
-    main,
-)
+if TYPE_CHECKING:
+    from robocasa.models.fixtures import Fixture
 
-
-def in_front_of_the_robot(episode: RoboCasaEpisode, reach: float = 0.6) -> np.ndarray:
-    """
-    :param episode: An episode.
-    :param reach: How far in front of the robot's base the point lies, in metres.
-    :return: The point on the floor that far in front of the robot.
-    """
-    world_T_base = episode.robot.root.global_pose.to_np()
-    return world_T_base[:3, 3] + reach * world_T_base[:3, 0]
+# %% where an object goes
 
 
 @dataclass
-class IntoFixture(PickAndPlaceTask):
+class IntoFixture(PickAndPlaceTask, ABC):
     """
     Put the object down inside a fixture.
     """
 
-    fixture_attribute: ClassVar[str] = ""
-    """
-    The attribute of RoboCasa's task the fixture is held in.
-    """
-
-    region_names: ClassVar[Sequence[str] | None] = None
-    """
-    Which of the fixture's inside regions the object may go to; all if not given.
-    """
-
-    margin: ClassVar[float] = 0.02
+    margin: float = 0.02
     """
     How far the object stays from the sides of the inside, in metres.
     """
 
-    dropped_in: ClassVar[bool] = False
+    dropped_in: bool = False
     """
     Whether the object is let go of at the top of the inside, to drop to its floor,
     rather than set down on the floor.
     """
 
+    @abstractmethod
+    def fixture(self, episode: RoboCasaEpisode) -> Fixture:
+        """
+        :param episode: The episode the task is performed in.
+        :return: The fixture the object is put into.
+        """
+
     def regions(self, episode: RoboCasaEpisode) -> Sequence[str] | None:
         """
         :param episode: The episode the task is performed in.
-        :return: Which of the fixture's inside regions the object may go to.
+        :return: Which of the fixture's inside regions the object may go to; all if
+            ``None``.
         """
-        return self.region_names
+        return None
 
-    def spots(self, episode: RoboCasaEpisode) -> List[np.ndarray]:
-        body = episode.object_body(self.picked_object)
-        return episode.spots_inside(
-            getattr(episode.environment, self.fixture_attribute),
-            self.regions(episode),
-            body=body,
+    def spots(self, episode: RoboCasaEpisode) -> list[np.ndarray]:
+        return episode.placement.inside(
+            self.fixture(episode),
+            episode.object_body(self.picked_object),
+            region_names=self.regions(episode),
             margin=self.margin,
             dropped_in=self.dropped_in,
         )
@@ -96,12 +83,24 @@ class OntoCounter(PickAndPlaceTask):
     Put the object down on the counter RoboCasa refers to, near the robot.
     """
 
-    def spots(self, episode: RoboCasaEpisode) -> List[np.ndarray]:
-        return episode.spots_on_counter(
+    def spots(self, episode: RoboCasaEpisode) -> list[np.ndarray]:
+        return episode.placement.on_counter(
             episode.environment.counter,
             episode.object_body(self.picked_object),
-            near=in_front_of_the_robot(episode),
+            near=self.in_front_of_the_robot(episode),
         )
+
+    @staticmethod
+    def in_front_of_the_robot(
+        episode: RoboCasaEpisode, reach: float = 0.6
+    ) -> np.ndarray:
+        """
+        :param episode: An episode.
+        :param reach: How far in front of the robot's base the point lies, in metres.
+        :return: The point on the floor that far in front of the robot.
+        """
+        world_T_base = episode.robot.root.global_pose.to_np()
+        return world_T_base[:3, 3] + reach * world_T_base[:3, 0]
 
 
 @dataclass
@@ -110,16 +109,16 @@ class OntoReceptacle(PickAndPlaceTask):
     Put the object down on or in another of the task's objects.
     """
 
-    receptacle: ClassVar[str] = "container"
+    receptacle: RoboCasaObjectName = RoboCasaObjectName.CONTAINER
     """
-    The name RoboCasa gives the object the moved object goes on or in.
+    The object the moved object goes on or in.
     """
 
-    def spots(self, episode: RoboCasaEpisode) -> List[np.ndarray]:
-        return episode.spots_on_receptacle(
-            episode.object_body(self.receptacle),
-            episode.object_body(self.picked_object),
-        )
+    def spots(self, episode: RoboCasaEpisode) -> list[np.ndarray]:
+        return episode.placement.on_receptacle(episode.object_body(self.receptacle))
+
+
+# %% RoboCasa's pick and place tasks
 
 
 @dataclass
@@ -128,7 +127,8 @@ class PickPlaceCounterToCabinet(IntoFixture):
     Take the object from the counter and put it inside the open cabinet.
     """
 
-    fixture_attribute = "cab"
+    def fixture(self, episode: RoboCasaEpisode) -> Fixture:
+        return episode.environment.cab
 
 
 @dataclass
@@ -141,12 +141,13 @@ class PickPlaceCabinetToCounter(OntoCounter):
 @dataclass
 class PickPlaceCounterToSink(IntoFixture):
     """
-    Take the object from the counter and drop it into the sink from just above its rim,
-    as reaching down to the basin's floor runs the forearm into the counter.
+    Take the object from the counter and drop it into the sink from just above its rim.
     """
 
-    fixture_attribute = "sink"
-    dropped_in = True
+    dropped_in: bool = True
+
+    def fixture(self, episode: RoboCasaEpisode) -> Fixture:
+        return episode.environment.sink
 
 
 @dataclass
@@ -179,7 +180,7 @@ class PickPlaceCounterToOven(OntoReceptacle):
     """
 
     layout: LayoutType = LayoutType.LAYOUT002
-    receptacle = "oven_tray"
+    receptacle: RoboCasaObjectName = RoboCasaObjectName.OVEN_TRAY
 
 
 @dataclass
@@ -202,7 +203,7 @@ class PickPlaceToasterToCounter(OntoReceptacle):
     Take the toasted item out of the toaster and put it on the plate.
     """
 
-    receptacle = "plate"
+    receptacle: RoboCasaObjectName = RoboCasaObjectName.PLATE
 
 
 @dataclass
@@ -212,7 +213,8 @@ class PickPlaceCounterToToasterOven(IntoFixture):
     RoboCasa slid out.
     """
 
-    fixture_attribute = "toaster_oven"
+    def fixture(self, episode: RoboCasaEpisode) -> Fixture:
+        return episode.environment.toaster_oven
 
     def regions(self, episode: RoboCasaEpisode) -> Sequence[str] | None:
         return [episode.environment.chosen_toaster_receptacle]
@@ -231,9 +233,13 @@ class PickPlaceCounterToStandMixer(IntoFixture):
     Take the object from the counter and put it into the stand mixer's bowl.
     """
 
-    fixture_attribute = "stand_mixer"
-    region_names = ("bowl",)
-    margin = 0.0
+    margin: float = 0.0
+
+    def fixture(self, episode: RoboCasaEpisode) -> Fixture:
+        return episode.environment.stand_mixer
+
+    def regions(self, episode: RoboCasaEpisode) -> Sequence[str] | None:
+        return [FixtureRegionPrefix.STAND_MIXER_BOWL]
 
 
 @dataclass
@@ -243,13 +249,14 @@ class PickPlaceFridgeShelfToDrawer(IntoFixture):
     which RoboCasa opened.
     """
 
-    fixture_attribute = "fridge"
+    def fixture(self, episode: RoboCasaEpisode) -> Fixture:
+        return episode.environment.fridge
 
     def regions(self, episode: RoboCasaEpisode) -> Sequence[str] | None:
         drawers = sorted(
             name
             for name in episode.environment.fridge.get_int_sites(relative=False)
-            if name.startswith("fridge_drawer")
+            if name.startswith(FixtureRegionPrefix.FRIDGE_DRAWER)
         )
         return drawers[-1:]
 
@@ -260,13 +267,14 @@ class PickPlaceFridgeDrawerToShelf(IntoFixture):
     Take the object out of the fridge's open drawer and put it on a shelf of the fridge.
     """
 
-    fixture_attribute = "fridge"
+    def fixture(self, episode: RoboCasaEpisode) -> Fixture:
+        return episode.environment.fridge
 
     def regions(self, episode: RoboCasaEpisode) -> Sequence[str] | None:
         return [
             name
             for name in episode.environment.fridge.get_int_sites(relative=False)
-            if name.startswith("fridge_shelf")
+            if name.startswith(FixtureRegionPrefix.FRIDGE_SHELF)
         ]
 
 
@@ -274,11 +282,13 @@ class PickPlaceFridgeDrawerToShelf(IntoFixture):
 class PickPlaceCounterToDrawer(IntoFixture):
     """
     Take the object from the counter and drop it into the open drawer from just above
-    it, as reaching down to the drawer's floor runs the forearm into the counter above.
+    it.
     """
 
-    fixture_attribute = "drawer"
-    dropped_in = True
+    dropped_in: bool = True
+
+    def fixture(self, episode: RoboCasaEpisode) -> Fixture:
+        return episode.environment.drawer
 
 
 @dataclass
@@ -294,8 +304,10 @@ class PickPlaceCounterToBlender(IntoFixture):
     Take the object from the counter and drop it into the blender's jar.
     """
 
-    fixture_attribute = "blender"
-    margin = 0.0
+    margin: float = 0.0
+
+    def fixture(self, episode: RoboCasaEpisode) -> Fixture:
+        return episode.environment.blender
 
 
 @dataclass
@@ -304,8 +316,8 @@ class CheesyBread(OntoReceptacle):
     Take the wedge of cheese and put it on the slice of bread on the cutting board.
     """
 
-    picked_object = "cheese"
-    receptacle = "bread"
+    picked_object: RoboCasaObjectName = RoboCasaObjectName.CHEESE
+    receptacle: RoboCasaObjectName = RoboCasaObjectName.BREAD
 
 
 @dataclass
@@ -314,8 +326,8 @@ class MakeIcedCoffee(OntoReceptacle):
     Take an ice cube from the bowl and drop it into the glass of coffee.
     """
 
-    picked_object = "ice_cube1"
-    receptacle = "cup"
+    picked_object: RoboCasaObjectName = RoboCasaObjectName.ICE_CUBE
+    receptacle: RoboCasaObjectName = RoboCasaObjectName.CUP
 
 
 @dataclass
@@ -324,36 +336,5 @@ class PackDessert(OntoReceptacle):
     Take the dessert and put it into the container holding the cooked food.
     """
 
-    picked_object = "dessert"
-    receptacle = "cooked_food_container"
-
-
-TASKS = [
-    PickPlaceCounterToCabinet,
-    PickPlaceCabinetToCounter,
-    PickPlaceCounterToSink,
-    PickPlaceSinkToCounter,
-    PickPlaceCounterToMicrowave,
-    PickPlaceMicrowaveToCounter,
-    PickPlaceCounterToOven,
-    PickPlaceCounterToStove,
-    PickPlaceStoveToCounter,
-    PickPlaceToasterToCounter,
-    PickPlaceCounterToToasterOven,
-    PickPlaceToasterOvenToCounter,
-    PickPlaceCounterToStandMixer,
-    PickPlaceFridgeShelfToDrawer,
-    PickPlaceFridgeDrawerToShelf,
-    PickPlaceCounterToDrawer,
-    PickPlaceDrawerToCounter,
-    PickPlaceCounterToBlender,
-    CheesyBread,
-    MakeIcedCoffee,
-    PackDessert,
-]
-"""
-Every task of this module.
-"""
-
-if __name__ == "__main__":
-    main(__spec__.name)
+    picked_object: RoboCasaObjectName = RoboCasaObjectName.DESSERT
+    receptacle: RoboCasaObjectName = RoboCasaObjectName.COOKED_FOOD_CONTAINER
