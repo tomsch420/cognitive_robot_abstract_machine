@@ -371,6 +371,17 @@ class HeadCameraVideo:
             replay.get_body_by_name(body.name).visual.shapes.clear()
         return replay
 
+    @staticmethod
+    def free_joint_positions(poses: np.ndarray) -> np.ndarray:
+        """
+        :param poses: Transforms, stacked along any leading axes.
+        :return: The position of a free MuJoCo joint for each transform: its
+            translation, then its rotation as a quaternion with the scalar first.
+        """
+        rotations = Rotation.from_matrix(poses[..., :3, :3].reshape(-1, 3, 3))
+        quaternions = rotations.as_quat(scalar_first=True).reshape(*poses.shape[:-2], 4)
+        return np.concatenate([poses[..., :3, 3], quaternions], axis=-1)
+
     def render_in_this_process(self, path: Path) -> None:
         """
         Render the recording into a video file in this process.
@@ -388,8 +399,8 @@ class HeadCameraVideo:
         model.vis.global_.fovy = self.field_of_view
         model.vis.headlight.ambient[:] = [0.45, 0.45, 0.45]
         model.vis.headlight.diffuse[:] = [0.7, 0.7, 0.7]
-        addresses = [
-            int(
+        addresses = np.array(
+            [
                 model.jnt_qposadr[
                     model.body_jntadr[
                         mujoco.mj_name2id(
@@ -397,18 +408,20 @@ class HeadCameraVideo:
                         )
                     ]
                 ]
-            )
-            for body in self.shown_bodies
-        ]
+                for body in self.shown_bodies
+            ]
+        )
+        free_joint_positions = self.free_joint_positions(
+            poses[:, : len(self.shown_bodies)]
+        )
+        position_indices = (addresses[:, None] + np.arange(7)).ravel()
         renderer = mujoco.Renderer(model, self.height, self.width)
         camera = mujoco.MjvCamera()
         camera.type = mujoco.mjtCamera.mjCAMERA_FREE
         logger.info("MuJoCo scene built in %.0f s", time.time() - began)
         frames = []
-        for frame_poses, looked_at in zip(poses, gaze):
-            for address, pose in zip(addresses, frame_poses):
-                x, y, z, w = Rotation.from_matrix(pose[:3, :3]).as_quat()
-                data.qpos[address : address + 7] = [*pose[:3, 3], w, x, y, z]
+        for frame_poses, positions, looked_at in zip(poses, free_joint_positions, gaze):
+            data.qpos[position_indices] = positions.ravel()
             mujoco.mj_kinematics(model, data)
             eye = frame_poses[-3, :3, 3]
             looking = looked_at - eye
