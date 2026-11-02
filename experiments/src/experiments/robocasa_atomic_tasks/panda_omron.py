@@ -41,9 +41,16 @@ from semantic_digital_twin.robots.robot_parts import (
     EndEffector,
     Finger,
     MobileBase,
+    ServoedRobotPart,
     Torso,
 )
 from semantic_digital_twin.spatial_types import Vector3
+from semantic_digital_twin.world_description.connection_properties import (
+    DriveServos,
+    JointDrive,
+    ServoGains,
+    VelocityServoGains,
+)
 from semantic_digital_twin.world_description.connections import OmniDrive
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
@@ -248,7 +255,9 @@ class PandaOmronRightFinger(Finger):
 
 @dataclass(eq=False)
 class PandaOmronGripper(
-    EndEffector, HasTwoFingers[PandaOmronLeftFinger, PandaOmronRightFinger]
+    EndEffector,
+    HasTwoFingers[PandaOmronLeftFinger, PandaOmronRightFinger],
+    ServoedRobotPart,
 ):
     """
     The Panda's two-finger gripper, its tool frame at robosuite's grip site between the
@@ -285,6 +294,20 @@ class PandaOmronGripper(
         ]
 
     @property
+    def drive_of_each_joint(self) -> dict[str, JointDrive]:
+        """
+        Each finger's joint, driven as robosuite's position actuators drive it, the
+        joint's own damping damping it.
+        """
+        finger = JointDrive(
+            gains=ServoGains(stiffness=1000.0, damping=0.0, torque_limit=20.0)
+        )
+        return {
+            PandaOmronJoint.LEFT_FINGER: finger,
+            PandaOmronJoint.RIGHT_FINGER: finger,
+        }
+
+    @property
     def approach_axis(self) -> Vector3:
         return Vector3.Z(reference_frame=self.tool_frame)
 
@@ -309,10 +332,31 @@ class PandaOmronGripper(
 
 
 @dataclass(eq=False)
-class PandaOmronArm(Arm[PandaOmronGripper]):
+class PandaOmronArm(Arm[PandaOmronGripper], ServoedRobotPart):
     """
     The Franka Panda arm.
     """
+
+    @property
+    def drive_of_each_joint(self) -> dict[str, JointDrive]:
+        """
+        The five joints from the shoulder to the forearm may exert as much torque as
+        robosuite lets their motors, and more than the two wrist joints.
+
+        .. note:: The torque limits are robosuite's; the stiffness, damping and armature
+            are the PR2 arm's, which are tuned for its simulated joints to follow their
+            commanded positions.
+        """
+        upper = JointDrive(
+            gains=ServoGains(stiffness=2000.0, damping=200.0, torque_limit=80.0),
+            armature=0.5,
+        )
+        wrist = JointDrive(
+            gains=ServoGains(stiffness=500.0, damping=30.0, torque_limit=12.0),
+            armature=0.1,
+        )
+        arm = PandaOmronJoint.arm()
+        return {joint: upper for joint in arm[:5]} | {joint: wrist for joint in arm[5:]}
 
     def setup_hardware_interfaces(self) -> None:
         for joint_name in PandaOmronJoint.arm():
@@ -348,10 +392,27 @@ class PandaOmronArm(Arm[PandaOmronGripper]):
 
 
 @dataclass(eq=False)
-class PandaOmronLift(Torso, HasOneArm[PandaOmronArm]):
+class PandaOmronLift(Torso, HasOneArm[PandaOmronArm], ServoedRobotPart):
     """
     The lift of the Omron base that carries the arm.
     """
+
+    @property
+    def drive_of_each_joint(self) -> dict[str, JointDrive]:
+        """
+        The lift's joint, which carries the arm.
+
+        .. note:: robosuite drives the lift with a motor of unlimited force; the gains
+            are the PR2 torso's.
+        """
+        return {
+            PandaOmronJoint.LIFT: JointDrive(
+                gains=ServoGains(
+                    stiffness=100000.0, damping=8000.0, torque_limit=10000.0
+                ),
+                armature=1.0,
+            )
+        }
 
     def setup_hardware_interfaces(self) -> None:
         self._world.get_connection_by_name(
@@ -403,6 +464,26 @@ class PandaOmronMobileBase(MobileBase[OmniDrive], HasTorso[PandaOmronLift]):
         """
         The drive moves the base; it has no joints of its own.
         """
+
+    @property
+    def drive_servos(self) -> DriveServos:
+        """
+        robosuite's velocity actuators of the base's forward, sideways and turning
+        motion; the forward and sideways ones drive both translations.
+        """
+        return DriveServos(
+            translation_gains=VelocityServoGains(damping=1000.0, torque_limit=600.0),
+            rotation_gains=VelocityServoGains(damping=1500.0, torque_limit=600.0),
+        )
+
+    def _setup_servos(self) -> None:
+        """
+        Declare the drive's servos, see :meth:`MobileBase._setup_servos`, and let a
+        physical simulation carry the weight of every body standing on the base, as
+        robosuite's controllers compensate gravity.
+        """
+        super()._setup_servos()
+        self._compensate_gravity()
 
     def setup_joint_states(self) -> list[JointState]:
         """
