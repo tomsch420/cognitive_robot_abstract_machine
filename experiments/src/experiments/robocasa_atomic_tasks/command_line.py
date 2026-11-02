@@ -32,17 +32,22 @@ class TaskRunOption(StrEnum):
 
     PHYSICS = "--physics"
     """
-    Simulate the PR2 and the kitchen physically in MuJoCo.
+    Simulate the robot and the kitchen physically in MuJoCo.
     """
 
     VIDEO = "--video"
     """
-    Where to write a video of the episode seen from the PR2's head camera.
+    Where to write a video of the episode seen from the robot.
     """
 
     COLLISION_AVOIDANCE = "--collision-avoidance"
     """
-    Whether the PR2 avoids colliding with the kitchen and with itself.
+    Whether the robot avoids colliding with the kitchen and with itself.
+    """
+
+    ROBOT = "--robot"
+    """
+    The robot that performs the task.
     """
 
     TIME_LIMIT = "--time-limit"
@@ -68,7 +73,7 @@ class TaskExitStatus(IntEnum):
 
     NOT_ACCOMPLISHED = 2
     """
-    The PR2 finished, but RoboCasa's own check did not find the task accomplished.
+    The robot finished, but RoboCasa's own check did not find the task accomplished.
     """
 
 

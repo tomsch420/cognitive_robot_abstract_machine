@@ -1,5 +1,5 @@
 """
-Have a PR2 perform one of RoboCasa's atomic tasks and report whether RoboCasa finds it
+Have a robot perform one of RoboCasa's atomic tasks and report whether RoboCasa finds it
 accomplished, exiting with the matching
 :class:`~experiments.robocasa_atomic_tasks.command_line.TaskExitStatus`.
 
@@ -7,6 +7,7 @@ Run with::
 
     python experiments/scripts/robocasa_atomic_tasks/run_task.py OpenDrawer
     python experiments/scripts/robocasa_atomic_tasks/run_task.py TurnOnStove --physics --video stove.mp4
+    python experiments/scripts/robocasa_atomic_tasks/run_task.py AdjustWaterTemperature --robot panda_omron
 """
 
 from __future__ import annotations
@@ -20,6 +21,7 @@ from pathlib import Path
 
 from experiments.robocasa_atomic_tasks.catalogue import TaskModule
 from experiments.robocasa_atomic_tasks.command_line import TaskExitStatus, TaskRunOption
+from experiments.robocasa_atomic_tasks.robots import RobotModel
 from semantic_digital_twin.adapters.robocasa_dataset.mujoco_compat import (
     robocasa_version_assertions_relaxed,
 )
@@ -46,6 +48,12 @@ parser.add_argument(
     action=argparse.BooleanOptionalAction,
     default=True,
 )
+parser.add_argument(
+    TaskRunOption.ROBOT,
+    type=RobotModel,
+    choices=list(RobotModel),
+    default=RobotModel.PR2,
+)
 parser.add_argument(TaskRunOption.TIME_LIMIT, type=int, default=0)
 arguments = parser.parse_args()
 
@@ -59,6 +67,7 @@ settings = dict(
     collision_avoidance=arguments.collision_avoidance,
     physics=arguments.physics,
     video=arguments.video,
+    robot=arguments.robot,
 )
 if arguments.layout:
     settings["layout"] = LayoutType[arguments.layout]

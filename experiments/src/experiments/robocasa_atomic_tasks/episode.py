@@ -1,6 +1,6 @@
 """
-One episode of one of RoboCasa's atomic tasks, performed by a PR2: the kitchen and
-objects RoboCasa composes, the PR2 standing where RoboCasa starts its own robot, its
+One episode of one of RoboCasa's atomic tasks, performed by a robot: the kitchen and
+objects RoboCasa composes, the robot standing where RoboCasa starts its own robot, its
 motions simulated kinematically with collision avoidance, or physically in a MuJoCo
 simulation of the kitchen built from the world, and RoboCasa's own success check as the
 judge.
@@ -63,6 +63,7 @@ from experiments.robocasa_atomic_tasks.skills import (
     StandAndPressAction,
     WithdrawAction,
 )
+from experiments.robocasa_atomic_tasks.robots import TaskRobot
 from experiments.robocasa_atomic_tasks.stands import RobotClearance, StandFinder
 from experiments.robocasa_task_execution.exceptions import NoClearStandingPose
 from krrood.entity_query_language.query.match import Match
@@ -74,7 +75,6 @@ from semantic_digital_twin.adapters.robocasa_dataset.loader import (
 from semantic_digital_twin.adapters.robocasa_dataset.mujoco_compat import (
     robocasa_version_assertions_relaxed,
 )
-from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.collision_checking.collision_rules import (
     AllowCollisionBetweenGroups,
 )
@@ -82,8 +82,7 @@ from semantic_digital_twin.datastructures.definitions import (
     StaticJointState,
     TorsoState,
 )
-from semantic_digital_twin.robots.pr2 import PR2
-from semantic_digital_twin.robots.robot_parts import Arm
+from semantic_digital_twin.robots.robot_parts import AbstractRobot, Arm
 from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Floor,
@@ -94,10 +93,7 @@ from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
 )
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connections import (
-    ActiveConnection1DOF,
-    OmniDrive,
-)
+from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
 from semantic_digital_twin.world_description.geometry import CoordinateBounds
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -114,7 +110,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class RoboCasaEpisode:
     """
-    One episode of one of RoboCasa's atomic tasks, with a PR2 standing where RoboCasa
+    One episode of one of RoboCasa's atomic tasks, with a robot standing where RoboCasa
     starts its own robot.
     """
 
@@ -127,12 +123,17 @@ class RoboCasaEpisode:
 
     task: RoboCasaTask
     """
-    The task, bound to the world the PR2 performs it in.
+    The task, bound to the world the robot performs it in.
     """
 
-    robot: PR2
+    robot: AbstractRobot
     """
     The robot performing the task.
+    """
+
+    task_robot: TaskRobot
+    """
+    What the robot brings into the kitchen: the arm it acts with and where it stands.
     """
 
     handling_margin: float = 0.4
@@ -150,12 +151,12 @@ class RoboCasaEpisode:
 
     simulation: MujocoSim | None = field(default=None, init=False, repr=False)
     """
-    The physical simulation of the world the PR2 acts in, while one runs.
+    The physical simulation of the world the robot acts in, while one runs.
     """
 
     collision_avoidance: bool = field(default=True, init=False, repr=False)
     """
-    Whether the PR2 avoids colliding with the kitchen and with itself while moving, as
+    Whether the robot avoids colliding with the kitchen and with itself while moving, as
     :meth:`executed` sets it.
     """
 
@@ -223,6 +224,7 @@ class RoboCasaEpisode:
             robot=self.robot,
             start_pose=self.task.robot_base_pose,
             clearance=self.clearance,
+            candidates=self.task_robot.stand_candidates,
         )
         self.grasps = KitchenGrasps(
             bounds=self.bounds, kitchen_direction=self.stands.kitchen_direction
@@ -243,21 +245,21 @@ class RoboCasaEpisode:
     @property
     def world(self) -> World:
         """
-        The world the PR2 performs the task in.
+        The world the robot performs the task in.
         """
         return self.task.world
 
     @property
     def arm(self) -> Arm:
         """
-        The arm the PR2 performs the task with, the right one as RoboCasa's robot's.
+        The arm the robot performs the task with.
         """
-        return self.robot.right_arm
+        return self.task_robot.acting_arm(self.robot)
 
     @property
     def physically_simulated(self) -> bool:
         """
-        Whether the PR2 acts in a physical simulation of the world.
+        Whether the robot acts in a physical simulation of the world.
         """
         return self.simulation is not None
 
@@ -269,6 +271,7 @@ class RoboCasaEpisode:
         task_name: str,
         layout: LayoutType,
         style: StyleType,
+        task_robot: TaskRobot,
         seed: int | None = None,
         task_parameters: dict[str, Any] | None = None,
     ) -> Self:
@@ -278,43 +281,37 @@ class RoboCasaEpisode:
         :param task_name: The name of the RoboCasa task environment.
         :param layout: The kitchen layout.
         :param style: The visual style of the kitchen.
+        :param task_robot: The robot performing the task.
         :param seed: The seed RoboCasa samples the objects and their placements with.
         :param task_parameters: Arguments of the RoboCasa task itself, by name.
-        :return: The episode, with the PR2's arms parked and the PR2 standing clear of
-            the kitchen at or behind RoboCasa's start pose.
-        :raises NoClearStandingPose: If the PR2 comes too close to the kitchen wherever
-            it stands near the start pose.
+        :return: The episode, with the robot's arms parked and the robot standing clear
+            of the kitchen at or behind RoboCasa's start pose.
+        :raises NoClearStandingPose: If the robot comes too close to the kitchen
+            wherever it stands near the start pose.
         """
         loader = RoboCasaDatasetLoader()
         environment = loader.build_task_environment(
             task_name, layout, style, seed=seed, task_parameters=task_parameters
         )
         task = loader.load_task_from_environment(environment)
-        world = task.world
-        pr2_world = URDFParser.from_file(PR2.get_ros_file_path()).parse()
-        with world.modify_world():
-            drive = OmniDrive.create_with_dofs(
-                parent=world.root, child=pr2_world.root, world=world
-            )
-            world.merge_world(pr2_world, drive)
-            drive.has_hardware_interface = True
-        drive.origin = task.robot_base_pose
-        robot = PR2.from_world(world)
-        robot.mobile_base.full_body_controlled = True
-        episode = cls(environment=environment, task=task, robot=robot)
+        robot = task_robot.place_in(task.world, task.robot_base_pose)
+        episode = cls(
+            environment=environment, task=task, robot=robot, task_robot=task_robot
+        )
         episode.stand_clear_of_the_kitchen()
         return episode
 
     def stand_clear_of_the_kitchen(self, maximum_distance: float = 1.0) -> None:
         """
-        Let the PR2's base rest on the floor, park its arms and step it back from
+        Let the robot's base rest on the floor, park its arms and step it back from
         RoboCasa's start pose until it keeps clear of the kitchen, see
         :meth:`StandFinder.stand_clear_of_the_start`.
 
         :param maximum_distance: How far back and to either side of the start pose the
-            PR2 stands at most.
-        :raises NoClearStandingPose: If the PR2 comes too close to the kitchen wherever
-            it stands up to ``maximum_distance`` behind and beside the start pose.
+            robot stands at most.
+        :raises NoClearStandingPose: If the robot comes too close to the kitchen
+            wherever it stands up to ``maximum_distance`` behind and beside the start
+            pose.
         """
         world = self.world
         with world.modify_world():
@@ -340,7 +337,7 @@ class RoboCasaEpisode:
     def create_executor(self, sampling_seed: int = 42) -> PlanExecutor:
         """
         :param sampling_seed: The seed the stands are sampled with.
-        :return: A new executor of a plan of the PR2 in the episode's world, simulating
+        :return: A new executor of a plan of the robot in the episode's world, simulating
             it physically while :attr:`simulation` runs and kinematically otherwise. In
             physics the bodies are carried by the grip of the fingers alone, the hand
             moves in straight lines around what it holds or lets go of, and only what
@@ -501,7 +498,7 @@ class RoboCasaEpisode:
         Perform the steps within the context kinematically simulated, or physically
         simulated in MuJoCo, which is started on entering and stopped on leaving.
 
-        :param collision_avoidance: Whether the PR2 avoids colliding with the kitchen
+        :param collision_avoidance: Whether the robot avoids colliding with the kitchen
             and with itself while moving.
         :param physics: Whether the steps are simulated physically.
         """

@@ -1,6 +1,6 @@
 """
 RoboCasa's own simulation as the judge of an episode: never stepped, but brought into
-the state of the world the PR2 acts in, with RoboCasa's robot put where the PR2 is.
+the state of the world our robot acts in, with RoboCasa's robot put where our robot is.
 """
 
 from __future__ import annotations
@@ -17,8 +17,7 @@ from experiments.robocasa_atomic_tasks.robocasa_names import (
     RoboCasaRobotFrame,
 )
 from experiments.robocasa_goals.simulation_mirror import RoboCasaSimulationMirror
-from semantic_digital_twin.robots.pr2 import PR2
-from semantic_digital_twin.robots.robot_parts import Arm
+from semantic_digital_twin.robots.robot_parts import AbstractRobot, Arm
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -42,10 +41,10 @@ class RoboCasaJudge:
 
     world: World
     """
-    The world the PR2 acts in.
+    The world our robot acts in.
     """
 
-    robot: PR2
+    robot: AbstractRobot
     """
     The robot acting.
     """
@@ -62,7 +61,7 @@ class RoboCasaJudge:
 
     pressed_geoms: set[str] = field(default_factory=set, init=False, repr=False)
     """
-    The names of RoboCasa's geoms the PR2's fingertips rest on right now.
+    The names of RoboCasa's geoms our robot's fingertips rest on right now.
     """
 
     def __post_init__(self) -> None:
@@ -108,11 +107,11 @@ class RoboCasaJudge:
         for fixture in self.environment.fixtures.values():
             fixture.update_state(self.environment)
 
-    def take_robocasas_robot_to_the_pr2(self) -> None:
+    def take_robocasas_robot_to_ours(self) -> None:
         """
-        Put the frames of RoboCasa's robot that its checks read where the PR2's
-        counterparts are: the end effector site of its gripper on the PR2's tool frame,
-        and its base on the PR2's base.
+        Put the frames of RoboCasa's robot that its checks read where our robot's
+        counterparts are: the end effector site of its gripper on our robot's tool frame,
+        and its base on our robot's base.
 
         Only the computed frames are moved, not the robot, so this holds until
         RoboCasa's simulation is next brought up to date.
@@ -184,5 +183,5 @@ class RoboCasaJudge:
             as it stands.
         """
         self.update_fixture_states()
-        self.take_robocasas_robot_to_the_pr2()
+        self.take_robocasas_robot_to_ours()
         return bool(self.environment._check_success())

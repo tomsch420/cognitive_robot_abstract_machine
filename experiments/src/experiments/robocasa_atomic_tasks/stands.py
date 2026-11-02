@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from semantic_digital_twin.robots.pr2 import PR2
+from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
     Pose,
@@ -54,7 +54,7 @@ class RobotClearance:
     The world the robot stands in.
     """
 
-    robot: PR2
+    robot: AbstractRobot
     """
     The robot.
     """
@@ -157,7 +157,7 @@ class StandFinder:
     The world the robot stands in.
     """
 
-    robot: PR2
+    robot: AbstractRobot
     """
     The robot.
     """

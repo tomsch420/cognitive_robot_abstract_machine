@@ -1,5 +1,5 @@
 """
-RoboCasa's atomic tasks as the PR2 performs them, and the kinds of tasks they share
+RoboCasa's atomic tasks as the robot performs them, and the kinds of tasks they share
 their solutions by.
 
 Every task is a subclass of :class:`RoboCasaAtomicTask` named after the RoboCasa task it
@@ -17,7 +17,8 @@ import numpy as np
 from typing_extensions import Any
 
 from experiments.robocasa_atomic_tasks.episode import RoboCasaEpisode
-from experiments.robocasa_atomic_tasks.recording import HeadCameraVideo
+from experiments.robocasa_atomic_tasks.recording import RobotViewVideo
+from experiments.robocasa_atomic_tasks.robots import RobotModel
 from experiments.robocasa_atomic_tasks.robocasa_names import RoboCasaObjectName
 from krrood.ormatic.utils import classproperty
 from semantic_digital_twin.adapters.robocasa_dataset.mujoco_compat import (
@@ -30,16 +31,16 @@ with robocasa_version_assertions_relaxed():
 logger = logging.getLogger(__name__)
 
 
-# %% one of RoboCasa's tasks, performed by the PR2
+# %% one of RoboCasa's tasks, performed by the robot
 
 
 @dataclass
 class RoboCasaAtomicTask(ABC):
     """
-    One of RoboCasa's atomic tasks, performed by a PR2.
+    One of RoboCasa's atomic tasks, performed by a robot.
 
     A subclass is named after the RoboCasa task it performs and says, in :meth:`solve`,
-    what the PR2 does.
+    what the robot does.
     """
 
     layout: LayoutType = LayoutType.LAYOUT001
@@ -57,21 +58,25 @@ class RoboCasaAtomicTask(ABC):
     The seed RoboCasa samples the objects and their placements with.
     """
 
+    robot: RobotModel = RobotModel.PR2
+    """
+    The robot that performs the task.
+    """
+
     collision_avoidance: bool = True
     """
-    Whether the PR2 avoids colliding with the kitchen and with itself while moving.
+    Whether the robot avoids colliding with the kitchen and with itself while moving.
     """
 
     physics: bool = False
     """
-    Whether the PR2 acts in a physical simulation of the kitchen in MuJoCo rather than a
-    kinematic one.
+    Whether the robot acts in a physical simulation of the kitchen in MuJoCo rather than
+    a kinematic one.
     """
 
     video: Path | None = None
     """
-    Where a video of the episode seen from the PR2's head camera is written, if
-    anywhere.
+    Where a video of the episode seen from the robot is written, if anywhere.
     """
 
     task_parameters: dict[str, Any] = field(default_factory=dict)
@@ -99,6 +104,7 @@ class RoboCasaAtomicTask(ABC):
             self.robocasa_task_name,
             self.layout,
             self.style,
+            self.robot.task_robot(),
             seed=self.seed,
             task_parameters=self.task_parameters or None,
         )
@@ -107,14 +113,14 @@ class RoboCasaAtomicTask(ABC):
     @abstractmethod
     def solve(self, episode: RoboCasaEpisode) -> None:
         """
-        Have the PR2 perform the task.
+        Have the robot perform the task.
 
         :param episode: The episode the task is performed in.
         """
 
     def run(self) -> bool:
         """
-        Compose an episode, have the PR2 perform the task and judge it; a video, if
+        Compose an episode, have the robot perform the task and judge it; a video, if
         asked for, shows the episode as far as it got.
 
         :return: Whether RoboCasa's own check finds the task accomplished.
@@ -123,9 +129,13 @@ class RoboCasaAtomicTask(ABC):
         logger.info("%s: %s", self.robocasa_task_name, episode.task.instruction)
         video = None
         if self.video is not None:
-            video = HeadCameraVideo(
+            video = RobotViewVideo(
                 world=episode.world,
                 robot=episode.robot,
+                eye=episode.task_robot.video_eye(episode.robot),
+                hidden_bodies=episode.task_robot.bodies_hidden_from_the_video(
+                    episode.robot
+                ),
                 tool_frame=episode.arm.end_effector.tool_frame,
             )
         try:

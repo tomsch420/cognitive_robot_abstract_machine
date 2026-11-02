@@ -15,7 +15,7 @@ from typing_extensions import TYPE_CHECKING, Sequence
 from experiments.robocasa_atomic_tasks.fixtures import KitchenFixtures
 from experiments.robocasa_atomic_tasks.geometry import BodyBounds
 from experiments.robocasa_atomic_tasks.judge import RoboCasaJudge
-from semantic_digital_twin.robots.pr2 import PR2
+from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
     Pose,
@@ -405,7 +405,7 @@ class KinematicSettling:
     The world the object rests in.
     """
 
-    robot: PR2
+    robot: AbstractRobot
     """
     The robot, which the object does not rest on.
     """

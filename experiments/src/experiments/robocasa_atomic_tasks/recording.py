@@ -1,11 +1,11 @@
 """
-A video of an episode as the PR2 sees it, from the camera in its head.
+A video of an episode as the robot sees it.
 
 While the episode runs, the pose of every body that shows something and may move is
 recorded at every change of the world's state. Afterwards a forked process builds one
 MuJoCo scene of the kitchen as it stood at the start, in which those bodies hang freely,
-replays the recorded poses and renders them from the head camera, turned towards the
-gripper as the head would be, and ahead while the arms are parked.
+replays the recorded poses and renders them from the robot's eye, turned towards the
+gripper while it reaches out, and ahead while the arms are parked.
 """
 
 from __future__ import annotations
@@ -15,7 +15,6 @@ import multiprocessing
 import time
 from copy import deepcopy
 from dataclasses import dataclass, field
-from enum import StrEnum
 from pathlib import Path
 
 import imageio.v2 as imageio
@@ -37,34 +36,14 @@ from semantic_digital_twin.world_description.world_entity import Body
 logger = logging.getLogger(__name__)
 
 
-# %% the PR2's head
-
-
-class PR2HeadLink(StrEnum):
-    """
-    The links of the PR2's head the video is seen from.
-    """
-
-    CAMERA = "wide_stereo_optical_frame"
-    """
-    The frame of the camera in the PR2's head.
-    """
-
-    PAN = "head_pan_link"
-    """
-    The link the head, and everything on it, hangs from; left out of the video, as the
-    camera turns without it.
-    """
-
-
 # %% recording
 
 
 @dataclass(eq=False)
 class PoseRecorder(StateChangeCallback):
     """
-    Keeps the global pose of some bodies at every change of the world's state that
-    moves any of them.
+    Keeps the global pose of some bodies at every change of the world's state that moves
+    any of them.
     """
 
     bodies: list[Body] = field(kw_only=True)
@@ -79,8 +58,8 @@ class PoseRecorder(StateChangeCallback):
 
     unmoved: float = field(kw_only=True, default=1e-5)
     """
-    How little the poses may change for a change of the state to count as moving none
-    of the bodies.
+    How little the poses may change for a change of the state to count as moving none of
+    the bodies.
     """
 
     def on_state_change(self, **kwargs) -> None:
@@ -148,9 +127,9 @@ class RenderingSimulation(MujocoSim):
 
 
 @dataclass
-class HeadCameraVideo:
+class RobotViewVideo:
     """
-    Records an episode as it runs, and renders it from the PR2's head camera.
+    Records an episode as it runs, and renders it from the robot's eye.
     """
 
     world: World
@@ -160,7 +139,17 @@ class HeadCameraVideo:
 
     robot: AbstractRobot
     """
-    The robot whose head the video is seen from.
+    The robot the video is seen from.
+    """
+
+    eye: Body
+    """
+    The body of the robot the video is seen from.
+    """
+
+    hidden_bodies: list[Body]
+    """
+    The bodies around :attr:`eye` the camera would see from inside.
     """
 
     tool_frame: Body
@@ -208,11 +197,6 @@ class HeadCameraVideo:
     The bodies that show something and may move.
     """
 
-    hidden_bodies: list[Body] = field(init=False, repr=False)
-    """
-    The bodies of the head, which the camera would see from inside.
-    """
-
     recorder: PoseRecorder = field(init=False, repr=False)
     """
     Keeps the poses of the shown bodies, then of the camera, the tool frame and the
@@ -231,13 +215,7 @@ class HeadCameraVideo:
                     connection.child
                 )
             )
-        head = world.get_body_by_name(PR2HeadLink.PAN)
-        hidden = {head} | set(
-            world.compute_descendent_child_kinematic_structure_entities(head)
-        )
-        self.hidden_bodies = [
-            body for body in hidden if isinstance(body, Body) and body.visual.shapes
-        ]
+        hidden = set(self.hidden_bodies)
         self.shown_bodies = [
             body
             for body in world.kinematic_structure_entities
@@ -251,7 +229,7 @@ class HeadCameraVideo:
             _world=world,
             bodies=[
                 *self.shown_bodies,
-                world.get_body_by_name(PR2HeadLink.CAMERA),
+                self.eye,
                 self.tool_frame,
                 self.robot.root,
             ],
@@ -333,7 +311,7 @@ class HeadCameraVideo:
         """
         :return: :attr:`start_world`, made into a scene to replay the recording in: the
             shown bodies hang freely, everything else is fixed where it stands, nothing
-            is driven or collides, and the head shows nothing.
+            is driven or collides, and :attr:`hidden_bodies` show nothing.
         """
         replay = self.start_world
         bodies = [replay.get_body_by_name(body.name) for body in self.shown_bodies]
