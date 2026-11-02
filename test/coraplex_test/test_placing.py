@@ -7,8 +7,8 @@ from coraplex.robot_plans.actions.core.placing import PlaceAction
 from cramph.composites import Sequence
 from giskardpy.motion_statechart.goals.cartesian_goals import CartesianPoseStraight
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
-from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList
-from semantic_digital_twin.datastructures.definitions import GripperState
+from coraplex.robot_plans.plan_transformations import MoveStraightAroundObjects
+from giskardpy.motion_statechart.goals.gripper import MoveGripper
 from semantic_digital_twin.robots.robot_parts import Arm
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
@@ -16,6 +16,7 @@ from semantic_digital_twin.spatial_types.spatial_types import Pose
 
 from ..conftest import SAMPLING_SEED
 from .conftest import expand
+from ..plan_running import simulated_executor, statechart_of
 
 # %% fixtures
 
@@ -159,7 +160,7 @@ def test_a_place_that_rises_off_the_object_withdraws_straight_up(pr2_holding_mil
     )
 
 
-def test_a_place_comes_down_and_withdraws_in_straight_lines_holding_the_hand_open(
+def test_a_place_moving_straight_around_objects_comes_down_and_withdraws_straight(
     pr2_holding_milk,
 ):
     """
@@ -169,19 +170,29 @@ def test_a_place_comes_down_and_withdraws_in_straight_lines_holding_the_hand_ope
     world, robot, milk, extensions = pr2_holding_milk
     target = Pose.from_xyz_rpy(1.2, 0.4, 0.9, reference_frame=world.root)
     place = PlaceAction(object_designator=milk, target_location=target)
-    expand(Sequence(nodes=[place]), extensions)
-    open_state = robot.left_arm.end_effector.get_joint_state_by_type(GripperState.OPEN)
+    executor = simulated_executor(
+        extensions, plan_adaptations=[MoveStraightAroundObjects()]
+    )
+    statechart_of(executor, Sequence(nodes=[place]))
 
     _, descent, _, withdrawal = _tool_goals_of(place)
-    [holding_open] = [
-        node for node in withdrawal.nodes if isinstance(node, JointPositionList)
-    ]
 
     assert (type(descent), type(withdrawal)) == (
         CartesianPoseStraight,
         CartesianPoseStraight,
     )
-    assert dict(holding_open.goal_state.items()) == dict(open_state.items())
+    assert [
+        type(node) for node in withdrawal.nodes if isinstance(node, MoveGripper)
+    ] == [MoveGripper]
+
+
+def test_a_place_leaves_the_paths_around_the_object_free_by_default(pr2_holding_milk):
+    world, robot, milk, extensions = pr2_holding_milk
+    target = Pose.from_xyz_rpy(1.2, 0.4, 0.9, reference_frame=world.root)
+    place = PlaceAction(object_designator=milk, target_location=target)
+    expand(Sequence(nodes=[place]), extensions)
+
+    assert [type(goal) for goal in _tool_goals_of(place)] == [CartesianPose] * 4
 
 
 # %% releasing what has not been picked up yet

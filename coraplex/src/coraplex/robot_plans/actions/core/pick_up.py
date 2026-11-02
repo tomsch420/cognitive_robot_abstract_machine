@@ -115,18 +115,25 @@ class ReachAction(
                     self.arm.end_effector.default_configuration(GripperState.OPEN)
                 )
             )
-        # The fingers are already around the object by now, so the hand is held to the
-        # line onto the grasp: left to take whatever path the arm finds, it swings the
-        # open fingers sideways through what it is reaching for.
+        # The fingers are already around the object by now: left to take whatever path
+        # the arm finds, the hand swings them sideways through what it is reaching for,
+        # and fingers nothing holds open drift shut on it.
+        holding_open = (
+            (
+                self.gripper_goal_type.moving_gripper_to(
+                    self.arm.end_effector.default_configuration(GripperState.OPEN)
+                ),
+            )
+            if self.moves_straight_around_objects and self.open_gripper_at_pre_pose
+            else ()
+        )
         children.append(
             self.tool_center_point_goal(
                 poses.grasp,
                 self.arm,
                 max_linear_velocity=self.final_approach_linear_velocity,
-                in_a_straight_line=True,
-                held_gripper_state=(
-                    GripperState.OPEN if self.open_gripper_at_pre_pose else None
-                ),
+                in_a_straight_line=self.moves_straight_around_objects,
+                accompanying_goals=holding_open,
             )
         )
         return children

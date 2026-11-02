@@ -47,7 +47,14 @@ from semantic_digital_twin.world_description.shape_collection import ShapeCollec
 from semantic_digital_twin.world_description.world_entity import Body
 from ..conftest import grasp_point_of, left_or_only_arm, right_or_only_arm
 from ..world_snapshot import WorldSnapshot
-from ...plan_running import perform_in_physics, run_plan, robot_extensions
+from coraplex.plans.executors import PhysicallySimulatedPlanExecutor
+from cramph.context import StatechartContext
+from ...plan_running import (
+    perform_in_physics,
+    robot_extensions,
+    run_plan,
+    statechart_of,
+)
 from ...pytest_environment import runs_in_continuous_integration
 
 
@@ -534,7 +541,7 @@ def physically_simulated_slider_context(stationary_block_context):
 @pytest.mark.skipif(
     not runs_in_continuous_integration(), reason="MuJoCo tests only run in CI"
 )
-def test_a_plan_in_physics_leaves_the_joints_of_the_environment_to_the_physics(
+def test_a_plan_in_physics_can_leave_the_joints_of_the_environment_to_the_physics(
     physically_simulated_slider_context,
 ):
     """
@@ -546,7 +553,13 @@ def test_a_plan_in_physics_leaves_the_joints_of_the_environment_to_the_physics(
     plan = Sequence(
         nodes=[JointPositionList(goal_state=JointState.from_mapping({slider: 0.3}))]
     )
+    executor = PhysicallySimulatedPlanExecutor(
+        StatechartContext.with_extensions(slider._world, extensions),
+        simulation=simulation,
+        leaves_the_environment_to_the_physics=True,
+    )
 
-    perform_in_physics(plan, extensions, simulation)
+    executor.compile(statechart_of(executor, plan))
+    executor.execute()
 
     assert slider.position == pytest.approx(0.0, abs=1e-6)

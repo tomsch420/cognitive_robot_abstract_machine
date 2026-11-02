@@ -102,14 +102,11 @@ class PlaceAction(
                 arm,
                 max_linear_velocity=self.transport_linear_velocity,
             ),
-            # The object is between the fingers on the way down and still between them
-            # on the way out, so both are held to a straight line: a free path sweeps
-            # what is being put down off its place.
             self.tool_center_point_goal(
                 poses.grasp,
                 arm,
                 max_linear_velocity=self.placing_linear_velocity,
-                in_a_straight_line=True,
+                in_a_straight_line=self.moves_straight_around_objects,
             ),
             Parallel(
                 nodes=[
@@ -141,14 +138,21 @@ class PlaceAction(
                 self.object_designator.root,
                 self.world.root,
             ),
-            # The gripper starts out around the object it has just let go of, so it is
-            # held open on a straight line out: fingers left to drift knock it over.
+            # The gripper starts out around the object it has just let go of.
             self.tool_center_point_goal(
                 retract_pose,
                 arm,
                 max_linear_velocity=self.retract_linear_velocity,
-                in_a_straight_line=True,
-                held_gripper_state=GripperState.OPEN,
+                in_a_straight_line=self.moves_straight_around_objects,
+                accompanying_goals=(
+                    (
+                        self.gripper_goal_type.moving_gripper_to(
+                            arm.end_effector.default_configuration(GripperState.OPEN)
+                        ),
+                    )
+                    if self.moves_straight_around_objects
+                    else ()
+                ),
             ),
         ]
 

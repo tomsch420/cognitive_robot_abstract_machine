@@ -25,7 +25,7 @@ from coraplex.robot_plans.mixins import (
     MovesToolCenterPoint,
     OperatesGripper,
 )
-from cramph.composites import Parallel, Sequence
+from cramph.composites import Sequence
 from cramph.node import StatechartNode
 from giskardpy.motion_statechart.binding_policy import GoalBindingPolicy
 from giskardpy.motion_statechart.tasks.cartesian_tasks import (
@@ -59,11 +59,7 @@ class MoveTorsoAction(SequentialAction):
 
     def create_steps(self) -> list[StatechartNode]:
         joint_state = self.robot.get_torso().get_joint_state_by_type(self.torso_state)
-        joint_goal = JointPositionList(goal_state=joint_state)
-        base_hold = self.keep_base_still()
-        if not base_hold:
-            return [joint_goal]
-        return [Parallel(nodes=[joint_goal, *base_hold])]
+        return [JointPositionList(goal_state=joint_state)]
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
@@ -148,18 +144,16 @@ class ParkArmsAction(ParallelAction, HasMaxJointVelocity):
 
     def create_steps(self) -> list[StatechartNode]:
         park_state = self.park_joint_state()
-        steps: list[StatechartNode] = [
-            JointPositionList(goal_state=park_state),
-            *self.keep_base_still(),
+        joint_goal = JointPositionList(goal_state=park_state)
+        if self.max_joint_velocity is None:
+            return [joint_goal]
+        return [
+            joint_goal,
+            JointVelocityLimit(
+                connections=list(park_state.connections),
+                max_velocity=self.max_joint_velocity,
+            ),
         ]
-        if self.max_joint_velocity is not None:
-            steps.append(
-                JointVelocityLimit(
-                    connections=list(park_state.connections),
-                    max_velocity=self.max_joint_velocity,
-                )
-            )
-        return steps
 
     def park_joint_state(self) -> JointState:
         """

@@ -43,7 +43,7 @@ from coraplex.robot_plans.actions.core.robot_body import (
     MoveFingersToWidthAction,
     ParkArmsAction,
 )
-from coraplex.robot_plans.mixins import ReattachesBranches
+from coraplex.robot_plans.mixins import MovesToolCenterPoint, ReattachesBranches
 from cramph.composites import Sequence, StatementNode
 from cramph.node import StatechartNode
 from giskardpy.motion_statechart.goals.base_pose_goals import HolonomicBaseGoal
@@ -528,6 +528,22 @@ class DetectWithRoboKudo(ConfigurationTransformation[DetectAction]):
 
 
 # %% letting contact carry a body
+
+
+@dataclass
+class MoveStraightAroundObjects(ConfigurationTransformation[MovesToolCenterPoint]):
+    """
+    Holds the tool center point to straight lines, with the hand held open, wherever the
+    fingers are around an object, where physics would otherwise have the hand sweep the
+    object away or close on it early, see :attr:`~coraplex.robot_plans.mixins.MovesToolC
+    enterPoint.moves_straight_around_objects`.
+    """
+
+    def is_applicable(self, plan_node: MovesToolCenterPoint) -> bool:
+        return True
+
+    def apply(self, plan_node: MovesToolCenterPoint) -> None:
+        plan_node.moves_straight_around_objects = True
 
 
 @dataclass

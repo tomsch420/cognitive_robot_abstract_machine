@@ -15,6 +15,7 @@ from cramph.composites import Parallel, Sequence, TryAll, TryInOrder
 from cramph.threaded_nodes import FunctionCall
 from cramph.data_types import LifeCycleValues
 from coraplex.robot_plans.plan_transformations import (
+    MoveStraightAroundObjects,
     OpenDrawerBeforeMoveAndPickUp,
     ParkArmsBeforeFirstAction,
 )
@@ -63,6 +64,7 @@ from giskardpy.motion_statechart.goals.gripper import MoveFingers, MoveGripper
 from giskardpy.motion_statechart.monitors.overwrite_state_monitors import SetOdometry
 from giskardpy.motion_statechart.goals.base_pose_goals import HolonomicBaseGoal
 from giskardpy.motion_statechart.goals.cartesian_goals import CartesianPoseStraight
+from giskardpy.motion_statechart.goals.gripper import MovesGripperToConfiguration
 from giskardpy.motion_statechart.goals.grasped_mechanism import (
     ArticulateGraspedMechanism,
 )
@@ -1550,32 +1552,10 @@ def test_moving_an_arm_or_looking_leaves_a_full_body_controlled_base_free(
         assert nodes_of_type(action, HoldPose) == []
 
 
-def test_moving_the_torso_or_parking_the_arms_holds_the_base_of_a_robot_that_stands_still(
-    multiple_robot_apartment_context,
-):
-    """
-    Joints move while the base is meant to stand, as they do while an arm reaches, so
-    collision avoidance must not push the base aside either.
-    """
-    world, robot, extensions = multiple_robot_apartment_context
-    with world.modify_world():
-        robot.mobile_base.full_body_controlled = False
-
-    for action in [
-        MoveTorsoAction(torso_state=TorsoState.HIGH),
-        ParkArmsAction(arms=robot.all_arms),
-    ]:
-        expand(action, extensions)
-
-        [hold_base] = nodes_of_type(action, HoldPose)
-        assert hold_base.root_link == world.root
-        assert hold_base.tip_link == robot.root
-
-
 # %% coming onto a grasp
 
 
-def test_a_reach_comes_onto_its_grasp_in_a_straight_line_holding_the_hand_open(
+def test_a_reach_moving_straight_around_objects_comes_onto_its_grasp_straight(
     multiple_robot_apartment_context,
 ):
     """
@@ -1590,17 +1570,20 @@ def test_a_reach_comes_onto_its_grasp_in_a_straight_line_holding_the_hand_open(
         grasp=milk.grasp_candidates()[0], arm=arm, open_gripper_at_pre_pose=True
     )
 
-    expand(reach, extensions)
+    executor = simulated_executor(
+        extensions, plan_adaptations=[MoveStraightAroundObjects()]
+    )
+    statechart_of(executor, reach)
 
     first_approach, *_, last_approach = nodes_of_type(reach, CartesianPose)
-    [holding_open] = [
-        node for node in last_approach.nodes if isinstance(node, JointPositionList)
-    ]
     assert type(first_approach) is CartesianPose
     assert type(last_approach) is CartesianPoseStraight
-    assert dict(holding_open.goal_state.items()) == dict(
-        arm.end_effector.get_joint_state_by_type(GripperState.OPEN).items()
-    )
+    holding_open = [
+        node
+        for node in last_approach.nodes
+        if isinstance(node, MovesGripperToConfiguration)
+    ]
+    assert len(holding_open) == 1
 
 
 # %% sending the fingers to a width

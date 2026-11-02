@@ -19,9 +19,7 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianPositionVelocityLimit,
     CartesianRotationVelocityLimit,
 )
-from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList
 from giskardpy.motion_statechart.weights import DefaultWeights
-from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.robots.robot_parts import Arm, EndEffector
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
@@ -203,6 +201,14 @@ class MovesToolCenterPoint(Action, ABC):
     Rotation threshold in rad for goal achievement.
     """
 
+    moves_straight_around_objects: bool = field(default=False, init=False)
+    """
+    Whether the tool center point is held to straight lines, with the hand held open,
+    wherever the fingers are around an object: coming onto a grasp, setting an object
+    down and withdrawing from it. Set by
+    :class:`~coraplex.robot_plans.plan_transformations.MoveStraightAroundObjects`.
+    """
+
     def tool_center_point_goal(
         self,
         target: Pose,
@@ -210,7 +216,7 @@ class MovesToolCenterPoint(Action, ABC):
         max_linear_velocity: float | None = None,
         max_angular_velocity: float | None = None,
         in_a_straight_line: bool = False,
-        held_gripper_state: GripperState | None = None,
+        accompanying_goals: tuple[MotionStatechartNode, ...] = (),
     ) -> MotionStatechartNode:
         """
         :param target: Where the tool center point should end up.
@@ -219,9 +225,8 @@ class MovesToolCenterPoint(Action, ABC):
         :param max_angular_velocity: Cap on how fast it turns, in rad/s.
         :param in_a_straight_line: Whether the tool center point is held to the line
             from where it sets off to `target`.
-        :param held_gripper_state: The state the hand is held in on the way, or None to
-            leave the hand alone. A hand nothing holds is commanded to wherever it is
-            measured, so its fingers keep whatever drift they pick up on the way.
+        :param accompanying_goals: Further goals held while the tool center point
+            moves, such as one holding the hand open.
         :return: The goal moving the tool center point there, together with whatever
             speed caps were asked for, and the task keeping the base still, see :meth:`~coraplex.robot_plans.actions.base.Action.keep_base_still`.
             A goal that is a parallel of its tasks holds them itself; any other is put in
@@ -233,15 +238,7 @@ class MovesToolCenterPoint(Action, ABC):
             root, tip, max_linear_velocity, max_angular_velocity
         )
         accompanying.extend(self.keep_base_still())
-        if held_gripper_state is not None:
-            accompanying.append(
-                JointPositionList(
-                    name="hold gripper",
-                    goal_state=arm.end_effector.get_joint_state_by_type(
-                        held_gripper_state
-                    ),
-                )
-            )
+        accompanying.extend(accompanying_goals)
         goal = self._reach_target(target, root, tip, in_a_straight_line)
         if not accompanying:
             return goal

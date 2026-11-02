@@ -492,6 +492,13 @@ class PhysicallySimulatedPlanExecutor(SimulatedPlanExecutor):
     Steps :attr:`simulation` one control period after every tick.
     """
 
+    leaves_the_environment_to_the_physics: bool = field(default=False, kw_only=True)
+    """
+    Whether the joints that are not the robot's are left to the physics while a plan
+    runs, so that only what the robot does to them moves them, and the world takes where
+    the physics left them once the plan is over.
+    """
+
     plan_adaptations: list[PlanTransformation] = field(
         default_factory=lambda: [LetContactCarryTheBodies()],
         kw_only=True,
@@ -536,9 +543,12 @@ class PhysicallySimulatedPlanExecutor(SimulatedPlanExecutor):
     def _run(self) -> None:
         """
         Differs from :meth:`SimulatedPlanExecutor._run` in leaving the joints that are
-        not the robot's to the physics while the plan runs, so that only what the robot
-        does to them moves them.
+        not the robot's to the physics while the plan runs, if
+        :attr:`leaves_the_environment_to_the_physics`.
         """
+        if not self.leaves_the_environment_to_the_physics:
+            super()._run()
+            return
         with self.simulation.synchronizer.leave_to_the_physics(
             self._joints_of_the_environment
         ):
