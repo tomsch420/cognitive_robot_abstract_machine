@@ -393,12 +393,9 @@ class KinematicStructureEntityConverter(EntityConverter, ABC):
         # exclude it (see Connection.reference_origin_expression). A drive that is not
         # servoed has no simulator joint, so its body is built where the drive holds it.
         parent_connection = entity.parent_connection
-        is_welded_drive = (
-            isinstance(parent_connection, WheeledDrive)
-            and not MujocoWheeledDriveJoints.of(
-                parent_connection, entity._world
-            ).servoed
-        )
+        is_welded_drive = isinstance(
+            parent_connection, WheeledDrive
+        ) and not MujocoWheeledDriveJoints.is_servoed(parent_connection, entity._world)
         static_frame = (
             parent_connection.origin_as_position_quaternion()
             if is_welded_drive
@@ -2052,15 +2049,24 @@ class MujocoWheeledDriveJoints(MujocoConnectionJoints[DriveType], ABC):
     def servoed(self) -> bool:
         """
         :return: Whether servos drive every degree of freedom the drive is commanded
-            with.
+            with, see :meth:`is_servoed`.
+        """
+        return self.is_servoed(self.connection, self.world)
+
+    @staticmethod
+    def is_servoed(drive: WheeledDrive, world: World) -> bool:
+        """
+        :param drive: A drive in `world`.
+        :param world: The world the drive belongs to.
+        :return: Whether servos drive every degree of freedom `drive` is commanded with.
         """
         actuated = {
             degree_of_freedom.id
-            for actuator in self.world.actuators
+            for actuator in world.actuators
             for degree_of_freedom in actuator.dofs
         }
         return {
-            degree_of_freedom.id for degree_of_freedom in self.connection.active_dofs
+            degree_of_freedom.id for degree_of_freedom in drive.active_dofs
         } <= actuated
 
     @property
