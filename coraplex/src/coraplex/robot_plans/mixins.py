@@ -23,6 +23,7 @@ from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.robots.robot_parts import Arm, EndEffector
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.spatial_types.spatial_types import Pose
+from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
 from semantic_digital_twin.world_description.world_entity import (
     Body,
     KinematicStructureEntity,
@@ -455,14 +456,29 @@ class HasApproachesGraspPoses:
         :return: The distance in meters, zero when the grasp already lies outside the
             box.
         """
-        bounding_box = body.collision.as_bounding_box_collection_in_frame(
-            body
-        ).bounding_box()
+        return HasApproachesGraspPoses.distance_out_of(
+            body.collision.as_bounding_box_collection_in_frame(body).bounding_box(),
+            reference_T_grasp,
+        )
 
-        body_T_grasp = body._world.transform(reference_T_grasp, body).to_np()
-        grasp_position = body_T_grasp[:3, 3]
+    @staticmethod
+    def distance_out_of(
+        bounding_box: VolumetricBoundingBox, reference_T_grasp: Pose
+    ) -> float:
+        """
+        The distance the gripper has to retrace from a grasp before it leaves a box.
+
+        :param bounding_box: The box the gripper has to leave, axis aligned in the frame
+            it is expressed in.
+        :param reference_T_grasp: The grasp frame, whose x-axis is the approach.
+        :return: The distance in meters, zero when the grasp already lies outside the
+            box.
+        """
+        frame = bounding_box.origin.reference_frame
+        frame_T_grasp = frame._world.transform(reference_T_grasp, frame).to_np()
+        grasp_position = frame_T_grasp[:3, 3]
         # The grasp frame's x-axis is where the gripper comes from, so it retraces -x.
-        retrace_direction = -body_T_grasp[:3, 0]
+        retrace_direction = -frame_T_grasp[:3, 0]
         intervals = (
             bounding_box.x_interval,
             bounding_box.y_interval,

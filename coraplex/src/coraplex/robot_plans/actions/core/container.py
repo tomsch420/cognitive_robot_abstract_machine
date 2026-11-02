@@ -36,6 +36,11 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
 )
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
+from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
+from semantic_digital_twin.world_description.shape_collection import (
+    BoundingBoxCollection,
+)
+from semantic_digital_twin.world_description.world_entity import Body
 
 # %% taking a container by its handle
 
@@ -51,8 +56,8 @@ class MovesContainerByItsHandle(
 
     release_clearance: float = 0.05
     """
-    How far in meters the gripper backs off once it has let go, past where it leaves the
-    bounding box of the body :attr:`mechanism` moves.
+    How far in meters the gripper backs off once it has let go, past where it leaves
+    :attr:`moved_part_bounding_box`.
     """
 
     @classmethod
@@ -91,6 +96,33 @@ class MovesContainerByItsHandle(
             ActiveConnection1DOF
         )
 
+    @property
+    def moved_part_bounding_box(self) -> VolumetricBoundingBox:
+        """
+        The box bounding the body :attr:`mechanism` moves or, where that body has no
+        geometry of its own, the bodies with geometry below it, in the frame of the body
+        :attr:`mechanism` moves.
+        """
+        part = self.mechanism.child
+        bounded = (
+            [part]
+            if isinstance(part, Body) and part.has_collision()
+            else [
+                body
+                for body in part._world.compute_descendent_child_kinematic_structure_entities(
+                    part
+                )
+                if isinstance(body, Body) and body.has_collision()
+            ]
+        )
+        return BoundingBoxCollection.merge_all(
+            (
+                body.collision.as_bounding_box_collection_in_frame(part)
+                for body in bounded
+            ),
+            part,
+        ).bounding_box()
+
     def back_off_pose(self, grasp_pose: Pose, end_effector: EndEffector) -> Pose:
         """
         The tool frame goal that clears the released handle and the container, back
@@ -102,8 +134,8 @@ class MovesContainerByItsHandle(
         :return: The pose the tool frame backs off to, in `grasp_pose`'s frame.
         """
         distance = (
-            HasApproachesGraspPoses.distance_to_boundary(
-                self.mechanism.child, grasp_pose
+            HasApproachesGraspPoses.distance_out_of(
+                self.moved_part_bounding_box, grasp_pose
             )
             + self.release_clearance
         )

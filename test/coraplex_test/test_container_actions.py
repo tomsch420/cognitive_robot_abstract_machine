@@ -14,11 +14,20 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Handle
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.spatial_types.spatial_types import (
     Pose,
     RotationMatrix,
     Vector3,
 )
+from semantic_digital_twin.world_description.connections import (
+    FixedConnection,
+    PrismaticConnection,
+)
+from semantic_digital_twin.world_description.geometry import Box, Scale
+from semantic_digital_twin.world_description.shape_collection import ShapeCollection
+from semantic_digital_twin.world_description.world_entity import Body
 from .conftest import left_or_only_arm
 from ..plan_running import simulated_executor, statechart_of
 
@@ -160,6 +169,64 @@ def test_back_off_pose_clears_the_drawer_of_a_grasp_from_above(pr2_at_drawer):
 
     assert back_off.to_np()[2, 3] - tool_goal.to_np()[2, 3] == pytest.approx(
         drawer_top - grasp_height + action.release_clearance, abs=1e-3
+    )
+
+
+# %% a handle hanging from its joint through a body without geometry
+
+
+@pytest.fixture
+def pr2_at_a_handle_below_an_empty_body(simple_pr2_context):
+    """
+    A PR2 next to a handle whose joint moves a body without geometry, from which the
+    handle hangs; it is how a part that turns about two joints in a row is built.
+    """
+    world, robot, extensions = simple_pr2_context
+    with world.modify_world():
+        empty = Body(name=PrefixedName("between_the_joints"))
+        handle_body = Body(
+            name=PrefixedName("handle_below_the_empty_body"),
+            collision=ShapeCollection([Box(scale=Scale(0.04, 0.2, 0.04))]),
+        )
+        world.add_connection(
+            PrismaticConnection.create_with_dofs(
+                world,
+                world.root,
+                empty,
+                axis=Vector3.X(),
+                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    1, 0, 1, reference_frame=world.root
+                ),
+            )
+        )
+        world.add_connection(FixedConnection(parent=empty, child=handle_body))
+        world.add_semantic_annotation(handle := Handle(root=handle_body))
+    return world, robot, handle
+
+
+def test_back_off_pose_clears_a_handle_below_a_body_without_geometry(
+    pr2_at_a_handle_below_an_empty_body,
+):
+    """
+    The part the joint moves is everything that hangs from it, so the gripper backs
+    out of the handle even though the body the joint moves directly has no geometry.
+    """
+    world, robot, handle = pr2_at_a_handle_below_an_empty_body
+    end_effector = left_or_only_arm(robot).end_effector
+    action = OpenAction(
+        grasp=GraspCandidate.from_body_origin(handle), arm=left_or_only_arm(robot)
+    )
+    grasp_pose = Pose(reference_frame=handle.root)
+
+    tool_goal = end_effector.tool_frame_goal_for_grasp(grasp_pose)
+    back_off = action.back_off_pose(grasp_pose, end_effector)
+
+    [handle_box] = handle.root.collision.shapes
+    np.testing.assert_allclose(
+        back_off.to_np()[:3, 3] - tool_goal.to_np()[:3, 3],
+        -(handle_box.scale.x / 2 + action.release_clearance)
+        * np.asarray(grasp_pose.to_np()[:3, 0]),
+        atol=1e-9,
     )
 
 
