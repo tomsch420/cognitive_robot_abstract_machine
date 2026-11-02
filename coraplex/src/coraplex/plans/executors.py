@@ -336,6 +336,8 @@ class PlanExecutor(Executor, ABC):
             return PlanOutcome.failed_by(
                 MotionWasInfeasible(infeasibility), infeasibility
             )
+        except PlanFailure as failure:
+            return PlanOutcome(failure=failure)
         return PlanOutcome(failure=self._failure_of_plan())
 
     @abstractmethod

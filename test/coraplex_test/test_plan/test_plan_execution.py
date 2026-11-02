@@ -396,6 +396,20 @@ def test_an_attempted_plan_that_fails_reports_its_failure_instead_of_raising_it(
     assert outcome.failure.violation is violation
 
 
+def test_an_attempted_plan_that_outlasts_the_simulation_time_limit_reports_it(
+    pr2_apartment_context,
+) -> None:
+    world, robot_view, extensions = pr2_apartment_context
+    executor = simulated_executor(extensions, simulation_time_per_action=timedelta(0))
+    executor.compile(
+        statechart_of(executor, MoveTorsoAction(torso_state=TorsoState.HIGH))
+    )
+
+    outcome = executor.attempt()
+
+    assert isinstance(outcome.failure, MotionExceededSimulationTimeLimit)
+
+
 # %% avoiding collisions in a world with several robots
 
 
