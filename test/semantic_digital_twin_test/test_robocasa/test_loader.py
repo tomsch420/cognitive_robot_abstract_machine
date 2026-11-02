@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 
+import mujoco
 import pytest
 
 pytest.importorskip("robocasa", reason="robocasa is not installed")
@@ -10,7 +11,10 @@ from semantic_digital_twin.adapters.robocasa_dataset.exceptions import (
 )
 from semantic_digital_twin.adapters.mjcf import MJCFParser
 from semantic_digital_twin.adapters.robocasa_dataset.loader import (
+    OBJ_CATEGORIES,
+    MJCFObject,
     RoboCasaDatasetLoader,
+    _mjcf_document_from_robocasa_object,
     _parse_robosuite_mjcf,
 )
 from semantic_digital_twin.adapters.robocasa_dataset.semantics import (
@@ -411,6 +415,31 @@ def test_load_task_weighs_a_body_as_robocasa_weighs_it(robocasa_loader):
 
     inertial = task.world.get_body_by_name(model.body_id2name(drawer)).inertial
     assert inertial.mass == pytest.approx(model.body_mass[drawer])
+
+
+def test_load_object_weighs_a_body_as_its_model_weighs_it(robocasa_loader):
+    """
+    An object's bodies weigh what MuJoCo makes of the densities its model gives its
+    geoms, which a world keeps no record of: weighed at MuJoCo's default density once
+    simulated again, a pan or a whisk would weigh kilograms.
+    """
+    world = robocasa_loader.load_object(RoboCasaObjectCategory.PAN)
+    [model_file] = robocasa_loader.object_model_files(RoboCasaObjectCategory.PAN)[:1]
+    group = model_file.relative_to(robocasa_loader.directory / "objects").parts[0]
+    model = mujoco.MjModel.from_xml_string(
+        _mjcf_document_from_robocasa_object(
+            MJCFObject(
+                name=RoboCasaObjectCategory.PAN,
+                mjcf_path=str(model_file),
+                scale=OBJ_CATEGORIES[RoboCasaObjectCategory.PAN][group].scale,
+            )
+        )
+    )
+
+    weighed = sum(
+        body.inertial.mass for body in world.bodies if body.inertial is not None
+    )
+    assert weighed == pytest.approx(float(model.body_mass.sum()))
 
 
 PINNED_CATEGORY = "yogurt"

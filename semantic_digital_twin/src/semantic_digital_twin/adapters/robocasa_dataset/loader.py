@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
+import mujoco
 from typing_extensions import TYPE_CHECKING, Any, ClassVar
 
 if TYPE_CHECKING:
@@ -341,7 +342,9 @@ class RoboCasaDatasetLoader:
             mujoco_objects=list(kitchen_appliances.values()),
         )
 
-        world = _parse_robosuite_mjcf(MJCFParser.from_xml_string(task.get_xml()))
+        world = _parse_robosuite_mjcf(
+            MJCFParser.from_xml_string(self._weighed_as_composed(task.get_xml()))
+        )
         self._apply_kitchen_appliance_semantics(world, kitchen_appliances)
         return self.preprocessing.apply(world)
 
@@ -451,7 +454,8 @@ class RoboCasaDatasetLoader:
         )
 
         document = ET.fromstring(stripped_document)
-        self._bake_inertials(document, environment.sim.model)
+        # robosuite wraps MuJoCo's model; the bake reads MuJoCo's own
+        self._bake_inertials(document, environment.sim.model._model)
         self._give_every_joint_a_body_of_its_own(document)
         mirrored_joints = self._mirror_joints_opening_towards_negative(document)
         world = _parse_robosuite_mjcf(
@@ -621,24 +625,41 @@ class RoboCasaDatasetLoader:
         return ET.tostring(root, encoding="unicode")
 
     @classmethod
-    def _bake_inertials(cls, document: ET.Element, model: Any) -> None:
+    def _weighed_as_composed(cls, document_text: str) -> str:
         """
-        Give every body of ``document`` that RoboCasa simulates with a mass the inertial
-        properties it is simulated with.
+        :param document_text: An MJCF document RoboCasa composed, whose geoms still carry
+            the densities RoboCasa weighs them by.
+        :return: The document with every body that weighs anything given the inertial
+            properties MuJoCo derives from those densities, see :meth:`_bake_inertials`.
+            A world keeps no densities, so a body parsed without an inertial would be
+            weighed at MuJoCo's default density once the world is simulated again.
+        """
+        document = ET.fromstring(document_text)
+        # named as _parse_robosuite_mjcf names them, so the bake finds them by name
+        for index, body in enumerate(document.find("worldbody").iter("body"), start=1):
+            if not body.get("name"):
+                body.set("name", f"unnamed_body_{index}")
+        renamed = ET.tostring(document, encoding="unicode")
+        cls._bake_inertials(document, mujoco.MjModel.from_xml_string(renamed))
+        return ET.tostring(document, encoding="unicode")
+
+    @classmethod
+    def _bake_inertials(cls, document: ET.Element, model: mujoco.MjModel) -> None:
+        """
+        Give every body of ``document`` that ``model`` simulates with a mass the
+        inertial properties it is simulated with.
 
         The document RoboCasa's simulation gives back does not say which of a body's
         geoms RoboCasa weighs, so weighed from its geoms alone a drawer would also weigh
         the region marking its inside.
 
-        :param document: The task's MJCF document, changed in place.
-        :param model: The model of RoboCasa's simulation of the task.
+        :param document: An MJCF document, changed in place.
+        :param model: The model MuJoCo simulates the document's bodies with.
         """
+        simulated = {model.body(index).name: index for index in range(model.nbody)}
         for body in document.find("worldbody").iter("body"):
-            name = body.get("name")
-            if name not in model.body_names:
-                continue
-            index = model.body_name2id(name)
-            if model.body_mass[index] <= 0.0:
+            index = simulated.get(body.get("name"))
+            if index is None or model.body_mass[index] <= 0.0:
                 continue
             for inertial in body.findall("inertial"):
                 body.remove(inertial)
@@ -801,7 +822,9 @@ class RoboCasaDatasetLoader:
         :raises RoboCasaApplianceNotFoundError: if no layout contains a fixture of ``category``.
         """
         appliance = self._find_configured_appliance(category, style_id)
-        world = _parse_robosuite_mjcf(MJCFParser.from_xml_string(appliance.get_xml()))
+        world = _parse_robosuite_mjcf(
+            MJCFParser.from_xml_string(self._weighed_as_composed(appliance.get_xml()))
+        )
         self._apply_kitchen_appliance_semantics(world, {appliance.name: appliance})
         return self.preprocessing.apply(world)
 
@@ -914,7 +937,9 @@ class RoboCasaDatasetLoader:
         )
         world = _parse_robosuite_mjcf(
             MJCFParser.from_xml_string(
-                _mjcf_document_from_robocasa_object(robocasa_object)
+                self._weighed_as_composed(
+                    _mjcf_document_from_robocasa_object(robocasa_object)
+                )
             )
         )
         self._apply_object_semantics(world, category)
