@@ -4,13 +4,13 @@ Tests for detecting a drawer or door being opened and being closed.
 
 from dataclasses import dataclass
 
-import pytest
-from giskardpy.motion_statechart.context import MotionStatechartContext
+from cramph.context import StatechartContext
+from cramph.executor import StatechartExecutor
 from segmind.datastructures.events import ClosedEvent, OpenedEvent, PartlyOpenEvent
 from segmind.detectors.base import SegmindContext
 from segmind.detectors.mechanism_detector_nodes import OpeningDetector
-from segmind.episode_segmenter import EpisodeSegmenterExecutor
-from segmind.statecharts.segmind_statechart import SegmindStatechart
+from segmind.episode_segmenter import EpisodeSegmentation
+from segmind.statecharts.segmind_statechart import DetectorStatechartBuilder
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types.spatial_types import Vector3
 from semantic_digital_twin.world import World
@@ -51,7 +51,7 @@ class DrawerOnRails:
     The detector watching the drawer.
     """
 
-    executor: EpisodeSegmenterExecutor
+    executor: StatechartExecutor
     """
     Ticks the detector.
     """
@@ -70,6 +70,19 @@ class DrawerOnRails:
         return self.executor.context.require_extension(
             SegmindContext
         ).logger.get_events()
+
+
+def segmenting_executor(world: World, detector: OpeningDetector) -> StatechartExecutor:
+    """
+    :param world: The world the detector watches.
+    :param detector: The detector to tick.
+    :return: An executor ticking `detector` in `world`, compiled.
+    """
+    executor = StatechartExecutor(
+        context=StatechartContext(world=world), extensions=[EpisodeSegmentation()]
+    )
+    executor.compile(DetectorStatechartBuilder([detector]).build(executor.context))
+    return executor
 
 
 def drawer_on_rails(starting_position: float) -> DrawerOnRails:
@@ -107,8 +120,7 @@ def drawer_on_rails(starting_position: float) -> DrawerOnRails:
         world.add_connection(rails)
     rails.position = starting_position
     detector = OpeningDetector(tracked_object=drawer)
-    executor = EpisodeSegmenterExecutor(context=MotionStatechartContext(world=world))
-    executor.compile(SegmindStatechart().build_statechart([detector]))
+    executor = segmenting_executor(world, detector)
     executor.tick()
     return DrawerOnRails(world, rails, detector, executor)
 
@@ -178,11 +190,9 @@ def test_a_drawer_moved_within_partly_open_is_not_reported():
 def test_a_body_without_a_joint_is_never_reported():
     drawer = drawer_on_rails(starting_position=0.0)
     cabinet = drawer.rails.parent
-    detector = OpeningDetector(tracked_object=cabinet)
-    executor = EpisodeSegmenterExecutor(
-        context=MotionStatechartContext(world=drawer.world)
+    executor = segmenting_executor(
+        drawer.world, OpeningDetector(tracked_object=cabinet)
     )
-    executor.compile(SegmindStatechart().build_statechart([detector]))
 
     executor.tick()
     executor.tick()
