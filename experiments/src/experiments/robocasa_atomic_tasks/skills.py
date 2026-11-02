@@ -11,6 +11,7 @@ approach begins.
 
 from __future__ import annotations
 
+from abc import ABC
 from dataclasses import dataclass
 
 import numpy as np
@@ -346,7 +347,7 @@ class DriveJoint(EndedByOwner, CompositeNode):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class DrivesAJointByAPart(MovesToolCenterPoint):
+class DrivesAJointByAPart(MovesToolCenterPoint, ABC):
     """
     An action that moves a joint of the environment by a part the gripper holds or
     pushes.
@@ -455,6 +456,16 @@ class OperateMechanismAction(DrivesAJointByAPart, MovesContainerByItsHandle):
             world_T_back_off = world.transform(back_off, world.root)
         return world.transform(world_T_back_off, joint.parent)
 
+    def _create_mechanism_goal(self) -> StatechartNode:
+        return self.joint_drive(
+            self.grasp.graspable.root,
+            self.arm,
+            self.mechanism,
+            self.goal_position,
+            self.threshold,
+            self.hold_base,
+        )
+
     def create_steps(self) -> list[StatechartNode]:
         end_effector = self.arm.end_effector
         settling = (
@@ -465,14 +476,7 @@ class OperateMechanismAction(DrivesAJointByAPart, MovesContainerByItsHandle):
         return [
             self.grasping_of(self.grasp, self.arm),
             *settling,
-            self.joint_drive(
-                self.grasp.graspable.root,
-                self.arm,
-                self.mechanism,
-                self.goal_position,
-                self.threshold,
-                self.hold_base,
-            ),
+            self._create_mechanism_goal(),
             self.gripper_goal_type.moving_gripper_to(
                 end_effector.default_configuration(GripperState.OPEN)
             ),
