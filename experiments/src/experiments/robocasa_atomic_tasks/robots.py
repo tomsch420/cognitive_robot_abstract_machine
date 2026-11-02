@@ -70,8 +70,26 @@ class TaskRobot(ABC):
         :return: The bodies around :meth:`video_eye` the video would see from inside.
         """
 
+    @abstractmethod
+    def wrist_bodies(self, robot: AbstractRobot) -> list[Body]:
+        """
+        :param robot: The robot, as :meth:`place_in` put it into the kitchen.
+        :return: The bodies of :meth:`acting_arm` just behind its gripper, which may
+            brush what stands around a part the gripper pushes.
+        """
+
 
 # %% the PR2
+
+
+class PR2WristLink(StrEnum):
+    """
+    The links of the PR2's right arm just behind its gripper.
+    """
+
+    FOREARM = "r_forearm_link"
+    WRIST_FLEX = "r_wrist_flex_link"
+    WRIST_ROLL = "r_wrist_roll_link"
 
 
 class PR2HeadLink(StrEnum):
@@ -131,6 +149,9 @@ class PR2Robot(TaskRobot):
             if isinstance(body, Body)
         ]
 
+    def wrist_bodies(self, robot: PR2) -> list[Body]:
+        return [robot._world.get_body_by_name(link) for link in PR2WristLink]
+
 
 # %% RoboCasa's own robot
 
@@ -157,6 +178,16 @@ class PandaOmronRobot(TaskRobot):
 
     def bodies_hidden_from_the_video(self, robot: PandaOmron) -> list[Body]:
         return [robot._world.get_body_by_name(PandaOmronBody.ARM_BASE)]
+
+    def wrist_bodies(self, robot: PandaOmron) -> list[Body]:
+        return [
+            robot._world.get_body_by_name(link)
+            for link in (
+                PandaOmronBody.FOREARM,
+                PandaOmronBody.WRIST,
+                PandaOmronBody.FLANGE,
+            )
+        ]
 
 
 # %% choosing one

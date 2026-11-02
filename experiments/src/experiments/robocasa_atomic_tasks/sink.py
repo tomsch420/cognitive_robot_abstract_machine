@@ -1,6 +1,6 @@
 """
-A PR2 performs RoboCasa's sink tasks (``kitchen_sink.py``): it takes hold of the
-faucet's handle or spout and turns it.
+The robot performs RoboCasa's sink tasks (``kitchen_sink.py``): it takes hold of the
+faucet's handle or spout and turns it, or swings the handle by pushing it.
 """
 
 from __future__ import annotations
@@ -51,12 +51,13 @@ class TurnOffSinkFaucet(TurnOnSinkFaucet):
 @dataclass
 class AdjustWaterTemperature(JointGoalTask):
     """
-    Swing the running faucet's handle towards hot or cold, as RoboCasa asks.
+    Swing the running faucet's handle towards hot or cold, as RoboCasa asks, as far as
+    it goes, pushing it with the sides of the fingers.
     """
 
     hot_share: float = 0.8
     """
-    How far along the temperature range the handle is swung for hot water; RoboCasa
+    How far along the temperature range the handle is aimed for hot water; RoboCasa
     counts the water hot from 0.6 and cold up to 0.4.
     """
 
@@ -69,6 +70,14 @@ class AdjustWaterTemperature(JointGoalTask):
             else 1.0 - self.hot_share
         )
         return [JointGoal(name, episode.joints.world_position_along_range(name, share))]
+
+    def solve(self, episode: RoboCasaEpisode) -> None:
+        """
+        Differs from :meth:`JointGoalTask.solve` in pushing the handle to the end of its
+        travel on the side of its goal, see :meth:`RoboCasaEpisode.push_sideways`.
+        """
+        [goal] = self.joint_goals(episode)
+        episode.push_sideways(goal.joint_name, goal.world_position)
 
 
 # %% the spout

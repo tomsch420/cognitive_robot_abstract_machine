@@ -51,6 +51,37 @@ class ObjectNotPickedUp(DataclassException):
 
 
 @dataclass
+class JointNotPushedToItsEnd(DataclassException):
+    """
+    Raised when every push of a part left the joint it hangs from short of the end of
+    its travel.
+    """
+
+    joint_name: str
+    """
+    The name RoboCasa gives the joint.
+    """
+
+    position: float
+    """
+    Where the joint stands after the last push.
+    """
+
+    end: float
+    """
+    The end of its travel it was pushed towards.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{self.joint_name} stands at {self.position:.4f}, not at {self.end:.4f}."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Push the part from other sides, or check what holds it back."
+
+
+@dataclass
 class NoRackAtLevel(DataclassException):
     """
     Raised when an oven has neither a rack nor a tray at the level asked for, nor at the

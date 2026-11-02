@@ -162,6 +162,23 @@ class BodyBounds:
             np.max([box.upper for box in boxes], axis=0),
         )
 
+    def distance_to_nearest_shape(self, body: Body, point: np.ndarray) -> float:
+        """
+        :param body: A body with collision geometry.
+        :param point: A point in the world's root frame.
+        :return: How far the point lies from the nearest of the boxes bounding the
+            body's own collision shapes one by one; 0 inside one of them.
+        """
+        return min(
+            float(np.linalg.norm(point - np.clip(point, bounds.lower, bounds.upper)))
+            for bounds in (
+                box.to_array_bounds()
+                for box in body.collision.as_bounding_box_collection_in_frame(
+                    self.world.root
+                ).bounding_boxes
+            )
+        )
+
     def distance_to(self, body: Body, point: np.ndarray) -> float:
         """
         :param body: A body with collision geometry, or with collision geometry below

@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 import numpy as np
 import pytest
 
+from experiments.robocasa_atomic_tasks.panda_omron import PandaOmron
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Handle
 from semantic_digital_twin.spatial_types.spatial_types import (
@@ -120,6 +121,17 @@ def kitchen_of_boxes() -> KitchenOfBoxes:
         plate_center=plate_center,
         plate_scale=plate_scale,
     )
+
+
+# %% RoboCasa's own robot
+
+
+@pytest.fixture(scope="module")
+def panda_omron() -> PandaOmron:
+    """
+    The PandaOmron, in a world of its own.
+    """
+    return PandaOmron.from_description()
 
 
 # %% a kitchen RoboCasa composed nothing into

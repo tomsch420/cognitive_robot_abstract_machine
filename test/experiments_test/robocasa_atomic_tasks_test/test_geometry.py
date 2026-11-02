@@ -7,7 +7,18 @@ from __future__ import annotations
 import numpy as np
 
 from experiments.robocasa_atomic_tasks.geometry import ApproachFrame, BodyBounds, Ray
-from semantic_digital_twin.world_description.geometry import CoordinateBounds
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.spatial_types.spatial_types import (
+    HomogeneousTransformationMatrix,
+)
+from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.geometry import (
+    Box,
+    CoordinateBounds,
+    Scale,
+)
+from semantic_digital_twin.world_description.shape_collection import ShapeCollection
+from semantic_digital_twin.world_description.world_entity import Body
 
 # %% frames
 
@@ -83,6 +94,36 @@ def test_a_point_above_a_body_lies_as_far_from_it_as_above_its_top(kitchen_of_bo
     point[2] = top + height_above
 
     assert np.isclose(bounds.distance_to(kitchen_of_boxes.plate, point), height_above)
+
+
+def test_a_point_between_two_shapes_of_a_body_lies_as_far_as_the_nearer_one():
+    world = World()
+    with world.modify_world():
+        body = Body(name=PrefixedName("two_cubes"))
+        world.add_kinematic_structure_entity(body)
+    cube_side, gap = 0.1, 1.0
+    left_centre, right_centre = -0.5 * (gap + cube_side), 0.5 * (gap + cube_side)
+    body.collision = ShapeCollection(
+        [
+            Box(
+                origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    x=centre, reference_frame=body
+                ),
+                scale=Scale(cube_side, cube_side, cube_side),
+            )
+            for centre in (left_centre, right_centre)
+        ],
+        reference_frame=body,
+    )
+    distance_from_the_left_cube = 0.2
+    point = np.array([left_centre + cube_side / 2 + distance_from_the_left_cube, 0, 0])
+
+    bounds = BodyBounds(world)
+
+    assert bounds.distance_to(body, point) == 0
+    assert np.isclose(
+        bounds.distance_to_nearest_shape(body, point), distance_from_the_left_cube
+    )
 
 
 def test_a_body_fixed_to_the_root_hangs_from_no_joint(kitchen_of_boxes):

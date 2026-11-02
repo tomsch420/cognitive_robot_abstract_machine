@@ -25,6 +25,7 @@ from experiments.robocasa_atomic_tasks.robots import (
 )
 from semantic_digital_twin.adapters.mjcf import MJCFParser
 from semantic_digital_twin.datastructures.definitions import GripperState
+from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.robot_parts import ServoedRobotPart
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
@@ -34,14 +35,6 @@ from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFr
 from semantic_digital_twin.world_description.world_entity import PositionServo
 
 # %% fixtures
-
-
-@pytest.fixture(scope="module")
-def panda_omron() -> PandaOmron:
-    """
-    The PandaOmron, in a world of its own.
-    """
-    return PandaOmron.from_description()
 
 
 @pytest.fixture(scope="module")
@@ -198,6 +191,21 @@ def test_the_panda_omron_acts_with_its_only_arm(panda_omron):
     [arm] = panda_omron.all_arms
 
     assert PandaOmronRobot().acting_arm(panda_omron) is arm
+
+
+def test_the_panda_omron_wrist_belongs_to_its_acting_arm(panda_omron):
+    task_robot = PandaOmronRobot()
+    arm_bodies = task_robot.acting_arm(panda_omron).bodies
+
+    assert all(body in arm_bodies for body in task_robot.wrist_bodies(panda_omron))
+
+
+def test_the_pr2_wrist_belongs_to_its_acting_arm(pr2_world_copy):
+    [pr2] = pr2_world_copy.get_semantic_annotations_by_type(PR2)
+    task_robot = PR2Robot()
+    arm_bodies = task_robot.acting_arm(pr2).bodies
+
+    assert all(body in arm_bodies for body in task_robot.wrist_bodies(pr2))
 
 
 def test_the_video_eye_is_hidden_from_the_panda_omron_video(panda_omron):
