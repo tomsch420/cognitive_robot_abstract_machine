@@ -11,9 +11,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import StrEnum
 
-from giskardpy.motion_statechart.context import MotionStatechartContext
-from typing_extensions import List
-
 from segmind.datastructures.events import (
     ClosedEvent,
     DetectionEvent,
@@ -75,21 +72,19 @@ class OpeningDetector(AbstractDetector):
 
     def update_context_and_events(
         self,
-        context: MotionStatechartContext,
         segmind_context: SegmindContext,
-        objects_to_check: List[Body],
-    ) -> List[DetectionEvent]:
+        tracked_objects: list[Body],
+    ) -> list[DetectionEvent]:
         """
         Detects parts whose state changed since they were last seen.
 
-        :param context: The current motion statechart context.
         :param segmind_context: The shared SegmindContext; nothing in it is needed.
-        :param objects_to_check: The bodies to check; those not moving on a joint of
+        :param tracked_objects: The bodies to check; those not moving on a joint of
             their own are left out.
         :return: One event per part whose state changed.
         """
-        events: List[DetectionEvent] = []
-        for body in objects_to_check:
+        events: list[DetectionEvent] = []
+        for body in tracked_objects:
             joint = body.parent_connection
             if not isinstance(joint, ActiveConnection1DOF):
                 continue

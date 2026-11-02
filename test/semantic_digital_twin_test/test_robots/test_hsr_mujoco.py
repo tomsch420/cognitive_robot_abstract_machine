@@ -1,334 +1,358 @@
 """
-Tests for simulating the HSR physically in MuJoCo: its joints are driven by servos and
-its driven parts carry their own weight.
+Tests for simulating the HSRB physically in MuJoCo: the servos driving its joints, the
+springs in its fingers and the drive moving its base across the floor.
 """
 
 from __future__ import annotations
 
-import math
 from datetime import timedelta
 
 import mujoco
+import numpy as np
 import pytest
+from scipy.spatial.transform import Rotation
 
 from ...pytest_environment import runs_in_continuous_integration
 
 from semantic_digital_twin.adapters.multi_sim import MujocoSim
-from semantic_digital_twin.specifications.robots import RobotSpecification
 from semantic_digital_twin.datastructures.definitions import (
     GripperState,
     StaticJointState,
+    TorsoState,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.world_description.contact import ContactParameters
+from semantic_digital_twin.world_description.geometry import Box, Scale
 from semantic_digital_twin.robots.hsrb import HSRB, HSRBJoint
 from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
 )
+from semantic_digital_twin.specifications.robots import RobotSpecification
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
+    ActiveConnection1DOF,
     Connection6DoF,
     FixedConnection,
 )
-from semantic_digital_twin.world_description.contact import ContactParameters
-from semantic_digital_twin.world_description.geometry import Box, Scale
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import (
     Body,
-    ContactExclusion,
     GravityCompensation,
     PositionServo,
     VelocityServo,
 )
 
-SETTLING_DURATION = timedelta(seconds=1)
-"""
-How long the HSR is left to move before its pose is read.
-"""
-
-POSITION_TOLERANCE = 0.01
-"""
-How far, in metres, a body may end up from where the world holds it.
-"""
-
-JOINT_TOLERANCE = 0.02
-"""
-How far, in radians, a driven joint may end up from its commanded position.
-"""
-
-CARTON_WIDTH = 0.06
-"""
-The width of a milk carton, in metres: an everyday object the hand has to close around.
-"""
-
-CARTON_HEIGHT = 0.2
-"""
-The height of that carton, in metres.
-"""
-
-GRASP_LIFT_HEIGHT = 0.2
-"""
-Where the arm lift stands while the hand closes on the carton, in metres.
-"""
-
-LIFTED_BY = 0.15
-"""
-How far the arm lift raises the grasped carton, in metres.
-"""
-
-SUPPORT_SIZE = 0.2
-"""
-The edge of the cube the carton stands on, in metres.
-"""
-
-LIFT_STEPS = 15
-"""
-How many steps the lift is raised in, as a controller raises it rather than in one jump
-that would shake the carton loose.
-"""
-
-LIFT_STEP_DURATION = timedelta(milliseconds=50)
-"""
-How long each step of the lift takes.
-"""
-
-COMMANDED_ARM_FLEX = -0.5
-"""
-The arm flex angle a test commands, in radians: well inside the joint's range.
-"""
-
-DRIVEN_DISTANCE = 0.5
-"""
-How far a test drives the base, in metres.
-"""
-
-DRIVE_STEPS = 20
-"""
-How many control ticks the base is commanded for, as a controller commands it every
-tick.
-"""
-
-DRIVE_STEP_DURATION = timedelta(milliseconds=100)
-"""
-How long each tick of the drive takes.
-"""
-
 
 @pytest.fixture
-def spawned_hsr() -> HSRB:
+def hsrb() -> HSRB:
     world = World()
     with world.modify_world():
         world.add_kinematic_structure_entity(Body(name=PrefixedName("floor")))
     return RobotSpecification(HSRB).spawn(world)
 
 
-def driven_parts(robot: HSRB) -> list:
+def _simulated_base_pose(
+    simulation: MujocoSim, hsrb: HSRB
+) -> tuple[float, float, float]:
     """
-    :return: The parts of the HSR whose joints are driven in a physical simulation.
+    :return: The x, y and yaw the simulated base stands at.
     """
-    arm = robot.all_arms[0]
-    torso = robot.get_torso()
-    return [arm, arm.end_effector, torso.neck, torso]
+    simulator = simulation.simulator
+    x, y, _ = simulator.get_body_position(body_name=hsrb.root.name.name).result
+    w, i, j, k = simulator.get_body_quaternion(body_name=hsrb.root.name.name).result
+    yaw = Rotation.from_quat([i, j, k, w]).as_euler("xyz")[2]
+    return float(x), float(y), float(yaw)
 
 
-def joint_position(simulation: MujocoSim, joint_name: str) -> float:
+def _command(hsrb: HSRB, positions: dict[str, float]) -> None:
     """
-    :return: Where MuJoCo holds the joint named ``joint_name``.
+    Command joints of the HSRB to positions, as a controller does.
+
+    :param positions: The position of each joint, by the joint's name.
     """
-    return float(simulation.simulator.get_joint_value(joint_name=joint_name).result)
-
-
-# %% what drives the HSR
-
-
-def test_every_driven_joint_has_one_position_servo(spawned_hsr):
-    world = spawned_hsr._world
-    driven = {
-        connection.raw_dof.id
-        for part in driven_parts(spawned_hsr)
-        for connection in part.servoed_connections
-    }
-    servoed = [
-        dof.id
-        for actuator in world.actuators
-        if isinstance(actuator, PositionServo)
-        for dof in actuator.dofs
-    ]
-
-    assert sorted(servoed, key=str) == sorted(driven, key=str)
-
-
-def test_the_base_drive_has_a_velocity_servo_for_each_commanded_degree_of_freedom(
-    spawned_hsr,
-):
-    drive = spawned_hsr.drive
-    servoed = {
-        dof.id
-        for actuator in spawned_hsr._world.actuators
-        if isinstance(actuator, VelocityServo)
-        for dof in actuator.dofs
-    }
-
-    assert {dof.id for dof in drive.active_dofs} == servoed
-
-
-def test_the_wheels_take_part_in_no_contact(spawned_hsr):
-    """
-    The base slides on its drive rather than rolling, so a wheel touching the ground
-    would only drag it.
-    """
-    exclusions = [
-        body.get_simulator_property_of_type(ContactExclusion)
-        for body in spawned_hsr.mobile_base.rolling_bodies
-    ]
-
-    assert exclusions and None not in exclusions
-
-
-def test_the_driven_parts_carry_their_own_weight(spawned_hsr):
-    fractions = {
-        body.get_simulator_property_of_type(GravityCompensation).fraction
-        for part in driven_parts(spawned_hsr)
-        for body in part.bodies
-    }
-
-    assert fractions == {1.0}
-
-
-def test_the_open_hand_leaves_room_for_a_carton(spawned_hsr):
-    world = spawned_hsr._world
-    spawned_hsr.all_arms[0].end_effector.get_joint_state_by_type(
-        GripperState.OPEN
-    ).apply_to(world)
+    world = hsrb._world
+    for joint_name, position in positions.items():
+        connection = world.get_connection_by_name(joint_name)
+        world.state[connection.raw_dof.id].position = position
     world.notify_state_change()
-    gap = world.collision_manager.collision_detector.check_collision_between_bodies(
-        world.get_body_by_name("hand_l_distal_link"),
-        world.get_body_by_name("hand_r_distal_link"),
-        distance=1.0,
-    ).distance
-
-    assert gap > CARTON_WIDTH
 
 
-# %% in MuJoCo
+def _hold_the_arm_out_sideways(hsrb: HSRB) -> dict[str, float]:
+    """
+    Command the arm into the pose it reaches beside the base in: lifted, swung level and
+    rolled out to the side.
+
+    :return: The commanded position of each arm joint, by the joint's name.
+    """
+    commanded = {
+        HSRBJoint.ARM_LIFT: 0.41,
+        HSRBJoint.ARM_FLEX: -1.46,
+        HSRBJoint.ARM_ROLL: 1.2,
+        HSRBJoint.WRIST_FLEX: -0.28,
+        HSRBJoint.WRIST_ROLL: -1.22,
+    }
+    _command(hsrb, commanded)
+    return commanded
+
+
+# %% the hand's states
+
+
+def test_the_open_hand_turns_its_motor_and_both_springs_to_their_upper_limits(
+    hsrb,
+) -> None:
+    world = hsrb._world
+    motor_and_springs = [
+        world.get_connection_by_name(joint_name)
+        for joint_name in [
+            HSRBJoint.HAND_MOTOR,
+            HSRBJoint.HAND_LEFT_SPRING_PROXIMAL,
+            HSRBJoint.HAND_RIGHT_SPRING_PROXIMAL,
+        ]
+    ]
+
+    opened = hsrb.end_effector.get_joint_state_by_type(GripperState.OPEN)
+
+    assert dict(zip(opened.connections, opened.target_values)) == {
+        connection: connection.raw_dof.limits.upper.position
+        for connection in motor_and_springs
+    }
+
+
+# %% the servos the HSRB declares
+
+
+def test_every_commanded_joint_the_hand_and_the_drive_are_driven_by_one_servo(hsrb):
+    """
+    Each joint a controller commands, the hand's motor and the spring of each finger are
+    driven by exactly one position servo, and each degree of freedom the drive is
+    commanded with by exactly one velocity servo.
+    """
+    world = hsrb._world
+    drive = hsrb.drive
+    commanded = {
+        connection.raw_dof
+        for connection in world.get_connections_of_branch(hsrb.root)
+        if isinstance(connection, ActiveConnection1DOF)
+        and connection.has_hardware_interface
+    }
+    hand = {
+        world.get_connection_by_name(joint_name).raw_dof
+        for joint_name in [
+            HSRBJoint.HAND_MOTOR,
+            HSRBJoint.HAND_LEFT_SPRING_PROXIMAL,
+            HSRBJoint.HAND_RIGHT_SPRING_PROXIMAL,
+        ]
+    }
+
+    def driven_by(servo_type: type) -> list[str]:
+        return sorted(
+            str(degree_of_freedom.name)
+            for actuator in world.actuators
+            if type(actuator) is servo_type
+            for degree_of_freedom in actuator.dofs
+        )
+
+    assert len(driven_by(PositionServo)) + len(driven_by(VelocityServo)) == len(
+        world.actuators
+    )
+    assert driven_by(PositionServo) == sorted(str(dof.name) for dof in commanded | hand)
+    assert driven_by(VelocityServo) == sorted(
+        str(dof.name) for dof in (drive.x_velocity, drive.y_velocity, drive.yaw)
+    )
+
+
+def test_the_drive_servos_have_the_gains_the_base_declares(hsrb):
+    world = hsrb._world
+    drive = hsrb.drive
+    drive_servos = hsrb.mobile_base.drive_servos
+
+    gains_by_degree_of_freedom = {
+        degree_of_freedom: actuator.gains
+        for actuator in world.actuators
+        for degree_of_freedom in actuator.dofs
+    }
+
+    assert gains_by_degree_of_freedom[drive.x_velocity] == (
+        drive_servos.translation_gains
+    )
+    assert gains_by_degree_of_freedom[drive.y_velocity] == (
+        drive_servos.translation_gains
+    )
+    assert gains_by_degree_of_freedom[drive.yaw] == drive_servos.rotation_gains
+
+
+def test_every_body_standing_on_the_base_carries_its_own_weight(hsrb):
+    for body in hsrb.mobile_base.bodies:
+        assert body.get_simulator_property_of_type(GravityCompensation) == (
+            GravityCompensation(fraction=1.0)
+        )
+
+
+# %% the physics: the joints
 
 
 @pytest.mark.skipif(
     not runs_in_continuous_integration(), reason="MuJoCo tests only run in CI"
 )
-def test_the_servos_hold_the_parked_arm_up(spawned_hsr):
-    world = spawned_hsr._world
-    spawned_hsr.all_arms[0].get_joint_state_by_type(StaticJointState.PARK).apply_to(
+def test_the_servos_hold_the_parked_arm_and_the_raised_torso_up(hsrb):
+    """
+    A joint with no servo would be written straight into MuJoCo and sag under its own
+    weight between one control cycle and the next.
+    """
+    world = hsrb._world
+    hsrb.mobile_base.torso.arm.get_joint_state_by_type(StaticJointState.PARK).apply_to(
         world
     )
+    hsrb.mobile_base.torso.get_joint_state_by_type(TorsoState.HIGH).apply_to(world)
     world.notify_state_change()
-    tool_frame = spawned_hsr.all_arms[0].end_effector.tool_frame
+    tool_frame = hsrb.end_effector.tool_frame
     parked = world.compute_forward_kinematics_np(world.root, tool_frame)[:3, 3]
 
     simulation = MujocoSim(world=world, headless=True)
     simulation.start_stepped_simulation()
     try:
-        simulation.step_simulation(SETTLING_DURATION)
+        simulation.step_simulation(timedelta(seconds=1))
         simulated = simulation.simulator.get_body_position(
             body_name=tool_frame.name.name
         ).result
     finally:
         simulation.stop_simulation()
 
-    assert list(simulated) == pytest.approx(list(parked), abs=POSITION_TOLERANCE)
+    assert list(simulated) == pytest.approx(list(parked), abs=0.01)
 
 
 @pytest.mark.skipif(
     not runs_in_continuous_integration(), reason="MuJoCo tests only run in CI"
 )
-def test_a_commanded_arm_joint_is_driven_there(spawned_hsr):
-    world = spawned_hsr._world
-    arm_flex = world.get_connection_by_name(HSRBJoint.ARM_FLEX)
+def test_the_servos_drive_the_joints_to_a_commanded_configuration(hsrb):
+    commanded = {
+        HSRBJoint.ARM_LIFT: 0.3,
+        HSRBJoint.ARM_FLEX: -1.0,
+        HSRBJoint.ARM_ROLL: 0.5,
+        HSRBJoint.WRIST_FLEX: -0.8,
+        HSRBJoint.WRIST_ROLL: 0.7,
+        HSRBJoint.HEAD_PAN: 0.5,
+        HSRBJoint.HEAD_TILT: -0.3,
+        HSRBJoint.HAND_MOTOR: 0.8,
+    }
 
-    simulation = MujocoSim(world=world, headless=True)
+    simulation = MujocoSim(world=hsrb._world, headless=True)
     simulation.start_stepped_simulation()
     try:
-        arm_flex.position = COMMANDED_ARM_FLEX
-        simulation.step_simulation(SETTLING_DURATION)
-        reached = joint_position(simulation, arm_flex.name.name)
+        _command(hsrb, commanded)
+        simulation.step_simulation(timedelta(seconds=3))
+        reached = {
+            joint_name: simulation.simulator.get_joint_value(joint_name).result
+            for joint_name in commanded
+        }
     finally:
         simulation.stop_simulation()
 
-    assert reached == pytest.approx(COMMANDED_ARM_FLEX, abs=JOINT_TOLERANCE)
+    assert reached == pytest.approx(commanded, abs=0.02)
 
 
 @pytest.mark.skipif(
     not runs_in_continuous_integration(), reason="MuJoCo tests only run in CI"
 )
-def test_the_gripper_closes_when_told_to(spawned_hsr):
-    world = spawned_hsr._world
-    gripper = spawned_hsr.all_arms[0].end_effector
-    gripper.get_joint_state_by_type(GripperState.OPEN).apply_to(world)
-    world.notify_state_change()
-    hand_motor = world.get_connection_by_name(HSRBJoint.HAND_MOTOR)
-    closed = gripper.get_joint_state_by_type(GripperState.CLOSE)
-
-    simulation = MujocoSim(world=world, headless=True)
+def test_the_torso_rises_with_half_the_arm_lift(hsrb):
+    simulation = MujocoSim(world=hsrb._world, headless=True)
     simulation.start_stepped_simulation()
     try:
-        closed.apply_to(world)
-        world.notify_state_change()
-        simulation.step_simulation(SETTLING_DURATION)
-        reached = joint_position(simulation, hand_motor.name.name)
+        _command(hsrb, {HSRBJoint.ARM_LIFT: 0.4})
+        simulation.step_simulation(timedelta(seconds=4))
+        torso_lift = simulation.simulator.get_joint_value(HSRBJoint.TORSO_LIFT).result
     finally:
         simulation.stop_simulation()
 
-    assert reached == pytest.approx(hand_motor.position, abs=JOINT_TOLERANCE)
+    torso_connection = hsrb._world.get_connection_by_name(HSRBJoint.TORSO_LIFT)
+    assert torso_lift == pytest.approx(0.4 * torso_connection.multiplier, abs=0.01)
 
 
-def stand_carton_between_the_open_fingers(robot: HSRB) -> Body:
+@pytest.mark.skipif(
+    not runs_in_continuous_integration(), reason="MuJoCo tests only run in CI"
+)
+def test_the_arm_comes_to_rest_held_out_sideways(hsrb):
     """
-    Hold the hand out level in front of the HSR, open, and stand a carton on a support
+    A servo too stiff for the light links it turns keeps them ringing around the
+    commanded position.
+    """
+    commanded = _hold_the_arm_out_sideways(hsrb)
+
+    simulation = MujocoSim(world=hsrb._world, headless=True)
+    simulation.start_stepped_simulation()
+    try:
+        simulation.step_simulation(timedelta(seconds=2))
+        held = []
+        for _ in range(100):
+            simulation.step_simulation(timedelta(milliseconds=10))
+            held.append(
+                {
+                    joint_name: simulation.simulator.get_joint_value(joint_name).result
+                    for joint_name in commanded
+                }
+            )
+    finally:
+        simulation.stop_simulation()
+
+    assert held == [pytest.approx(commanded, abs=0.02)] * len(held)
+
+
+# %% the physics: holding something
+
+
+def _carton_between_the_open_fingers(hsrb: HSRB, carton_scale: Scale) -> Body:
+    """
+    Hold the hand out level in front of the HSRB, open, and stand a carton on a support
     between its fingers, as a front grasp finds an object on a table.
 
+    :param carton_scale: The carton's width, depth and height.
     :return: The carton.
     """
-    world = robot._world
-    gripper = robot.all_arms[0].end_effector
-    gripper.get_joint_state_by_type(GripperState.OPEN).apply_to(world)
-    world.get_connection_by_name(HSRBJoint.ARM_FLEX).position = 0.0
-    world.get_connection_by_name(HSRBJoint.WRIST_FLEX).position = -math.pi / 2
-    world.get_connection_by_name(HSRBJoint.ARM_LIFT).position = GRASP_LIFT_HEIGHT
-    world.notify_state_change()
-    tool_position = world.compute_forward_kinematics_np(world.root, gripper.tool_frame)[
-        :3, 3
-    ]
-    support_top = tool_position[2] - CARTON_HEIGHT / 2
+    world = hsrb._world
+    _command(
+        hsrb,
+        {
+            HSRBJoint.ARM_LIFT: 0.2,
+            HSRBJoint.ARM_FLEX: 0.0,
+            HSRBJoint.WRIST_FLEX: -np.pi / 2,
+            HSRBJoint.HAND_MOTOR: 1.0,
+        },
+    )
+    x, y, z = world.compute_forward_kinematics_np(
+        world.root, hsrb.end_effector.tool_frame
+    )[:3, 3]
+
+    support = Body(name=PrefixedName("support"))
+    support_scale = Scale(0.2, 0.2, 0.2)
+    support.collision = ShapeCollection(
+        [
+            Box(
+                origin=HomogeneousTransformationMatrix(reference_frame=support),
+                scale=support_scale,
+            )
+        ],
+        reference_frame=support,
+    )
+    carton = Body(name=PrefixedName("carton"))
+    carton.collision = ShapeCollection(
+        [
+            Box(
+                origin=HomogeneousTransformationMatrix(reference_frame=carton),
+                scale=carton_scale,
+            )
+        ],
+        reference_frame=carton,
+    )
     with world.modify_world():
-        support = Body(name=PrefixedName("support"))
-        support.collision = ShapeCollection(
-            [
-                Box(
-                    origin=HomogeneousTransformationMatrix(reference_frame=support),
-                    scale=Scale(SUPPORT_SIZE, SUPPORT_SIZE, SUPPORT_SIZE),
-                )
-            ],
-            reference_frame=support,
-        )
         world.add_connection(
             FixedConnection(
                 parent=world.root,
                 child=support,
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
-                    *tool_position[:2],
-                    support_top - SUPPORT_SIZE / 2,
-                    reference_frame=world.root,
+                    x=x, y=y, z=z - carton_scale.z / 2 - support_scale.z / 2
                 ),
             )
-        )
-        carton = Body(name=PrefixedName("carton"))
-        carton.collision = ShapeCollection(
-            [
-                Box(
-                    origin=HomogeneousTransformationMatrix(reference_frame=carton),
-                    scale=Scale(CARTON_WIDTH, CARTON_WIDTH, CARTON_HEIGHT),
-                )
-            ],
-            reference_frame=carton,
         )
         world.add_connection(
             Connection6DoF.create_with_dofs(
@@ -336,7 +360,7 @@ def stand_carton_between_the_open_fingers(robot: HSRB) -> Body:
                 parent=world.root,
                 child=carton,
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
-                    *tool_position, reference_frame=world.root
+                    x=x, y=y, z=z, reference_frame=world.root
                 ),
             )
         )
@@ -347,19 +371,16 @@ def stand_carton_between_the_open_fingers(robot: HSRB) -> Body:
 @pytest.mark.skipif(
     not runs_in_continuous_integration(), reason="MuJoCo tests only run in CI"
 )
-def test_the_hand_holds_a_carton_it_closed_on_while_lifting_it(spawned_hsr):
+def test_the_closed_hand_keeps_a_carton_while_the_arm_lifts_it(hsrb):
     """
-    MuJoCo's default friction lets a held object slide out under its own weight, so
-    the simulation resolves friction exactly (elliptic cone, raised impedance ratio,
-    slip removed), as a demo carrying objects does.
+    MuJoCo's default friction cone lets a held object slide out under its own weight, so
+    the simulation resolves friction exactly, as a demo carrying objects does.
     """
-    world = spawned_hsr._world
-    carton = stand_carton_between_the_open_fingers(spawned_hsr)
-    gripper = spawned_hsr.all_arms[0].end_effector
-    arm_lift = world.get_connection_by_name(HSRBJoint.ARM_LIFT)
+    carton = _carton_between_the_open_fingers(hsrb, Scale(0.06, 0.06, 0.2))
+    lift = 0.15
 
     simulation = MujocoSim(
-        world=world,
+        world=hsrb._world,
         headless=True,
         cone=mujoco.mjtCone.mjCONE_ELLIPTIC,
         impratio=10.0,
@@ -367,111 +388,128 @@ def test_the_hand_holds_a_carton_it_closed_on_while_lifting_it(spawned_hsr):
     )
     simulation.start_stepped_simulation()
     try:
-        simulation.step_simulation(SETTLING_DURATION)
-        gripper.get_joint_state_by_type(GripperState.CLOSE).apply_to(world)
-        world.notify_state_change()
-        simulation.step_simulation(SETTLING_DURATION)
-        grasped_at = simulation.simulator.get_body_position(
-            body_name=carton.name.name
-        ).result[2]
-        for step in range(1, LIFT_STEPS + 1):
-            arm_lift.position = GRASP_LIFT_HEIGHT + LIFTED_BY * step / LIFT_STEPS
-            simulation.step_simulation(LIFT_STEP_DURATION)
-        simulation.step_simulation(SETTLING_DURATION)
-        lifted_to = simulation.simulator.get_body_position(
-            body_name=carton.name.name
-        ).result[2]
-    finally:
-        simulation.stop_simulation()
-
-    assert lifted_to - grasped_at == pytest.approx(LIFTED_BY, abs=POSITION_TOLERANCE)
-
-
-def drive_by(
-    robot: HSRB, simulation: MujocoSim, x_offset: float, y_offset: float
-) -> None:
-    """
-    Drive the base by the given offset from where it stands, without turning it, at the
-    constant velocity that covers it in :data:`DRIVE_STEPS` ticks, commanded every tick
-    as a controller does, then stop it and let it come to rest.
-
-    :param x_offset: How far to drive along the base's facing direction, in metres.
-    :param y_offset: How far to drive to its left, in metres.
-    """
-    world = robot._world
-    drive = robot.drive
-    driving_time = (DRIVE_STEPS * DRIVE_STEP_DURATION).total_seconds()
-    for _ in range(DRIVE_STEPS):
-        world.state[drive.x_velocity.id].velocity = x_offset / driving_time
-        world.state[drive.y_velocity.id].velocity = y_offset / driving_time
-        world.notify_state_change()
-        simulation.step_simulation(DRIVE_STEP_DURATION)
-    world.state[drive.x_velocity.id].velocity = 0.0
-    world.state[drive.y_velocity.id].velocity = 0.0
-    world.notify_state_change()
-    simulation.step_simulation(SETTLING_DURATION)
-
-
-@pytest.mark.skipif(
-    not runs_in_continuous_integration(), reason="MuJoCo tests only run in CI"
-)
-def test_the_base_drives_as_far_as_its_drive_is_commanded(spawned_hsr):
-    world = spawned_hsr._world
-    base = spawned_hsr.drive.child
-    start = world.compute_forward_kinematics_np(world.root, base)[:3, 3]
-
-    simulation = MujocoSim(world=world, headless=True)
-    simulation.start_stepped_simulation()
-    try:
-        drive_by(spawned_hsr, simulation, x_offset=-DRIVEN_DISTANCE, y_offset=0.0)
-        reached = simulation.simulator.get_body_position(
-            body_name=base.name.name
-        ).result
-    finally:
-        simulation.stop_simulation()
-
-    expected = [start[0] - DRIVEN_DISTANCE, start[1], start[2]]
-    assert list(reached) == pytest.approx(expected, abs=POSITION_TOLERANCE)
-
-
-@pytest.mark.skipif(
-    not runs_in_continuous_integration(), reason="MuJoCo tests only run in CI"
-)
-def test_the_hand_holds_a_carton_while_the_base_drives(spawned_hsr):
-    """
-    The carton is held by friction alone, so it travels with the hand only if the
-    grip withstands the base speeding up and slowing down.
-    """
-    world = spawned_hsr._world
-    carton = stand_carton_between_the_open_fingers(spawned_hsr)
-    gripper = spawned_hsr.all_arms[0].end_effector
-    arm_lift = world.get_connection_by_name(HSRBJoint.ARM_LIFT)
-
-    simulation = MujocoSim(
-        world=world,
-        headless=True,
-        cone=mujoco.mjtCone.mjCONE_ELLIPTIC,
-        impratio=10.0,
-        noslip_iterations=10,
-    )
-    simulation.start_stepped_simulation()
-    try:
-        simulation.step_simulation(SETTLING_DURATION)
-        gripper.get_joint_state_by_type(GripperState.CLOSE).apply_to(world)
-        world.notify_state_change()
-        simulation.step_simulation(SETTLING_DURATION)
-        for step in range(1, LIFT_STEPS + 1):
-            arm_lift.position = GRASP_LIFT_HEIGHT + LIFTED_BY * step / LIFT_STEPS
-            simulation.step_simulation(LIFT_STEP_DURATION)
-        simulation.step_simulation(SETTLING_DURATION)
-        lifted = simulation.simulator.get_body_position(body_name=carton.name.name)
-        lifted = list(lifted.result)
-        drive_by(spawned_hsr, simulation, x_offset=-DRIVEN_DISTANCE, y_offset=0.0)
-        carried = list(
-            simulation.simulator.get_body_position(body_name=carton.name.name).result
+        simulation.step_simulation(timedelta(seconds=1))
+        _command(hsrb, {HSRBJoint.HAND_MOTOR: 0.0})
+        simulation.step_simulation(timedelta(seconds=1))
+        grasped_height = float(
+            simulation.simulator.get_body_position(body_name=carton.name.name).result[2]
+        )
+        _command(hsrb, {HSRBJoint.ARM_LIFT: 0.2 + lift})
+        simulation.step_simulation(timedelta(seconds=3))
+        lifted_height = float(
+            simulation.simulator.get_body_position(body_name=carton.name.name).result[2]
         )
     finally:
         simulation.stop_simulation()
 
-    expected = [lifted[0] - DRIVEN_DISTANCE, lifted[1], lifted[2]]
-    assert carried == pytest.approx(expected, abs=POSITION_TOLERANCE)
+    assert lifted_height - grasped_height == pytest.approx(lift, abs=0.01)
+
+
+# %% the physics: the base
+
+
+def _drive_at(
+    simulation: MujocoSim,
+    hsrb: HSRB,
+    base_velocity: tuple[float, float, float],
+    duration: timedelta,
+) -> None:
+    """
+    Command the drive with a velocity in the frame of the base for a while, then stop it
+    and let it come to a standstill.
+
+    :param base_velocity: The forward, sideways and angular velocity.
+    """
+    world = hsrb._world
+    drive = hsrb.drive
+    for degree_of_freedom, velocity in zip(
+        (drive.x_velocity, drive.y_velocity, drive.yaw), base_velocity
+    ):
+        world.state[degree_of_freedom.id].velocity = velocity
+    world.notify_state_change()
+    simulation.step_simulation(duration)
+    for degree_of_freedom in (drive.x_velocity, drive.y_velocity, drive.yaw):
+        world.state[degree_of_freedom.id].velocity = 0.0
+    world.notify_state_change()
+    simulation.step_simulation(timedelta(seconds=0.5))
+
+
+@pytest.mark.skipif(
+    not runs_in_continuous_integration(), reason="MuJoCo tests only run in CI"
+)
+def test_the_drive_moves_the_base_at_the_commanded_velocity(hsrb):
+    simulation = MujocoSim(world=hsrb._world, headless=True)
+    simulation.start_stepped_simulation()
+    try:
+        _drive_at(simulation, hsrb, (0.2, -0.1, 0.0), timedelta(seconds=2))
+        reached = _simulated_base_pose(simulation, hsrb)
+    finally:
+        simulation.stop_simulation()
+
+    assert reached == pytest.approx((0.4, -0.2, 0.0), abs=0.02)
+
+
+@pytest.mark.skipif(
+    not runs_in_continuous_integration(), reason="MuJoCo tests only run in CI"
+)
+def test_the_drive_turns_the_base_at_the_commanded_angular_velocity(hsrb):
+    simulation = MujocoSim(world=hsrb._world, headless=True)
+    simulation.start_stepped_simulation()
+    try:
+        _drive_at(simulation, hsrb, (0.0, 0.0, 0.3), timedelta(seconds=2))
+        reached = _simulated_base_pose(simulation, hsrb)
+    finally:
+        simulation.stop_simulation()
+
+    assert reached == pytest.approx((0.0, 0.0, 0.6), abs=0.02)
+
+
+@pytest.mark.skipif(
+    not runs_in_continuous_integration(), reason="MuJoCo tests only run in CI"
+)
+def test_the_base_stands_still_while_the_arm_swings(hsrb):
+    """
+    The arm swinging out shifts the robot's weight, which must not push a base that is
+    commanded to stand.
+    """
+    simulation = MujocoSim(world=hsrb._world, headless=True)
+    simulation.start_stepped_simulation()
+    try:
+        simulation.step_simulation(timedelta(seconds=0.5))
+        standing = _simulated_base_pose(simulation, hsrb)
+        _command(
+            hsrb,
+            {
+                HSRBJoint.ARM_LIFT: 0.5,
+                HSRBJoint.ARM_FLEX: -np.pi / 2,
+                HSRBJoint.ARM_ROLL: 1.5,
+            },
+        )
+        simulation.step_simulation(timedelta(seconds=3))
+        after = _simulated_base_pose(simulation, hsrb)
+    finally:
+        simulation.stop_simulation()
+
+    assert after == pytest.approx(standing, abs=0.005)
+
+
+@pytest.mark.skipif(
+    not runs_in_continuous_integration(), reason="MuJoCo tests only run in CI"
+)
+def test_the_base_stands_still_while_the_arm_is_held_out_sideways(hsrb):
+    """
+    The arm held out to the side must not turn a base that is commanded to stand.
+    """
+    _hold_the_arm_out_sideways(hsrb)
+
+    simulation = MujocoSim(world=hsrb._world, headless=True)
+    simulation.start_stepped_simulation()
+    try:
+        simulation.step_simulation(timedelta(seconds=2))
+        standing = _simulated_base_pose(simulation, hsrb)
+        simulation.step_simulation(timedelta(seconds=5))
+        after = _simulated_base_pose(simulation, hsrb)
+    finally:
+        simulation.stop_simulation()
+
+    assert after == pytest.approx(standing, abs=0.001)

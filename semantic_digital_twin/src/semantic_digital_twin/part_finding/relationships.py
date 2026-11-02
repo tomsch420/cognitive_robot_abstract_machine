@@ -10,7 +10,6 @@ from dataclasses import dataclass
 from krrood.class_diagrams.class_diagram import WrappedClass
 from krrood.class_diagrams.wrapped_field import WrappedField
 from krrood.entity_query_language.utils import camel_case_to_words
-from typing_extensions import Optional, Type
 
 from semantic_digital_twin.exceptions import (
     NoSinglePartWholeRelationshipField,
@@ -42,7 +41,7 @@ class PartRelationshipInspector:
 
     @classmethod
     def all_of_type(
-        cls, whole_type: Type[PartWholeRelationship]
+        cls, whole_type: type[PartWholeRelationship]
     ) -> list[PartRelationshipInspector]:
         """
         :param whole_type: A type of annotation.
@@ -59,7 +58,7 @@ class PartRelationshipInspector:
 
     @classmethod
     def named(
-        cls, whole_type: Type[PartWholeRelationship], name: str
+        cls, whole_type: type[PartWholeRelationship], name: str
     ) -> PartRelationshipInspector:
         """
         :param whole_type: A type of annotation.
@@ -77,8 +76,8 @@ class PartRelationshipInspector:
     @classmethod
     def for_part(
         cls,
-        whole_type: Type[PartWholeRelationship],
-        part_type: Type[HasRootBody],
+        whole_type: type[PartWholeRelationship],
+        part_type: type[HasRootBody],
         name: str = "",
     ) -> PartRelationshipInspector:
         """
@@ -111,7 +110,7 @@ class PartRelationshipInspector:
         return self.relationship_field.field.name
 
     @property
-    def part_type(self) -> Type[HasRootBody]:
+    def part_type(self) -> type[HasRootBody]:
         """
         :return: The type of annotation each part is.
         """
@@ -133,7 +132,7 @@ class PartRelationshipInspector:
         return self.relationship_field.is_many_to_many_relationship
 
     @property
-    def maximum_parts(self) -> Optional[int]:
+    def maximum_parts(self) -> int | None:
         """
         :return: The most parts the relationship holds, one for a relationship that
             holds a single part; ``None`` for no limit.

@@ -29,6 +29,7 @@ from semantic_digital_twin.spatial_computations.forward_kinematics import (
     ForwardKinematicsManager,
 )
 from semantic_digital_twin.testing import StateChangeCounter
+from semantic_digital_twin.spatial_computations.raytracer import RayTracer
 from semantic_digital_twin.world import (
     ResetStateContextManager,
     WorldEntityRebinding,
@@ -47,6 +48,7 @@ ignore_classes = {
     WorldEntityRebinding,
     StateChangeCounter,
     ForwardKinematicsManager,
+    RayTracer,
     MeshFileStorage,
     # A store holds a database session, and the step that reads it holds the store.
     DecomposedObjectStore,
@@ -61,6 +63,7 @@ ignore_classes = {
 }
 
 
+# %% Interface generation
 def generate_orm():
     """
     Generate the ORM classes for the coraplex package.
