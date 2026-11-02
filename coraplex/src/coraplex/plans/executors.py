@@ -21,6 +21,7 @@ from coraplex.plans.failures import (
     MotionExceededSimulationTimeLimit,
     MotionMadeNoProgress,
     MotionViolatedCollisionAvoidance,
+    MotionWasInfeasible,
 )
 from coraplex.plans.plan_transformation import PlanRewriting, PlanTransformation
 from coraplex.plans.underspecified import UnderspecifiedChildChooser
@@ -63,6 +64,7 @@ from giskardpy.motion_statechart.graph_node import ConvergingTask, EndMotion
 from giskardpy.motion_statechart.monitors.progress_monitors import StillProgressing
 from giskardpy.middleware.ros2.giskard_client_executor import GiskardClientExecutor
 from giskardpy.motion_statechart.ros_context import RosNodeAccess
+from giskardpy.qp.exceptions import InfeasibleException
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from krrood.symbolic_math.symbolic_math import logic_or
 from semantic_digital_twin.adapters.multi_sim import MujocoSynchronizer
@@ -272,6 +274,8 @@ class PlanExecutor(Executor, ABC):
             than :attr:`SimulatedPlanExecutor.simulation_time_limit`.
         :raises MotionViolatedCollisionAvoidance: When the plan brings bodies closer to
             each other than collision avoidance allows.
+        :raises MotionWasInfeasible: When the controller finds no motion that satisfies
+            every constraint of the plan at once.
         """
         if self.statechart is None:
             raise PlanNotCompiled()
@@ -281,6 +285,8 @@ class PlanExecutor(Executor, ABC):
             raise MotionMadeNoProgress(stalled) from stalled
         except CollisionViolatedError as violation:
             raise MotionViolatedCollisionAvoidance(violation) from violation
+        except InfeasibleException as infeasibility:
+            raise MotionWasInfeasible(infeasibility) from infeasibility
         self._raise_if_plan_failed()
 
     @abstractmethod

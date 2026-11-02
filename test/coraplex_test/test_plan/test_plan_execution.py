@@ -21,6 +21,7 @@ from coraplex.plans.failures import (
     MotionExceededSimulationTimeLimit,
     MotionMadeNoProgress,
     MotionViolatedCollisionAvoidance,
+    MotionWasInfeasible,
 )
 from coraplex.robot_plans.actions.core.pick_up import ReachAction
 from coraplex.robot_plans.plan_transformations import DetectBeforeGrasp
@@ -45,6 +46,7 @@ from giskardpy.motion_statechart.goals.collision_avoidance import (
 )
 from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.monitors.progress_monitors import StillProgressing
+from giskardpy.qp.exceptions import InfeasibleException
 from semantic_digital_twin.datastructures.definitions import TorsoState
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.robots.pr2 import PR2Joint
@@ -328,6 +330,30 @@ def test_a_plan_that_violates_collision_avoidance_fails_as_a_plan_failure(
         executor.execute()
 
     assert failure.value.violation is violation
+
+
+def test_a_plan_whose_motion_is_infeasible_fails_as_a_plan_failure(
+    pr2_apartment_context, monkeypatch
+) -> None:
+    """
+    A plan whose motion the controller finds no solution for did not work from where it
+    started, so a surrounding plan can try another candidate instead of stopping.
+    """
+    world, robot_view, extensions = pr2_apartment_context
+    infeasibility = InfeasibleException(solver_status="infeasible")
+
+    def find_no_solution(executor: StatechartExecutor) -> None:
+        raise infeasibility
+
+    executor = simulated_executor(extensions)
+    executor.compile(
+        statechart_of(executor, MoveTorsoAction(torso_state=TorsoState.HIGH))
+    )
+    monkeypatch.setattr(StatechartExecutor, "tick", find_no_solution)
+    with pytest.raises(MotionWasInfeasible) as failure:
+        executor.execute()
+
+    assert failure.value.infeasibility is infeasibility
 
 
 # %% avoiding collisions in a world with several robots
