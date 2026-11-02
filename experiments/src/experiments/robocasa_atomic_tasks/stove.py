@@ -81,9 +81,7 @@ class LowerHeat(JointGoalTask):
 
     def joint_goals(self, episode: RoboCasaEpisode) -> List[tuple[str, float]]:
         name = knob_joint_name(episode)
-        low = (
-            self.low_heat_lower_bound + episode.environment.stove.STOVE_HIGH_MIN
-        ) / 2
+        low = (self.low_heat_lower_bound + episode.environment.stove.STOVE_HIGH_MIN) / 2
         return [(name, episode.world_position_of(name, low))]
 
 

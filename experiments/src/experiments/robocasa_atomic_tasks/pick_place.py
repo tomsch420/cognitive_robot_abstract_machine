@@ -141,8 +141,8 @@ class PickPlaceCabinetToCounter(OntoCounter):
 @dataclass
 class PickPlaceCounterToSink(IntoFixture):
     """
-    Take the object from the counter and drop it into the sink from just above its
-    rim, as reaching down to the basin's floor runs the forearm into the counter.
+    Take the object from the counter and drop it into the sink from just above its rim,
+    as reaching down to the basin's floor runs the forearm into the counter.
     """
 
     fixture_attribute = "sink"
@@ -166,16 +166,16 @@ class PickPlaceCounterToMicrowave(OntoReceptacle):
 @dataclass
 class PickPlaceMicrowaveToCounter(OntoReceptacle):
     """
-    Take the object from the plate in the open microwave and put it on the plate on
-    the counter.
+    Take the object from the plate in the open microwave and put it on the plate on the
+    counter.
     """
 
 
 @dataclass
 class PickPlaceCounterToOven(OntoReceptacle):
     """
-    Take the object from the counter and put it on the tray in the open oven; in
-    layout 2, since layout 1 has no oven.
+    Take the object from the counter and put it on the tray in the open oven; in layout
+    2, since layout 1 has no oven.
     """
 
     layout: LayoutType = LayoutType.LAYOUT002
@@ -208,8 +208,8 @@ class PickPlaceToasterToCounter(OntoReceptacle):
 @dataclass
 class PickPlaceCounterToToasterOven(IntoFixture):
     """
-    Take the object from the counter and put it on the rack or tray of the toaster
-    oven RoboCasa slid out.
+    Take the object from the counter and put it on the rack or tray of the toaster oven
+    RoboCasa slid out.
     """
 
     fixture_attribute = "toaster_oven"
@@ -221,8 +221,7 @@ class PickPlaceCounterToToasterOven(IntoFixture):
 @dataclass
 class PickPlaceToasterOvenToCounter(OntoReceptacle):
     """
-    Take the object from the toaster oven's tray and put it on the plate on the
-    counter.
+    Take the object from the toaster oven's tray and put it on the plate on the counter.
     """
 
 
@@ -240,8 +239,8 @@ class PickPlaceCounterToStandMixer(IntoFixture):
 @dataclass
 class PickPlaceFridgeShelfToDrawer(IntoFixture):
     """
-    Take the object from a shelf of the fridge and put it into the fridge's top
-    drawer, which RoboCasa opened.
+    Take the object from a shelf of the fridge and put it into the fridge's top drawer,
+    which RoboCasa opened.
     """
 
     fixture_attribute = "fridge"
@@ -258,8 +257,7 @@ class PickPlaceFridgeShelfToDrawer(IntoFixture):
 @dataclass
 class PickPlaceFridgeDrawerToShelf(IntoFixture):
     """
-    Take the object out of the fridge's open drawer and put it on a shelf of the
-    fridge.
+    Take the object out of the fridge's open drawer and put it on a shelf of the fridge.
     """
 
     fixture_attribute = "fridge"

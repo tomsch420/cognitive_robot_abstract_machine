@@ -91,7 +91,13 @@ class CloseFridgeDrawer(DoorShareTask):
         )
 
 
-TASKS = [OpenDrawer, CloseDrawer, SlideDishwasherRack, OpenFridgeDrawer, CloseFridgeDrawer]
+TASKS = [
+    OpenDrawer,
+    CloseDrawer,
+    SlideDishwasherRack,
+    OpenFridgeDrawer,
+    CloseFridgeDrawer,
+]
 """
 Every task of this module.
 """

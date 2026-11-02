@@ -80,8 +80,8 @@ class CloseMicrowave(ManipulateFixtureDoors):
 @dataclass
 class OpenFridge(ManipulateFixtureDoors):
     """
-    Swing the doors of the fridge's cooling compartment open; RoboCasa leaves a
-    freezer below it out of the task.
+    Swing the doors of the fridge's cooling compartment open; RoboCasa leaves a freezer
+    below it out of the task.
     """
 
     share = 1.0

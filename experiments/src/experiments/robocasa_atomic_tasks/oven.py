@@ -39,8 +39,8 @@ class PreheatOven(JointGoalTask):
 
     temperature_share: ClassVar[float] = 0.5
     """
-    How far the temperature knob is turned, as a share of its range: RoboCasa counts
-    the oven preheating from 0.25.
+    How far the temperature knob is turned, as a share of its range: RoboCasa counts the
+    oven preheating from 0.25.
     """
 
     def joint_goals(self, episode: RoboCasaEpisode) -> List[tuple[str, float]]:

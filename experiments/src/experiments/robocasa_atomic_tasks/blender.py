@@ -1,7 +1,7 @@
 """
-A PR2 performs RoboCasa's blender tasks (``kitchen_blender.py``): it takes the
-blender's lid off and lays it on the counter, puts it back on the jar, or presses the
-blender's power button.
+A PR2 performs RoboCasa's blender tasks (``kitchen_blender.py``): it takes the blender's
+lid off and lays it on the counter, puts it back on the jar, or presses the blender's
+power button.
 
 Run one with::
 

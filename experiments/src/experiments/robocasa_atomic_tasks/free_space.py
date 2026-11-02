@@ -1,12 +1,12 @@
 """
 Paths for the gripper through the free space of the kitchen, planned on a graph of
-convex sets: the boxes the space around the gripper's way decomposes into once the
-boxes bounding everything but the robot, bloated by how far the gripper keeps from
-them, are taken out of it.
+convex sets: the boxes the space around the gripper's way decomposes into once the boxes
+bounding everything but the robot, bloated by how far the gripper keeps from them, are
+taken out of it.
 
 Collision avoidance alone pulls the gripper straight towards its goal and stops it
-wherever the kitchen stands in the way, in front of a cabinet's floor or beside the
-door of a microwave. A path around those leads it to where the straight way is free.
+wherever the kitchen stands in the way, in front of a cabinet's floor or beside the door
+of a microwave. A path around those leads it to where the straight way is free.
 """
 
 from __future__ import annotations
@@ -127,9 +127,9 @@ def path_through_free_space(
     :param margin: How far beyond the box spanned by the start and the goal the space
         searched reaches, in metres.
     :param floor_height: How high above the floor the path keeps at least, in metres.
-    :param maximum_snap: How far from the start or the goal the free space may begin,
-        if either lies within the clearance of something, for the path to leave or
-        enter it straight from there, in metres.
+    :param maximum_snap: How far from the start or the goal the free space may begin, if
+        either lies within the clearance of something, for the path to leave or enter it
+        straight from there, in metres.
     :param ignored: Bodies that are no obstacles, such as a part to be taken hold of.
     :return: The points of the path, the start first and the goal last, or ``None`` if
         the free space connects no points near the two.

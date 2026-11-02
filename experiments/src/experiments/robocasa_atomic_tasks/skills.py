@@ -4,7 +4,7 @@ moving a fixture's mechanism by one of its parts to a given position, and pressi
 button.
 
 Each comes with a counterpart that also walks the robot to a stand, picked among a
-list of candidates, as is the grasp, by coraplex trying them, and then leads the
+list of candidates, as is the grasp, by coraplex trying them, and then may lead the
 gripper along a path through the kitchen's free space to where its last straight
 approach begins.
 """
@@ -12,46 +12,48 @@ approach begins.
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import numpy as np
 from scipy.spatial.transform import Rotation, Slerp
-from typing_extensions import List, Sequence
+from typing_extensions import Sequence
 
-from giskardpy.motion_statechart.context import MotionStatechartContext
-from giskardpy.motion_statechart.data_types import DefaultWeights
-from giskardpy.motion_statechart.goals.templates import Parallel
-from giskardpy.motion_statechart.graph_node import Goal, NodeArtifacts
-from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose, HoldPose
-from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
-from krrood.symbolic_math.symbolic_math import trinary_logic_and
-from krrood.entity_query_language.factories import a, variable
-from krrood.entity_query_language.query.match import Match
-from coraplex.datastructures.enums import MovementType
-from coraplex.plans.factories import sequential
-from coraplex.plans.plan_node import PlanNode
-from coraplex.querying.predicates import IsAmongTheClosestGraspsTo
-from coraplex.robot_plans.actions.base import ActionDescription
-from coraplex.robot_plans.actions.core.container import ContainerAction
+from coraplex.datastructures.trajectory import PoseTrajectory
+from coraplex.exceptions import ObjectIsNotHeld
+from coraplex.querying.grasp_closeness import GraspCloseness
+from coraplex.robot_plans.actions.base import SequentialAction
+from coraplex.robot_plans.actions.core.container import MovesContainerByItsHandle
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.pick_up import PickUpAction
 from coraplex.robot_plans.actions.core.placing import PlaceAction
-from coraplex.datastructures.enums import ExecutionType
-from coraplex.exceptions import ObjectIsNotHeld
-from coraplex.plans.factories import execute_single
-from coraplex.plans.executables import Executable, GiskardExecutable
-from coraplex.plans.plan_node import ExecutionBoundaryNode
-from coraplex.robot_plans.motions.base import BaseMotion
-from coraplex.robot_plans.motions.navigation import MoveMotion
-from coraplex.robot_plans.motions.gripper import (
-    MoveGripperMotion,
-    MoveTCPWaypointsMotion,
-    MoveToolCenterPointMotion,
+from coraplex.robot_plans.actions.core.robot_body import (
+    FollowToolCenterPointPathAction,
+)
+from coraplex.robot_plans.mixins import MovesToolCenterPoint, OperatesGripper
+from cramph.composites import Parallel
+from cramph.monitors import CountSimulationTimeSeconds
+from cramph.node import CompositeNode, EndedByOwner, NodeArtifacts, StatechartNode
+from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose, HoldPose
+from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
+from giskardpy.motion_statechart.weights import DefaultWeights
+from krrood.entity_query_language.factories import a, flat_variable, variable
+from krrood.entity_query_language.predicate import RenderedFields, SymbolicFunction
+from krrood.entity_query_language.query.match import Match
+from krrood.entity_query_language.verbalization.fragments.base import (
+    VerbalizationFragment,
+)
+from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
+    FunctionVerbalizationTemplates,
+)
+from krrood.symbolic_math.symbolic_math import trinary_logic_and
+from semantic_digital_twin.collision_checking.collision_matrix import CollisionRule
+from semantic_digital_twin.collision_checking.collision_rules import (
+    AllowCollisionForEndEffector,
 )
 from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.exceptions import NothingHeld
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
-from semantic_digital_twin.robots.robot_parts import Arm
+from semantic_digital_twin.robots.robot_parts import Arm, EndEffector
 from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Handle
 from semantic_digital_twin.spatial_types.spatial_types import (
@@ -92,59 +94,83 @@ def frame_at(
 # %% standing somewhere
 
 
-@dataclass
-class DriveToStandMotion(MoveMotion):
-    """
-    Drives the base to where the robot is to stand, as close as
-    :class:`~coraplex.robot_plans.actions.core.navigation.NavigateAction` asks it to
-    come, rather than as close as a pose goal does by default.
-
-    A base driven by its wheels' velocities in a physical simulation settles a centimetre
-    or two beside its goal and holds there; a pose goal that waits for it to come nearer
-    never ends.
-    """
-
-    position_threshold: float = 0.03
-    """
-    How close the base has to come to where it is to stand, in metres.
-    """
-
-    orientation_threshold: float = 0.03
-    """
-    How close it has to come to the way it is to face, in radians.
-    """
-
-    @property
-    def _motion_chart(self):
-        if GiskardExecutable.execution_type == ExecutionType.KINEMATICALLY_SIMULATED:
-            return super()._motion_chart
-        return CartesianPose(
-            root_link=self.world.root,
-            tip_link=self.robot.root,
-            goal_pose=self.target,
-            translation_threshold=self.position_threshold,
-            orientation_threshold=self.orientation_threshold,
-        )
-
-
-@dataclass
+@dataclass(eq=False, repr=False, kw_only=True)
 class StandAction(NavigateAction):
     """
-    Takes the robot to where it is to stand, see :class:`DriveToStandMotion`.
+    Takes the robot to where it is to stand, as close as a base driven by its wheels'
+    velocities settles in a physical simulation.
     """
 
-    @property
-    def _action_plan(self) -> PlanNode:
-        return execute_single(
-            DriveToStandMotion(self.robot.mobile_base.pose_facing(self.target_location))
+    base_pose_threshold: float = 0.03
+    """
+    How far the base may be from where it is to stand, in metres and in radians: a base
+    driven by its wheels' velocities in a physical simulation settles a centimetre or two
+    beside its goal and holds there, and a goal that waits for it to come nearer never
+    ends.
+    """
+
+
+# %% which grasps are tried from a stand
+
+
+@dataclass(eq=False)
+class GraspsClosestTo(SymbolicFunction):
+    """
+    The grasps of a list that are among the :attr:`number_of_grasps` closest to a
+    standing position, in the order the list gives them, see
+    :class:`~coraplex.querying.grasp_closeness.GraspCloseness`.
+    """
+
+    grasps: list[GraspCandidate]
+    """
+    The grasps, best first.
+    """
+
+    standing_position: Pose
+    """
+    Where the robot stands while taking one of the grasps, read when the grasps are
+    chosen.
+    """
+
+    number_of_grasps: int | None = None
+    """
+    How many of the closest grasps are kept, all of them if None.
+    """
+
+    def __call__(self) -> list[GraspCandidate]:
+        if self.number_of_grasps is None:
+            return list(self.grasps)
+        world = self.standing_position.reference_frame._world
+        world_P_standing = world.transform(self.standing_position, world.root).to_np()[
+            :, 3
+        ]
+        closest = sorted(
+            self.grasps,
+            key=lambda grasp: GraspCloseness.from_grasp(
+                grasp,
+                grasp.graspable.root.global_transform.to_np(),
+                world_P_standing,
+            ),
+        )[: self.number_of_grasps]
+        return [grasp for grasp in self.grasps if grasp in closest]
+
+    @classmethod
+    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+        """
+        :param fields: The rendered fragment for each field.
+        :return: The noun phrase *"the grasps closest to <standing position> of
+            <grasps>"*.
+        """
+        return FunctionVerbalizationTemplates.possessive(
+            cls, fields["grasps"], fields["standing_position"]
         )
 
 
 # %% reaching through free space
 
 
-@dataclass
-class ReachThroughFreeSpaceAction(ActionDescription):
+@dataclass(eq=False, repr=False, kw_only=True)
+class ReachThroughFreeSpaceAction(MovesToolCenterPoint, SequentialAction):
     """
     Leads the tool frame from where it is to a goal along a path through the free space
     around the two, planned on a graph of convex sets, turning it towards the goal's
@@ -182,8 +208,15 @@ class ReachThroughFreeSpaceAction(ActionDescription):
         """
         return self.goal
 
-    @property
-    def _action_plan(self) -> PlanNode:
+    def create_temporary_collision_rules(self) -> list[CollisionRule]:
+        """
+        :return: An allowance for the gripper to come close to what it reaches for, as
+            the last motion onto the goal is the one the action reached for afterwards
+            begins with.
+        """
+        return [AllowCollisionForEndEffector(end_effector=self.arm.end_effector)]
+
+    def create_steps(self) -> list[StatechartNode]:
         world = self.world
         goal = self.tool_goal()
         world_T_start = self.arm.end_effector.tool_frame.global_pose.to_np()
@@ -195,13 +228,9 @@ class ReachThroughFreeSpaceAction(ActionDescription):
             world_T_goal[:3, 3],
             clearance=self.clearance,
         )
-        # the last motion onto the goal is the one the action reached for afterwards
-        # begins with, which lets the gripper come close to what it reaches for
-        onto_the_goal = MoveToolCenterPointMotion(
-            goal, self.arm, allow_gripper_collision=True
-        )
+        onto_the_goal = self.tool_center_point_goal(goal, self.arm)
         if path is None or len(path) <= 2:
-            return sequential([onto_the_goal])
+            return [onto_the_goal]
         lengths = np.r_[0.0, np.cumsum(np.linalg.norm(np.diff(path, axis=0), axis=1))]
         turning = Slerp(
             [0.0, 1.0],
@@ -217,26 +246,26 @@ class ReachThroughFreeSpaceAction(ActionDescription):
                     world_T_waypoint, reference_frame=world.root
                 ).pose
             )
-        return sequential(
-            [
-                MoveTCPWaypointsMotion(
-                    waypoints,
-                    self.arm,
-                    position_threshold=self.waypoint_threshold,
-                ),
-                onto_the_goal,
-            ]
-        )
+        return [
+            FollowToolCenterPointPathAction(
+                target_locations=PoseTrajectory(waypoints),
+                arm=self.arm,
+                position_threshold=self.waypoint_threshold,
+            ),
+            onto_the_goal,
+        ]
 
 
-@dataclass
+@dataclass(eq=False, repr=False, kw_only=True)
 class ReachAboveThePlacementAction(ReachThroughFreeSpaceAction):
     """
     Leads the tool frame, holding an object, through free space to above where a place
     puts the object down, where the place's own motions begin.
     """
 
-    place: PlaceAction | None = None
+    goal: Pose | None = None
+
+    place: PlaceAction
     """
     The place whose start is reached.
     """
@@ -249,22 +278,24 @@ class ReachAboveThePlacementAction(ReachThroughFreeSpaceAction):
         ).retreat
 
 
-@dataclass
+@dataclass(kw_only=True, eq=False)
 class MayReachThroughFreeSpace:
     """
     A step that walks the robot to a stand and acts from there, and may lead the
     gripper there along a path through free space first.
     """
 
-    through_free_space: bool = field(default=False, kw_only=True)
+    through_free_space: bool = False
     """
     Whether the gripper is led along a path through free space to where the action's
     own motions begin, rather than left to them alone.
     """
 
-    def reaching(self, reach: ReachThroughFreeSpaceAction) -> List[ActionDescription]:
+    def reaching(self, reach: Match) -> list[Match]:
         """
-        :param reach: The reach through free space to where the action begins.
+        :param reach: The statement of the reach through free space to where the action
+            begins, grounded only once the reach begins, so that its path sets off from
+            where the tool frame then is.
         :return: The reach, if the step reaches through free space; nothing otherwise.
         """
         return [reach] if self.through_free_space else []
@@ -278,7 +309,7 @@ def part_grasps(
     depth: float = 0.02,
     upward_slope: float = 0.8,
     lower_end_height: float = 0.04,
-) -> List[GraspCandidate]:
+) -> list[GraspCandidate]:
     """
     The grasps a part of a fixture is taken hold of by, such as a handle, a knob, a
     lever or the front edge of a rack.
@@ -353,7 +384,7 @@ def grasps_from_above(
     direction: np.ndarray,
     depth: float = 0.03,
     pitches: Sequence[float] = (math.pi / 4, math.pi / 2),
-) -> List[GraspCandidate]:
+) -> list[GraspCandidate]:
     """
     Grasps that take an object from above: coming down onto its top along the
     direction the robot faces the kitchen in, pitched down by each of a list of angles,
@@ -399,8 +430,8 @@ def grasps_from_above(
 
 
 def grasps_approaching_along(
-    grasps: List[GraspCandidate], direction: np.ndarray, minimum_alignment: float = 0.5
-) -> List[GraspCandidate]:
+    grasps: list[GraspCandidate], direction: np.ndarray, minimum_alignment: float = 0.5
+) -> list[GraspCandidate]:
     """
     :param grasps: Grasps on a part.
     :param direction: The horizontal direction the robot faces the kitchen in.
@@ -440,63 +471,62 @@ def grasps_approaching_along(
 # %% moving a mechanism to a position
 
 
-@dataclass(eq=False, repr=False)
-class DriveJoint(Goal):
+@dataclass(eq=False, repr=False, kw_only=True)
+class DriveJoint(EndedByOwner, CompositeNode):
     """
     Move one joint of the environment to a position while keeping the robot's tool
     frame fixed relative to a part the joint moves, as a hand holding or pushing that
     part would.
 
-    Unlike :class:`~giskardpy.motion_statechart.goals.open_close.Open`, the joint is
-    named rather than taken to be the first one above the part, so that a part hanging
-    from two joints, such as a faucet handle turned on and swung for hot water, is moved
-    about the right one.
+    Unlike
+    :class:`~giskardpy.motion_statechart.goals.grasped_mechanism.ArticulateGraspedMechanism`,
+    the joint is named rather than taken to be the first one above the part, so that a
+    part hanging from two joints, such as a faucet handle turned on and swung for hot
+    water, is moved about the right one.
     """
 
-    tip_link: KinematicStructureEntity = field(kw_only=True)
+    tip_link: KinematicStructureEntity
     """
     The robot's tool frame.
     """
 
-    environment_link: KinematicStructureEntity = field(kw_only=True)
+    environment_link: KinematicStructureEntity
     """
     The part the tool frame stays fixed to.
     """
 
-    joint: ActiveConnection1DOF = field(kw_only=True)
+    joint: ActiveConnection1DOF
     """
     The joint moved.
     """
 
-    goal_position: float = field(kw_only=True)
+    goal_position: float
     """
     The position the joint is moved to.
     """
 
-    threshold: float = field(default=0.01, kw_only=True)
+    threshold: float = 0.01
     """
     How close the joint has to come to :attr:`goal_position`.
     """
 
-    mechanism_weight: float = field(
-        default=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE, kw_only=True
-    )
+    mechanism_weight: float = DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE
     """
     Weight of the goal on the joint, below collision avoidance for the reason
-    :attr:`~giskardpy.motion_statechart.goals.open_close.Open.mechanism_weight` gives.
+    :attr:`~giskardpy.motion_statechart.goals.grasped_mechanism.ArticulateGraspedMechanism.mechanism_weight`
+    gives.
     """
 
-    grasp_weight: float = field(
-        default=DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE, kw_only=True
-    )
+    grasp_weight: float = DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE
     """
     Weight of the goal keeping the tool frame fixed to the part, above collision
     avoidance for the reason
-    :attr:`~giskardpy.motion_statechart.goals.open_close.Open.grasp_weight` gives.
+    :attr:`~giskardpy.motion_statechart.goals.grasped_mechanism.ArticulateGraspedMechanism.grasp_weight`
+    gives.
     """
 
-    def expand(self, context: MotionStatechartContext) -> None:
-        self._add_children_to_motion_statechart(
+    def expand(self) -> None:
+        self._add_children_to_statechart(
             [
                 JointPositionList(
                     name="joint goal",
@@ -516,38 +546,72 @@ class DriveJoint(Goal):
             ]
         )
 
-    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
+    def build_artifacts(self) -> NodeArtifacts:
         """
         Observe the goal reached once the joint and the hold on the part both are.
         """
         return NodeArtifacts(
-            observation=trinary_logic_and(*[node.goal_reached for node in self.nodes])
+            observation=trinary_logic_and(
+                *[node.observation_variable for node in self.nodes]
+            )
         )
 
 
-@dataclass
-class MechanismMotion(BaseMotion):
+def mechanism_goal(
+    action: MovesToolCenterPoint,
+    part: Body,
+    arm: Arm,
+    joint: ActiveConnection1DOF,
+    goal_position: float,
+    threshold: float,
+    hold_base: bool,
+) -> StatechartNode:
     """
-    Moves a joint to a position, keeping the gripper where it holds or pushes a part
-    the joint moves.
+    :param action: The action the goal is a step of.
+    :param part: The part the gripper holds or pushes.
+    :param arm: The arm whose gripper is on the part.
+    :param joint: The joint moved.
+    :param goal_position: The position the joint is moved to.
+    :param threshold: How close the joint has to come to `goal_position`.
+    :param hold_base: Whether the base stands still while the joint moves, as for a
+        knob turned by the wrist alone: a base driven by its wheels' velocities drifts
+        by a few millimetres, enough to drag the fingers off a knob's bar.
+    :return: A new goal moving the joint while the gripper stays on the part.
+    """
+    drive = DriveJoint(
+        tip_link=arm.end_effector.tool_frame,
+        environment_link=part,
+        joint=joint,
+        goal_position=goal_position,
+        threshold=threshold,
+    )
+    if not hold_base:
+        return drive
+    return Parallel(
+        nodes=[
+            drive,
+            HoldPose(
+                name="hold base",
+                root_link=action.world.root,
+                tip_link=action.robot.root,
+            ),
+        ]
+    )
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class OperateMechanismAction(MovesContainerByItsHandle):
+    """
+    Takes hold of a part of a fixture, moves a joint the part hangs from to a position
+    once the fingers have closed on it, lets go of the part and backs off it.
     """
 
-    part: Body
+    joint: ActiveConnection1DOF | None = None
     """
-    The part the gripper holds or pushes.
-    """
-
-    arm: Arm
-    """
-    The arm whose gripper is on the part.
+    The joint moved; the first one above the part if not given.
     """
 
-    joint: ActiveConnection1DOF
-    """
-    The joint moved.
-    """
-
-    goal_position: float
+    goal_position: float = 0.0
     """
     The position the joint is moved to.
     """
@@ -559,91 +623,15 @@ class MechanismMotion(BaseMotion):
 
     hold_base: bool = False
     """
-    Whether the base stands still while the joint moves in a physical simulation, as
-    for a knob turned by the wrist alone: a base driven by its wheels' velocities drifts
-    by a few millimetres, enough to drag the fingers off a knob's bar.
+    Whether the base stands still while the joint moves, see :func:`mechanism_goal`.
     """
 
-    def perform(self):
-        return
-
-    @property
-    def _motion_chart(self):
-        drive = DriveJoint(
-            tip_link=self.arm.end_effector.tool_frame,
-            environment_link=self.part,
-            joint=self.joint,
-            goal_position=self.goal_position,
-            threshold=self.threshold,
-        )
-        if (
-            not self.hold_base
-            or GiskardExecutable.execution_type == ExecutionType.KINEMATICALLY_SIMULATED
-        ):
-            return drive
-        return Parallel(
-            [
-                drive,
-                HoldPose(
-                    name="hold base", root_link=self.world.root, tip_link=self.robot.root
-                ),
-            ]
-        )
-
-
-@dataclass
-class StandstillExecutable(Executable):
+    settling_time: float = 0.0
     """
-    Does nothing itself: the motion before it is a chart of its own, which ends once
-    the physics has brought every servo-driven joint to a standstill.
-    """
-
-
-@dataclass(eq=False)
-class WaitForStandstillNode(ExecutionBoundaryNode):
-    """
-    Keeps the motions before and after it out of one chart, so that in a physical
-    simulation the joints come to rest where the motions before it sent them before
-    the ones after it begin.
-
-    A controller takes the joints to be where it commands them, while the servos of a
-    physically simulated robot only follow: fingers told to close on a part are still
-    closing when the motion that closes them ends.
-    """
-
-    def notify(self) -> None:
-        pass
-
-    def parse(self) -> StandstillExecutable:
-        return StandstillExecutable(context=self.context)
-
-
-@dataclass
-class OperateMechanismAction(ContainerAction):
-    """
-    Takes hold of a part of a fixture, moves a joint the part hangs from to a position
-    once the fingers have closed on it, lets go of the part and backs off it.
-    """
-
-    joint: ActiveConnection1DOF | None = field(default=None, kw_only=True)
-    """
-    The joint moved; the first one above the part if not given.
-    """
-
-    goal_position: float = field(default=0.0, kw_only=True)
-    """
-    The position the joint is moved to.
-    """
-
-    threshold: float = field(default=0.01, kw_only=True)
-    """
-    How close the joint has to come to :attr:`goal_position`.
-    """
-
-    hold_base: bool = field(default=False, kw_only=True)
-    """
-    Whether the base stands still while the joint moves, see
-    :attr:`MechanismMotion.hold_base`.
+    How much simulated time, in seconds, the fingers are given to close on the part
+    before the joint moves. A controller takes the joints to be where it commands them,
+    while the servos of a physically simulated robot only follow: fingers told to close
+    on a part are still closing when the motion that closes them ends.
     """
 
     release_clearance: float = 0.12
@@ -653,96 +641,67 @@ class OperateMechanismAction(ContainerAction):
     """
 
     @property
-    def joint_moved(self) -> ActiveConnection1DOF:
+    def mechanism(self) -> ActiveConnection1DOF:
         """
-        The joint moved: :attr:`joint`, or the first one above the part, as it is in
-        the world the action is performed in, where :attr:`joint` may be one of a copy
-        of the world a trial had.
+        Differs from :attr:`MovesContainerByItsHandle.mechanism` in being :attr:`joint`
+        where one is given.
         """
-        above_the_part = self.handle.root.get_first_parent_connection_of_type(
-            ActiveConnection1DOF
-        )
-        if self.joint is None:
-            return above_the_part
-        return next(
-            (
-                connection
-                for connection in self.world.connections
-                if connection.name.name == self.joint.name.name
-            ),
-            above_the_part,
-        )
+        if self.joint is not None:
+            return self.joint
+        return super().mechanism
 
-    def back_off_pose(self, grasp_pose: Pose, end_effector) -> Pose:
+    def back_off_pose(self, grasp_pose: Pose, end_effector: EndEffector) -> Pose:
         """
-        The tool frame goal that clears the released part, where the part stands once
-        the joint is at :attr:`goal_position`, stated relative to what the joint hangs
-        from.
+        Differs from :meth:`MovesContainerByItsHandle.back_off_pose` in clearing the
+        part where it stands once the joint is at :attr:`goal_position`, stated relative
+        to what the joint hangs from.
 
         A goal stated relative to the part would move with it: in a physical simulation
         the controller takes the part to follow the gripper all the way, and the part
         may stand elsewhere once the physics hands back where it really is; backing off
         relative to it then sweeps the open fingers across it.
-
-        :param grasp_pose: The grasp frame the part is held by.
-        :param end_effector: The end effector that holds it.
-        :return: The pose the tool frame backs off to, in the frame of the body the
-            joint hangs from.
         """
         world = self.world
-        joint = self.joint_moved
+        joint = self.mechanism
         back_off = super().back_off_pose(grasp_pose, end_effector)
-        start = joint.position
-        joint.position = self.goal_position
-        try:
+        with world.reset_state_context():
+            joint.position = self.goal_position
             world_T_back_off = world.transform(back_off, world.root)
-        finally:
-            joint.position = start
         return world.transform(world_T_back_off, joint.parent)
 
-    @property
-    def _action_plan(self) -> PlanNode:
-        handle_grasp = self.handle_grasp
+    def create_steps(self) -> list[StatechartNode]:
         end_effector = self.arm.end_effector
-        # in a physical simulation the fingers close on the part before it is moved
         settling = (
-            [WaitForStandstillNode()]
-            if GiskardExecutable.execution_type == ExecutionType.PHYSICALLY_SIMULATED
+            [CountSimulationTimeSeconds(seconds=self.settling_time)]
+            if self.settling_time > 0
             else []
         )
-        return sequential(
-            [
-                self.grasping_of(handle_grasp, self.arm, self.tolerate_grasp_stall),
-                *settling,
-                self._mechanism_motion,
-                MoveGripperMotion(
-                    GripperState.OPEN, end_effector, allow_gripper_collision=True
-                ),
-                MoveToolCenterPointMotion(
-                    self.back_off_pose(handle_grasp.grasp_pose, end_effector),
-                    self.arm,
-                    allow_gripper_collision=True,
-                    position_threshold=self.position_threshold,
-                    orientation_threshold=self.orientation_threshold,
-                ),
-            ]
-        )
+        return [
+            self.grasping_of(self.grasp, self.arm),
+            *settling,
+            self._create_mechanism_goal(),
+            self.gripper_goal_type.moving_gripper_to(
+                end_effector.default_configuration(GripperState.OPEN)
+            ),
+            self.tool_center_point_goal(
+                self.back_off_pose(self.grasp.grasp_pose, end_effector), self.arm
+            ),
+        ]
 
-    @property
-    def _mechanism_motion(self) -> BaseMotion:
-        joint = self.joint_moved
-        return MechanismMotion(
-            self.handle.root,
+    def _create_mechanism_goal(self) -> StatechartNode:
+        return mechanism_goal(
+            self,
+            self.grasp.graspable.root,
             self.arm,
-            joint=joint,
-            goal_position=self.goal_position,
-            threshold=self.threshold,
-            hold_base=self.hold_base,
+            self.mechanism,
+            self.goal_position,
+            self.threshold,
+            self.hold_base,
         )
 
 
-@dataclass
-class StandAndOperateMechanismAction(MayReachThroughFreeSpace, ActionDescription):
+@dataclass(eq=False, repr=False, kw_only=True)
+class StandAndOperateMechanismAction(MayReachThroughFreeSpace, SequentialAction):
     """
     Walks to where the robot stands and moves the mechanism by the part.
     """
@@ -762,15 +721,16 @@ class StandAndOperateMechanismAction(MayReachThroughFreeSpace, ActionDescription
         cls,
         handle: Handle,
         arm: Arm,
-        stands: List[Pose],
+        stands: list[Pose],
         joint: ActiveConnection1DOF,
         goal_position: float,
-        grasps: List[GraspCandidate],
+        grasps: list[GraspCandidate],
         threshold: float = 0.01,
         number_of_grasps: int | None = None,
         approach_clearance: float = 0.2,
         through_free_space: bool = False,
         hold_base: bool = False,
+        settling_time: float = 0.0,
     ) -> Match:
         """
         :param handle: The part the mechanism is moved by.
@@ -778,8 +738,8 @@ class StandAndOperateMechanismAction(MayReachThroughFreeSpace, ActionDescription
         :param stands: Where the robot may stand, best first.
         :param joint: The joint moved.
         :param goal_position: The position the joint is moved to.
+        :param grasps: The grasps the part may be taken hold of by, best first.
         :param threshold: How close the joint has to come to ``goal_position``.
-        :param grasps: The grasps the part may be taken hold of by.
         :param number_of_grasps: How many of the grasps closest to a stand are tried
             from there; all of them if not given.
         :param approach_clearance: How far from the part the gripper starts its last
@@ -788,47 +748,38 @@ class StandAndOperateMechanismAction(MayReachThroughFreeSpace, ActionDescription
         :param through_free_space: Whether the gripper is led to the part along a
             path through free space.
         :param hold_base: Whether the base stands still while the joint moves, see
-            :attr:`MechanismMotion.hold_base`.
+            :func:`mechanism_goal`.
+        :param settling_time: See :attr:`OperateMechanismAction.settling_time`.
         :return: The step, with the stand and the grasp left open.
         """
-        step = a(cls)(
-            navigate=a(StandAction)(
-                target_location=variable(Pose, domain=stands)
-            ),
+        stand = variable(Pose, domain=stands)
+        return a(cls)(
+            navigate=a(StandAction)(target_location=stand),
             operate=a(OperateMechanismAction)(
-                handle=handle,
+                grasp=flat_variable(GraspsClosestTo(grasps, stand, number_of_grasps)),
                 arm=arm,
-                grasp=variable(GraspCandidate, domain=grasps),
                 joint=joint,
                 goal_position=goal_position,
                 threshold=threshold,
                 approach_clearance=approach_clearance,
                 hold_base=hold_base,
+                settling_time=settling_time,
             ),
             through_free_space=through_free_space,
         )
-        return step.where(
-            IsAmongTheClosestGraspsTo(
-                step.operate.grasp,
-                step.navigate.target_location,
-                grasps,
-                number_of_grasps or len(grasps),
-            )
-        )
 
-    @property
-    def _action_plan(self) -> PlanNode:
+    def create_steps(self) -> list[StatechartNode]:
         operate = self.operate
         pre_grasp = operate.grasp_pose_sequence(
-            operate.handle_grasp.grasp_pose, operate.arm.end_effector, operate.handle_grasp
+            operate.grasp.grasp_pose, operate.arm.end_effector, operate.grasp
         ).pre_grasp
-        return sequential(
-            [
-                self.navigate,
-                *self.reaching(ReachThroughFreeSpaceAction(pre_grasp, operate.arm)),
-                operate,
-            ]
-        )
+        return [
+            self.navigate,
+            *self.reaching(
+                a(ReachThroughFreeSpaceAction)(goal=pre_grasp, arm=operate.arm)
+            ),
+            operate,
+        ]
 
 
 # %% pressing a button
@@ -860,8 +811,8 @@ def fingertips_goal(
     return arm.end_effector.tool_frame_goal_for_grasp(world_T_press.pose)
 
 
-@dataclass
-class PressAction(ActionDescription):
+@dataclass(eq=False, repr=False, kw_only=True)
+class PressAction(MovesToolCenterPoint, OperatesGripper, SequentialAction):
     """
     Closes the gripper and pushes its fingertips against a point, coming in along a
     direction.
@@ -901,26 +852,28 @@ class PressAction(ActionDescription):
             self.arm, self.point, self.approach, distance_before_the_point
         )
 
-    @property
-    def _action_plan(self) -> PlanNode:
-        return sequential(
-            [
-                MoveGripperMotion(GripperState.CLOSE, self.arm.end_effector),
-                MoveToolCenterPointMotion(
-                    self.press_goal(self.approach_distance), self.arm
-                ),
-                MoveToolCenterPointMotion(
-                    self.press_goal(0.0),
-                    self.arm,
-                    allow_gripper_collision=True,
-                    movement_type=MovementType.STRAIGHT_CARTESIAN,
-                ),
-            ]
-        )
+    def create_temporary_collision_rules(self) -> list[CollisionRule]:
+        """
+        :return: An allowance for the gripper to touch what it presses.
+        """
+        return [AllowCollisionForEndEffector(end_effector=self.arm.end_effector)]
+
+    def create_steps(self) -> list[StatechartNode]:
+        return [
+            self.gripper_goal_type.moving_gripper_to(
+                self.arm.end_effector.default_configuration(GripperState.CLOSE)
+            ),
+            self.tool_center_point_goal(
+                self.press_goal(self.approach_distance), self.arm
+            ),
+            self.tool_center_point_goal(
+                self.press_goal(0.0), self.arm, in_a_straight_line=True
+            ),
+        ]
 
 
-@dataclass
-class PushAction(ActionDescription):
+@dataclass(eq=False, repr=False, kw_only=True)
+class PushAction(MovesToolCenterPoint, SequentialAction):
     """
     Presses a part of a fixture with the fingertips and pushes it on, moving the joint
     it hangs from to a position, the way a switch or a lever is pushed down.
@@ -951,24 +904,23 @@ class PushAction(ActionDescription):
     How close the joint has to come to :attr:`goal_position`.
     """
 
-    @property
-    def _action_plan(self) -> PlanNode:
-        return sequential(
-            [
-                self.press,
-                MechanismMotion(
-                    self.part,
-                    self.press.arm,
-                    joint=self.joint,
-                    goal_position=self.goal_position,
-                    threshold=self.threshold,
-                ),
-            ]
-        )
+    def create_steps(self) -> list[StatechartNode]:
+        return [
+            self.press,
+            mechanism_goal(
+                self,
+                self.part,
+                self.press.arm,
+                self.joint,
+                self.goal_position,
+                self.threshold,
+                hold_base=False,
+            ),
+        ]
 
 
-@dataclass
-class WithdrawAction(ActionDescription):
+@dataclass(eq=False, repr=False, kw_only=True)
+class WithdrawAction(MovesToolCenterPoint, SequentialAction):
     """
     Draws the gripper straight back from a point it pressed, the way it came in.
     """
@@ -993,22 +945,24 @@ class WithdrawAction(ActionDescription):
     How far back from the point the gripper withdraws, in metres.
     """
 
-    @property
-    def _action_plan(self) -> PlanNode:
-        return sequential(
-            [
-                MoveToolCenterPointMotion(
-                    fingertips_goal(self.arm, self.point, self.approach, self.distance),
-                    self.arm,
-                    allow_gripper_collision=True,
-                    movement_type=MovementType.STRAIGHT_CARTESIAN,
-                )
-            ]
-        )
+    def create_temporary_collision_rules(self) -> list[CollisionRule]:
+        """
+        :return: An allowance for the gripper to touch what it pressed while it leaves.
+        """
+        return [AllowCollisionForEndEffector(end_effector=self.arm.end_effector)]
+
+    def create_steps(self) -> list[StatechartNode]:
+        return [
+            self.tool_center_point_goal(
+                fingertips_goal(self.arm, self.point, self.approach, self.distance),
+                self.arm,
+                in_a_straight_line=True,
+            )
+        ]
 
 
-@dataclass
-class StandAndPressAction(MayReachThroughFreeSpace, ActionDescription):
+@dataclass(eq=False, repr=False, kw_only=True)
+class StandAndPressAction(MayReachThroughFreeSpace, OperatesGripper, SequentialAction):
     """
     Walks to where the robot stands and presses the point.
     """
@@ -1029,7 +983,7 @@ class StandAndPressAction(MayReachThroughFreeSpace, ActionDescription):
         point: np.ndarray,
         approach: np.ndarray,
         arm: Arm,
-        stands: List[Pose],
+        stands: list[Pose],
         pushed_joint: ActiveConnection1DOF | None = None,
         goal_position: float = 0.0,
         threshold: float = 0.0005,
@@ -1050,9 +1004,7 @@ class StandAndPressAction(MayReachThroughFreeSpace, ActionDescription):
         """
         press = a(PressAction)(point=point, approach=approach, arm=arm)
         return a(cls)(
-            navigate=a(StandAction)(
-                target_location=variable(Pose, domain=stands)
-            ),
+            navigate=a(StandAction)(target_location=variable(Pose, domain=stands)),
             press=(
                 press
                 if pushed_joint is None
@@ -1067,21 +1019,20 @@ class StandAndPressAction(MayReachThroughFreeSpace, ActionDescription):
             through_free_space=through_free_space,
         )
 
-    @property
-    def _action_plan(self) -> PlanNode:
+    def create_steps(self) -> list[StatechartNode]:
         press = self.press if isinstance(self.press, PressAction) else self.press.press
-        return sequential(
-            [
-                self.navigate,
-                MoveGripperMotion(GripperState.CLOSE, press.arm.end_effector),
-                *self.reaching(
-                    ReachThroughFreeSpaceAction(
-                        press.press_goal(press.approach_distance), press.arm
-                    )
-                ),
-                self.press,
-            ]
-        )
+        return [
+            self.navigate,
+            self.gripper_goal_type.moving_gripper_to(
+                press.arm.end_effector.default_configuration(GripperState.CLOSE)
+            ),
+            *self.reaching(
+                a(ReachThroughFreeSpaceAction)(
+                    goal=press.press_goal(press.approach_distance), arm=press.arm
+                )
+            ),
+            self.press,
+        ]
 
 
 def horizontal_direction(from_point: np.ndarray, to_point: np.ndarray) -> np.ndarray:
@@ -1143,7 +1094,7 @@ def lies_between_the_fingers(
     return float(np.linalg.norm(tool - np.clip(tool, lower, upper))) <= reach
 
 
-@dataclass
+@dataclass(eq=False, repr=False, kw_only=True)
 class PlaceHeldObjectAction(PlaceAction):
     """
     Puts down an object an arm is known to hold.
@@ -1153,7 +1104,7 @@ class PlaceHeldObjectAction(PlaceAction):
     tips, the grasp is read off where the object sits in the gripper instead.
     """
 
-    holding_arm: Arm | None = field(default=None, kw_only=True)
+    holding_arm: Arm | None = None
     """
     The arm that holds the object.
     """
@@ -1171,8 +1122,8 @@ class PlaceHeldObjectAction(PlaceAction):
             )
 
 
-@dataclass
-class StandAndPickUpAction(MayReachThroughFreeSpace, ActionDescription):
+@dataclass(eq=False, repr=False, kw_only=True)
+class StandAndPickUpAction(MayReachThroughFreeSpace, SequentialAction):
     """
     Walks to where the robot stands and picks the object up.
     """
@@ -1192,8 +1143,8 @@ class StandAndPickUpAction(MayReachThroughFreeSpace, ActionDescription):
         cls,
         graspable: HasGraspCandidates,
         arm: Arm,
-        stands: List[Pose],
-        grasps: List[GraspCandidate],
+        stands: list[Pose],
+        grasps: list[GraspCandidate],
         number_of_grasps: int | None = None,
         through_free_space: bool = False,
     ) -> Match:
@@ -1201,48 +1152,39 @@ class StandAndPickUpAction(MayReachThroughFreeSpace, ActionDescription):
         :param graspable: The object to pick up.
         :param arm: The arm to pick it up with.
         :param stands: Where the robot may stand, best first.
-        :param grasps: The grasps the object may be taken by.
+        :param grasps: The grasps the object may be taken by, best first.
         :param number_of_grasps: How many of the grasps closest to a stand are tried
             from there; all of them if not given.
         :param through_free_space: Whether the gripper is led to the object along a
             path through free space.
         :return: The step, with the stand and the grasp left open.
         """
-        step = a(cls)(
-            navigate=a(StandAction)(
-                target_location=variable(Pose, domain=stands)
-            ),
+        stand = variable(Pose, domain=stands)
+        return a(cls)(
+            navigate=a(StandAction)(target_location=stand),
             pick_up=a(PickUpAction)(
-                grasp=variable(GraspCandidate, domain=grasps), arm=arm
+                grasp=flat_variable(GraspsClosestTo(grasps, stand, number_of_grasps)),
+                arm=arm,
             ),
             through_free_space=through_free_space,
         )
-        return step.where(
-            IsAmongTheClosestGraspsTo(
-                step.pick_up.grasp,
-                step.navigate.target_location,
-                grasps,
-                number_of_grasps or len(grasps),
-            )
-        )
 
-    @property
-    def _action_plan(self) -> PlanNode:
+    def create_steps(self) -> list[StatechartNode]:
         pick_up = self.pick_up
         pre_grasp = pick_up.grasp_pose_sequence(
             pick_up.grasp.grasp_pose, pick_up.arm.end_effector, pick_up.grasp
         ).pre_grasp
-        return sequential(
-            [
-                self.navigate,
-                *self.reaching(ReachThroughFreeSpaceAction(pre_grasp, pick_up.arm)),
-                pick_up,
-            ]
-        )
+        return [
+            self.navigate,
+            *self.reaching(
+                a(ReachThroughFreeSpaceAction)(goal=pre_grasp, arm=pick_up.arm)
+            ),
+            pick_up,
+        ]
 
 
-@dataclass
-class StandAndPlaceAction(MayReachThroughFreeSpace, ActionDescription):
+@dataclass(eq=False, repr=False, kw_only=True)
+class StandAndPlaceAction(MayReachThroughFreeSpace, SequentialAction):
     """
     Walks to where the robot stands and puts the object it holds down.
     """
@@ -1267,8 +1209,8 @@ class StandAndPlaceAction(MayReachThroughFreeSpace, ActionDescription):
         cls,
         graspable: HasGraspCandidates,
         arm: Arm,
-        target_poses: List[Pose],
-        stands: List[Pose],
+        target_poses: list[Pose],
+        stands: list[Pose],
         retreat_distance: float = 0.1,
         through_free_space: bool = False,
     ) -> Match:
@@ -1284,9 +1226,7 @@ class StandAndPlaceAction(MayReachThroughFreeSpace, ActionDescription):
         :return: The step, with the stand and the pose left open.
         """
         return a(cls)(
-            navigate=a(StandAction)(
-                target_location=variable(Pose, domain=stands)
-            ),
+            navigate=a(StandAction)(target_location=variable(Pose, domain=stands)),
             place=a(PlaceHeldObjectAction)(
                 object_designator=graspable,
                 target_location=variable(Pose, domain=target_poses),
@@ -1297,16 +1237,11 @@ class StandAndPlaceAction(MayReachThroughFreeSpace, ActionDescription):
             through_free_space=through_free_space,
         )
 
-    @property
-    def _action_plan(self) -> PlanNode:
-        return sequential(
-            [
-                self.navigate,
-                *self.reaching(
-                    ReachAboveThePlacementAction(
-                        goal=None, arm=self.arm, place=self.place
-                    )
-                ),
-                self.place,
-            ]
-        )
+    def create_steps(self) -> list[StatechartNode]:
+        return [
+            self.navigate,
+            *self.reaching(
+                a(ReachAboveThePlacementAction)(arm=self.arm, place=self.place)
+            ),
+            self.place,
+        ]

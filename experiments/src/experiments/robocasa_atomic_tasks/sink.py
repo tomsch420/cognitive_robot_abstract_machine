@@ -54,8 +54,8 @@ class TurnSinkSpout(JointGoalTask):
 
     spout_position: ClassVar[float] = 0.8
     """
-    How far the spout is swung, in radians: RoboCasa counts it turned to a side from
-    pi / 6 on, and it stops at 1.05 rad either way.
+    How far the spout is swung, in radians: RoboCasa counts it turned to a side from pi
+    / 6 on, and it stops at 1.05 rad either way.
     """
 
     def joint_goals(self, episode: RoboCasaEpisode) -> List[tuple[str, float]]:

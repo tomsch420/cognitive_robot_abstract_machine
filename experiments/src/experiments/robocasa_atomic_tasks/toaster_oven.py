@@ -39,9 +39,7 @@ class AdjustToasterOvenTemperature(JointGoalTask):
         environment = episode.environment
         name = environment.toaster_oven._joint_names["temperature"]
         sign = 1.0 if environment.should_increase else -1.0
-        share = float(
-            np.clip(environment.initial_temp + sign * self.change, 0.0, 1.0)
-        )
+        share = float(np.clip(environment.initial_temp + sign * self.change, 0.0, 1.0))
         return [(name, episode.world_position_along_range(name, share))]
 
 

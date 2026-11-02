@@ -43,17 +43,22 @@ from semantic_digital_twin.adapters.robocasa_dataset.mujoco_compat import (
 with robocasa_version_assertions_relaxed():
     from robocasa.models.scenes.scene_registry import LayoutType, StyleType
 
-from coraplex.datastructures.dataclasses import Context
-from coraplex.datastructures.enums import ExecutionType
 import mujoco
 
-from coraplex.plans.executables import GiskardExecutable
-from coraplex.execution_environment import (
-    ExecutionEnvironment,
-    PhysicallySimulatedRobot,
+from coraplex.plans.context_extensions import RobotAccess, StatementGrounding
+from coraplex.plans.executors import (
+    KinematicallySimulatedPlanExecutor,
+    PhysicallySimulatedPlanExecutor,
+    PlanExecutor,
 )
-from coraplex.plans.factories import sequential
 from coraplex.plans.failures import EmptyUnderspecified, PlanFailure
+from coraplex.robot_plans.plan_transformations import (
+    LetContactCarryTheBodies,
+    MoveStraightAroundObjects,
+)
+from cramph.composites import Sequence as SequenceOfSteps
+from cramph.context import StatechartContext
+from cramph.statechart import Statechart
 from giskardpy.qp.exceptions import InfeasibleException
 from coraplex.robot_plans.actions.core.robot_body import (
     MoveTorsoAction,
@@ -86,6 +91,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
 )
 from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
+    Pose,
 )
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
@@ -130,7 +136,7 @@ def infeasible_motions_fail() -> Iterator[None]:
     crosses into the plan, but lets the solver's infeasibility through, which ends the
     whole plan from inside the trial of a single candidate.
     """
-    execute = GiskardExecutable.execute
+    execute = PlanExecutor.execute
 
     def execute_failing_where_infeasible(self) -> None:
         try:
@@ -138,11 +144,11 @@ def infeasible_motions_fail() -> Iterator[None]:
         except InfeasibleException as infeasibility:
             raise MotionWasInfeasible(infeasibility) from infeasibility
 
-    GiskardExecutable.execute = execute_failing_where_infeasible
+    PlanExecutor.execute = execute_failing_where_infeasible
     try:
         yield
     finally:
-        GiskardExecutable.execute = execute
+        PlanExecutor.execute = execute
 
 
 # %% RoboCasa's robot, as the judge sees it
@@ -230,6 +236,19 @@ class RoboCasaEpisode:
     The names of RoboCasa's geoms the PR2's fingertips rest on right now.
     """
 
+    collision_avoidance: bool = field(default=True, init=False, repr=False)
+    """
+    Whether the PR2 avoids colliding with the kitchen and with itself while moving, as
+    :meth:`executed` sets it.
+    """
+
+    finger_settling_time: ClassVar[float] = 1.0
+    """
+    How much simulated time, in seconds, the fingers are given to close on a part in a
+    physical simulation before the joint it hangs from is moved, see
+    :attr:`~experiments.robocasa_atomic_tasks.skills.OperateMechanismAction.settling_time`.
+    """
+
     def __post_init__(self) -> None:
         self.mirror = RoboCasaSimulationMirror(
             environment=self.environment, world=self.world
@@ -250,12 +269,46 @@ class RoboCasaEpisode:
         """
         return self.robot.right_arm
 
-    def context(self, sampling_seed: int = 42) -> Context:
+    def create_executor(self, sampling_seed: int = 42) -> PlanExecutor:
         """
         :param sampling_seed: The seed the stands are sampled with.
-        :return: A context of the episode's world and robot.
+        :return: A new executor of a plan of the PR2 in the episode's world, simulating
+            it physically while :attr:`simulation` runs and kinematically otherwise.
+            In physics the bodies are carried by the grip of the fingers alone, the hand
+            moves in straight lines around what it holds or lets go of, and only what
+            the robot does to the kitchen's joints moves them.
         """
-        return Context(self.world, self.robot, sampling_seed=sampling_seed)
+        context = StatechartContext.with_extensions(
+            self.world,
+            [
+                RobotAccess(self.robot),
+                StatementGrounding(sampling_seed=sampling_seed),
+            ],
+        )
+        if not self.physically_simulated:
+            return KinematicallySimulatedPlanExecutor(
+                context, collision_avoidance=self.collision_avoidance
+            )
+        return PhysicallySimulatedPlanExecutor(
+            context,
+            simulation=self.simulation,
+            collision_avoidance=self.collision_avoidance,
+            plan_adaptations=[LetContactCarryTheBodies(), MoveStraightAroundObjects()],
+            leaves_the_environment_to_the_physics=True,
+        )
+
+    def run(self, steps: Sequence[Any]) -> None:
+        """
+        Perform steps one after another in one plan.
+
+        :param steps: The actions, or matches of actions left underspecified.
+        :raises PlanFailure: If the plan fails.
+        """
+        executor = self.create_executor()
+        statechart = Statechart(context=executor.context)
+        statechart.add_node(SequenceOfSteps(nodes=list(steps)))
+        executor.compile(statechart)
+        executor.execute()
 
     @property
     def physically_simulated(self) -> bool:
@@ -276,22 +329,16 @@ class RoboCasaEpisode:
             and with itself while moving.
         :param physics: Whether the steps are simulated physically.
         """
+        self.collision_avoidance = collision_avoidance
         with infeasible_motions_fail():
             if not physics:
-                with ExecutionEnvironment(
-                    ExecutionType.KINEMATICALLY_SIMULATED,
-                    collision_avoidance=collision_avoidance,
-                ):
-                    yield
+                yield
                 return
             began = time.time()
             self.simulation = self.start_physical_simulation()
             logger.info("Physical simulation started in %.0f s", time.time() - began)
             try:
-                with PhysicallySimulatedRobot(
-                    simulation=self.simulation, collision_avoidance=collision_avoidance
-                ):
-                    yield
+                yield
             finally:
                 self.simulation.stop_simulation()
                 self.simulation = None
@@ -418,7 +465,9 @@ class RoboCasaEpisode:
             (
                 (back, side)
                 for back in np.arange(0.0, maximum_distance + step / 2, step)
-                for side in np.arange(-maximum_distance / 2, maximum_distance / 2 + step / 2, step)
+                for side in np.arange(
+                    -maximum_distance / 2, maximum_distance / 2 + step / 2, step
+                )
             ),
             key=lambda offset: (abs(offset[0]) + 2 * abs(offset[1]), abs(offset[1])),
         )
@@ -510,7 +559,7 @@ class RoboCasaEpisode:
             "Getting clear of %s",
             ", ".join(sorted({f"{a.name.name}-{b.name.name}" for a, b in pairs})),
         )
-        steps = [ParkArmsAction(self.robot.all_arms)]
+        steps = [ParkArmsAction(arms=self.robot.all_arms)]
         base = self.world.get_body_in_branch_by_name(self.robot.root, "base_link")
         base_against = [other for body, other in pairs if body is base]
         if base_against:
@@ -523,7 +572,7 @@ class RoboCasaEpisode:
             world_T_stand[:2, 3] += base_step * away
             steps.append(
                 StandAction(
-                    HomogeneousTransformationMatrix(
+                    target_location=HomogeneousTransformationMatrix(
                         world_T_stand, reference_frame=self.world.root
                     ).pose
                 )
@@ -537,7 +586,7 @@ class RoboCasaEpisode:
             collision_manager.add_ignore_collision_rule(rule)
         collision_manager.update_collision_matrix()
         try:
-            sequential(steps, self.context()).perform()
+            self.run(steps)
         except PlanFailure as failure:
             logger.warning(
                 "Getting clear failed after %s: %s",
@@ -644,11 +693,13 @@ class RoboCasaEpisode:
         self.raise_torso_for(graspable.root.global_pose.to_np()[:3, 3])
         stands = self.stands_facing(graspable.root.global_pose.to_np()[:3, 3])
         grasps = grasps_from_above(graspable, self.kitchen_direction) + (
-            grasps_approaching_along(graspable.grasp_candidates(), self.kitchen_direction)
+            grasps_approaching_along(
+                graspable.grasp_candidates(), self.kitchen_direction
+            )
             or graspable.grasp_candidates()
         )
         self.perform_reaching(
-            ParkArmsAction(self.robot.all_arms),
+            ParkArmsAction(arms=self.robot.all_arms),
             lambda through_free_space: StandAndPickUpAction.from_stands(
                 graspable,
                 self.arm,
@@ -656,7 +707,7 @@ class RoboCasaEpisode:
                 grasps=grasps,
                 through_free_space=through_free_space,
             ),
-            ParkArmsAction(self.robot.all_arms),
+            ParkArmsAction(arms=self.robot.all_arms),
             retries=2,
         )
 
@@ -788,7 +839,7 @@ class RoboCasaEpisode:
         for attempt in range(retries + 1):
             self.get_clear()
             try:
-                sequential(list(steps), self.context()).perform()
+                self.run(steps)
                 return
             except PlanFailure as failure:
                 if attempt == retries or (
@@ -851,13 +902,13 @@ class RoboCasaEpisode:
         """
         if point[2] < height:
             return
-        self.perform(MoveTorsoAction(TorsoState.HIGH))
+        self.perform(MoveTorsoAction(torso_state=TorsoState.HIGH))
 
     def park(self) -> None:
         """
         Park both arms.
         """
-        self.perform(ParkArmsAction(self.robot.all_arms))
+        self.perform(ParkArmsAction(arms=self.robot.all_arms))
 
     def pick_up(self, name: str) -> None:
         """
@@ -948,7 +999,7 @@ class RoboCasaEpisode:
         if turned_by_the_wrist:
             grasps = knob.turning_grasp_candidates(self.kitchen_direction) + grasps
         self.perform_reaching(
-            ParkArmsAction(self.robot.all_arms),
+            ParkArmsAction(arms=self.robot.all_arms),
             lambda through_free_space: StandAndOperateMechanismAction.from_stands(
                 handle=handle,
                 arm=self.arm,
@@ -958,9 +1009,12 @@ class RoboCasaEpisode:
                 goal_position=goal,
                 threshold=threshold,
                 through_free_space=through_free_space,
-                hold_base=turned_by_the_wrist,
+                hold_base=turned_by_the_wrist and self.physically_simulated,
+                settling_time=(
+                    self.finger_settling_time if self.physically_simulated else 0.0
+                ),
             ),
-            ParkArmsAction(self.robot.all_arms),
+            ParkArmsAction(arms=self.robot.all_arms),
             retries=2,
         )
         logger.info("%s moved to %.4f", joint.name.name, joint.position)
@@ -973,9 +1027,7 @@ class RoboCasaEpisode:
         :return: The position, moved within the joint's limits.
         """
         limits = joint.dof.limits
-        return float(
-            np.clip(position, limits.lower.position, limits.upper.position)
-        )
+        return float(np.clip(position, limits.lower.position, limits.upper.position))
 
     def press(self, geom_name: str, approach: np.ndarray | None = None) -> None:
         """
@@ -1001,7 +1053,7 @@ class RoboCasaEpisode:
         ):
             stands = self.stands_facing(point)
             self.perform_reaching(
-                ParkArmsAction(self.robot.all_arms),
+                ParkArmsAction(arms=self.robot.all_arms),
                 lambda through_free_space: StandAndPressAction.from_stands(
                     point=point,
                     approach=approach,
@@ -1073,7 +1125,7 @@ class RoboCasaEpisode:
         part_point = part_T_world[:3, :3] @ point + part_T_world[:3, 3]
         part_approach = part_T_world[:3, :3] @ approach
         self.perform_reaching(
-            ParkArmsAction(self.robot.all_arms),
+            ParkArmsAction(arms=self.robot.all_arms),
             lambda through_free_space: StandAndPressAction.from_stands(
                 point=point,
                 approach=approach,
@@ -1185,9 +1237,12 @@ class RoboCasaEpisode:
 
         # Where pushing fails, the part is taken hold of and moved most of the way,
         # which turns the side to push towards the robot, and pushed from there.
-        if self.pushable(
-            self.push_direction(joint, goal, self.bounding_box_center(handle.root))
-        ) and pushed_shut():
+        if (
+            self.pushable(
+                self.push_direction(joint, goal, self.bounding_box_center(handle.root))
+            )
+            and pushed_shut()
+        ):
             return
         self.operate(joint_name, world_position)
         if pushed_shut():
@@ -1225,8 +1280,8 @@ class RoboCasaEpisode:
         :param approach: The direction the fingertips came in along.
         """
         self.perform(
-            WithdrawAction(point, approach, self.arm),
-            ParkArmsAction(self.robot.all_arms),
+            WithdrawAction(point=point, approach=approach, arm=self.arm),
+            ParkArmsAction(arms=self.robot.all_arms),
         )
         self.update_fixture_states()
 
@@ -1261,7 +1316,9 @@ class RoboCasaEpisode:
             return None
         start = joint.position
         world_T_part = joint.child.global_pose.to_np()
-        before = world_T_part[:3, 3] if point is None else np.asarray(point, dtype=float)
+        before = (
+            world_T_part[:3, 3] if point is None else np.asarray(point, dtype=float)
+        )
         part_point = np.linalg.inv(world_T_part) @ np.append(before, 1.0)
         joint.position = start + 1e-3 * (1.0 if world_position >= start else -1.0)
         after = (joint.child.global_pose.to_np() @ part_point)[:3]
@@ -1493,7 +1550,11 @@ class RoboCasaEpisode:
                 angle = base_angle + turn
                 front = np.array([math.cos(angle), math.sin(angle)])
                 left_of_the_robot = np.array([front[1], -front[0]])
-                position = np.asarray(point[:2]) + distance * front + offset * left_of_the_robot
+                position = (
+                    np.asarray(point[:2])
+                    + distance * front
+                    + offset * left_of_the_robot
+                )
                 world_T_stand = HomogeneousTransformationMatrix.from_xyz_rpy(
                     position[0],
                     position[1],
@@ -1603,7 +1664,7 @@ class RoboCasaEpisode:
                     retreat_distance=retreat_distance,
                     through_free_space=through_free_space,
                 ),
-                ParkArmsAction(self.robot.all_arms),
+                ParkArmsAction(arms=self.robot.all_arms),
                 retries=2,
             )
         if self.physically_simulated:
@@ -1634,9 +1695,7 @@ class RoboCasaEpisode:
         below = self.world.compute_descendent_child_kinematic_structure_entities(body)
         if rigidly_attached:
             below = [
-                part
-                for part in below
-                if self.joint_of(part) is self.joint_of(body)
+                part for part in below if self.joint_of(part) is self.joint_of(body)
             ]
         corners = []
         for part in [body, *below]:
@@ -1645,7 +1704,9 @@ class RoboCasaEpisode:
             box = part.collision.as_bounding_box_collection_in_frame(
                 self.world.root
             ).bounding_box()
-            corners.append([box.min_x, box.min_y, box.min_z, box.max_x, box.max_y, box.max_z])
+            corners.append(
+                [box.min_x, box.min_y, box.min_z, box.max_x, box.max_y, box.max_z]
+            )
         corners = np.array(corners)
         return corners[:, :3].min(axis=0), corners[:, 3:].max(axis=0)
 
@@ -1699,7 +1760,9 @@ class RoboCasaEpisode:
         detector = self.world.collision_manager.collision_detector
         own = {body} | {
             part
-            for part in self.world.compute_descendent_child_kinematic_structure_entities(body)
+            for part in self.world.compute_descendent_child_kinematic_structure_entities(
+                body
+            )
             if isinstance(part, Body)
         }
         own_with_collision = [part for part in own if part.has_collision()]
@@ -1881,11 +1944,15 @@ class RoboCasaEpisode:
             object comes to rest in it.
         """
         lower, upper = self.bounding_box(receptacle)
-        middle = np.array([(lower[0] + upper[0]) / 2, (lower[1] + upper[1]) / 2, upper[2]])
+        middle = np.array(
+            [(lower[0] + upper[0]) / 2, (lower[1] + upper[1]) / 2, upper[2]]
+        )
         radius = share * np.min(upper[:2] - lower[:2]) / 2
         spots = [middle]
         for angle in np.linspace(0, 2 * np.pi, 6, endpoint=False):
-            spots.append(middle + radius * np.array([np.cos(angle), np.sin(angle), 0.0]))
+            spots.append(
+                middle + radius * np.array([np.cos(angle), np.sin(angle), 0.0])
+            )
         return spots
 
     def spot_is_free(
@@ -1906,11 +1973,15 @@ class RoboCasaEpisode:
         """
         lower, upper = self.bounding_box(body)
         size = upper - lower
-        spot_lower = np.asarray(spot) + np.array([-size[0] / 2, -size[1] / 2, clearance])
+        spot_lower = np.asarray(spot) + np.array(
+            [-size[0] / 2, -size[1] / 2, clearance]
+        )
         spot_upper = spot_lower + size
         skipped = (
             {body}
-            | set(self.world.compute_descendent_child_kinematic_structure_entities(body))
+            | set(
+                self.world.compute_descendent_child_kinematic_structure_entities(body)
+            )
             | set(ignored)
         )
         for other in self.possible_obstructions:
@@ -1937,7 +2008,12 @@ class RoboCasaEpisode:
             root = self.world.get_body_by_name(robocasa_object.root_body)
             object_bodies.extend(
                 part
-                for part in [root, *self.world.compute_descendent_child_kinematic_structure_entities(root)]
+                for part in [
+                    root,
+                    *self.world.compute_descendent_child_kinematic_structure_entities(
+                        root
+                    ),
+                ]
                 if isinstance(part, Body) and part.has_collision()
             )
         small_fixture_bodies = []

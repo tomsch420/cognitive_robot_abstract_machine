@@ -55,8 +55,8 @@ class ObjectNotPickedUp(DataclassException):
 @dataclass
 class MotionWasInfeasible(PlanFailure):
     """
-    Raised when the motion controller found no motion that satisfies every constraint
-    at once, such as when the robot starts a motion closer to something than collision
+    Raised when the motion controller found no motion that satisfies every constraint at
+    once, such as when the robot starts a motion closer to something than collision
     avoidance allows.
 
     Like coraplex's :class:`~coraplex.plans.failures.MotionMadeNoProgress`, this says

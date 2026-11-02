@@ -66,7 +66,10 @@ class PoseRecorder(StateChangeCallback):
     def on_state_change(self, **kwargs) -> None:
         world = self._world
         poses = np.stack(
-            [world.compute_forward_kinematics_np(world.root, body) for body in self.bodies]
+            [
+                world.compute_forward_kinematics_np(world.root, body)
+                for body in self.bodies
+            ]
         ).astype(np.float32)
         if self.poses and np.abs(poses - self.poses[-1]).max() < 1e-5:
             return
@@ -141,7 +144,9 @@ class HeadCameraVideo:
 
     def __post_init__(self) -> None:
         world = self.world
-        robot_entities = world.get_kinematic_structure_entities_of_branch(self.robot.root)
+        robot_entities = world.get_kinematic_structure_entities_of_branch(
+            self.robot.root
+        )
         movable = set(robot_entities)
         for connection in world.connections:
             if isinstance(connection, FixedConnection) or connection.child in movable:
@@ -214,7 +219,9 @@ class HeadCameraVideo:
         """
         poses = np.stack(self.recorder.poses)
         if len(poses) > self.maximum_frames:
-            poses = poses[np.linspace(0, len(poses) - 1, self.maximum_frames).astype(int)]
+            poses = poses[
+                np.linspace(0, len(poses) - 1, self.maximum_frames).astype(int)
+            ]
         return np.concatenate(
             [poses, np.repeat(poses[-1:], self.frames_per_second, axis=0)]
         )

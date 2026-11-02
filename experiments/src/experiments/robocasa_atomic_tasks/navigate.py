@@ -43,8 +43,8 @@ logger = logging.getLogger(__name__)
 @dataclass
 class NavigateKitchen(RoboCasaAtomicTask):
     """
-    Drive to where RoboCasa would stand its own robot in front of the target fixture,
-    or as near to it as the PR2 fits, facing the fixture.
+    Drive to where RoboCasa would stand its own robot in front of the target fixture, or
+    as near to it as the PR2 fits, facing the fixture.
     """
 
     tolerance: ClassVar[float] = 0.18
@@ -54,8 +54,8 @@ class NavigateKitchen(RoboCasaAtomicTask):
 
     goal_search_radius: ClassVar[float] = 0.8
     """
-    How far from its final spot the path through the free space may end, in metres;
-    the PR2 drives the rest of the way straight.
+    How far from its final spot the path through the free space may end, in metres; the
+    PR2 drives the rest of the way straight.
     """
 
     start_search_radius: ClassVar[float] = 0.5
@@ -75,8 +75,8 @@ class NavigateKitchen(RoboCasaAtomicTask):
         )
         start, path_end, waypoints = self.widest_path(episode, base_pose[:2, 3], goal)
         steps = [
-            ParkArmsAction(episode.robot.all_arms),
-            StandAction(self.base_pose(episode, start, start_yaw)),
+            ParkArmsAction(arms=episode.robot.all_arms),
+            StandAction(target_location=self.base_pose(episode, start, start_yaw)),
         ]
         # Turned while driving, the arms the PR2 parks beside it sweep through what it
         # passes; it turns on the spot at every waypoint and drives straight between.
@@ -86,13 +86,23 @@ class NavigateKitchen(RoboCasaAtomicTask):
             if np.linalg.norm(there - here) < 1e-3:
                 continue
             yaw = math.atan2(*(there - here)[::-1])
-            steps.append(StandAction(self.base_pose(episode, here, yaw)))
-            steps.append(StandAction(self.base_pose(episode, there, yaw)))
+            steps.append(
+                StandAction(target_location=self.base_pose(episode, here, yaw))
+            )
+            steps.append(
+                StandAction(target_location=self.base_pose(episode, there, yaw))
+            )
         steps.append(
-            StandAction(self.base_pose(episode, path_end, environment.target_ori[2]))
+            StandAction(
+                target_location=self.base_pose(
+                    episode, path_end, environment.target_ori[2]
+                )
+            )
         )
         steps.append(
-            StandAction(self.base_pose(episode, goal, environment.target_ori[2]))
+            StandAction(
+                target_location=self.base_pose(episode, goal, environment.target_ori[2])
+            )
         )
         episode.perform(steps[0])
         # A base driven by its wheels' velocities in a physical simulation may stall
