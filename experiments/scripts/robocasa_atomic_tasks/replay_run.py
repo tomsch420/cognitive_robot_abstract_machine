@@ -33,4 +33,7 @@ run = TaskRunDatabase.connect(arguments.database).latest_run_of(arguments.task)
 episode = tasks[run.task](
     layout=run.layout, style=run.style, seed=run.seed, robot=run.robot
 ).compose()
+# a viewer that shows the worlds plans run in, as cramera-live does, starts showing
+# this one once a plan executor is created for it
+episode.create_executor()
 TaskRunReplay(world=episode.world, run=run).play(arguments.speed)
