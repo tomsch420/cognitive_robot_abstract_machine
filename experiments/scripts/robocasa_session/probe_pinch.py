@@ -1,4 +1,9 @@
-"""How hard does the simulated PR2 gripper pinch? Close it on a box fixed between its fingertips and sum the normal forces."""
+"""
+How hard does the simulated PR2 gripper pinch?
+
+Close it on a box fixed between its fingertips and sum the normal forces.
+"""
+
 from datetime import timedelta
 import mujoco
 import numpy as np
@@ -23,17 +28,42 @@ gripper.get_joint_state_by_type(GripperState.OPEN).apply_to(world)
 world.notify_state_change()
 tool = gripper.tool_frame.global_pose.to_np()
 box = Body(name=PrefixedName("pinched_box"))
-box.collision = ShapeCollection([Box(scale=Scale(0.03, 0.04, 0.03), origin=HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=box))])
+box.collision = ShapeCollection(
+    [
+        Box(
+            scale=Scale(0.03, 0.04, 0.03),
+            origin=HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=box),
+        )
+    ]
+)
 with world.modify_world():
-    world.add_connection(FixedConnection(parent=world.root, child=box, parent_T_connection_expression=HomogeneousTransformationMatrix(tool, reference_frame=world.root)))
-simulation = MujocoSim(world=world, headless=True, step_size=0.002, integrator=mujoco.mjtIntegrator.mjINT_IMPLICITFAST, cone=mujoco.mjtCone.mjCONE_ELLIPTIC, impratio=10.0)
+    world.add_connection(
+        FixedConnection(
+            parent=world.root,
+            child=box,
+            parent_T_connection_expression=HomogeneousTransformationMatrix(
+                tool, reference_frame=world.root
+            ),
+        )
+    )
+simulation = MujocoSim(
+    world=world,
+    headless=True,
+    step_size=0.002,
+    integrator=mujoco.mjtIntegrator.mjINT_IMPLICITFAST,
+    cone=mujoco.mjtCone.mjCONE_ELLIPTIC,
+    impratio=10.0,
+)
 simulation.start_stepped_simulation()
 model, data = simulation.simulator._mj_model, simulation.simulator._mj_data
 gripper.get_joint_state_by_type(GripperState.CLOSE).apply_to(world)
 world.notify_state_change()
 simulation.step_simulation(timedelta(seconds=1.5))
 box_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, "pinched_box")
-tips = {mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, t.name.name): t.name.name for t in (gripper.thumb.tip, gripper.finger.tip)}
+tips = {
+    mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, t.name.name): t.name.name
+    for t in (gripper.thumb.tip, gripper.finger.tip)
+}
 others = {}
 force = np.zeros(6)
 for i, c in enumerate(data.contact[: data.ncon]):
@@ -41,10 +71,22 @@ for i, c in enumerate(data.contact[: data.ncon]):
     if box_id not in bodies:
         continue
     mujoco.mj_contactForce(model, data, i, force)
-    other = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_BODY, (bodies - {box_id}).pop())
+    other = mujoco.mj_id2name(
+        model, mujoco.mjtObj.mjOBJ_BODY, (bodies - {box_id}).pop()
+    )
     others[other] = others.get(other, 0.0) + force[0]
 finger = gripper.thumb.root.parent_connection.name.name
-print("finger joint", round(simulation.simulator.get_joint_value(finger).result, 3), "normal force on the box by body (N):", {k: round(v, 1) for k, v in others.items()})
+print(
+    "finger joint",
+    round(simulation.simulator.get_joint_value(finger).result, 3),
+    "normal force on the box by body (N):",
+    {k: round(v, 1) for k, v in others.items()},
+)
 servo = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, finger + "_servo")
-print("servo force", round(float(data.actuator_force[servo]), 2), "limit", model.actuator_forcerange[servo])
+print(
+    "servo force",
+    round(float(data.actuator_force[servo]), 2),
+    "limit",
+    model.actuator_forcerange[servo],
+)
 simulation.stop_simulation()

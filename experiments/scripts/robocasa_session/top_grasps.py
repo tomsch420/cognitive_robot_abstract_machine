@@ -1,4 +1,7 @@
-"""Probe helper: replace an object's grasps by grasps from above."""
+"""
+Probe helper: replace an object's grasps by grasps from above.
+"""
+
 import numpy as np
 
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate

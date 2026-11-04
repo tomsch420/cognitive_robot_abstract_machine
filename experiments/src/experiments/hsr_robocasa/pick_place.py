@@ -287,7 +287,9 @@ class HSRPickPlaceTask(HSRRoboCasaTask, ABC):
         gives it, so that it neither turns in the hand nor rolls on without end.
         """
         for shape in self.food.root.collision.shapes:
-            shape.get_simulator_property_of_type(MujocoGeom).contact_dimensionality = (
+            shape.get_simulator_property_of_type(
+                MujocoGeom
+            ).contact_dimensionality = (
                 ContactDimensionality.SLIDING_TORSIONAL_AND_ROLLING
             )
 

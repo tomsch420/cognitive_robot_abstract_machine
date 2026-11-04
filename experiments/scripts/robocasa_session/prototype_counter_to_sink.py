@@ -1,4 +1,8 @@
-"""Prototype: the PR2 performs RoboCasa's PickPlaceCounterToSink with an underspecified coraplex transport."""
+"""
+Prototype: the PR2 performs RoboCasa's PickPlaceCounterToSink with an underspecified
+coraplex transport.
+"""
+
 import logging
 import time
 
@@ -29,7 +33,9 @@ failure_counts = collections.Counter()
 
 
 class LoggingTrialSequence(SequentialNode):
-    """Logs why a trial candidate failed, then re-raises."""
+    """
+    Logs why a trial candidate failed, then re-raises.
+    """
 
     def perform(self):
         try:
@@ -37,10 +43,21 @@ class LoggingTrialSequence(SequentialNode):
         except PlanFailure as failure:
             action = self.children[0].designator
             navigate = getattr(action, "navigate", None)
-            stand = navigate.target_location.to_np()[:3, 3].round(2).tolist() if navigate is not None else None
+            stand = (
+                navigate.target_location.to_np()[:3, 3].round(2).tolist()
+                if navigate is not None
+                else None
+            )
             failure_counts[(type(action).__name__, type(failure).__name__)] += 1
             if sum(failure_counts.values()) <= 12:
-                print("TRIAL FAILED", type(action).__name__, "stand", stand, type(failure).__name__, str(failure)[:300].replace("\n", " | "))
+                print(
+                    "TRIAL FAILED",
+                    type(action).__name__,
+                    "stand",
+                    stand,
+                    type(failure).__name__,
+                    str(failure)[:300].replace("\n", " | "),
+                )
             raise
 
 
@@ -69,34 +86,67 @@ world = task.world
 print("instruction:", task.instruction, f"({time.time() - start:.0f}s)")
 
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Floor
+
 with world.modify_world():
     world.add_semantic_annotation(Floor(root=world.get_body_by_name("floor_room_main")))
 
 pr2_world = URDFParser.from_file(PR2.get_ros_file_path()).create_world()
 with world.modify_world():
-    drive = OmniDrive.create_with_dofs(parent=world.root, child=pr2_world.root, world=world)
+    drive = OmniDrive.create_with_dofs(
+        parent=world.root, child=pr2_world.root, world=world
+    )
     world.merge_world(pr2_world, drive)
     drive.has_hardware_interface = True
 drive.origin = task.robot_base_pose
 pr2 = PR2.from_world(world)
 
 from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
-cup = next(a for a in world.semantic_annotations if a.root == task.manipulated_objects[0] and isinstance(a, HasGraspCandidates))
+
+cup = next(
+    a
+    for a in world.semantic_annotations
+    if a.root == task.manipulated_objects[0] and isinstance(a, HasGraspCandidates)
+)
 print("target object", type(cup).__name__, cup.root.name.name)
 sink = world.get_semantic_annotations_by_type(Sink)[0]
-sink_box = sink.root.collision.as_bounding_box_collection_in_frame(world.root).bounding_box()
+sink_box = sink.root.collision.as_bounding_box_collection_in_frame(
+    world.root
+).bounding_box()
 cup_position = cup.root.global_pose.to_np()[:3, 3]
-print("cup at", cup_position.round(3), "sink box", [round(float(v), 3) for v in (sink_box.min_x, sink_box.max_x, sink_box.min_y, sink_box.max_y, sink_box.min_z, sink_box.max_z)])
+print(
+    "cup at",
+    cup_position.round(3),
+    "sink box",
+    [
+        round(float(v), 3)
+        for v in (
+            sink_box.min_x,
+            sink_box.max_x,
+            sink_box.min_y,
+            sink_box.max_y,
+            sink_box.min_z,
+            sink_box.max_z,
+        )
+    ],
+)
 
 target = Pose(
-    position=Point3((sink_box.min_x + sink_box.max_x) / 2, (sink_box.min_y + sink_box.max_y) / 2, 0.78),
+    position=Point3(
+        (sink_box.min_x + sink_box.max_x) / 2,
+        (sink_box.min_y + sink_box.max_y) / 2,
+        0.78,
+    ),
     orientation=cup.root.global_pose.quaternion,
     reference_frame=world.root,
 )
 
 context = Context(world, pr2, sampling_seed=42)
-transport = TransportAction.from_graspable_by_closest_grasps(cup, target, pr2.right_arm, context)
-plan = sequential([MoveTorsoAction(TorsoState.HIGH), ParkArmsAction(pr2.all_arms), transport], context)
+transport = TransportAction.from_graspable_by_closest_grasps(
+    cup, target, pr2.right_arm, context
+)
+plan = sequential(
+    [MoveTorsoAction(TorsoState.HIGH), ParkArmsAction(pr2.all_arms), transport], context
+)
 
 start = time.time()
 try:
@@ -107,6 +157,17 @@ finally:
 print(f"performed in {time.time() - start:.0f}s")
 
 final = cup.root.global_pose.to_np()[:3, 3]
-inside = sink_box.min_x <= final[0] <= sink_box.max_x and sink_box.min_y <= final[1] <= sink_box.max_y and final[2] < sink_box.max_z
-print("cup now at", final.round(3), "distance to target", round(float(np.linalg.norm(final - target.to_np()[:3, 3])), 3), "inside sink box:", inside)
+inside = (
+    sink_box.min_x <= final[0] <= sink_box.max_x
+    and sink_box.min_y <= final[1] <= sink_box.max_y
+    and final[2] < sink_box.max_z
+)
+print(
+    "cup now at",
+    final.round(3),
+    "distance to target",
+    round(float(np.linalg.norm(final - target.to_np()[:3, 3])), 3),
+    "inside sink box:",
+    inside,
+)
 print("robot base at", drive.origin.to_np()[:3, 3].round(3))

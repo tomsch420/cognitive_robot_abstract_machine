@@ -1,4 +1,8 @@
-"""Load a RoboCasa kitchen, spawn the PR2 in front of the main counter and render it from inside the room."""
+"""
+Load a RoboCasa kitchen, spawn the PR2 in front of the main counter and render it from
+inside the room.
+"""
+
 import math
 import sys
 from pathlib import Path
@@ -8,7 +12,10 @@ import numpy as np
 
 from experiments.robocasa_kitchen_demo import _largest_counter_top, load_kitchen
 from robocasa.models.scenes.scene_registry import LayoutType, StyleType
-from semantic_digital_twin.adapters.mujoco_video_recording import MujocoVideoRecorder, VideoResolution
+from semantic_digital_twin.adapters.mujoco_video_recording import (
+    MujocoVideoRecorder,
+    VideoResolution,
+)
 from semantic_digital_twin.adapters.multi_sim import MujocoBuilder, MujocoCamera
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.robots.pr2 import PR2
@@ -31,7 +38,9 @@ def start_build_for_rendering(self, file_path):
 def end_build_for_rendering(self, file_path):
     original_end_build(self, file_path)
     scene = Path(file_path).read_text()
-    Path(file_path).write_text(scene.replace("<compiler ", '<compiler balanceinertia="true" ', 1))
+    Path(file_path).write_text(
+        scene.replace("<compiler ", '<compiler balanceinertia="true" ', 1)
+    )
 
 
 MujocoBuilder._start_build = start_build_for_rendering
@@ -43,18 +52,26 @@ layout = LayoutType[sys.argv[2]] if len(sys.argv) > 2 else LayoutType.LAYOUT001
 style = StyleType[sys.argv[3]] if len(sys.argv) > 3 else StyleType.STYLE001
 
 world = load_kitchen(layout, style)
-print("kitchen bodies", len(world.bodies), "annotations", len(world.semantic_annotations))
+print(
+    "kitchen bodies", len(world.bodies), "annotations", len(world.semantic_annotations)
+)
 
 counter_boxes = [
     box
-    for box in _largest_counter_top(world).as_bounding_box_collection_in_frame(world.root).bounding_boxes
+    for box in _largest_counter_top(world)
+    .as_bounding_box_collection_in_frame(world.root)
+    .bounding_boxes
     if box.max_z < 2.0
 ]
 counter_front_y = min(box.min_y for box in counter_boxes)
-counter_center_x = (min(box.min_x for box in counter_boxes) + max(box.max_x for box in counter_boxes)) / 2
+counter_center_x = (
+    min(box.min_x for box in counter_boxes) + max(box.max_x for box in counter_boxes)
+) / 2
 robot_x, robot_y = counter_center_x, counter_front_y - 0.6
 
-pr2_world = URDFParser.from_file("package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro").create_world()
+pr2_world = URDFParser.from_file(
+    "package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro"
+).create_world()
 with world.modify_world():
     # a fixed connection, because the MuJoCo mirror does not take over the OmniDrive's degrees of freedom
     placement = FixedConnection(
@@ -66,13 +83,23 @@ with world.modify_world():
     )
     world.merge_world(pr2_world, placement)
 PR2.from_world(world)
-print("with PR2 bodies", len(world.bodies), "robot at", round(robot_x, 2), round(robot_y, 2))
+print(
+    "with PR2 bodies",
+    len(world.bodies),
+    "robot at",
+    round(robot_x, 2),
+    round(robot_y, 2),
+)
 
 resolution = VideoResolution(width=1280, height=960)
 
 
-def attach_camera(name: str, position: np.ndarray, target: np.ndarray, fovy: float) -> MujocoCamera:
-    rotation = MujocoCamera._look_at_rotation(Point3.from_iterable(position), Point3.from_iterable(target))
+def attach_camera(
+    name: str, position: np.ndarray, target: np.ndarray, fovy: float
+) -> MujocoCamera:
+    rotation = MujocoCamera._look_at_rotation(
+        Point3.from_iterable(position), Point3.from_iterable(target)
+    )
     quaternion_xyzw = rotation.quaternion.to_np().tolist()
     camera = MujocoCamera(
         name=name,
@@ -88,8 +115,18 @@ def attach_camera(name: str, position: np.ndarray, target: np.ndarray, fovy: flo
 
 robot_center = np.array([robot_x, robot_y + 0.2, 0.8])
 cameras = {
-    "overview.png": attach_camera("kitchen_overview_camera", np.array([5.3, -2.85, 2.7]), np.array([2.3, -0.5, 0.7]), 70.0),
-    "pr2_close_up.png": attach_camera("pr2_close_up_camera", robot_center + np.array([1.4, -1.6, 0.9]), robot_center, 60.0),
+    "overview.png": attach_camera(
+        "kitchen_overview_camera",
+        np.array([5.3, -2.85, 2.7]),
+        np.array([2.3, -0.5, 0.7]),
+        70.0,
+    ),
+    "pr2_close_up.png": attach_camera(
+        "pr2_close_up_camera",
+        robot_center + np.array([1.4, -1.6, 0.9]),
+        robot_center,
+        60.0,
+    ),
 }
 for file_name, camera in cameras.items():
     recorder = MujocoVideoRecorder(world=world, camera=camera, resolution=resolution)

@@ -1,4 +1,8 @@
-"""Render the PR2 performing RoboCasa's counter to sink task: start, holding the object, object in the sink."""
+"""
+Render the PR2 performing RoboCasa's counter to sink task: start, holding the object,
+object in the sink.
+"""
+
 import sys
 from copy import deepcopy
 from pathlib import Path
@@ -13,11 +17,17 @@ from coraplex.execution_environment import kinematically_simulated_robot
 from coraplex.plans.factories import sequential
 from coraplex.robot_plans.actions.composite.transporting import TransportAction
 from coraplex.robot_plans.actions.core.robot_body import MoveTorsoAction, ParkArmsAction
-from semantic_digital_twin.adapters.mujoco_video_recording import MujocoVideoRecorder, VideoResolution
+from semantic_digital_twin.adapters.mujoco_video_recording import (
+    MujocoVideoRecorder,
+    VideoResolution,
+)
 from semantic_digital_twin.adapters.multi_sim import MujocoBuilder, MujocoCamera
 from semantic_digital_twin.datastructures.definitions import TorsoState
 from krrood_spatial_math.spatial_types import Point3
-from semantic_digital_twin.world_description.connections import Connection6DoF, FixedConnection
+from semantic_digital_twin.world_description.connections import (
+    Connection6DoF,
+    FixedConnection,
+)
 
 # the PR2 URDF has links whose inertia violates the triangle inequality; let MuJoCo balance them,
 # and allow offscreen frames larger than the 640x480 default
@@ -37,7 +47,9 @@ def start_build_for_rendering(self, file_path):
 def end_build_for_rendering(self, file_path):
     original_end_build(self, file_path)
     scene = Path(file_path).read_text()
-    Path(file_path).write_text(scene.replace("<compiler ", '<compiler balanceinertia="true" ', 1))
+    Path(file_path).write_text(
+        scene.replace("<compiler ", '<compiler balanceinertia="true" ', 1)
+    )
 
 
 original_build_tendons = MujocoBuilder._build_tendons
@@ -45,7 +57,10 @@ converted_texture_directory = Path("/root/work/png_textures")
 
 
 def build_tendons_then_convert_jpeg_textures(self):
-    """MuJoCo reads only PNG textures; give it PNG copies of the JPEG ones some objaverse objects use."""
+    """
+    MuJoCo reads only PNG textures; give it PNG copies of the JPEG ones some objaverse
+    objects use.
+    """
     from PIL import Image
 
     original_build_tendons(self)
@@ -68,21 +83,28 @@ resolution = VideoResolution(width=1280, height=960)
 
 
 def frozen_copy(world):
-    """A copy of the world in which every movable connection is frozen where it stands now,
-    since the MuJoCo mirror ignores drives and starts every joint at zero."""
+    """
+    A copy of the world in which every movable connection is frozen where it stands now,
+    since the MuJoCo mirror ignores drives and starts every joint at zero.
+    """
     frozen = deepcopy(world)
     # free bodies stay free only on the top level, which is the only place MuJoCo allows free joints
     movable = [
         c
         for c in frozen.connections
-        if not isinstance(c, FixedConnection) and not (isinstance(c, Connection6DoF) and c.parent is frozen.root)
+        if not isinstance(c, FixedConnection)
+        and not (isinstance(c, Connection6DoF) and c.parent is frozen.root)
     ]
     transforms = [frozen.compute_forward_kinematics(c.parent, c.child) for c in movable]
     with frozen.modify_world():
         for connection, transform in zip(movable, transforms):
             parent, child = connection.parent, connection.child
             frozen.remove_connection(connection)
-            frozen.add_connection(FixedConnection(parent=parent, child=child, parent_T_connection_expression=transform))
+            frozen.add_connection(
+                FixedConnection(
+                    parent=parent, child=child, parent_T_connection_expression=transform
+                )
+            )
     # a picture needs no collision geometry, and MuJoCo spends minutes on the convex hulls of some meshes
     for body in frozen.bodies:
         body.collision.shapes.clear()
@@ -90,9 +112,13 @@ def frozen_copy(world):
 
 
 def render(frozen, cameras, output_directory: Path, prefix: str) -> None:
-    """Render one frame per camera of a frozen copy."""
+    """
+    Render one frame per camera of a frozen copy.
+    """
     for name, (position, target, fovy) in cameras.items():
-        rotation = MujocoCamera._look_at_rotation(Point3.from_iterable(position), Point3.from_iterable(target))
+        rotation = MujocoCamera._look_at_rotation(
+            Point3.from_iterable(position), Point3.from_iterable(target)
+        )
         quaternion_xyzw = rotation.quaternion.to_np().tolist()
         camera = MujocoCamera(
             name=f"{prefix}_{name}_camera",
@@ -103,7 +129,9 @@ def render(frozen, cameras, output_directory: Path, prefix: str) -> None:
             resolution=[float(resolution.width), float(resolution.height)],
         )
         frozen.root.add_simulator_property(camera)
-        recorder = MujocoVideoRecorder(world=frozen, camera=camera, resolution=resolution)
+        recorder = MujocoVideoRecorder(
+            world=frozen, camera=camera, resolution=resolution
+        )
         recorder.start()
         video = recorder.stop()
         path = output_directory / f"{prefix}_{name}.png"
@@ -138,15 +166,27 @@ if len(sys.argv) > 3 and sys.argv[3] == "start-only":
     sys.exit()
 
 context = Context(world, robot, sampling_seed=42)
-transport = TransportAction.from_graspable_by_closest_grasps(episode.target_object, placement, robot.right_arm, context)
+transport = TransportAction.from_graspable_by_closest_grasps(
+    episode.target_object, placement, robot.right_arm, context
+)
 # the same steps the transport runs, split after the pick-up to take a picture in between
 with kinematically_simulated_robot:
-    sequential([MoveTorsoAction(TorsoState.HIGH), ParkArmsAction(robot.all_arms), transport.pick_up, ParkArmsAction(robot.all_arms)], context).perform()
+    sequential(
+        [
+            MoveTorsoAction(TorsoState.HIGH),
+            ParkArmsAction(robot.all_arms),
+            transport.pick_up,
+            ParkArmsAction(robot.all_arms),
+        ],
+        context,
+    ).perform()
 snapshots["2_holding"] = frozen_copy(world)
 with kinematically_simulated_robot:
     sequential([transport.place, ParkArmsAction(robot.all_arms)], context).perform()
 snapshots["3_placed"] = frozen_copy(world)
-print("outcome:", episode.outcome(), "succeeded:", episode.outcome().succeeded, flush=True)
+print(
+    "outcome:", episode.outcome(), "succeeded:", episode.outcome().succeeded, flush=True
+)
 import multiprocessing
 
 # MuJoCo hangs when it shares a process with a plan that ran, so every snapshot renders in a child of its own
@@ -162,4 +202,7 @@ for prefix, frozen in snapshots.items():
             child.kill()
             print(f"{prefix}_{name} timed out", flush=True)
         else:
-            print(f"{prefix}_{name} exit {child.exitcode} in {time.time() - start:.0f}s", flush=True)
+            print(
+                f"{prefix}_{name} exit {child.exitcode} in {time.time() - start:.0f}s",
+                flush=True,
+            )

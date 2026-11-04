@@ -530,7 +530,9 @@ class PandaOmron(AbstractRobot, HasMobileBase[PandaOmronMobileBase]):
         :return: This robot, read from the MJCF robosuite assembles, without the world
             body MJCF puts above every robot's root.
         """
-        world = MJCFParser.from_xml_string(PandaOmronDescription().document()).create_world()
+        world = MJCFParser.from_xml_string(
+            PandaOmronDescription().document()
+        ).create_world()
         with world.modify_world():
             world.remove_kinematic_structure_entity(world.root)
         return cls.from_world(world)

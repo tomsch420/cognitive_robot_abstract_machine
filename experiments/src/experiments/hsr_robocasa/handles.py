@@ -46,8 +46,8 @@ class HSRHandleTask(HSRRoboCasaTask, ABC):
     handle_reach: float = 0.6
     """
     How far in front of its base's centre the HSR takes hold of the handle: from the
-    front, and with its hand level the arm reaches 0.37 m to 0.70 m ahead at a
-    handle's height.
+    front, and with its hand level the arm reaches 0.37 m to 0.70 m ahead at a handle's
+    height.
     """
 
     tool_frame_tolerance: float = 0.02
@@ -109,9 +109,8 @@ class HSRHandleTask(HSRRoboCasaTask, ABC):
     @property
     def closing_shift(self) -> np.ndarray:
         """
-        The transform, in the kitchen's frame, that moves the fixture's moving part
-        from where it stands now to where it stands closed, at its joint's lower
-        limit.
+        The transform, in the kitchen's frame, that moves the fixture's moving part from
+        where it stands now to where it stands closed, at its joint's lower limit.
         """
         joint = self.moving_part.parent_connection
         travel = joint.dof.limits.lower.position - joint.position
