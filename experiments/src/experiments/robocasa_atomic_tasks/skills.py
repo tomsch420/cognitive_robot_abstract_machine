@@ -1,7 +1,8 @@
 """
 The actions the PR2 performs RoboCasa's atomic tasks with, beyond those coraplex ships:
 moving a fixture's mechanism by one of its parts to a given position, pressing and
-pushing with the fingertips, and standing somewhere picked from a list of candidates.
+pushing with the fingertips or with one finger of the open gripper, and standing
+somewhere picked from a list of candidates.
 
 Each comes with a counterpart that also walks the robot to a stand, picked among a
 list of candidates, as is the grasp, by coraplex trying them, and then may lead the
@@ -46,6 +47,7 @@ from krrood.entity_query_language.verbalization.fragments.base import (
 from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
     FunctionVerbalizationTemplates,
 )
+from krrood.ormatic.utils import classproperty
 from krrood.symbolic_math.symbolic_math import trinary_logic_and
 from semantic_digital_twin.collision_checking.collision_matrix import CollisionRule
 from semantic_digital_twin.collision_checking.collision_rules import (
@@ -58,6 +60,7 @@ from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Handle
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
+    Point3,
     Pose,
 )
 from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
@@ -619,14 +622,21 @@ class PressAction(
     PlacesFingertips, MovesToolCenterPoint, OperatesGripper, SequentialAction
 ):
     """
-    Closes the gripper and pushes its fingertips against a point, coming in along a
-    direction; the gripper stays on the point.
+    Brings the gripper into :attr:`gripper_state` and pushes its fingertips against a
+    point, coming in along a direction; the gripper stays on the point.
     """
 
     approach_distance: float = 0.25
     """
     How far before the point the straight push onto it starts, in metres.
     """
+
+    @classproperty
+    def gripper_state(cls) -> GripperState:
+        """
+        The state the gripper is in while it presses: closed.
+        """
+        return GripperState.CLOSE
 
     def create_temporary_collision_rules(self) -> list[CollisionRule]:
         """
@@ -637,7 +647,7 @@ class PressAction(
     def create_steps(self) -> list[StatechartNode]:
         return [
             self.gripper_goal_type.moving_gripper_to(
-                self.arm.end_effector.default_configuration(GripperState.CLOSE)
+                self.arm.end_effector.default_configuration(self.gripper_state)
             ),
             self.tool_center_point_goal(
                 self.fingertips_goal(self.approach_distance), self.arm
@@ -724,7 +734,8 @@ class WithdrawAction(PlacesFingertips, MovesToolCenterPoint, SequentialAction):
 @dataclass(eq=False, repr=False, kw_only=True)
 class StandAndPressAction(MayReachThroughFreeSpace, OperatesGripper, SequentialAction):
     """
-    Walks to where the robot stands and presses the point.
+    Walks to where the robot stands, brings the gripper into the press's
+    :attr:`PressAction.gripper_state` and presses the point.
     """
 
     navigate: NavigateAction
@@ -784,7 +795,7 @@ class StandAndPressAction(MayReachThroughFreeSpace, OperatesGripper, SequentialA
         return [
             self.navigate,
             self.gripper_goal_type.moving_gripper_to(
-                press.arm.end_effector.default_configuration(GripperState.CLOSE)
+                press.arm.end_effector.default_configuration(press.gripper_state)
             ),
             *self.reaching(
                 a(ReachThroughFreeSpaceAction)(
@@ -795,14 +806,14 @@ class StandAndPressAction(MayReachThroughFreeSpace, OperatesGripper, SequentialA
         ]
 
 
-# %% pushing a part with the sides of the fingers
+# %% pushing a part with one finger of the open gripper
 
 
 @dataclass
-class SidewaysApproach:
+class FingerApproach:
     """
-    How a closed gripper comes to rest beside a part to push it with the sides of its
-    fingers, the way a hand nudges a lever.
+    How the open gripper comes in beside a part to push it with one fingertip, the way
+    a finger nudges a lever.
     """
 
     approach: np.ndarray
@@ -813,47 +824,47 @@ class SidewaysApproach:
 
     closing: np.ndarray
     """
-    The direction the fingers close along, square to :attr:`approach`.
+    The direction the fingers close along, the direction the part is pushed in, square
+    to :attr:`approach`.
     """
 
     @classmethod
-    def beside(
-        cls, push: np.ndarray, tilts: tuple[float, ...] = (10.0, 0.0, 20.0)
-    ) -> list[SidewaysApproach]:
+    def across(
+        cls, push: np.ndarray, tilts: tuple[float, ...] = (0.0, 30.0, 60.0, 90.0)
+    ) -> list[FingerApproach]:
         """
         :param push: The direction the part is pushed in, in the world's root frame.
         :param tilts: How far below level the fingertips may come in, in degrees,
-            best first.
-        :return: The ways to come in level across the push from either side and
-            tilted down by each of ``tilts``, the fingers closing upright first, which
-            turns the hand's narrow side along the push, and along the push next.
+            best first; 90 comes in from straight above.
+        :return: The ways to come in across the push from either side, tilted down by
+            each of ``tilts``, the fingers closing along the push.
         """
         up = np.array([0.0, 0.0, 1.0])
+        push = push / np.linalg.norm(push)
         across = np.cross(up, push)
         across = across / np.linalg.norm(across)
+        downward = np.cross(across, push)
+        downward = downward if downward @ up < 0.0 else -downward
         approaches = []
         for tilt in np.radians(tilts):
-            for side in (1.0, -1.0):
-                approach = side * across * np.cos(tilt) - up * np.sin(tilt)
-                for closing in (up, push):
-                    square = closing - (closing @ approach) * approach
-                    approaches.append(
-                        cls(approach=approach, closing=square / np.linalg.norm(square))
-                    )
+            for side in (1.0, -1.0) if np.cos(tilt) > 1e-9 else (1.0,):
+                approach = side * across * np.cos(tilt) + downward * np.sin(tilt)
+                approaches.append(cls(approach=approach, closing=push))
         return approaches
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class PlacesFingertipsSideways(PlacesFingertips):
+class PlacesOneFingertip(PlacesFingertips):
     """
-    An action that puts an arm's fingertips on a point, coming in along a direction with
-    the fingers closing along another.
+    An action that puts the inner face of one fingertip of the open gripper on a point,
+    coming in along a direction with the fingers spread along another; the other
+    fingertip lies on the far side of the point.
     """
 
     closing: np.ndarray
     """
     The direction the fingers close along, in the world's root frame, square to
-    :attr:`approach`.
+    :attr:`approach`; the fingertip that trails it is put on the point.
     """
 
     def fingertips_goal(
@@ -861,7 +872,9 @@ class PlacesFingertipsSideways(PlacesFingertips):
     ) -> Pose:
         """
         Differs from :meth:`PlacesFingertips.fingertips_goal` in closing the fingers
-        along :attr:`closing`; ``degenerate_closing`` is not used.
+        along :attr:`closing` and putting the inner face of the fingertip that trails it
+        on the point, rather than the middle between the fingertips;
+        ``degenerate_closing`` is not used.
         """
         approach = self.approach / np.linalg.norm(self.approach)
         world_T_press = ApproachFrame(
@@ -869,37 +882,74 @@ class PlacesFingertipsSideways(PlacesFingertips):
             approach=approach,
             closing=self.closing,
         ).in_reference_frame(self.arm._world.root)
-        return self.arm.end_effector.tool_frame_goal_for_grasp(world_T_press.pose)
+        end_effector = self.arm.end_effector
+        return end_effector.tool_frame_goal_for_point(
+            self.trailing_fingertip_face(), world_T_press.pose
+        )
+
+    def trailing_fingertip_face(self) -> Point3:
+        """
+        :return: The middle of the inner face of the fingertip that lies against the
+            closing axis while the gripper is open, in the tool frame.
+        """
+        end_effector = self.arm.end_effector
+        world = self.arm._world
+        closing = end_effector.closing_axis.to_np()[:3]
+        with world.reset_state_context():
+            end_effector.default_configuration(GripperState.OPEN).joint_state.apply_to(
+                world
+            )
+            fingertip_boxes = [
+                box.to_array_bounds()
+                for finger in end_effector.fingers
+                for box in finger.tip.collision.as_bounding_box_collection_in_frame(
+                    end_effector.tool_frame
+                ).bounding_boxes
+            ]
+        trailing = min(
+            fingertip_boxes, key=lambda bounds: (bounds.lower + bounds.upper) @ closing
+        )
+        center = (trailing.lower + trailing.upper) / 2.0
+        half_extent = (trailing.upper - trailing.lower) / 2.0
+        face = center + closing * (np.abs(closing) @ half_extent)
+        return Point3(*face, reference_frame=end_effector.tool_frame)
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class SidewaysPressAction(PlacesFingertipsSideways, PressAction):
+class FingerPressAction(PlacesOneFingertip, PressAction):
     """
-    Closes the gripper and brings its fingertips onto a point beside a part, the fingers
-    closing along a direction so their sides face the part; the gripper stays there.
+    Opens the gripper and brings one fingertip onto a point beside a part, the fingers
+    spread along the way the part is pushed; the gripper stays there.
+    """
+
+    @classproperty
+    def gripper_state(cls) -> GripperState:
+        """
+        The state the gripper is in while it presses: open.
+        """
+        return GripperState.OPEN
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class FingerWithdrawAction(PlacesOneFingertip, WithdrawAction):
+    """
+    Draws the open gripper straight back from a point it was brought to by a
+    :class:`FingerPressAction`, the way it came in.
     """
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class SidewaysWithdrawAction(PlacesFingertipsSideways, WithdrawAction):
+class StandAndPushWithAFingerAction(StandAndPressAction):
     """
-    Draws the gripper straight back from a point it was brought to by a
-    :class:`SidewaysPressAction`, the way it came in.
-    """
-
-
-@dataclass(eq=False, repr=False, kw_only=True)
-class StandAndPushSidewaysAction(StandAndPressAction):
-    """
-    Walks to where the robot stands, brings the fingertips beside a part and pushes the
-    part on with the sides of the fingers, moving the joint it hangs from to a position.
+    Walks to where the robot stands, opens the gripper, brings one fingertip beside a
+    part and pushes the part on with it, moving the joint it hangs from to a position.
     """
 
     @classmethod
     def from_stands_beside(
         cls,
         point: np.ndarray,
-        sideways: SidewaysApproach,
+        finger_approach: FingerApproach,
         arm: Arm,
         stands: list[Pose],
         pushed_joint: ActiveConnection1DOF,
@@ -908,9 +958,9 @@ class StandAndPushSidewaysAction(StandAndPressAction):
         through_free_space: bool,
     ) -> Match:
         """
-        :param point: Where the fingertips come to rest beside the part, in the world's
+        :param point: Where the fingertip comes to rest beside the part, in the world's
             root frame.
-        :param sideways: How the gripper comes in.
+        :param finger_approach: How the gripper comes in.
         :param arm: The arm that pushes.
         :param stands: Where the robot may stand, best first.
         :param pushed_joint: The joint the part hangs from.
@@ -923,10 +973,10 @@ class StandAndPushSidewaysAction(StandAndPressAction):
         return a(cls)(
             navigate=a(StandAction)(target_location=variable(Pose, domain=stands)),
             press=a(PushAction)(
-                press=a(SidewaysPressAction)(
+                press=a(FingerPressAction)(
                     point=point,
-                    approach=sideways.approach,
-                    closing=sideways.closing,
+                    approach=finger_approach.approach,
+                    closing=finger_approach.closing,
                     arm=arm,
                 ),
                 part=pushed_joint.child,

@@ -13,10 +13,11 @@ import pytest
 from coraplex.robot_plans.actions.base import Action
 from experiments.robocasa_atomic_tasks import skills
 from experiments.robocasa_atomic_tasks.skills import (
+    FingerApproach,
+    FingerPressAction,
     PressAction,
-    SidewaysApproach,
-    SidewaysPressAction,
 )
+from semantic_digital_twin.datastructures.definitions import GripperState
 
 # %% every action
 
@@ -37,7 +38,7 @@ def test_every_action_can_be_made(action: type[Action]):
     assert not inspect.isabstract(action)
 
 
-# %% pushing a part with the sides of the fingers
+# %% pushing a part with one finger of the open gripper
 
 
 @pytest.fixture
@@ -48,33 +49,6 @@ def lever_push() -> np.ndarray:
     """
     push = np.array([0.0, -1.0, -0.07])
     return push / np.linalg.norm(push)
-
-
-def test_every_sideways_approach_comes_in_across_the_push(lever_push):
-    for sideways in SidewaysApproach.beside(lever_push):
-        assert sideways.approach[:2] @ lever_push[:2] == pytest.approx(0.0, abs=1e-12)
-        assert sideways.closing @ sideways.approach == pytest.approx(0.0, abs=1e-12)
-
-
-def test_sideways_approaches_come_from_either_side_tilted_down_by_each_tilt(
-    lever_push,
-):
-    tilts = (10.0, 30.0)
-
-    approaches = [
-        sideways.approach for sideways in SidewaysApproach.beside(lever_push, tilts)
-    ]
-
-    downward = [-approach[2] for approach in approaches]
-    np.testing.assert_allclose(downward, np.repeat(np.sin(np.radians(tilts)), 4))
-    np.testing.assert_allclose(approaches[0][:2], -approaches[2][:2])
-
-
-def test_the_fingers_close_upright_before_they_close_along_the_push(lever_push):
-    upright, along_the_push = SidewaysApproach.beside(lever_push, (0.0,))[:2]
-
-    np.testing.assert_allclose(upright.closing, [0.0, 0.0, 1.0], atol=1e-12)
-    np.testing.assert_allclose(along_the_push.closing, lever_push, atol=1e-12)
 
 
 def tool_frame_goal_in_the_root(press: PressAction) -> np.ndarray:
@@ -89,38 +63,43 @@ def tool_frame_goal_in_the_root(press: PressAction) -> np.ndarray:
     ).homogeneous_matrix.to_np()
 
 
-def test_a_sideways_press_closes_the_fingers_along_its_closing(panda_omron):
-    [arm] = panda_omron.all_arms
-    gripper = arm.end_effector
-    approach = np.array([-1.0, 0.0, 0.0])
-    closing = np.array([0.0, 0.0, 1.0])
-    press = SidewaysPressAction(
-        point=np.array([1.0, 0.0, 1.0]), approach=approach, closing=closing, arm=arm
-    )
-
-    rotation = tool_frame_goal_in_the_root(press)[:3, :3]
-
-    np.testing.assert_allclose(
-        rotation @ gripper.approach_axis.to_np()[:3], approach, atol=1e-9
-    )
-    assert abs(rotation @ gripper.closing_axis.to_np()[:3] @ closing) == pytest.approx(
-        1.0
-    )
+def test_every_finger_approach_spreads_the_fingers_along_the_push(lever_push):
+    for finger_approach in FingerApproach.across(lever_push):
+        np.testing.assert_allclose(finger_approach.closing, lever_push, atol=1e-12)
+        assert finger_approach.approach @ lever_push == pytest.approx(0.0, abs=1e-12)
+        assert np.linalg.norm(finger_approach.approach) == pytest.approx(1.0)
 
 
-def test_a_sideways_press_closing_level_rests_as_a_press_does(panda_omron):
+def test_finger_approaches_come_from_either_side_and_once_from_above(lever_push):
+    level, other_side, from_above = FingerApproach.across(lever_push, (0.0, 90.0))
+
+    np.testing.assert_allclose(level.approach, -other_side.approach, atol=1e-12)
+    assert from_above.approach[2] < -0.99
+
+
+def test_a_finger_press_opens_the_gripper():
+    assert FingerPressAction.gripper_state == GripperState.OPEN
+    assert PressAction.gripper_state == GripperState.CLOSE
+
+
+def test_a_finger_press_puts_the_trailing_fingertip_on_the_point(panda_omron):
     [arm] = panda_omron.all_arms
     point = np.array([1.0, 0.0, 1.0])
-    approach = np.array([-1.0, 0.0, 0.0])
-    level = np.cross([0.0, 0.0, 1.0], approach)
-
-    sideways = SidewaysPressAction(
-        point=point, approach=approach, closing=level, arm=arm
+    push = np.array([0.0, -1.0, 0.0])
+    press = FingerPressAction(
+        point=point, approach=np.array([-1.0, 0.0, 0.0]), closing=push, arm=arm
     )
-    press = PressAction(point=point, approach=approach, arm=arm)
+
+    world_T_tool = tool_frame_goal_in_the_root(press)
+    tool_P_face = press.trailing_fingertip_face().to_np()
 
     np.testing.assert_allclose(
-        tool_frame_goal_in_the_root(sideways),
-        tool_frame_goal_in_the_root(press),
-        atol=1e-9,
+        (world_T_tool @ tool_P_face)[:3], point - press.approach * 0.1, atol=1e-9
+    )
+    world_closing = world_T_tool[:3, :3] @ arm.end_effector.closing_axis.to_np()[:3]
+    assert world_closing @ push == pytest.approx(1.0)
+    assert (
+        press.trailing_fingertip_face().to_np()[:3]
+        @ arm.end_effector.closing_axis.to_np()[:3]
+        < 0.0
     )

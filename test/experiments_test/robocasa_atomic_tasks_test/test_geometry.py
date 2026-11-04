@@ -57,6 +57,12 @@ def test_a_slanted_ray_enters_a_box_through_the_side_it_reaches_first():
     np.testing.assert_allclose(ray.entry_into(bounds), [1.0, 0.0, 1.0])
 
 
+def test_a_point_lies_as_far_from_a_ray_as_from_the_line_it_runs_along():
+    ray = Ray(point=np.array([1.0, 0.0, 0.0]), direction=np.array([2.0, 0.0, 0.0]))
+
+    assert ray.distance_to(np.array([-3.0, 3.0, 4.0])) == 5.0
+
+
 # %% bounding boxes
 
 

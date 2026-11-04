@@ -61,10 +61,10 @@ from experiments.robocasa_atomic_tasks.skills import (
     StandAndOperateMechanismAction,
     StandAndPickUpAction,
     StandAndPlaceAction,
-    SidewaysApproach,
-    SidewaysWithdrawAction,
+    FingerApproach,
+    FingerWithdrawAction,
     StandAndPressAction,
-    StandAndPushSidewaysAction,
+    StandAndPushWithAFingerAction,
     WithdrawAction,
 )
 from experiments.robocasa_atomic_tasks.robots import TaskRobot
@@ -97,7 +97,10 @@ from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
 )
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
+from semantic_digital_twin.world_description.connections import (
+    ActiveConnection1DOF,
+    RevoluteConnection,
+)
 from semantic_digital_twin.world_description.geometry import CoordinateBounds
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -939,55 +942,49 @@ class RoboCasaEpisode:
         ):
             self.press_and_push(point, approach, joint, goal).raise_if_failed()
 
-    def push_sideways(
+    def push_with_a_finger(
         self,
         joint_name: str,
         towards: float,
-        finger_half_thickness: float = 0.012,
         hand_distance: float = 0.1,
         threshold_share: float = 0.02,
         reach_of_the_wrist: float = 0.5,
     ) -> None:
         """
-        Push the part hanging from one of the fixtures' joints with the sides of the
-        fingers, coming in beside the part, until the joint stands at the end of its
-        travel, such as a lever swung as far as it goes; then withdraw and park the
-        arms. In a physical simulation the wrist may brush what stands around the part.
+        Open the gripper and push the part hanging from one of the fixtures' joints with
+        one fingertip, set against the part's shape farthest from the joint's axis,
+        until the joint stands at the end of its travel, such as a lever swung as far as
+        it goes; then withdraw and park the arms. In a physical simulation the wrist may
+        brush what stands around the part.
 
         The gripper comes in first from where its hand has the most room, and from the
         next way where the joint did not reach the end.
 
-        :param joint_name: The name RoboCasa gives the joint.
+        :param joint_name: The name RoboCasa gives the joint, one that turns its part.
         :param towards: A position of the joint, as the world states it, on the side of
             the end it is pushed to.
-        :param finger_half_thickness: How far off the part the middle of the closed
-            fingers rests, in metres.
-        :param hand_distance: How far behind the fingertips the hand is taken to rest
+        :param hand_distance: How far behind the fingertip the hand is taken to rest
             when the room around it is compared, in metres.
         :param threshold_share: How close the joint has to come to the end, as a share
             of its travel.
         :param reach_of_the_wrist: How far from the part the bodies the gripper and the
             wrist may touch may begin, in metres.
+        :raises JointNotPushedToItsEnd: If every push left the joint short of the end.
         """
         joint = self.joints.connection(joint_name)
         part = self.joints.part_moved_by(joint_name).root
-        limits = joint.dof.limits
-        end = (
-            limits.upper.position
-            if towards >= joint.position
-            else limits.lower.position
-        )
+        end = self.joints.end_towards(joint, towards)
         surroundings = self.fixtures.bodies_around(part, margin=reach_of_the_wrist)
         wrist = [
             body
             for body in self.task_robot.wrist_bodies(self.robot)
             if body.collision.shapes
         ]
-        point = self.point_beside(joint, part, end, finger_half_thickness)
+        point = self.point_for_a_fingertip(joint, part, end)
         push = self.joints.push_direction(joint, end, point=point)
 
-        def room_for_the_hand(sideways: SidewaysApproach) -> float:
-            hand = point - sideways.approach * hand_distance
+        def room_for_the_hand(finger_approach: FingerApproach) -> float:
+            hand = point - finger_approach.approach * hand_distance
             return min(
                 self.bounds.distance_to_nearest_shape(body, hand)
                 for body in surroundings
@@ -995,17 +992,21 @@ class RoboCasaEpisode:
             )
 
         approaches = sorted(
-            SidewaysApproach.beside(push), key=room_for_the_hand, reverse=True
+            FingerApproach.across(push), key=room_for_the_hand, reverse=True
         )
         logger.info(
-            "Pushing %s sideways from %.4f to %.4f", joint_name, joint.position, end
+            "Pushing %s with a finger from %.4f to %.4f at %s",
+            joint_name,
+            joint.position,
+            end,
+            np.round(point, 3),
         )
         threshold = threshold_share * self.joints.travel_of(joint)
-        for sideways in approaches:
+        for finger_approach in approaches:
             logger.info(
                 "Coming in along %s, the fingers closing along %s",
-                np.round(sideways.approach, 2),
-                np.round(sideways.closing, 2),
+                np.round(finger_approach.approach, 2),
+                np.round(finger_approach.closing, 2),
             )
             with (
                 self.allowances.gripper_may_touch(self.arm, surroundings),
@@ -1016,12 +1017,12 @@ class RoboCasaEpisode:
                 ),
             ):
                 outcome = self.press_and_push(
-                    self.point_beside(joint, part, end, finger_half_thickness),
-                    sideways.approach,
+                    self.point_for_a_fingertip(joint, part, end),
+                    finger_approach.approach,
                     joint,
                     end,
                     threshold_share=threshold_share,
-                    closing=sideways.closing,
+                    closing=finger_approach.closing,
                 )
             if outcome.succeeded and abs(joint.position - end) <= threshold:
                 return
@@ -1033,28 +1034,31 @@ class RoboCasaEpisode:
             joint_name=joint_name, position=joint.position, end=end
         )
 
-    def point_beside(
-        self,
-        joint: ActiveConnection1DOF,
-        part: Body,
-        end: float,
-        finger_half_thickness: float,
+    def point_for_a_fingertip(
+        self, joint: RevoluteConnection, part: Body, end: float
     ) -> np.ndarray:
         """
-        :param joint: A joint of the kitchen.
-        :param part: The part it moves, with collision geometry.
+        :param joint: A joint of the kitchen that turns its part.
+        :param part: The part it turns, with collision geometry.
         :param end: The position it is pushed towards.
-        :param finger_half_thickness: How far off the part the point lies, in metres.
-        :return: Where the middle of the closed fingers rests to push the part the joint
-            moves towards ``end``: off the middle of the part's face it is pushed on, in
-            the world's root frame.
+        :return: Where a fingertip rests to push the part towards ``end`` with the most
+            leverage: on the face it is pushed on of the box bounding the part's shape
+            farthest from the joint's axis, level with that box's middle, in the
+            world's root frame.
         """
-        center = self.bounds.center_of(part)
-        push = self.joints.push_direction(joint, end, point=center)
-        return (
-            Ray(point=center, direction=push).entry_into(self.bounds.of_body(part))
-            - push * finger_half_thickness
+        axis = self.joints.axis_of(joint)
+        boxes = [
+            box.to_array_bounds()
+            for box in part.collision.as_bounding_box_collection_in_frame(
+                self.world.root
+            ).bounding_boxes
+        ]
+        farthest = max(
+            boxes, key=lambda box: axis.distance_to((box.lower + box.upper) / 2.0)
         )
+        center = (farthest.lower + farthest.upper) / 2.0
+        push = self.joints.push_direction(joint, end, point=center)
+        return Ray(point=center, direction=push).entry_into(farthest)
 
     def press_and_push(
         self,
@@ -1076,9 +1080,10 @@ class RoboCasaEpisode:
         :param goal: The position the joint is pushed to.
         :param threshold_share: How close the joint has to come to ``goal``, as a share
             of its travel.
-        :param closing: The direction the fingers close along, square to ``approach``,
-            to rest beside the part and push it with their sides; ``None`` to press it
-            with the fingertips, the fingers closing level.
+        :param closing: The direction the fingers of the open gripper spread along,
+            square to ``approach``, to push the part with the fingertip that trails it,
+            see :class:`StandAndPushWithAFingerAction`; ``None`` to press it with the
+            fingertips of the closed gripper, the fingers closing level.
         :return: How the press and push ended; nothing is withdrawn if it failed.
         """
         stands = self.stands.stands_facing(point)
@@ -1102,9 +1107,11 @@ class RoboCasaEpisode:
                         through_free_space=through_free_space,
                     )
                     if closing is None
-                    else StandAndPushSidewaysAction.from_stands_beside(
+                    else StandAndPushWithAFingerAction.from_stands_beside(
                         point=point,
-                        sideways=SidewaysApproach(approach=approach, closing=closing),
+                        finger_approach=FingerApproach(
+                            approach=approach, closing=closing
+                        ),
                         arm=self.arm,
                         stands=stands,
                         pushed_joint=joint,
@@ -1260,13 +1267,13 @@ class RoboCasaEpisode:
 
         :param point: The point pressed.
         :param approach: The direction the fingertips came in along.
-        :param closing: The direction the fingers closed along while they rested beside
-            a part; ``None`` if they closed level.
+        :param closing: The direction the fingers of the open gripper spread along while
+            one fingertip rested beside a part; ``None`` if the gripper was closed.
         """
         withdrawal = (
             WithdrawAction(point=point, approach=approach, arm=self.arm)
             if closing is None
-            else SidewaysWithdrawAction(
+            else FingerWithdrawAction(
                 point=point, approach=approach, closing=closing, arm=self.arm
             )
         )

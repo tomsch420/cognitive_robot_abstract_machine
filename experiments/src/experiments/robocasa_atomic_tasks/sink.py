@@ -52,7 +52,7 @@ class TurnOffSinkFaucet(TurnOnSinkFaucet):
 class AdjustWaterTemperature(JointGoalTask):
     """
     Swing the running faucet's handle towards hot or cold, as RoboCasa asks, as far as
-    it goes, pushing it with the sides of the fingers.
+    it goes, pushing it with one finger of the open gripper.
     """
 
     hot_share: float = 0.8
@@ -74,10 +74,11 @@ class AdjustWaterTemperature(JointGoalTask):
     def solve(self, episode: RoboCasaEpisode) -> None:
         """
         Differs from :meth:`JointGoalTask.solve` in pushing the handle to the end of its
-        travel on the side of its goal, see :meth:`RoboCasaEpisode.push_sideways`.
+        travel on the side of its goal with one finger of the open gripper, see
+        :meth:`RoboCasaEpisode.push_with_a_finger`.
         """
         [goal] = self.joint_goals(episode)
-        episode.push_sideways(goal.joint_name, goal.world_position)
+        episode.push_with_a_finger(goal.joint_name, goal.world_position)
 
 
 # %% the spout

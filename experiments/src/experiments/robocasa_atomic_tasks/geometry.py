@@ -105,6 +105,15 @@ class Ray:
             )
         return self.point - self.direction * float(np.min(steps))
 
+    def distance_to(self, point: np.ndarray) -> float:
+        """
+        :param point: A point, in the frame the ray is given in.
+        :return: How far the point lies from the line the ray runs along.
+        """
+        direction = self.direction / np.linalg.norm(self.direction)
+        offset = point - self.point
+        return float(np.linalg.norm(offset - (offset @ direction) * direction))
+
 
 # %% bodies
 

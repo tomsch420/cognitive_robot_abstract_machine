@@ -11,7 +11,7 @@ import numpy as np
 from typing_extensions import TYPE_CHECKING
 
 from experiments.robocasa_atomic_tasks.exceptions import NoRackAtLevel
-from experiments.robocasa_atomic_tasks.geometry import BodyBounds
+from experiments.robocasa_atomic_tasks.geometry import BodyBounds, Ray
 from experiments.robocasa_atomic_tasks.robocasa_names import RackKind
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Handle,
@@ -21,6 +21,7 @@ from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection1DOF,
     PrismaticConnection,
+    RevoluteConnection,
 )
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -229,6 +230,34 @@ class FixtureJoints:
         """
         limits = joint.dof.limits
         return float(np.clip(position, limits.lower.position, limits.upper.position))
+
+    @staticmethod
+    def end_towards(joint: ActiveConnection1DOF, position: float) -> float:
+        """
+        :param joint: A joint of the world.
+        :param position: A position of it.
+        :return: The limit of the joint on the side of ``position``, seen from where the
+            joint stands.
+        """
+        limits = joint.dof.limits
+        if position >= joint.position:
+            return limits.upper.position
+        return limits.lower.position
+
+    @staticmethod
+    def axis_of(joint: RevoluteConnection) -> Ray:
+        """
+        :param joint: A joint of the world that turns its part.
+        :return: The line the joint turns its part about, in the world's root frame.
+        """
+        world_T_connection = (
+            joint.parent.global_pose.to_np()
+            @ joint.parent_T_connection_expression.to_np()
+        )
+        return Ray(
+            point=world_T_connection[:3, 3],
+            direction=world_T_connection[:3, :3] @ joint.axis.to_np()[:3],
+        )
 
     def push_direction(
         self,
