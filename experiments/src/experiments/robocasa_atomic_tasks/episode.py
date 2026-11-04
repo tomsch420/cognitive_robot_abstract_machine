@@ -950,6 +950,7 @@ class RoboCasaEpisode:
         towards: float,
         hand_distance: float = 0.1,
         threshold_share: float = 0.02,
+        aim_share: float = 0.002,
         reach_of_the_wrist: float = 0.5,
     ) -> None:
         """
@@ -969,6 +970,9 @@ class RoboCasaEpisode:
             when the room around it is compared, in metres.
         :param threshold_share: How close the joint has to come to the end, as a share
             of its travel.
+        :param aim_share: How close the push itself drives the joint to the end, as a
+            share of its travel; tighter than ``threshold_share``, since the part comes
+            to rest a little short of where the push leaves it.
         :param reach_of_the_wrist: How far from the part the bodies the gripper and the
             wrist may touch may begin, in metres.
         :raises JointNotPushedToItsEnd: If every push left the joint short of the end.
@@ -1023,7 +1027,7 @@ class RoboCasaEpisode:
                     finger_approach.approach,
                     joint,
                     end,
-                    threshold_share=threshold_share,
+                    threshold_share=aim_share,
                     closing=finger_approach.closing,
                 )
             if outcome.succeeded and abs(joint.position - end) <= threshold:
