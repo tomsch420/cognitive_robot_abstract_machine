@@ -8,7 +8,7 @@ from dataclasses import dataclass
 
 import numpy as np
 from krrood.exceptions import DataclassException
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose
 
 
 @dataclass

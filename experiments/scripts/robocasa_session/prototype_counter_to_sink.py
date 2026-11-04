@@ -15,7 +15,7 @@ from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.definitions import TorsoState
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Sink
-from semantic_digital_twin.spatial_types.spatial_types import Point3, Pose
+from krrood_spatial_math.spatial_types import Point3, Pose
 from semantic_digital_twin.world_description.connections import OmniDrive
 
 logging.basicConfig(level=logging.INFO)
@@ -72,7 +72,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import Floo
 with world.modify_world():
     world.add_semantic_annotation(Floor(root=world.get_body_by_name("floor_room_main")))
 
-pr2_world = URDFParser.from_file(PR2.get_ros_file_path()).parse()
+pr2_world = URDFParser.from_file(PR2.get_ros_file_path()).create_world()
 with world.modify_world():
     drive = OmniDrive.create_with_dofs(parent=world.root, child=pr2_world.root, world=world)
     world.merge_world(pr2_world, drive)

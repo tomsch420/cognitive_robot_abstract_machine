@@ -9,7 +9,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from semantic_digital_twin.spatial_types.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
 )
 from semantic_digital_twin.world import World

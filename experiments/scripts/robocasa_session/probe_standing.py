@@ -3,7 +3,7 @@ from math import pi
 import numpy as np
 from experiments.robocasa_task_execution.counter_to_sink import CounterToSinkEpisode
 from robocasa.models.scenes.scene_registry import LayoutType, StyleType
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 
 episode = CounterToSinkEpisode.compose(LayoutType.LAYOUT001, StyleType.STYLE001, seed=7)
 world, robot = episode.task.world, episode.robot

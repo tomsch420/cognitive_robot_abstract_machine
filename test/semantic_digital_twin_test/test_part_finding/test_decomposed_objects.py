@@ -30,7 +30,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Mug,
     Pot,
 )
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.geometry import Cylinder, Mesh
 from semantic_digital_twin.world_description.mesh_file_storage import MeshFileStorage
 

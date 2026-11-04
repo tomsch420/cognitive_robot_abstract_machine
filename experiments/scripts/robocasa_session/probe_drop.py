@@ -3,7 +3,7 @@ import numpy as np
 from experiments.robocasa_task_execution.counter_to_sink import CounterToSinkEpisode, RoboCasaObjectName
 from robocasa.models.scenes.scene_registry import LayoutType, StyleType
 from robocasa.utils import object_utils
-from semantic_digital_twin.spatial_types.spatial_types import Point3, Pose
+from krrood_spatial_math.spatial_types import Point3, Pose
 
 episode = CounterToSinkEpisode.compose(LayoutType[sys.argv[1]], StyleType.STYLE001)
 env = episode.environment

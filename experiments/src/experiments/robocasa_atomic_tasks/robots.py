@@ -15,7 +15,7 @@ from experiments.robocasa_atomic_tasks.stands import StandCandidates
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, Arm
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.specifications.robots import RobotSpecification
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import OmniDrive
@@ -119,7 +119,7 @@ class PR2Robot(TaskRobot):
     def place_in(
         self, world: World, start_pose: HomogeneousTransformationMatrix
     ) -> PR2:
-        pr2_world = URDFParser.from_file(PR2.get_ros_file_path()).parse()
+        pr2_world = URDFParser.from_file(PR2.get_ros_file_path()).create_world()
         with world.modify_world():
             drive = OmniDrive.create_with_dofs(
                 parent=world.root, child=pr2_world.root, world=world

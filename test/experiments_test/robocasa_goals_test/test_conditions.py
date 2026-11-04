@@ -26,7 +26,7 @@ from experiments.robocasa_task_execution.counter_to_sink import (
     RoboCasaObjectName,
 )
 from semantic_digital_twin.robots.robot_parts import EndEffector
-from semantic_digital_twin.spatial_types.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
 )
 from semantic_digital_twin.world_description.world_entity import Body

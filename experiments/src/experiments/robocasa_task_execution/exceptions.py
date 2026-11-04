@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from krrood.exceptions import DataclassException
-from semantic_digital_twin.spatial_types.spatial_types import Point3, Pose
+from krrood_spatial_math.spatial_types import Point3, Pose
 from semantic_digital_twin.world_description.world_entity import Body
 
 # %% where the robot starts

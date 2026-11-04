@@ -16,7 +16,7 @@ from coraplex.robot_plans.actions.core.robot_body import MoveTorsoAction, ParkAr
 from semantic_digital_twin.adapters.mujoco_video_recording import MujocoVideoRecorder, VideoResolution
 from semantic_digital_twin.adapters.multi_sim import MujocoBuilder, MujocoCamera
 from semantic_digital_twin.datastructures.definitions import TorsoState
-from semantic_digital_twin.spatial_types.spatial_types import Point3
+from krrood_spatial_math.spatial_types import Point3
 from semantic_digital_twin.world_description.connections import Connection6DoF, FixedConnection
 
 # the PR2 URDF has links whose inertia violates the triangle inequality; let MuJoCo balance them,

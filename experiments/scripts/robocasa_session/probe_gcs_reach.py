@@ -20,8 +20,8 @@ from coraplex.robot_plans.actions.core.robot_body import MoveTorsoAction
 from coraplex.robot_plans.motions.gripper import MoveTCPWaypointsMotion
 from semantic_digital_twin.collision_checking.collision_rules import AvoidExternalCollisions
 from semantic_digital_twin.datastructures.definitions import TorsoState
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Point3
-from semantic_digital_twin.spatial_types.spatial_types import Pose, Quaternion
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Point3
+from krrood_spatial_math.spatial_types import Pose, Quaternion
 from semantic_digital_twin.semantic_annotations.semantic_annotations import SemanticEnvironmentAnnotation
 from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
 from semantic_digital_twin.world_description.graph_of_convex_sets.boxes import VolumetricGraphOfBoundingBoxes

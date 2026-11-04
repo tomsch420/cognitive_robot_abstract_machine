@@ -33,8 +33,8 @@ from experiments.physical_pick_up.scene import PickUpScene
 from semantic_digital_twin.part_finding.annotation_part_finder import (
     AnnotationPartFinder,
 )
-from semantic_digital_twin.spatial_types import Vector3
-from semantic_digital_twin.spatial_types.spatial_types import AxisAngle
+from krrood_spatial_math.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import AxisAngle
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Handle,
     Mug,

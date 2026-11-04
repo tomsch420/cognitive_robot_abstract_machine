@@ -42,9 +42,7 @@ from semantic_digital_twin.semantic_annotations.mixins import (
 from semantic_digital_twin.semantic_annotations.natural_language import (
     NaturalLanguageWithTypeDescription,
 )
-from semantic_digital_twin.spatial_types.spatial_types import (
-    HomogeneousTransformationMatrix,
-)
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.utils import camel_case_split
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
@@ -195,7 +193,7 @@ def _parse_robosuite_mjcf(parser: MJCFParser) -> World:
                 geom.group = GeomVisibilityAndCollisionType.ONLY_COLLIDABLE
             elif geom.rgba[3] == 0 and not geom.material:
                 geom.group = GeomVisibilityAndCollisionType.UNDEFINED_1
-    return parser.parse()
+    return parser.create_world()
 
 
 def _category_from_class_name(class_name: str) -> str:
@@ -972,7 +970,7 @@ class RoboCasaDatasetLoader:
         Attach a SemanticAnnotation to the root body of a loaded object.
 
         The object's own body is the first body in the world with collision geometry:
-        MJCFParser.parse() always creates an empty placeholder root body named after the
+        :meth:`~semantic_digital_twin.adapters.mjcf.MJCFParser.create_world` always creates an empty placeholder root body named after the
         MJCF worldbody, distinct from the loaded content.
 
         :param world: The world the object was parsed into.

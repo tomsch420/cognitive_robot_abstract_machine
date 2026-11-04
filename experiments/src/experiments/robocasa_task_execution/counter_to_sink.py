@@ -94,7 +94,7 @@ from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
 from semantic_digital_twin.reasoning.robot_predicates import is_body_gripped
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Floor
-from semantic_digital_twin.spatial_types.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Point3,
     Pose,
@@ -348,7 +348,7 @@ class CounterToSinkEpisode:
         )
         task = loader.load_task_from_environment(environment)
         world = task.world
-        pr2_world = URDFParser.from_file(PR2.get_ros_file_path()).parse()
+        pr2_world = URDFParser.from_file(PR2.get_ros_file_path()).create_world()
         with world.modify_world():
             drive = OmniDrive.create_with_dofs(
                 parent=world.root, child=pr2_world.root, world=world

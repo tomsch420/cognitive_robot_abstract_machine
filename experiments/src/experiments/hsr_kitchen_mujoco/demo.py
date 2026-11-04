@@ -42,7 +42,7 @@ from semantic_digital_twin.predefined_maps.kitchen_environment import (
 )
 from semantic_digital_twin.robots.hsrb import HSRB, HSRBJoint
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
-from semantic_digital_twin.spatial_types.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Pose,
 )
@@ -202,7 +202,7 @@ def build_world() -> World:
     :return: The kitchen with the HSR standing in front of the table, and the milk on
         the table.
     """
-    world = KitchenEnvironment().get_world()
+    world = KitchenEnvironment().create_world()
     robot = RobotSpecification(HSRB).spawn(world)
     robot.root.parent_connection.origin = standing_pose(
         world, start_pose(world)

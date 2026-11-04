@@ -27,7 +27,7 @@ from semantic_digital_twin.adapters.mjcf import MJCFParser
 from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.robot_parts import ServoedRobotPart
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connection_properties import ServoGains
 from semantic_digital_twin.world_description.connections import OmniDrive
@@ -125,7 +125,7 @@ def test_every_position_servo_of_the_panda_omron_is_the_drive_of_one_of_its_part
     panda_omron,
 ):
     world = panda_omron._world
-    description = MJCFParser.from_xml_string(PandaOmronDescription().document()).parse()
+    description = MJCFParser.from_xml_string(PandaOmronDescription().document()).create_world()
     gains_by_degree_of_freedom = servo_gains_by_degree_of_freedom(world)
 
     driven: set[DegreeOfFreedom] = set()

@@ -16,7 +16,7 @@ from experiments.robocasa_atomic_tasks.fixtures import KitchenFixtures
 from experiments.robocasa_atomic_tasks.geometry import BodyBounds
 from experiments.robocasa_atomic_tasks.judge import RoboCasaJudge
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
-from semantic_digital_twin.spatial_types.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Pose,
 )

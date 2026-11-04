@@ -21,7 +21,7 @@ from experiments.robocasa_atomic_tasks.exceptions import NoPathThroughTheKitchen
 from experiments.robocasa_atomic_tasks.skills import StandAction
 from experiments.robocasa_atomic_tasks.tasks import RoboCasaAtomicTask
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Floor
-from semantic_digital_twin.spatial_types.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Point2,
     Pose,

@@ -44,7 +44,7 @@ from semantic_digital_twin.robots.robot_parts import (
     ServoedRobotPart,
     Torso,
 )
-from semantic_digital_twin.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import Vector3
 from semantic_digital_twin.world_description.connection_properties import (
     DriveServos,
     JointDrive,
@@ -530,7 +530,7 @@ class PandaOmron(AbstractRobot, HasMobileBase[PandaOmronMobileBase]):
         :return: This robot, read from the MJCF robosuite assembles, without the world
             body MJCF puts above every robot's root.
         """
-        world = MJCFParser.from_xml_string(PandaOmronDescription().document()).parse()
+        world = MJCFParser.from_xml_string(PandaOmronDescription().document()).create_world()
         with world.modify_world():
             world.remove_kinematic_structure_entity(world.root)
         return cls.from_world(world)

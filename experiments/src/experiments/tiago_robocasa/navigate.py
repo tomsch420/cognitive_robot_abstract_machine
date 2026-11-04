@@ -24,7 +24,7 @@ from experiments.scene_recording import ViewerCamera
 from experiments.tiago_robocasa.exceptions import NoClearStandingPose
 from experiments.tiago_robocasa.robocasa_task import TiagoRoboCasaTask
 from experiments.tiago_robocasa.trials import Trials, parser_of, settings_from
-from semantic_digital_twin.spatial_types.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Pose,
 )

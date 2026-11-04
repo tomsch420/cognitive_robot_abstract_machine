@@ -33,7 +33,7 @@ from semantic_digital_twin.adapters.mujoco_video_recording import (
 )
 from semantic_digital_twin.adapters.multi_sim import MujocoCamera
 from semantic_digital_twin.callbacks.callback import StateChangeCallback
-from semantic_digital_twin.spatial_types.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
 )
 from semantic_digital_twin.world_description.connections import (

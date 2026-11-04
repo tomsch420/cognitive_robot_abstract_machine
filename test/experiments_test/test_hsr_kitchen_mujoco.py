@@ -62,7 +62,7 @@ def position_of(world: World, name: str):
 
 
 def test_the_scene_is_the_predetermined_kitchen(world: World):
-    kitchen = KitchenEnvironment().get_world()
+    kitchen = KitchenEnvironment().create_world()
 
     assert {body.name.name for body in kitchen.bodies} <= {
         body.name.name for body in world.bodies

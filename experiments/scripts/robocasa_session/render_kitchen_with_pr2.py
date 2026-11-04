@@ -12,7 +12,7 @@ from semantic_digital_twin.adapters.mujoco_video_recording import MujocoVideoRec
 from semantic_digital_twin.adapters.multi_sim import MujocoBuilder, MujocoCamera
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.robots.pr2 import PR2
-from semantic_digital_twin.spatial_types.spatial_types import HomogeneousTransformationMatrix, Point3
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Point3
 from semantic_digital_twin.world_description.connections import FixedConnection
 
 # the PR2 URDF has links whose inertia violates the triangle inequality; let MuJoCo balance them,
@@ -54,7 +54,7 @@ counter_front_y = min(box.min_y for box in counter_boxes)
 counter_center_x = (min(box.min_x for box in counter_boxes) + max(box.max_x for box in counter_boxes)) / 2
 robot_x, robot_y = counter_center_x, counter_front_y - 0.6
 
-pr2_world = URDFParser.from_file("package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro").parse()
+pr2_world = URDFParser.from_file("package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro").create_world()
 with world.modify_world():
     # a fixed connection, because the MuJoCo mirror does not take over the OmniDrive's degrees of freedom
     placement = FixedConnection(

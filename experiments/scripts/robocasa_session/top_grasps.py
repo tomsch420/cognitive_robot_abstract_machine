@@ -2,7 +2,7 @@
 import numpy as np
 
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
-from semantic_digital_twin.spatial_types.spatial_types import Point3, Pose, RotationMatrix, Vector3
+from krrood_spatial_math.spatial_types import Point3, Pose, RotationMatrix, Vector3
 
 
 def use_top_grasps(graspable, finger_axis_count=4, depth_below_top=0.03):

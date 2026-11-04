@@ -78,7 +78,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     WineBottle,
 )
 from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
-from semantic_digital_twin.spatial_types import RotationMatrix
+from krrood_spatial_math.spatial_types import RotationMatrix
 from semantic_digital_twin.world_description.geometry import Mesh, Shape
 
 # %% the geometry of an object

@@ -12,7 +12,7 @@ import numpy as np
 from experiments.robocasa_task_execution.counter_to_sink import CounterToSinkEpisode
 from robocasa.models.scenes.scene_registry import LayoutType, StyleType
 from semantic_digital_twin.semantic_annotations.semantic_annotations import SemanticEnvironmentAnnotation
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Point3
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Point3
 from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
 from semantic_digital_twin.world_description.graph_of_convex_sets.boxes import VolumetricGraphOfBoundingBoxes
 from semantic_digital_twin.world_description.graph_of_convex_sets.plotting import NavigationPath, NavigationScene, Theme

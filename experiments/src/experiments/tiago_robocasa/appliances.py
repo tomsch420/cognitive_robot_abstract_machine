@@ -33,7 +33,7 @@ from coraplex.robot_plans.motions.gripper import (
 )
 from experiments.tiago_robocasa.handles import HandleHold, TiagoHandleTask
 from semantic_digital_twin.datastructures.definitions import GripperState
-from semantic_digital_twin.spatial_types.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Pose,
 )

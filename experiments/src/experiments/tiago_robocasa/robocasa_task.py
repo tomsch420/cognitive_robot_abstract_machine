@@ -60,7 +60,7 @@ from semantic_digital_twin.datastructures.definitions import (
 )
 from semantic_digital_twin.robots.tiago import TiagoMujoco
 from semantic_digital_twin.specifications.robots import RobotSpecification
-from semantic_digital_twin.spatial_types.spatial_types import Point2, Pose
+from krrood_spatial_math.spatial_types import Point2, Pose
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
 from random_events.interval import closed

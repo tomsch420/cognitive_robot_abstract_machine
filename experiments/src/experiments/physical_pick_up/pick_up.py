@@ -31,8 +31,8 @@ from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.grasping.surface_grasp import GraspResult, axis_angle_of
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, Arm
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Vector3
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
+from krrood_spatial_math.spatial_types import Pose
 
 # %% filming
 
