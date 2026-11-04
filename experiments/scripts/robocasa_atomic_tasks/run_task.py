@@ -8,6 +8,7 @@ Run with::
     python experiments/scripts/robocasa_atomic_tasks/run_task.py OpenDrawer
     python experiments/scripts/robocasa_atomic_tasks/run_task.py TurnOnStove --physics --video stove.mp4
     python experiments/scripts/robocasa_atomic_tasks/run_task.py AdjustWaterTemperature --robot panda_omron
+    python experiments/scripts/robocasa_atomic_tasks/run_task.py AdjustWaterTemperature --robot panda_omron --physics --database sqlite:////root/work/task_runs.sqlite
 """
 
 from __future__ import annotations
@@ -22,6 +23,7 @@ from pathlib import Path
 from experiments.robocasa_atomic_tasks.catalogue import TaskModule
 from experiments.robocasa_atomic_tasks.command_line import TaskExitStatus, TaskRunOption
 from experiments.robocasa_atomic_tasks.robots import RobotModel
+from experiments.robocasa_atomic_tasks.task_run_database import TaskRunDatabase
 from semantic_digital_twin.adapters.robocasa_dataset.mujoco_compat import (
     robocasa_version_assertions_relaxed,
 )
@@ -55,6 +57,7 @@ parser.add_argument(
     default=RobotModel.PR2,
 )
 parser.add_argument(TaskRunOption.TIME_LIMIT, type=int, default=0)
+parser.add_argument(TaskRunOption.DATABASE)
 arguments = parser.parse_args()
 
 # %% running the task
@@ -68,17 +71,26 @@ settings = dict(
     physics=arguments.physics,
     video=arguments.video,
     robot=arguments.robot,
+    records_the_run=arguments.database is not None,
 )
 if arguments.layout:
     settings["layout"] = LayoutType[arguments.layout]
 if arguments.style:
     settings["style"] = StyleType[arguments.style]
 start = time.time()
-succeeded = tasks[arguments.task](**settings).run()
+task = tasks[arguments.task](**settings)
+succeeded = task.run()
 logger.info(
     "%s %s after %.0f s",
     arguments.task,
     "succeeded" if succeeded else "failed",
     time.time() - start,
 )
+if succeeded and task.recorded_run is not None:
+    TaskRunDatabase.connect(arguments.database).add(task.recorded_run)
+    logger.info(
+        "Stored the run, %d moments, in %s",
+        len(task.recorded_run.moments),
+        arguments.database,
+    )
 sys.exit(TaskExitStatus.ACCOMPLISHED if succeeded else TaskExitStatus.NOT_ACCOMPLISHED)

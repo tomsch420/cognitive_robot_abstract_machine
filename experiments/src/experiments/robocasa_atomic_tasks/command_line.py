@@ -55,6 +55,29 @@ class TaskRunOption(StrEnum):
     How many seconds the run may take before it is killed.
     """
 
+    DATABASE = "--database"
+    """
+    The URI of the database a successful run is stored in, for example
+    ``sqlite:////root/work/task_runs.sqlite``; a run is recorded only in a physical
+    simulation.
+    """
+
+
+class TaskReplayOption(StrEnum):
+    """
+    The command-line options of the script that replays a stored run of one task.
+    """
+
+    DATABASE = "--database"
+    """
+    The URI of the database the run is stored in.
+    """
+
+    SPEED = "--speed"
+    """
+    How many times faster than it passed in the simulation the run is replayed.
+    """
+
 
 class TaskExitStatus(IntEnum):
     """

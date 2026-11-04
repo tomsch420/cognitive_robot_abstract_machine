@@ -20,6 +20,10 @@ from experiments.robocasa_atomic_tasks.episode import RoboCasaEpisode
 from experiments.robocasa_atomic_tasks.recording import RobotViewVideo
 from experiments.robocasa_atomic_tasks.robots import RobotModel
 from experiments.robocasa_atomic_tasks.robocasa_names import RoboCasaObjectName
+from experiments.robocasa_atomic_tasks.stored_runs import (
+    SimulatedMomentRecorder,
+    StoredTaskRun,
+)
 from krrood.ormatic.utils import classproperty
 from semantic_digital_twin.adapters.robocasa_dataset.mujoco_compat import (
     robocasa_version_assertions_relaxed,
@@ -84,6 +88,17 @@ class RoboCasaAtomicTask(ABC):
     Arguments of the RoboCasa task itself, by name.
     """
 
+    records_the_run: bool = False
+    """
+    Whether the world's state is recorded as the physical simulation moves it, into
+    :attr:`recorded_run`.
+    """
+
+    recorded_run: StoredTaskRun | None = field(default=None, init=False, repr=False)
+    """
+    The run as the world's state moved through it, once it is recorded.
+    """
+
     episode: RoboCasaEpisode | None = field(default=None, init=False, repr=False)
     """
     The episode composed for the task, once it is.
@@ -121,7 +136,8 @@ class RoboCasaAtomicTask(ABC):
     def run(self) -> bool:
         """
         Compose an episode, have the robot perform the task and judge it; a video, if
-        asked for, shows the episode as far as it got.
+        asked for, shows the episode as far as it got, and so does :attr:`recorded_run`
+        if :attr:`records_the_run` and the episode is simulated physically.
 
         :return: Whether RoboCasa's own check finds the task accomplished.
         """
@@ -140,8 +156,23 @@ class RoboCasaAtomicTask(ABC):
             )
         try:
             with episode.executed(self.collision_avoidance, self.physics):
+                recorder = None
+                if self.records_the_run and self.physics:
+                    recorder = SimulatedMomentRecorder(
+                        _world=episode.world, simulation=episode.simulation
+                    )
                 self.solve(episode)
                 episode.let_physics_run()
+                if recorder is not None:
+                    self.recorded_run = StoredTaskRun(
+                        task=self.robocasa_task_name,
+                        layout=self.layout,
+                        style=self.style,
+                        seed=self.seed,
+                        robot=self.robot,
+                        degree_of_freedom_names=recorder.degree_of_freedom_names,
+                        moments=recorder.finish(),
+                    )
             if video is not None:
                 video.stop()
             succeeded = episode.judge.succeeded()

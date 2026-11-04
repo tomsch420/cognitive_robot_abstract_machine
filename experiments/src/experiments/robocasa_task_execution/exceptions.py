@@ -10,7 +10,7 @@ from semantic_digital_twin.world_description.world_entity import Body
 
 
 @dataclass
-class NoClearStandingPose(DataclassException):
+class NoClearStandingPoseBehindTheStart(DataclassException):
     """
     Raised when the robot collides with the kitchen wherever it stands behind the start
     pose RoboCasa gives.

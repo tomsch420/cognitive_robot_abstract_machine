@@ -69,7 +69,9 @@ from experiments.robocasa_atomic_tasks.skills import (
 )
 from experiments.robocasa_atomic_tasks.robots import TaskRobot
 from experiments.robocasa_atomic_tasks.stands import RobotClearance, StandFinder
-from experiments.robocasa_task_execution.exceptions import NoClearStandingPose
+from experiments.robocasa_task_execution.exceptions import (
+    NoClearStandingPoseBehindTheStart,
+)
 from krrood.entity_query_language.query.match import Match
 from semantic_digital_twin.adapters.multi_sim import MujocoSim
 from semantic_digital_twin.adapters.robocasa_dataset.loader import (
@@ -293,8 +295,8 @@ class RoboCasaEpisode:
         :param task_parameters: Arguments of the RoboCasa task itself, by name.
         :return: The episode, with the robot's arms parked and the robot standing clear
             of the kitchen at or behind RoboCasa's start pose.
-        :raises NoClearStandingPose: If the robot comes too close to the kitchen
-            wherever it stands near the start pose.
+        :raises NoClearStandingPoseBehindTheStart: If the robot comes too close to the
+            kitchen wherever it stands near the start pose.
         """
         loader = RoboCasaDatasetLoader()
         environment = loader.build_task_environment(
@@ -316,9 +318,9 @@ class RoboCasaEpisode:
 
         :param maximum_distance: How far back and to either side of the start pose the
             robot stands at most.
-        :raises NoClearStandingPose: If the robot comes too close to the kitchen
-            wherever it stands up to ``maximum_distance`` behind and beside the start
-            pose.
+        :raises NoClearStandingPoseBehindTheStart: If the robot comes too close to the
+            kitchen wherever it stands up to ``maximum_distance`` behind and beside the
+            start pose.
         """
         world = self.world
         with world.modify_world():
@@ -335,7 +337,7 @@ class RoboCasaEpisode:
         for arm in self.robot.all_arms:
             arm.get_joint_state_by_type(StaticJointState.PARK).apply_to(world)
         if not self.stands.stand_clear_of_the_start(maximum_distance=maximum_distance):
-            raise NoClearStandingPose(
+            raise NoClearStandingPoseBehindTheStart(
                 start_pose=self.task.robot_base_pose, maximum_distance=maximum_distance
             )
 

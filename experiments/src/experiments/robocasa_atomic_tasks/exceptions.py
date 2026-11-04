@@ -128,3 +128,46 @@ class NoPathThroughTheKitchen(DataclassException):
 
     def suggest_correction(self) -> str:
         return "Compose another episode, or let the robot keep less clearance."
+
+
+# %% stored runs
+
+
+@dataclass
+class NoStoredRun(DataclassException):
+    """
+    Raised when a run of a task is to be replayed but none is stored.
+    """
+
+    task: str
+    """
+    The name of the task.
+    """
+
+    def error_message(self) -> str:
+        return f"No run of {self.task} is stored."
+
+    def suggest_correction(self) -> str:
+        return "Run the task with physics and a database to store its run in first."
+
+
+@dataclass
+class DegreesOfFreedomNotInTheWorld(DataclassException):
+    """
+    Raised when a stored run is to be replayed in a world that lacks degrees of freedom
+    the run moved.
+    """
+
+    names: list[str]
+    """
+    The names of the degrees of freedom the world lacks.
+    """
+
+    def error_message(self) -> str:
+        return f"The world has no degrees of freedom named {', '.join(self.names)}."
+
+    def suggest_correction(self) -> str:
+        return (
+            "Compose the episode with the layout, style, seed and robot the run was "
+            "recorded with."
+        )

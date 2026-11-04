@@ -67,7 +67,9 @@ from experiments.robocasa_goals.events import (
 )
 from experiments.robocasa_goals.goals import RoboCasaGoal
 from experiments.robocasa_goals.simulation_mirror import RoboCasaSimulationMirror
-from experiments.robocasa_task_execution.exceptions import NoClearStandingPose
+from experiments.robocasa_task_execution.exceptions import (
+    NoClearStandingPoseBehindTheStart,
+)
 from coraplex.robot_plans.actions.composite.transporting import MoveAndPickUpAction
 from coraplex.robot_plans.actions.core.robot_body import (
     MoveTorsoAction,
@@ -369,7 +371,7 @@ class CounterToSinkEpisode:
 
         :param step: How far the PR2 steps back at a time.
         :param maximum_distance: How far behind the start pose the PR2 stands at most.
-        :raises NoClearStandingPose: If the PR2 collides wherever it stands up to
+        :raises NoClearStandingPoseBehindTheStart: If the PR2 collides wherever it stands up to
             ``maximum_distance`` behind the start pose.
         """
         world = self.task.world
@@ -394,7 +396,7 @@ class CounterToSinkEpisode:
             drive.origin = start_pose @ start_T_standing_pose
             if not self.robot.is_in_collision:
                 return
-        raise NoClearStandingPose(
+        raise NoClearStandingPoseBehindTheStart(
             start_pose=self.task.robot_base_pose, maximum_distance=maximum_distance
         )
 
