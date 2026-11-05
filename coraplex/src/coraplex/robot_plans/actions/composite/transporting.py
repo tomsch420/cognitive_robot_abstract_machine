@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from typing_extensions import Self
+from typing_extensions import Callable, Self
 
 from krrood.entity_query_language.factories import a, flat_variable, variable
 from coraplex.datastructures.enums import ReachFraction
@@ -27,6 +27,7 @@ from krrood.entity_query_language.query.match import Match
 from krrood.parametrization.model_registries import ModelRegistry
 from semantic_digital_twin.robots.robot_parts import Arm
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
+from semantic_digital_twin.grasping.object_relative_grasp import GraspResult
 from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Handle
 from krrood_spatial_math.spatial_types import Pose
@@ -255,7 +256,7 @@ class MoveAndPickUpAction(SequentialAction):
         context: StatechartContext,
         number_of_grasps: int = GraspsByCloseness.number_of_grasps,
         model_registry: ModelRegistry | None = None,
-        require_lifting: bool = False,
+        result_pattern: Callable[[], Match[GraspResult]] | None = None,
     ) -> Match:
         """
         A pick-up of `graspable`, standing wherever it can be reached from and taking it
@@ -269,8 +270,8 @@ class MoveAndPickUpAction(SequentialAction):
             pose are tried from there.
         :param model_registry: Answers where the object may be grasped, see
             :meth:`~semantic_digital_twin.semantic_annotations.mixins.HasGraspCandidates.grasp_candidates`.
-        :param require_lifting: Whether only grasps expected to lift the object are
-            tried.
+        :param result_pattern: Builds the pattern of the result the tried grasps are to
+            have had; any result when ``None``.
         :return: The pick-up, with the standing pose and the grasp left open.
         """
         object_pose = Pose(reference_frame=graspable.root)
@@ -293,7 +294,7 @@ class MoveAndPickUpAction(SequentialAction):
                         standing_position,
                         number_of_grasps,
                         model_registry,
-                        require_lifting,
+                        result_pattern,
                     )
                 ),
                 arm=arm,

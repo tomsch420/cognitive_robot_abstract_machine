@@ -10,8 +10,8 @@ almost always removes that region.
 
 The robot reaches the object from where it stands, so whether it reaches a grasp depends
 on the grasp's direction seen from the robot, not from the object. Models over grasps
-seen from the world are learned over grasps whose azimuth is turned by the object's yaw,
-and a grasp chosen from one is turned back by the yaw of the object it is tried on.
+seen from the world are learned over grasps whose yaw is turned by the object's yaw, and
+a grasp chosen from one is turned back by the yaw of the object it is tried on.
 """
 
 from __future__ import annotations
@@ -31,10 +31,11 @@ from krrood.parametrization.parameterizer import UnderspecifiedParameters
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit,
 )
-from semantic_digital_twin.grasping.surface_grasp import (
-    SurfaceGrasp,
-    draw_surface_grasps,
+from semantic_digital_twin.grasping.object_relative_grasp import (
+    GraspResult,
+    draw_grasps,
 )
+from semantic_digital_twin.grasping.surface_grasp import SurfaceGrasp
 from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
 
 # %% turning grasps between the object's frame and the world's
@@ -44,18 +45,18 @@ def turned(grasp: SurfaceGrasp, yaw: float) -> SurfaceGrasp:
     """
     :param grasp: A grasp.
     :param yaw: The angle to turn it by about the vertical axis, in radians.
-    :return: A copy of the grasp, its azimuth turned by ``yaw`` into ``[0, 2 pi)``.
+    :return: A copy of the grasp, its yaw turned by ``yaw`` into ``[0, 2 pi)``.
     """
     result = copy.copy(grasp)
-    result.azimuth = float(np.mod(grasp.azimuth + yaw, 2 * math.pi))
+    result.yaw = float(np.mod(grasp.yaw + yaw, 2 * math.pi))
     return result
 
 
 @dataclass
 class WorldFrameLearner(GraspModelLearner):
     """
-    Learns a grasp model over grasps seen from the world, the azimuth of each turned by
-    the yaw of the object it was tried on.
+    Learns a grasp model over grasps seen from the world, the yaw of each turned by the
+    yaw of the object it was tried on.
     """
 
     def learn(
@@ -104,7 +105,7 @@ class LiftProbability:
 
     def __post_init__(self):
         parameters = UnderspecifiedParameters(
-            self.part.surface_grasp_statement(require_lifting=True)
+            self.part.grasp_strategy.statement(self.part, GraspResult.lifting_pattern)
         )
         circuit = self.model.model_registry().get_model(parameters)
         grasp_variables = SurfaceGraspVariables(circuit).of_the_grasp
@@ -175,8 +176,8 @@ class GraspSelection:
             object, in the frame the model was learned in, without a result; ``None``
             if the model draws none.
         """
-        drawn = draw_surface_grasps(
-            part.surface_grasp_statement(require_lifting=True),
+        drawn = draw_grasps(
+            part.grasp_strategy.statement(part, GraspResult.lifting_pattern),
             self.candidates if self.minimum_lift_probability > 0 else 1,
             model.model_registry(),
         )

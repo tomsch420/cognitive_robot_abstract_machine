@@ -404,17 +404,17 @@ def test_a_bowl_left_behind_slips_out_of_the_gripper_by_the_whole_lift(part_find
 
     result = experiment.run()
 
-    assert length(result.translational_slip) == pytest.approx(
+    assert length(result.slip.translation) == pytest.approx(
         PhysicalPickUp.lift_height, abs=0.03
     )
-    assert length(result.object_displacement) < 0.03
+    assert length(result.object_displacement.translation) < 0.03
 
 
 @simulates_physics
 def test_a_held_bowl_slips_by_much_less_than_the_lift(part_finder):
     result = PickUpExperiment(scene=PickUpScene(part_finder=part_finder)).run()
 
-    assert length(result.translational_slip) < PhysicalPickUp.lift_height / 4
+    assert length(result.slip.translation) < PhysicalPickUp.lift_height / 4
 
 
 @simulates_physics
@@ -425,9 +425,9 @@ def test_a_held_bowl_turns_in_the_world_as_it_turns_in_the_gripper(part_finder):
     """
     result = PickUpExperiment(scene=PickUpScene(part_finder=part_finder)).run()
 
-    assert float(result.object_displacement.z) > PhysicalPickUp.minimum_rise
-    assert float(result.object_rotation.angle) == pytest.approx(
-        float(result.rotational_slip.angle), abs=0.05
+    assert float(result.object_displacement.translation.z) > PhysicalPickUp.minimum_rise
+    assert length(result.object_displacement.rotation_vector) == pytest.approx(
+        length(result.slip.rotation_vector), abs=0.05
     )
 
 

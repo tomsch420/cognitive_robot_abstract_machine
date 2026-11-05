@@ -237,10 +237,10 @@ class PicksWithLearnedGrasps(TiagoPickPlaceTask):
                 taken = on_the_object.taken
                 logger.info(
                     "taking the %s by a learned grasp of lift probability %.3f:"
-                    " azimuth %.2f, height %.2f, depth %.3f m, pitch %.2f, roll %.2f",
+                    " yaw %.2f, height %.2f, depth %.3f m, pitch %.2f, roll %.2f",
                     self.learned.annotation_type.lower(),
                     on_the_object.lift_probability,
-                    taken.azimuth,
+                    taken.yaw,
                     taken.height,
                     taken.depth,
                     taken.pitch,

@@ -2,10 +2,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from typing_extensions import Callable
+
 import numpy as np
 from numpy.typing import NDArray
 
 from krrood.entity_query_language.predicate import RenderedFields, SymbolicFunction
+from krrood.entity_query_language.query.match import Match
 from krrood.parametrization.model_registries import ModelRegistry
 from krrood.entity_query_language.verbalization.fragments.base import (
     VerbalizationFragment,
@@ -14,6 +17,7 @@ from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech impor
     FunctionVerbalizationTemplates,
 )
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
+from semantic_digital_twin.grasping.object_relative_grasp import GraspResult
 from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
 from krrood_spatial_math.spatial_types import Pose
 
@@ -96,9 +100,11 @@ class GraspsByCloseness(SymbolicFunction):
     annotations.mixins.HasGraspCandidates.grasp_candidates`.
     """
 
-    require_lifting: bool = False
+    result_pattern: Callable[[], Match[GraspResult]] | None = None
     """
-    Whether only grasps expected to lift the object are ranked.
+    Builds the pattern of the result the ranked grasps are to have had, such as :meth:`~
+    semantic_digital_twin.grasping.object_relative_grasp.GraspResult.lifting_pattern`;
+    any result when ``None``.
     """
 
     def __call__(self) -> list[GraspCandidate]:
@@ -108,7 +114,7 @@ class GraspsByCloseness(SymbolicFunction):
         ]
         world_T_object = self.graspable.root.global_transform.to_np()
         grasps_by_closeness = sorted(
-            self.graspable.grasp_candidates(self.model_registry, self.require_lifting),
+            self.graspable.grasp_candidates(self.model_registry, self.result_pattern),
             key=lambda grasp: GraspCloseness.from_grasp(
                 grasp, world_T_object, world_P_standing
             ),

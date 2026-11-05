@@ -34,6 +34,7 @@ from krrood.parametrization.model_registries import (
     UniformPriorRegistry,
 )
 from semantic_digital_twin.grasping.grasp_trials import GraspTrials
+from semantic_digital_twin.grasping.object_relative_grasp import GraspResult
 
 # %% the pipeline
 
@@ -150,7 +151,11 @@ class GraspLearningPipeline:
             performer=performer,
             number_of_trials=number_of_attempts,
             model_registry=model_registry,
-            require_lifting=source == GraspSource.LEARNED_MODEL,
+            result_pattern=(
+                GraspResult.lifting_pattern
+                if source == GraspSource.LEARNED_MODEL
+                else None
+            ),
         )
         task = self.task
         attempts = []

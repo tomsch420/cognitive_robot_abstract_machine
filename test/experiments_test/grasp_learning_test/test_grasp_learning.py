@@ -33,15 +33,14 @@ from experiments.physical_pick_up.scene import PickUpScene
 from semantic_digital_twin.part_finding.annotation_part_finder import (
     AnnotationPartFinder,
 )
-from krrood_spatial_math.spatial_types import Vector3
-from krrood_spatial_math.spatial_types import AxisAngle
+from krrood_spatial_math.spatial_types import Twist, Vector3
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Handle,
     Mug,
 )
-from semantic_digital_twin.grasping.surface_grasp import (
+from semantic_digital_twin.grasping.object_relative_grasp import (
     GraspResult,
-    draw_surface_grasps,
+    draw_grasps,
 )
 
 simulates_physics = pytest.mark.skipif(
@@ -83,18 +82,21 @@ def synthetic_attempts(scene: PickUpScene, number: int) -> List[GraspAttempt]:
         lift it exactly when they lie above :data:`LIFTING_HEIGHT`.
     """
     task = task_of(scene)
-    grasps = draw_surface_grasps(
-        scene.graspable.grasped_part().surface_grasp_statement(), number
+    grasps = draw_grasps(
+        scene.graspable.grasped_part().grasp_strategy.statement(
+            scene.graspable.grasped_part()
+        ),
+        number,
     )
     for grasp in grasps:
         raised = grasp.height > LIFTING_HEIGHT
         grasp.result = GraspResult(
             object_raised=raised,
             motion_completed=True,
-            object_displacement=Vector3(0.0, 0.0, 0.2 if raised else 0.0),
-            object_rotation=AxisAngle(),
-            translational_slip=Vector3(0.0, 0.0, 0.0 if raised else -0.2),
-            rotational_slip=AxisAngle(),
+            object_displacement=Twist(
+                translation=Vector3(0.0, 0.0, 0.2 if raised else 0.0)
+            ),
+            slip=Twist(translation=Vector3(0.0, 0.0, 0.0 if raised else -0.2)),
         )
     return [
         GraspAttempt(
@@ -148,21 +150,17 @@ def test_stored_attempts_are_read_back_by_task(milk_scene, database):
 
 def result_values(result: GraspResult) -> List[float]:
     """
-    :return: Every value of ``result``, the components of its vectors and rotations
-        one by one, since they compare symbolically.
+    :return: Every value of ``result``, the components of its twists one by one, since
+        they compare symbolically.
     """
-    vectors = (
-        result.object_displacement,
-        result.object_rotation.axis,
-        result.translational_slip,
-        result.rotational_slip.axis,
-    )
     return [
         float(result.object_raised),
         float(result.motion_completed),
-        float(result.object_rotation.angle),
-        float(result.rotational_slip.angle),
-        *(float(value) for vector in vectors for value in vector.to_np()[:3]),
+        *(
+            float(value)
+            for twist in (result.object_displacement, result.slip)
+            for value in twist.to_np()
+        ),
     ]
 
 
@@ -177,8 +175,10 @@ def test_a_learned_model_asks_for_lifting_grasps_after_storage(milk_scene, datab
     )
 
     [model] = database.model_library().models
-    grasps = draw_surface_grasps(
-        milk_scene.graspable.surface_grasp_statement(require_lifting=True),
+    grasps = draw_grasps(
+        milk_scene.graspable.grasp_strategy.statement(
+            milk_scene.graspable, GraspResult.lifting_pattern
+        ),
         30,
         model.model_registry(),
     )

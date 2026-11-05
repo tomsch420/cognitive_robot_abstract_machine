@@ -46,6 +46,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
 )
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, Arm
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
+from semantic_digital_twin.grasping.object_relative_grasp import GraspResult
 from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from krrood_spatial_math.spatial_types import Point3, Pose, RotationMatrix
@@ -596,9 +597,9 @@ class GraspedOnlyWhereAModelExpectsLifting(Milk):
     def grasp_candidates(
         self,
         model_registry: ModelRegistry | None = None,
-        require_lifting: bool = False,
+        result_pattern: Callable[[], Match[GraspResult]] | None = None,
     ) -> list[GraspCandidate]:
-        if model_registry is None or not require_lifting:
+        if model_registry is None or result_pattern is None:
             return []
         return self.default_grasp_candidates()[-1:]
 
@@ -616,7 +617,7 @@ def test_a_pick_up_of_a_graspable_tries_the_grasps_a_model_expects_to_lift_it(
         robot.right_arm,
         context_of(extensions),
         model_registry=model_registry,
-        require_lifting=True,
+        result_pattern=GraspResult.lifting_pattern,
     )
 
     [pick_up] = itertools.islice(
@@ -625,7 +626,9 @@ def test_a_pick_up_of_a_graspable_tries_the_grasps_a_model_expects_to_lift_it(
 
     assert [_grasp_signature(pick_up.pick_up.grasp)] == [
         _grasp_signature(grasp)
-        for grasp in carton.grasp_candidates(model_registry, require_lifting=True)
+        for grasp in carton.grasp_candidates(
+            model_registry, GraspResult.lifting_pattern
+        )
     ]
 
 

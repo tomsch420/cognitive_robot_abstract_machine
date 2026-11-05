@@ -520,7 +520,7 @@ class PickUpObject(Enum):
         semantic_annotation_type=Bowl,
         mass=0.25,
         default_grasp=SurfaceGrasp(
-            azimuth=math.pi, height=0.75, depth=0.002, pitch=0.0, roll=0.0
+            yaw=math.pi, height=0.75, depth=0.002, pitch=0.0, roll=0.0
         ),
         convex_decomposition=hollow_object_decomposition(),
     )
@@ -534,7 +534,7 @@ class PickUpObject(Enum):
         semantic_annotation_type=Bowl,
         mass=0.35,
         default_grasp=SurfaceGrasp(
-            azimuth=math.pi, height=0.9, depth=0.0015, pitch=0.5, roll=0.0
+            yaw=math.pi, height=0.9, depth=0.0015, pitch=0.5, roll=0.0
         ),
         meters_per_mesh_unit=0.001,
         convex_decomposition=hollow_object_decomposition(),
@@ -552,7 +552,7 @@ class PickUpObject(Enum):
         semantic_annotation_type=Cup,
         mass=0.15,
         default_grasp=SurfaceGrasp(
-            azimuth=math.pi, height=0.92, depth=0.0015, pitch=0.0, roll=0.0
+            yaw=math.pi, height=0.92, depth=0.0015, pitch=0.0, roll=0.0
         ),
         convex_decomposition=hollow_object_decomposition(),
     )
@@ -566,7 +566,7 @@ class PickUpObject(Enum):
         semantic_annotation_type=Milk,
         mass=0.5,
         default_grasp=SurfaceGrasp(
-            azimuth=math.pi, height=0.7, depth=0.032, pitch=0.0, roll=0.0
+            yaw=math.pi, height=0.7, depth=0.032, pitch=0.0, roll=0.0
         ),
     )
     """
@@ -579,7 +579,7 @@ class PickUpObject(Enum):
         semantic_annotation_type=Cereal,
         mass=0.4,
         default_grasp=SurfaceGrasp(
-            azimuth=math.pi, height=0.8, depth=0.073, pitch=0.0, roll=math.pi / 2
+            yaw=math.pi, height=0.8, depth=0.073, pitch=0.0, roll=math.pi / 2
         ),
     )
     """
@@ -593,7 +593,7 @@ class PickUpObject(Enum):
         semantic_annotation_type=Bottle,
         mass=0.5,
         default_grasp=SurfaceGrasp(
-            azimuth=math.pi, height=0.85, depth=0.02, pitch=0.0, roll=0.0
+            yaw=math.pi, height=0.85, depth=0.02, pitch=0.0, roll=0.0
         ),
     )
     """
@@ -607,7 +607,7 @@ class PickUpObject(Enum):
         semantic_annotation_type=Spoon,
         mass=0.04,
         default_grasp=SurfaceGrasp(
-            azimuth=math.pi, height=0.3, depth=0.11, pitch=0.0, roll=math.pi / 2
+            yaw=math.pi, height=0.3, depth=0.11, pitch=0.0, roll=math.pi / 2
         ),
         convex_decomposition=hollow_object_decomposition(),
     )
@@ -622,7 +622,7 @@ class PickUpObject(Enum):
         semantic_annotation_type=Whisk,
         mass=0.1,
         default_grasp=SurfaceGrasp(
-            azimuth=math.pi, height=0.45, depth=0.16, pitch=0.0, roll=math.pi / 2
+            yaw=math.pi, height=0.45, depth=0.16, pitch=0.0, roll=math.pi / 2
         ),
         convex_decomposition=hollow_object_decomposition(),
     )
@@ -637,7 +637,7 @@ class PickUpObject(Enum):
         semantic_annotation_type=CuttingKnife,
         mass=0.2,
         default_grasp=SurfaceGrasp(
-            azimuth=math.pi, height=0.5, depth=0.13, pitch=0.0, roll=math.pi / 2
+            yaw=math.pi, height=0.5, depth=0.13, pitch=0.0, roll=math.pi / 2
         ),
         resting_orientation=FixedRestingOrientation(roll=math.pi / 2),
         convex_decomposition=hollow_object_decomposition(),
@@ -656,7 +656,7 @@ class PickUpObject(Enum):
         semantic_annotation_type=CheezeIt,
         mass=0.411,
         default_grasp=SurfaceGrasp(
-            azimuth=math.pi, height=0.85, depth=0.036, pitch=0.0, roll=0.0
+            yaw=math.pi, height=0.85, depth=0.036, pitch=0.0, roll=0.0
         ),
         meters_per_mesh_unit=0.001,
     )
@@ -671,7 +671,7 @@ class PickUpObject(Enum):
         semantic_annotation_type=Bowl,
         mass=0.147,
         default_grasp=SurfaceGrasp(
-            azimuth=math.pi, height=0.9, depth=0.0007, pitch=0.5, roll=0.0
+            yaw=math.pi, height=0.9, depth=0.0007, pitch=0.5, roll=0.0
         ),
         meters_per_mesh_unit=0.001,
         convex_decomposition=hollow_object_decomposition(),
@@ -686,7 +686,7 @@ class PickUpObject(Enum):
         semantic_annotation_type=Mug,
         mass=0.118,
         default_grasp=SurfaceGrasp(
-            azimuth=math.pi, height=0.92, depth=0.0007, pitch=0.0, roll=0.0
+            yaw=math.pi, height=0.92, depth=0.0007, pitch=0.0, roll=0.0
         ),
         meters_per_mesh_unit=0.001,
         convex_decomposition=hollow_object_decomposition(),
@@ -702,7 +702,7 @@ class PickUpObject(Enum):
         semantic_annotation_type=Spoon,
         mass=0.04,
         default_grasp=SurfaceGrasp(
-            azimuth=math.pi, height=0.95, depth=0.08, pitch=0.6, roll=math.pi / 2
+            yaw=math.pi, height=0.95, depth=0.08, pitch=0.6, roll=math.pi / 2
         ),
         resting_orientation=HandleTowardsRobot(),
     )
@@ -716,7 +716,7 @@ class PickUpObject(Enum):
         semantic_annotation_type=Knife,
         mass=0.08,
         default_grasp=SurfaceGrasp(
-            azimuth=math.pi, height=0.5, depth=0.08, pitch=0.0, roll=math.pi / 2
+            yaw=math.pi, height=0.5, depth=0.08, pitch=0.0, roll=math.pi / 2
         ),
         resting_orientation=HandleTowardsRobot(),
     )
@@ -730,7 +730,7 @@ class PickUpObject(Enum):
         semantic_annotation_type=Cookware,
         mass=0.05,
         default_grasp=SurfaceGrasp(
-            azimuth=math.pi, height=0.71, depth=0.2, pitch=0.0, roll=math.pi / 2
+            yaw=math.pi, height=0.71, depth=0.2, pitch=0.0, roll=math.pi / 2
         ),
         resting_orientation=HandleTowardsRobot(),
     )
@@ -744,7 +744,7 @@ class PickUpObject(Enum):
         semantic_annotation_type=Cookware,
         mass=0.05,
         default_grasp=SurfaceGrasp(
-            azimuth=math.pi, height=0.4, depth=0.12, pitch=0.0, roll=math.pi / 2
+            yaw=math.pi, height=0.4, depth=0.12, pitch=0.0, roll=math.pi / 2
         ),
         resting_orientation=HandleTowardsRobot(),
     )
@@ -758,7 +758,7 @@ class PickUpObject(Enum):
         semantic_annotation_type=Cookware,
         mass=0.1,
         default_grasp=SurfaceGrasp(
-            azimuth=math.pi, height=0.27, depth=0.13, pitch=0.0, roll=math.pi / 2
+            yaw=math.pi, height=0.27, depth=0.13, pitch=0.0, roll=math.pi / 2
         ),
         resting_orientation=HandleTowardsRobot(),
     )
@@ -772,7 +772,7 @@ class PickUpObject(Enum):
         semantic_annotation_type=Mug,
         mass=0.3,
         default_grasp=SurfaceGrasp(
-            azimuth=math.pi / 2, height=0.9, depth=0.005, pitch=0.0, roll=0.0
+            yaw=math.pi / 2, height=0.9, depth=0.005, pitch=0.0, roll=0.0
         ),
     )
     """
@@ -786,7 +786,7 @@ class PickUpObject(Enum):
         semantic_annotation_type=Cup,
         mass=0.15,
         default_grasp=SurfaceGrasp(
-            azimuth=math.pi, height=0.9, depth=0.001, pitch=0.0, roll=0.0
+            yaw=math.pi, height=0.9, depth=0.001, pitch=0.0, roll=0.0
         ),
     )
     """
@@ -799,7 +799,7 @@ class PickUpObject(Enum):
         semantic_annotation_type=Container,
         mass=0.35,
         default_grasp=SurfaceGrasp(
-            azimuth=math.pi, height=0.8, depth=0.034, pitch=0.0, roll=0.0
+            yaw=math.pi, height=0.8, depth=0.034, pitch=0.0, roll=0.0
         ),
     )
     """
@@ -812,7 +812,7 @@ class PickUpObject(Enum):
         semantic_annotation_type=Bottle,
         mass=0.3,
         default_grasp=SurfaceGrasp(
-            azimuth=math.pi, height=0.8, depth=0.015, pitch=0.0, roll=0.0
+            yaw=math.pi, height=0.8, depth=0.015, pitch=0.0, roll=0.0
         ),
     )
     """
@@ -825,7 +825,7 @@ class PickUpObject(Enum):
         semantic_annotation_type=Container,
         mass=0.4,
         default_grasp=SurfaceGrasp(
-            azimuth=math.pi, height=0.92, depth=0.014, pitch=0.0, roll=0.0
+            yaw=math.pi, height=0.92, depth=0.014, pitch=0.0, roll=0.0
         ),
     )
     """

@@ -67,27 +67,28 @@ def milk_circuit(milk_scene):
     model = GraspModelLearner().learn(
         task_of(milk_scene), synthetic_attempts(milk_scene, 200)
     )
-    statement = milk_scene.graspable.grasped_part().surface_grasp_statement()
+    part = milk_scene.graspable.grasped_part()
+    statement = part.grasp_strategy.statement(part)
     return model.model_registry().get_model(UnderspecifiedParameters(statement))
 
 
 # %% grasps as points
 
 
-def test_a_turned_grasp_keeps_its_azimuth_within_a_full_turn(milk_scene):
+def test_a_turned_grasp_keeps_its_yaw_within_a_full_turn(milk_scene):
     [grasp] = synthetic_attempts(milk_scene, 1)
     grasp = grasp.grasp
 
     result = turned(grasp, 2 * math.pi + 0.5)
 
-    assert result.azimuth == pytest.approx(math.fmod(grasp.azimuth + 0.5, 2 * math.pi))
+    assert result.yaw == pytest.approx(math.fmod(grasp.yaw + 0.5, 2 * math.pi))
     assert result is not grasp
 
 
-def test_grasps_from_either_side_of_zero_azimuth_lie_close(milk_scene):
+def test_grasps_from_either_side_of_zero_yaw_lie_close(milk_scene):
     [attempt] = synthetic_attempts(milk_scene, 1)
-    near_zero = turned(attempt.grasp, -attempt.grasp.azimuth + 0.01)
-    near_full_turn = turned(attempt.grasp, -attempt.grasp.azimuth - 0.01)
+    near_zero = turned(attempt.grasp, -attempt.grasp.yaw + 0.01)
+    near_full_turn = turned(attempt.grasp, -attempt.grasp.yaw - 0.01)
 
     distance = np.linalg.norm(
         np.subtract(grasp_features(near_zero), grasp_features(near_full_turn))

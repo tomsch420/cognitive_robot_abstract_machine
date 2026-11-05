@@ -64,10 +64,11 @@ from krrood.parametrization.parameterizer import UnderspecifiedParameters
 from semantic_digital_twin.adapters.robocasa_dataset.loader import (
     RoboCasaDatasetLoader,
 )
-from semantic_digital_twin.grasping.surface_grasp import (
-    SurfaceGrasp,
-    draw_surface_grasps,
+from semantic_digital_twin.grasping.object_relative_grasp import (
+    GraspResult,
+    draw_grasps,
 )
+from semantic_digital_twin.grasping.surface_grasp import SurfaceGrasp
 from semantic_digital_twin.part_finding.annotation_part_finder import (
     AnnotationPartFinder,
 )
@@ -131,12 +132,12 @@ class IterationObject:
 def grasp_features(grasp: SurfaceGrasp) -> List[float]:
     """
     :param grasp: A surface grasp.
-    :return: The grasp as a point, its azimuth on the unit circle so that grasps from
+    :return: The grasp as a point, its yaw on the unit circle so that grasps from
         either side of zero lie close.
     """
     return [
-        math.cos(grasp.azimuth),
-        math.sin(grasp.azimuth),
+        math.cos(grasp.yaw),
+        math.sin(grasp.yaw),
         grasp.height,
         grasp.depth,
         grasp.pitch,
@@ -170,7 +171,7 @@ class PreparedModel:
         statement allows them.
         """
         parameters = UnderspecifiedParameters(
-            self.part.surface_grasp_statement(require_lifting=True)
+            self.part.grasp_strategy.statement(self.part, GraspResult.lifting_pattern)
         )
         model = self.model.model_registry().get_model(parameters)
         return parameters.resolve_conditioned_and_truncated_model(model) is not None
@@ -227,8 +228,10 @@ class DrawnFromModel(GraspChoice):
     ) -> Optional[SurfaceGrasp]:
         if not prepared.answers:
             return None
-        [drawn] = draw_surface_grasps(
-            prepared.part.surface_grasp_statement(require_lifting=True),
+        [drawn] = draw_grasps(
+            prepared.part.grasp_strategy.statement(
+                prepared.part, GraspResult.lifting_pattern
+            ),
             1,
             prepared.model.model_registry(),
         )
@@ -500,7 +503,7 @@ class IterationWorker:
             regions, otherwise the one the policy chooses; ``None`` if it has none.
         """
         if batch.model is None:
-            [drawn] = draw_surface_grasps(part.surface_grasp_statement(), 1)
+            [drawn] = draw_grasps(part.grasp_strategy.statement(part), 1)
             return drawn
         prepared = self.prepared(batch.model, part, batch.iteration_object.name)
         return batch.choice.grasp(prepared, placement, generator)
@@ -762,8 +765,8 @@ class PolicyUnchanged(StoppingRule):
 
     def observe(self, state: RoundState) -> Dict[str, Any]:
         part = state.densities.parts[state.main_object]
-        grasps = draw_surface_grasps(
-            part.surface_grasp_statement(require_lifting=True),
+        grasps = draw_grasps(
+            part.grasp_strategy.statement(part, GraspResult.lifting_pattern),
             self.policy_samples,
             state.model.model_registry(),
         )

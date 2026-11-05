@@ -24,6 +24,7 @@ from probabilistic_model.probabilistic_circuit.relational.relational_probabilist
     RelationalProbabilisticCircuit,
 )
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
+from semantic_digital_twin.grasping.object_relative_grasp import GraspResult
 from semantic_digital_twin.grasping.surface_grasp import SurfaceGrasp
 from semantic_digital_twin.robots.robot_parts import EndEffector
 from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
@@ -151,4 +152,6 @@ class GraspModelLibrary:
         model = self.model_for(graspable, gripper)
         if model is None:
             return graspable.grasp_candidates()
-        return graspable.grasp_candidates(model.model_registry(), require_lifting=True)
+        return graspable.grasp_candidates(
+            model.model_registry(), GraspResult.lifting_pattern
+        )

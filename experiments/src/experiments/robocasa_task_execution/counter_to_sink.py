@@ -92,6 +92,7 @@ from semantic_digital_twin.datastructures.definitions import (
     StaticJointState,
     TorsoState,
 )
+from semantic_digital_twin.grasping.object_relative_grasp import GraspResult
 from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
 from semantic_digital_twin.reasoning.robot_predicates import is_body_gripped
 from semantic_digital_twin.robots.pr2 import PR2
@@ -500,7 +501,9 @@ class CounterToSinkEpisode:
             model_registry=(
                 None if grasp_model is None else grasp_model.model_registry()
             ),
-            require_lifting=grasp_model is not None,
+            result_pattern=(
+                None if grasp_model is None else GraspResult.lifting_pattern
+            ),
         )
         return sequential(
             [

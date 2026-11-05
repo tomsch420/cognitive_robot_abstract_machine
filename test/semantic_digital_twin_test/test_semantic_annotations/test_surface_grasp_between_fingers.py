@@ -51,7 +51,7 @@ def from_above_along_x(depth: float, roll: float = 0.0) -> SurfaceGrasp:
     :return: A grasp coming down from straight above onto the carton's face that looks
         along its x-axis.
     """
-    return SurfaceGrasp(azimuth=0.0, height=0.5, depth=depth, pitch=0.0, roll=roll)
+    return SurfaceGrasp(yaw=0.0, height=0.5, depth=depth, pitch=0.0, roll=roll)
 
 
 # %% fingers closing along the line of sight

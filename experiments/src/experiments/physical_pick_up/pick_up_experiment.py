@@ -23,7 +23,7 @@ from experiments.physical_pick_up.pick_up import (
 )
 from experiments.physical_pick_up.robots import ObjectPlacement
 from experiments.physical_pick_up.scene import PickUpScene, PickUpSceneChoice
-from semantic_digital_twin.grasping.surface_grasp import GraspResult
+from semantic_digital_twin.grasping.object_relative_grasp import GraspResult
 from giskardpy.executor import SteppedSimulationPacer
 from semantic_digital_twin.adapters.multi_sim import MujocoCamera, MujocoSim
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
