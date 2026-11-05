@@ -1,6 +1,7 @@
 """
-Replay the run of one of RoboCasa's atomic tasks stored last, in an episode composed
-anew in the kitchen it was performed in, as fast as it passed in the simulation.
+Replay the run of one of RoboCasa's atomic tasks stored last, with the plans the robot
+performed, in an episode composed anew in the kitchen it was performed in, as fast as it
+passed in the simulation.
 
 Run under cramera to watch it::
 
@@ -36,4 +37,4 @@ episode = tasks[run.task](
 # a viewer that shows the worlds plans run in, as cramera-live does, starts showing
 # this one once a plan executor is created for it
 episode.create_executor()
-TaskRunReplay(world=episode.world, run=run).play(arguments.speed)
+TaskRunReplay(world=episode.world, run=run, robot=episode.robot).play(arguments.speed)

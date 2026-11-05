@@ -37,6 +37,7 @@ from coraplex.robot_plans.plan_transformations import (
 )
 from cramph.composites import Sequence as SequenceOfSteps
 from cramph.context import StatechartContext
+from cramph.executor import ExecutorExtension
 from cramph.node import StatechartNode
 from cramph.statechart import Statechart
 from experiments.robocasa_atomic_tasks.exceptions import (
@@ -167,6 +168,13 @@ class RoboCasaEpisode:
     """
     Whether the robot avoids colliding with the kitchen and with itself while moving, as
     :meth:`executed` sets it.
+    """
+
+    executor_extensions: list[ExecutorExtension] = field(
+        default_factory=list, init=False, repr=False
+    )
+    """
+    Added to every executor of a plan of the robot, such as one recording the plans.
     """
 
     bounds: BodyBounds = field(init=False, repr=False)
@@ -347,7 +355,8 @@ class RoboCasaEpisode:
         """
         :param sampling_seed: The seed the stands are sampled with.
         :return: A new executor of a plan of the robot in the episode's world, simulating
-            it physically while :attr:`simulation` runs and kinematically otherwise. In
+            it physically while :attr:`simulation` runs and kinematically otherwise, with
+            :attr:`executor_extensions`. In
             physics the bodies are carried by the grip of the fingers alone, the hand
             moves in straight lines around what it holds or lets go of, and only what
             the robot does to the kitchen's joints moves them.
@@ -361,12 +370,15 @@ class RoboCasaEpisode:
         )
         if not self.physically_simulated:
             return KinematicallySimulatedPlanExecutor(
-                context, collision_avoidance=self.collision_avoidance
+                context,
+                collision_avoidance=self.collision_avoidance,
+                extensions=list(self.executor_extensions),
             )
         return PhysicallySimulatedPlanExecutor(
             context,
             simulation=self.simulation,
             collision_avoidance=self.collision_avoidance,
+            extensions=list(self.executor_extensions),
             plan_adaptations=[LetContactCarryTheBodies(), MoveStraightAroundObjects()],
             leaves_the_environment_to_the_physics=True,
         )

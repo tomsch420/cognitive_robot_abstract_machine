@@ -21,6 +21,7 @@ from experiments.robocasa_atomic_tasks.recording import RobotViewVideo
 from experiments.robocasa_atomic_tasks.robots import RobotModel
 from experiments.robocasa_atomic_tasks.robocasa_names import RoboCasaObjectName
 from experiments.robocasa_atomic_tasks.stored_runs import (
+    PlanRecorder,
     SimulatedMomentRecorder,
     StoredTaskRun,
 )
@@ -90,8 +91,8 @@ class RoboCasaAtomicTask(ABC):
 
     records_the_run: bool = False
     """
-    Whether the world's state is recorded as the physical simulation moves it, into
-    :attr:`recorded_run`.
+    Whether the world's state and the plans the robot performs are recorded as the
+    physical simulation moves them, into :attr:`recorded_run`.
     """
 
     recorded_run: StoredTaskRun | None = field(default=None, init=False, repr=False)
@@ -161,6 +162,8 @@ class RoboCasaAtomicTask(ABC):
                     recorder = SimulatedMomentRecorder(
                         _world=episode.world, simulation=episode.simulation
                     )
+                    plan_recorder = PlanRecorder(simulation=episode.simulation)
+                    episode.executor_extensions.append(plan_recorder)
                 self.solve(episode)
                 episode.let_physics_run()
                 if recorder is not None:
@@ -172,6 +175,7 @@ class RoboCasaAtomicTask(ABC):
                         robot=self.robot,
                         degree_of_freedom_names=recorder.degree_of_freedom_names,
                         moments=recorder.finish(),
+                        plans=plan_recorder.plans,
                     )
             if video is not None:
                 video.stop()

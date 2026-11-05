@@ -1,20 +1,28 @@
 """
-Recording the world's state as a physical simulation moves it, storing the run and
-replaying it in another world.
+Recording the world's state and the plans as a physical simulation moves them, storing
+the run and replaying it in another world.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import pytest
 
+from coraplex.plans.executors import KinematicallySimulatedPlanExecutor, PlanExecutor
+from cramph.composites import Sequence
+from cramph.context import StatechartContext
+from cramph.executor import StatechartExecutor, TickingExecutorExtension
+from cramph.monitors import CountTicks
+from cramph.statechart import Statechart
 from experiments.robocasa_atomic_tasks.exceptions import (
     DegreesOfFreedomNotInTheWorld,
     NoStoredRun,
 )
 from experiments.robocasa_atomic_tasks.robots import RobotModel
 from experiments.robocasa_atomic_tasks.stored_runs import (
+    PlanRecorder,
+    RecordedPlan,
     SimulatedMoment,
     SimulatedMomentRecorder,
     StoredTaskRun,
@@ -117,7 +125,103 @@ def recorded_lever_positions(
     ]
 
 
+# %% a plan performed in the world
+
+
+TICK_DURATION = 0.1
+"""
+How much simulated time passes with every tick of :func:`recorded_plan`, in seconds.
+"""
+
+
+@dataclass
+class ExtensionNotingWhatItIsShown(TickingExecutorExtension):
+    """
+    An executor extension that notes the plan it was shown, every state it was shown
+    after a tick and how often a run stopped.
+    """
+
+    plan_node_names: list[str] = field(default_factory=list)
+    """
+    The names of the top-level nodes of the plan compiled.
+    """
+
+    life_cycle_values: list[list[float]] = field(default_factory=list)
+    """
+    The life cycle value of every node after each tick.
+    """
+
+    stopped_runs: int = 0
+    """
+    How often a run stopped.
+    """
+
+    def after_compile(self, executor: PlanExecutor) -> None:
+        self.plan_node_names = [str(node.name) for node in executor.plan_nodes]
+
+    def after_tick(self, executor: StatechartExecutor) -> None:
+        self.life_cycle_values.append(
+            executor.statechart.life_cycle_state.data.tolist()
+        )
+
+    def after_run(self, executor: PlanExecutor) -> None:
+        self.stopped_runs += 1
+
+
+@pytest.fixture
+def recorded_plan(world_with_a_lever) -> RecordedPlan:
+    """
+    :return: A plan of two steps counting ticks, performed while the simulated time
+        advanced by :data:`TICK_DURATION` before every tick.
+    """
+    simulated_time = AdvancingSimulatedTime()
+    recorder = PlanRecorder(simulation=simulated_time)
+    executor = KinematicallySimulatedPlanExecutor(
+        StatechartContext(world=world_with_a_lever.world), extensions=[recorder]
+    )
+    statechart = Statechart(context=executor.context)
+    statechart.add_node(
+        Sequence(
+            name="count ticks twice",
+            nodes=[
+                CountTicks(name="count two ticks", ticks=2),
+                CountTicks(name="count three ticks", ticks=3),
+            ],
+        )
+    )
+    executor.compile(statechart)
+    while not statechart.is_ended():
+        simulated_time.current_simulation_time += TICK_DURATION
+        executor.tick()
+    executor.finish_run()
+    return recorder.plans[0]
+
+
 # %% recording
+
+
+def test_a_recorded_plan_holds_the_simulated_time_of_every_change_of_its_state(
+    recorded_plan,
+):
+    assert recorded_plan.state_change_times == pytest.approx(
+        [
+            item.tick_count * TICK_DURATION
+            for item in recorded_plan.statechart.state_history.items
+        ]
+    )
+
+
+def test_a_recorded_plan_names_its_top_level_nodes_without_what_the_executor_added(
+    recorded_plan,
+):
+    statechart = recorded_plan.statechart
+    plan_nodes = [
+        statechart.get_node_by_index(index) for index in recorded_plan.plan_node_indices
+    ]
+
+    assert plan_nodes == [
+        node for node in statechart.top_level_nodes if node.name == "count ticks twice"
+    ]
 
 
 def test_a_state_left_at_the_same_simulated_time_is_not_kept(world_with_a_lever):
@@ -190,6 +294,29 @@ def test_the_run_of_a_task_stored_last_is_read_back(database, world_with_a_lever
     assert database.latest_run_of("AdjustWaterTemperature") == later
 
 
+def test_the_plans_of_a_run_are_read_back(database, world_with_a_lever, recorded_plan):
+    run = run_of_the_lever(world_with_a_lever, "AdjustWaterTemperature")
+    run.plans = [recorded_plan]
+    database.add(run)
+
+    read_back = database.latest_run_of("AdjustWaterTemperature").plans
+
+    assert [
+        (
+            [(type(node), node.name) for node in plan.statechart.nodes],
+            plan.plan_node_indices,
+            plan.state_change_times,
+        )
+        for plan in read_back
+    ] == [
+        (
+            [(type(node), node.name) for node in recorded_plan.statechart.nodes],
+            recorded_plan.plan_node_indices,
+            recorded_plan.state_change_times,
+        )
+    ]
+
+
 def test_reading_the_run_of_a_task_never_stored_raises(database):
     with pytest.raises(NoStoredRun):
         database.latest_run_of("AdjustWaterTemperature")
@@ -215,3 +342,62 @@ def test_replaying_in_a_world_without_a_degree_of_freedom_of_the_run_raises(
 
     with pytest.raises(DegreesOfFreedomNotInTheWorld):
         TaskRunReplay(world=world_with_a_lever.world, run=run).play()
+
+
+def run_with_the_recorded_plan(
+    lever: WorldWithALever, plan: RecordedPlan
+) -> StoredTaskRun:
+    """
+    :param lever: The world the run moved.
+    :param plan: The plan the robot performed in the run.
+    :return: :func:`run_of_the_lever` with `plan`.
+    """
+    run = run_of_the_lever(lever, "AdjustWaterTemperature")
+    run.plans = [plan]
+    return run
+
+
+def test_a_replayed_plan_is_shown_with_its_top_level_nodes(
+    world_with_a_lever, recorded_plan
+):
+    shown = ExtensionNotingWhatItIsShown()
+
+    TaskRunReplay(
+        world=world_with_a_lever.world,
+        run=run_with_the_recorded_plan(world_with_a_lever, recorded_plan),
+        executor_extensions=[shown],
+    ).play(speed=1000.0)
+
+    assert shown.plan_node_names == ["count ticks twice"]
+
+
+def test_a_replayed_plan_goes_through_every_state_it_was_recorded_in(
+    world_with_a_lever, recorded_plan
+):
+    recorded_life_cycle_values = [
+        item.life_cycle_state.covering_every_node().data.tolist()
+        for item in recorded_plan.statechart.state_history.items
+    ]
+    shown = ExtensionNotingWhatItIsShown()
+
+    TaskRunReplay(
+        world=world_with_a_lever.world,
+        run=run_with_the_recorded_plan(world_with_a_lever, recorded_plan),
+        executor_extensions=[shown],
+    ).play(speed=1000.0)
+
+    assert shown.life_cycle_values == recorded_life_cycle_values
+
+
+def test_the_run_of_a_replayed_plan_stops_once_after_its_last_state(
+    world_with_a_lever, recorded_plan
+):
+    shown = ExtensionNotingWhatItIsShown()
+
+    TaskRunReplay(
+        world=world_with_a_lever.world,
+        run=run_with_the_recorded_plan(world_with_a_lever, recorded_plan),
+        executor_extensions=[shown],
+    ).play(speed=1000.0)
+
+    assert shown.stopped_runs == 1
