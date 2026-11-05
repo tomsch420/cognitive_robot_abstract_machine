@@ -23,6 +23,7 @@ from cramph.statechart import Statechart
 from experiments.robocasa_atomic_tasks.exceptions import (
     DegreesOfFreedomNotInTheWorld,
 )
+from experiments.robocasa_atomic_tasks.judge import Judgement
 from experiments.robocasa_atomic_tasks.robots import RobotModel
 from semantic_digital_twin.adapters.multi_sim import MujocoSim
 from semantic_digital_twin.adapters.robocasa_dataset.mujoco_compat import (
@@ -123,6 +124,11 @@ class StoredTaskRun:
     moments: list[SimulatedMoment]
     """
     The moments of the run, in the order they passed.
+    """
+
+    judgement: Judgement
+    """
+    RoboCasa's verdict on the world as the run left it.
     """
 
     plans: list[RecordedPlan] = field(default_factory=list)

@@ -9,6 +9,7 @@ import logging
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 
+import mujoco
 import numpy as np
 from typing_extensions import TYPE_CHECKING, Any, Iterator
 
@@ -25,6 +26,82 @@ if TYPE_CHECKING:
     from robocasa.environments.kitchen.kitchen import Kitchen
 
 logger = logging.getLogger(__name__)
+
+# %% what RoboCasa judged
+
+
+@dataclass
+class JudgedObject:
+    """
+    One of the task's objects as RoboCasa's simulation held it when it judged the
+    episode.
+    """
+
+    name: str
+    """
+    The name RoboCasa's task gives the object.
+    """
+
+    position: list[float]
+    """
+    The position of the object's root body in the world frame, in meters.
+    """
+
+    distance_to_gripper: float
+    """
+    How far the object's root body stood from the end effector site of RoboCasa's
+    gripper, in meters.
+    """
+
+    touched_bodies: list[str]
+    """
+    The names of the bodies RoboCasa's simulation had the object's root body touch,
+    sorted.
+    """
+
+
+@dataclass
+class JudgedJointPosition:
+    """
+    The position of one of the kitchen's hinge or slide joints as RoboCasa's simulation
+    held it when it judged the episode.
+    """
+
+    joint_name: str
+    """
+    The name of the joint in RoboCasa's simulation.
+    """
+
+    position: float
+    """
+    The position of the joint, in radians for a hinge and meters for a slide.
+    """
+
+
+@dataclass
+class Judgement:
+    """
+    RoboCasa's verdict on an episode, with the state of its simulation it judged.
+    """
+
+    accomplished: bool
+    """
+    Whether RoboCasa's own check found the task accomplished.
+    """
+
+    judged_objects: list[JudgedObject]
+    """
+    Every object of the task, in the order RoboCasa's task lists them.
+    """
+
+    judged_joint_positions: list[JudgedJointPosition]
+    """
+    Every hinge and slide joint of the kitchen, without RoboCasa's robot, in the order
+    of RoboCasa's model.
+    """
+
+
+# %% the judge
 
 
 @dataclass
@@ -136,11 +213,7 @@ class RoboCasaJudge:
         self.mirror.synchronize()
         model, data = self.environment.sim.model, self.environment.sim.data
         own = model.body_name2id(body.name.name)
-        robocasa_robot_bodies = {
-            model.body_name2id(name)
-            for name in model.body_names
-            if (name or "").startswith(tuple(RoboCasaRobotBodyPrefix))
-        }
+        robocasa_robot_bodies = self.robocasa_robot_body_ids
         for contact in data.contact[: data.ncon]:
             first = model.geom_bodyid[contact.geom1]
             second = model.geom_bodyid[contact.geom2]
@@ -148,13 +221,21 @@ class RoboCasaJudge:
                 return True
         return False
 
-    def log_judgement(self, logged_contacts: int = 6) -> None:
+    @property
+    def robocasa_robot_body_ids(self) -> set[int]:
         """
-        Log what RoboCasa's simulation has every object of the task touch, and how far
-        the gripper stands from it.
+        The identifiers of the bodies of RoboCasa's own robot in its simulation.
+        """
+        model = self.environment.sim.model
+        return {
+            model.body_name2id(name)
+            for name in model.body_names
+            if (name or "").startswith(tuple(RoboCasaRobotBodyPrefix))
+        }
 
-        :param logged_contacts: How many of the bodies an object touches are logged at
-            most.
+    def judged_objects(self) -> list[JudgedObject]:
+        """
+        :return: Every object of the task as RoboCasa's simulation holds it right now.
         """
         model, data = self.environment.sim.model, self.environment.sim.data
         robocasa_robot = self.environment.robots[0]
@@ -165,23 +246,50 @@ class RoboCasaJudge:
             second = model.body_id2name(model.geom_bodyid[contact.geom2])
             touching.setdefault(first, set()).add(second)
             touching.setdefault(second, set()).add(first)
+        judged = []
         for name, robocasa_object in self.environment.objects.items():
             position = data.body_xpos[self.environment.obj_body_id[name]]
-            logger.info(
-                "Judged %s at %s, %.2f m from the gripper, touching %s",
-                name,
-                np.round(position, 3).tolist(),
-                float(np.linalg.norm(gripper - position)),
-                sorted(touching.get(robocasa_object.root_body, set()))[
-                    :logged_contacts
-                ],
+            judged.append(
+                JudgedObject(
+                    name=name,
+                    position=position.tolist(),
+                    distance_to_gripper=float(np.linalg.norm(gripper - position)),
+                    touched_bodies=sorted(
+                        touching.get(robocasa_object.root_body, set())
+                    ),
+                )
             )
+        return judged
 
-    def succeeded(self) -> bool:
+    def judged_joint_positions(self) -> list[JudgedJointPosition]:
         """
-        :return: Whether RoboCasa's own check finds the task accomplished in the world
-            as it stands.
+        :return: Every hinge and slide joint of the kitchen, without RoboCasa's robot,
+            at the position RoboCasa's simulation holds it at right now.
+        """
+        model, data = self.environment.sim.model, self.environment.sim.data
+        robocasa_robot_bodies = self.robocasa_robot_body_ids
+        one_coordinate_joints = {
+            mujoco.mjtJoint.mjJNT_HINGE,
+            mujoco.mjtJoint.mjJNT_SLIDE,
+        }
+        return [
+            JudgedJointPosition(
+                joint_name=model.joint_id2name(joint),
+                position=float(data.qpos[model.jnt_qposadr[joint]]),
+            )
+            for joint in range(model.njnt)
+            if model.jnt_type[joint] in one_coordinate_joints
+            and model.jnt_bodyid[joint] not in robocasa_robot_bodies
+        ]
+
+    def pass_judgement(self) -> Judgement:
+        """
+        :return: RoboCasa's verdict on the world as it stands.
         """
         self.update_fixture_states()
         self.take_robocasas_robot_to_ours()
-        return bool(self.environment._check_success())
+        return Judgement(
+            accomplished=bool(self.environment._check_success()),
+            judged_objects=self.judged_objects(),
+            judged_joint_positions=self.judged_joint_positions(),
+        )

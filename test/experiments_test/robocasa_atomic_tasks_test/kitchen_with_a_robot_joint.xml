@@ -1,0 +1,20 @@
+<mujoco model="kitchen with a robot joint">
+  <worldbody>
+    <body name="sink_main_group_handle">
+      <joint name="sink_main_group_handle_joint" type="hinge" axis="0 1 0" range="0 0.5"/>
+      <geom type="box" size="0.01 0.01 0.01"/>
+    </body>
+    <body name="drawer" pos="1 0 0">
+      <joint name="drawer_slide" type="slide" axis="1 0 0"/>
+      <geom type="box" size="0.01 0.01 0.01"/>
+    </body>
+    <body name="mug" pos="2 0 0">
+      <freejoint name="mug_joint"/>
+      <geom type="box" size="0.01 0.01 0.01"/>
+    </body>
+    <body name="robot0_link1" pos="3 0 0">
+      <joint name="robot0_joint1" type="hinge" axis="0 0 1"/>
+      <geom type="box" size="0.01 0.01 0.01"/>
+    </body>
+  </worldbody>
+</mujoco>

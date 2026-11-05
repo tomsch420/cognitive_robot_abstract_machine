@@ -86,7 +86,7 @@ logger.info(
     "succeeded" if succeeded else "failed",
     time.time() - start,
 )
-if succeeded and task.recorded_run is not None:
+if task.recorded_run is not None:
     TaskRunDatabase.connect(arguments.database).add(task.recorded_run)
     logger.info(
         "Stored the run, %d moments, in %s",

@@ -19,6 +19,11 @@ from experiments.robocasa_atomic_tasks.exceptions import (
     DegreesOfFreedomNotInTheWorld,
     NoStoredRun,
 )
+from experiments.robocasa_atomic_tasks.judge import (
+    JudgedJointPosition,
+    JudgedObject,
+    Judgement,
+)
 from experiments.robocasa_atomic_tasks.robots import RobotModel
 from experiments.robocasa_atomic_tasks.stored_runs import (
     PlanRecorder,
@@ -275,6 +280,22 @@ def run_of_the_lever(lever: WorldWithALever, task: str) -> StoredTaskRun:
             SimulatedMoment(simulation_time=0.0, positions=[0.2]),
             SimulatedMoment(simulation_time=0.1, positions=[0.4]),
         ],
+        judgement=Judgement(
+            accomplished=False,
+            judged_objects=[
+                JudgedObject(
+                    name="obj",
+                    position=[1.0, 2.0, 0.9],
+                    distance_to_gripper=0.3,
+                    touched_bodies=["counter_main", "obj_main"],
+                )
+            ],
+            judged_joint_positions=[
+                JudgedJointPosition(
+                    joint_name="sink_main_group_handle_joint", position=0.38
+                )
+            ],
+        ),
     )
 
 
@@ -315,6 +336,13 @@ def test_the_plans_of_a_run_are_read_back(database, world_with_a_lever, recorded
             recorded_plan.state_change_times,
         )
     ]
+
+
+def test_the_judgement_of_a_run_is_read_back(database, world_with_a_lever):
+    run = run_of_the_lever(world_with_a_lever, "AdjustWaterTemperature")
+    database.add(run)
+
+    assert database.latest_run_of("AdjustWaterTemperature").judgement == run.judgement
 
 
 def test_reading_the_run_of_a_task_never_stored_raises(database):
