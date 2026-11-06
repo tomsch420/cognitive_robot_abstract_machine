@@ -68,6 +68,7 @@ from krrood_spatial_math.spatial_types import (
     Pose,
 )
 from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
+from semantic_digital_twin.world_description.geometry import CoordinateBounds
 from semantic_digital_twin.world_description.world_entity import (
     Body,
     KinematicStructureEntity,
@@ -663,6 +664,25 @@ class PlacesFingertips:
     The arm whose fingertips are placed.
     """
 
+    def open_fingertip_boxes(self) -> list[CoordinateBounds]:
+        """
+        :return: The boxes bounding the collision shapes of the fingertips while the
+            gripper is open, in the tool frame.
+        """
+        end_effector = self.arm.end_effector
+        world = self.arm._world
+        with world.reset_state_context():
+            end_effector.default_configuration(GripperState.OPEN).joint_state.apply_to(
+                world
+            )
+            return [
+                box.to_array_bounds()
+                for finger in end_effector.fingers
+                for box in finger.tip.collision.as_bounding_box_collection_in_frame(
+                    end_effector.tool_frame
+                ).bounding_boxes
+            ]
+
     def fingertips_goal(
         self, distance_before_the_point: float, degenerate_closing: float = 1e-6
     ) -> Pose:
@@ -760,6 +780,12 @@ class PushAction(DrivesAJointByAPart, SequentialAction):
     How close the joint has to come to :attr:`goal_position`.
     """
 
+    hold_base: bool = False
+    """
+    Whether the base stands still while the joint moves, see
+    :meth:`DrivesAJointByAPart.joint_drive`.
+    """
+
     def create_steps(self) -> list[StatechartNode]:
         return [
             self.press,
@@ -769,7 +795,7 @@ class PushAction(DrivesAJointByAPart, SequentialAction):
                 self.joint,
                 self.goal_position,
                 self.threshold,
-                hold_base=False,
+                hold_base=self.hold_base,
             ),
         ]
 
@@ -963,21 +989,10 @@ class PlacesOneFingertip(PlacesFingertips):
             closing axis while the gripper is open, in the tool frame.
         """
         end_effector = self.arm.end_effector
-        world = self.arm._world
         closing = end_effector.closing_axis.to_np()[:3]
-        with world.reset_state_context():
-            end_effector.default_configuration(GripperState.OPEN).joint_state.apply_to(
-                world
-            )
-            fingertip_boxes = [
-                box.to_array_bounds()
-                for finger in end_effector.fingers
-                for box in finger.tip.collision.as_bounding_box_collection_in_frame(
-                    end_effector.tool_frame
-                ).bounding_boxes
-            ]
         trailing = min(
-            fingertip_boxes, key=lambda bounds: (bounds.lower + bounds.upper) @ closing
+            self.open_fingertip_boxes(),
+            key=lambda bounds: (bounds.lower + bounds.upper) @ closing,
         )
         center = (trailing.lower + trailing.upper) / 2.0
         half_extent = (trailing.upper - trailing.lower) / 2.0
@@ -1083,6 +1098,121 @@ class StandAndPushWithAFingerAction(StandAndPressAction):
             ),
             through_free_space=through_free_space,
         )
+
+
+# %% pushing a part with the side of one fingertip of the open gripper
+
+
+@dataclass
+class FingerSideApproach:
+    """
+    How the open gripper comes in level beside a part, the fingers one above the other,
+    to push the part with the side of its lower fingertip.
+    """
+
+    approach: np.ndarray
+    """
+    The level direction the fingertips come in along, square to :attr:`push`, in the
+    world's root frame.
+    """
+
+    push: np.ndarray
+    """
+    The direction the part is pushed in, in the world's root frame.
+    """
+
+    @property
+    def closing(self) -> np.ndarray:
+        """
+        The direction the fingers close along: upwards, square to :attr:`approach` and
+        :attr:`push`.
+        """
+        closing = np.cross(self.approach, self.push)
+        closing = closing / np.linalg.norm(closing)
+        return closing if closing[2] >= 0.0 else -closing
+
+    @classmethod
+    def beside(cls, push: np.ndarray) -> list[FingerSideApproach]:
+        """
+        :param push: The direction the part is pushed in, in the world's root frame.
+        :return: The level ways to come in square to the push, from either side.
+        """
+        push = push / np.linalg.norm(push)
+        across = np.cross([0.0, 0.0, 1.0], push)
+        across = across / np.linalg.norm(across)
+        return [cls(approach=side * across, push=push) for side in (1.0, -1.0)]
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class PlacesFingerSide(PlacesOneFingertip):
+    """
+    An action that puts the side of the lower fingertip of the open gripper against a
+    point, the side facing the way the part there is pushed, its lower edge level with
+    the point; the fingers close along :attr:`closing`, which points upwards.
+    """
+
+    push: np.ndarray
+    """
+    The direction the part at the point is pushed in, in the world's root frame.
+    """
+
+    def fingertips_goal(
+        self, distance_before_the_point: float, degenerate_closing: float = 1e-6
+    ) -> Pose:
+        """
+        Differs from :meth:`PlacesOneFingertip.fingertips_goal` in putting the lower
+        edge of the pushing side of the lower fingertip on the point.
+        """
+        approach = self.approach / np.linalg.norm(self.approach)
+        world_T_press = ApproachFrame(
+            position=self.point - approach * distance_before_the_point,
+            approach=approach,
+            closing=self.closing,
+        ).in_reference_frame(self.arm._world.root)
+        return self.arm.end_effector.tool_frame_goal_for_point(
+            self.pushing_edge_of_the_lower_fingertip(), world_T_press.pose
+        )
+
+    def pushing_edge_of_the_lower_fingertip(self) -> Point3:
+        """
+        :return: The middle of the lower edge of the side of the lower fingertip that
+            faces :attr:`push`, in the tool frame.
+        """
+        end_effector = self.arm.end_effector
+        approach = end_effector.approach_axis.to_np()[:3]
+        closing = end_effector.closing_axis.to_np()[:3]
+        across = np.cross(approach, closing)
+        facing = np.sign(np.cross(self.approach, self.closing) @ self.push)
+        pushing_side = facing * across
+        upwards = closing if self.closing[2] >= 0.0 else -closing
+        lower = min(
+            self.open_fingertip_boxes(),
+            key=lambda bounds: (bounds.lower + bounds.upper) @ upwards,
+        )
+        center = (lower.lower + lower.upper) / 2.0
+        half_extent = (lower.upper - lower.lower) / 2.0
+        edge = (
+            center
+            + pushing_side * (np.abs(pushing_side) @ half_extent)
+            - upwards * (np.abs(upwards) @ half_extent)
+        )
+        return Point3(*edge, reference_frame=end_effector.tool_frame)
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class FingerSidePressAction(PlacesFingerSide, FingerPressAction):
+    """
+    Opens the gripper and brings the side of its lower fingertip against a point of a
+    part, the fingers one above the other; the gripper stays there.
+    """
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class FingerSideWithdrawAction(PlacesFingerSide, FingerWithdrawAction):
+    """
+    Draws the open gripper straight back from a point a :class:`FingerSidePressAction`
+    brought the side of its lower fingertip to, the way it came in, then straight up.
+    """
 
 
 # %% picking an object up and putting it down

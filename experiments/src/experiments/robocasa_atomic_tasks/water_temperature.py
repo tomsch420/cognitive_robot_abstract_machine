@@ -1,28 +1,34 @@
 """
-The robot sets how hot a mixer tap runs by swinging the tap's lever with one fingertip
-of the open gripper.
+The robot sets how hot a mixer tap runs by swinging the tap's lever with the side of one
+fingertip of the open gripper.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 
 from coraplex.robot_plans.actions.base import SequentialAction
 from cramph.node import StatechartNode
+from experiments.robocasa_atomic_tasks.geometry import BodyBounds
 from experiments.robocasa_atomic_tasks.joints import FixtureJoints
 from experiments.robocasa_atomic_tasks.robocasa_names import WaterTemperature
 from experiments.robocasa_atomic_tasks.skills import (
-    FingerApproach,
-    FingerPressAction,
-    FingerWithdrawAction,
+    FingerSideApproach,
+    FingerSidePressAction,
+    FingerSideWithdrawAction,
     PushAction,
 )
 from krrood.entity_query_language.factories import a, variable
 from krrood.entity_query_language.query.match import Match
+from semantic_digital_twin.collision_checking.collision_matrix import CollisionRule
+from semantic_digital_twin.collision_checking.collision_rules import (
+    AllowCollisionBetweenGroups,
+)
 from semantic_digital_twin.robots.robot_parts import Arm
 from semantic_digital_twin.semantic_annotations.semantic_annotations import MixerLever
+from semantic_digital_twin.world_description.world_entity import Body
 
 # %% swinging the lever
 
@@ -31,9 +37,10 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import Mixe
 class AdjustWaterTemperatureAction(SequentialAction):
     """
     Swings the lever of a mixer tap on its temperature joint as far as it goes towards
-    hot or cold water: sets one fingertip of the open gripper against the lever's part
-    farthest from that joint, swings the joint to its end while the fingertip stays on
-    the lever, and draws the gripper back from where the lever left it.
+    hot or cold water: the open gripper comes in level beside the lever, its fingers one
+    above the other, and rests the side of its lower fingertip behind the lever's part
+    farthest from that joint; the joint is swung to its end with the base held and the
+    fingertip kept on the lever, and the gripper draws back from where the lever left it.
 
     .. note:: The robot stands within reach of the lever when the action begins.
     """
@@ -53,10 +60,21 @@ class AdjustWaterTemperatureAction(SequentialAction):
     The arm whose fingertip swings the lever.
     """
 
-    finger_approach: FingerApproach
+    finger_side_approach: FingerSideApproach
     """
-    How the open gripper comes in beside the lever, its fingers closing along the way
-    the lever is pushed.
+    How the open gripper comes in beside the lever.
+    """
+
+    wrist: list[Body] = field(default_factory=list)
+    """
+    The bodies of the arm just behind its gripper, which may brush what stands around
+    the lever.
+    """
+
+    surroundings: list[Body] = field(default_factory=list)
+    """
+    The bodies standing around the lever, such as the tap's spout and the wall behind
+    it, which the wrist may touch.
     """
 
     threshold_share: float = 0.002
@@ -65,31 +83,66 @@ class AdjustWaterTemperatureAction(SequentialAction):
     tight, since the lever comes to rest a little short of where the push leaves it.
     """
 
+    approach_distance: float = 0.1
+    """
+    How far before the lever, along the approach, the gripper starts its straight way in
+    and ends its straight way back, in metres.
+    """
+
     @classmethod
     def finger_approaches(
-        cls, lever: MixerLever, temperature: WaterTemperature
-    ) -> list[FingerApproach]:
+        cls,
+        lever: MixerLever,
+        temperature: WaterTemperature,
+        surroundings: list[Body],
+        hand_distance: float = 0.1,
+    ) -> list[FingerSideApproach]:
         """
         :param lever: The lever swung.
         :param temperature: How hot the water is to run.
-        :return: The ways the gripper may come in beside the lever, best first, see
-            :meth:`FingerApproach.across`.
+        :param surroundings: The bodies standing around the lever.
+        :param hand_distance: How far behind the fingertip the hand is taken to rest
+            when the room around it is compared, in metres.
+        :return: The ways the gripper may come in beside the lever, from where its hand
+            has the most room among ``surroundings`` first, see
+            :meth:`FingerSideApproach.beside`.
         """
         joint = lever.temperature_joint
         end = temperature.temperature_joint_position(lever)
         point = FixtureJoints.point_for_a_fingertip(joint, lever.root, end)
-        return FingerApproach.across(
-            FixtureJoints.push_direction(joint, end, point=point)
+        push = FixtureJoints.push_direction(joint, end, point=point)
+        bounds = BodyBounds(lever._world)
+
+        def room_for_the_hand(finger_side_approach: FingerSideApproach) -> float:
+            hand = point - finger_side_approach.approach * hand_distance
+            return min(
+                (
+                    bounds.distance_to_nearest_shape(body, hand)
+                    for body in surroundings
+                    if body.collision.shapes
+                ),
+                default=np.inf,
+            )
+
+        return sorted(
+            FingerSideApproach.beside(push), key=room_for_the_hand, reverse=True
         )
 
     @classmethod
     def from_finger_approaches(
-        cls, lever: MixerLever, temperature: WaterTemperature, arm: Arm
+        cls,
+        lever: MixerLever,
+        temperature: WaterTemperature,
+        arm: Arm,
+        wrist: list[Body],
+        surroundings: list[Body],
     ) -> Match:
         """
         :param lever: The lever swung.
         :param temperature: How hot the water is to run.
         :param arm: The arm whose fingertip swings the lever.
+        :param wrist: See :attr:`wrist`.
+        :param surroundings: See :attr:`surroundings`.
         :return: The action, with the way the gripper comes in left open among
             :meth:`finger_approaches`.
         """
@@ -97,33 +150,65 @@ class AdjustWaterTemperatureAction(SequentialAction):
             lever=lever,
             temperature=temperature,
             arm=arm,
-            finger_approach=variable(
-                FingerApproach, domain=cls.finger_approaches(lever, temperature)
+            finger_side_approach=variable(
+                FingerSideApproach,
+                domain=cls.finger_approaches(lever, temperature, surroundings),
             ),
+            wrist=wrist,
+            surroundings=surroundings,
         )
+
+    def create_temporary_collision_rules(self) -> list[CollisionRule]:
+        """
+        :return: An allowance for the gripper and :attr:`wrist` to touch
+            :attr:`surroundings` and the lever.
+        """
+        gripper = [
+            body
+            for body in self.arm._world.get_kinematic_structure_entities_of_branch(
+                self.arm.end_effector.root
+            )
+            if isinstance(body, Body) and body.collision.shapes
+        ]
+        return [
+            AllowCollisionBetweenGroups(
+                body_group_a=[*gripper, *self.wrist],
+                body_group_b=[*self.surroundings, self.lever.root],
+            )
+        ]
 
     def create_steps(self) -> list[StatechartNode]:
         joint = self.lever.temperature_joint
         end = self.temperature.temperature_joint_position(self.lever)
         point = FixtureJoints.point_for_a_fingertip(joint, self.lever.root, end)
-        approach = self.finger_approach.approach
-        closing = self.finger_approach.closing
+        approach = self.finger_side_approach.approach
+        closing = self.finger_side_approach.closing
+        push = self.finger_side_approach.push
         world_T_swung = self.swing_of_the_lever_to(end)
+        swung = world_T_swung[:3, :3]
         return [
             PushAction(
-                press=FingerPressAction(
-                    point=point, approach=approach, closing=closing, arm=self.arm
+                press=FingerSidePressAction(
+                    point=point,
+                    approach=approach,
+                    closing=closing,
+                    push=push,
+                    arm=self.arm,
+                    approach_distance=self.approach_distance,
                 ),
                 part=self.lever.root,
                 joint=joint,
                 goal_position=end,
                 threshold=self.threshold_share * FixtureJoints.travel_of(joint),
+                hold_base=True,
             ),
-            FingerWithdrawAction(
-                point=world_T_swung[:3, :3] @ point + world_T_swung[:3, 3],
-                approach=world_T_swung[:3, :3] @ approach,
-                closing=world_T_swung[:3, :3] @ closing,
+            FingerSideWithdrawAction(
+                point=swung @ point + world_T_swung[:3, 3],
+                approach=swung @ approach,
+                closing=swung @ closing,
+                push=swung @ push,
                 arm=self.arm,
+                distance=self.approach_distance,
             ),
         ]
 

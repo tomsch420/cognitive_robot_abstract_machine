@@ -14,8 +14,9 @@ from experiments.robocasa_atomic_tasks.joints import FixtureJoints
 from experiments.robocasa_atomic_tasks.panda_omron import PandaOmron
 from experiments.robocasa_atomic_tasks.robocasa_names import WaterTemperature
 from experiments.robocasa_atomic_tasks.skills import (
-    FingerApproach,
-    FingerWithdrawAction,
+    FingerSideApproach,
+    FingerSidePressAction,
+    FingerSideWithdrawAction,
     PushAction,
 )
 from experiments.robocasa_atomic_tasks.water_temperature import (
@@ -25,7 +26,13 @@ from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, V
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.semantic_annotations.semantic_annotations import MixerLever
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connections import RevoluteConnection
+from semantic_digital_twin.collision_checking.collision_rules import (
+    AllowCollisionBetweenGroups,
+)
+from semantic_digital_twin.world_description.connections import (
+    FixedConnection,
+    RevoluteConnection,
+)
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
     LimitSide,
@@ -62,6 +69,11 @@ class MixerTapWithAPost:
     post_center: np.ndarray
     """
     Where the post's middle lies, in the world's root frame.
+    """
+
+    obstacle: Body
+    """
+    A block standing 5 cm to the left of the post, as a faucet's spout does.
     """
 
 
@@ -115,11 +127,25 @@ def mixer_tap_with_a_post() -> MixerTapWithAPost:
         )
         lever = MixerLever(root=lever_body, hot_side=LimitSide.UPPER)
         world.add_semantic_annotation(lever)
+        obstacle = Body(
+            name=PrefixedName("obstacle"),
+            collision=ShapeCollection([Box(scale=Scale(0.03, 0.3, 0.3))]),
+        )
+        world.add_connection(
+            FixedConnection(
+                parent=tap,
+                child=obstacle,
+                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    *(pivot + np.array([-0.05, -0.15, 0.1])), reference_frame=tap
+                ),
+            )
+        )
     return MixerTapWithAPost(
         lever=lever,
         pivot=pivot,
         post_scale=post_scale,
         post_center=pivot + np.array([0.0, 0.0, post_height]),
+        obstacle=obstacle,
     )
 
 
@@ -131,14 +157,16 @@ def adjustment(
         of its finger approaches.
     """
     [arm] = robot.all_arms
-    [finger_approach, *_] = AdjustWaterTemperatureAction.finger_approaches(
-        tap.lever, temperature
+    [finger_side_approach, *_] = AdjustWaterTemperatureAction.finger_approaches(
+        tap.lever, temperature, [tap.obstacle]
     )
     return AdjustWaterTemperatureAction(
         lever=tap.lever,
         temperature=temperature,
         arm=arm,
-        finger_approach=finger_approach,
+        finger_side_approach=finger_side_approach,
+        wrist=[arm.end_effector.root],
+        surroundings=[tap.obstacle],
     )
 
 
@@ -162,52 +190,117 @@ def test_cold_water_runs_at_the_coldest_position_of_the_lever(mixer_tap_with_a_p
     )
 
 
+# %% how the hand comes in
+
+
+def test_the_hand_comes_in_level_and_square_to_the_push():
+    push = np.array([0.0, -1.0, 0.1]) / np.linalg.norm([0.0, -1.0, 0.1])
+
+    for finger_side_approach in FingerSideApproach.beside(push):
+        assert finger_side_approach.approach[2] == pytest.approx(0.0)
+        assert finger_side_approach.approach @ push == pytest.approx(0.0)
+
+
+def test_the_fingers_close_upwards_square_to_the_approach_and_the_push():
+    push = np.array([0.0, -1.0, 0.1]) / np.linalg.norm([0.0, -1.0, 0.1])
+
+    for finger_side_approach in FingerSideApproach.beside(push):
+        closing = finger_side_approach.closing
+        assert closing[2] > 0.0
+        assert closing @ finger_side_approach.approach == pytest.approx(0.0)
+        assert closing @ push == pytest.approx(0.0)
+
+
+def test_the_side_with_room_for_the_hand_is_tried_first(mixer_tap_with_a_post):
+    tap = mixer_tap_with_a_post
+    first, second = AdjustWaterTemperatureAction.finger_approaches(
+        tap.lever, WaterTemperature.HOT, [tap.obstacle]
+    )
+
+    obstacle_side = np.sign(tap.obstacle.global_pose.to_np()[0, 3] - tap.post_center[0])
+    assert np.sign(first.approach[0]) == obstacle_side
+    assert np.sign(second.approach[0]) == -obstacle_side
+
+
 # %% how the fingertip pushes the lever
 
 
-def test_the_fingertip_rests_on_the_post_where_it_is_pushed_from(
+def test_the_lower_fingertip_rests_its_side_on_the_point(panda_omron):
+    [arm] = panda_omron.all_arms
+    point = np.array([1.0, 0.0, 1.0])
+    press = FingerSidePressAction(
+        point=point,
+        approach=np.array([-1.0, 0.0, 0.0]),
+        closing=np.array([0.0, 0.0, 1.0]),
+        push=np.array([0.0, -1.0, 0.0]),
+        arm=arm,
+    )
+    world = arm._world
+    world_T_tool = world.transform(
+        press.fingertips_goal(0.0), world.root
+    ).homogeneous_matrix.to_np()
+    tool_P_edge = press.pushing_edge_of_the_lower_fingertip().to_np()
+
+    np.testing.assert_allclose((world_T_tool @ tool_P_edge)[:3], point, atol=1e-9)
+    corners = [
+        world_T_tool[:3, :3] @ corner + world_T_tool[:3, 3]
+        for box in press.open_fingertip_boxes()
+        for corner in (box.lower, box.upper)
+    ]
+    lowest = min(corner[2] for corner in corners)
+    assert lowest == pytest.approx(point[2])
+
+
+def test_the_push_swings_the_temperature_joint_and_holds_the_base(
+    mixer_tap_with_a_post, panda_omron
+):
+    tap = mixer_tap_with_a_post
+    [push, _] = adjustment(tap, WaterTemperature.COLD, panda_omron).create_steps()
+
+    assert isinstance(push, PushAction)
+    assert isinstance(push.press, FingerSidePressAction)
+    assert push.joint is tap.lever.temperature_joint
+    assert push.part is tap.lever.root
+    assert push.goal_position == tap.lever.coldest_position
+    assert push.hold_base
+
+
+def test_the_fingertip_side_rests_on_the_post_where_it_is_pushed_from(
     mixer_tap_with_a_post, panda_omron
 ):
     tap = mixer_tap_with_a_post
     [push, _] = adjustment(tap, WaterTemperature.HOT, panda_omron).create_steps()
 
-    swinging_towards = np.sign(push.press.closing[1])
+    behind = -np.sign(push.press.push[1])
     np.testing.assert_allclose(
         push.press.point,
-        tap.post_center - [0.0, swinging_towards * tap.post_scale.y / 2.0, 0.0],
+        tap.post_center + [0.0, behind * tap.post_scale.y / 2.0, 0.0],
         # the push direction is probed by turning the swivel a milliradian
         atol=1e-5,
     )
 
 
-def test_the_fingers_close_along_the_way_the_post_is_pushed(
+def test_the_wrist_may_touch_what_stands_around_the_lever(
     mixer_tap_with_a_post, panda_omron
 ):
     tap = mixer_tap_with_a_post
-    point = FixtureJoints.point_for_a_fingertip(
-        tap.lever.temperature_joint, tap.lever.root, tap.lever.hottest_position
-    )
-    push = FixtureJoints.push_direction(
-        tap.lever.temperature_joint, tap.lever.hottest_position, point=point
-    )
+    action = adjustment(tap, WaterTemperature.HOT, panda_omron)
 
-    for finger_approach in AdjustWaterTemperatureAction.finger_approaches(
-        tap.lever, WaterTemperature.HOT
-    ):
-        np.testing.assert_allclose(finger_approach.closing, push, atol=1e-12)
+    [rule] = action.create_temporary_collision_rules()
+    assert isinstance(rule, AllowCollisionBetweenGroups)
+    assert set(action.wrist) <= set(rule.body_group_a)
+    assert rule.body_group_b == [*action.surroundings, tap.lever.root]
 
 
-def test_the_push_swings_the_temperature_joint_with_the_fingertip_on_the_lever(
+def test_the_fingers_may_touch_the_lever_and_what_stands_around_it(
     mixer_tap_with_a_post, panda_omron
 ):
     tap = mixer_tap_with_a_post
-    action = adjustment(tap, WaterTemperature.COLD, panda_omron)
-    [push, _] = action.create_steps()
+    action = adjustment(tap, WaterTemperature.HOT, panda_omron)
 
-    assert isinstance(push, PushAction)
-    assert push.joint is tap.lever.temperature_joint
-    assert push.part is tap.lever.root
-    assert push.goal_position == tap.lever.coldest_position
+    [rule] = action.create_temporary_collision_rules()
+    fingertips = {finger.tip for finger in action.arm.end_effector.fingers}
+    assert fingertips <= set(rule.body_group_a)
 
 
 def test_the_gripper_withdraws_from_where_the_push_leaves_the_post(
@@ -218,10 +311,8 @@ def test_the_gripper_withdraws_from_where_the_push_leaves_the_post(
     [push, withdraw] = action.create_steps()
 
     swing = Rotation.from_rotvec([tap.lever.hottest_position, 0.0, 0.0]).as_matrix()
-    assert isinstance(withdraw, FingerWithdrawAction)
+    assert isinstance(withdraw, FingerSideWithdrawAction)
     np.testing.assert_allclose(
         withdraw.point, tap.pivot + swing @ (push.press.point - tap.pivot), atol=1e-9
     )
-    np.testing.assert_allclose(
-        withdraw.approach, swing @ push.press.approach, atol=1e-9
-    )
+    np.testing.assert_allclose(withdraw.push, swing @ push.press.push, atol=1e-9)
