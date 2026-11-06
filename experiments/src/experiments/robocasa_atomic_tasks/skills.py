@@ -421,7 +421,24 @@ class DriveJoint(EndedByOwner, CompositeNode):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class DrivesAJointByAPart(MovesToolCenterPoint, ABC):
+class HoldsBase(MovesToolCenterPoint, ABC):
+    """
+    An action that may keep the robot's base where it stands while it moves the tool
+    center point, even where the robot otherwise moves its whole body.
+    """
+
+    def base_hold(self) -> HoldPose:
+        """
+        :return: A new task keeping the robot's base at the pose it has when the task
+            starts.
+        """
+        return HoldPose(
+            name="hold base", root_link=self.world.root, tip_link=self.robot.root
+        )
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class DrivesAJointByAPart(HoldsBase, ABC):
     """
     An action that moves a joint of the environment by a part the gripper holds or
     pushes.
@@ -455,16 +472,7 @@ class DrivesAJointByAPart(MovesToolCenterPoint, ABC):
         )
         if not hold_base:
             return drive
-        return Parallel(
-            nodes=[
-                drive,
-                HoldPose(
-                    name="hold base",
-                    root_link=self.world.root,
-                    tip_link=self.robot.root,
-                ),
-            ]
-        )
+        return Parallel(nodes=[drive, self.base_hold()])
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
@@ -801,7 +809,7 @@ class PushAction(DrivesAJointByAPart, SequentialAction):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class WithdrawAction(PlacesFingertips, MovesToolCenterPoint, SequentialAction):
+class WithdrawAction(PlacesFingertips, HoldsBase, SequentialAction):
     """
     Draws the gripper straight back from a point it pressed, the way it came in.
     """
@@ -810,6 +818,19 @@ class WithdrawAction(PlacesFingertips, MovesToolCenterPoint, SequentialAction):
     """
     How far back from the point the gripper withdraws, in metres.
     """
+
+    hold_base: bool = False
+    """
+    Whether the base stands still while the gripper withdraws, as after a push that held
+    it, so that the base does not drive into what it stands close to.
+    """
+
+    def goals_held_while_withdrawing(self) -> tuple[HoldPose, ...]:
+        """
+        :return: The tasks held while the gripper moves away from the point: the hold
+            on the base if :attr:`hold_base`, none otherwise.
+        """
+        return (self.base_hold(),) if self.hold_base else ()
 
     def create_temporary_collision_rules(self) -> list[CollisionRule]:
         """
@@ -823,6 +844,7 @@ class WithdrawAction(PlacesFingertips, MovesToolCenterPoint, SequentialAction):
                 self.fingertips_goal(self.distance),
                 self.arm,
                 in_a_straight_line=True,
+                accompanying_goals=self.goals_held_while_withdrawing(),
             )
         ]
 
@@ -1046,6 +1068,7 @@ class FingerWithdrawAction(PlacesOneFingertip, WithdrawAction):
                 ).pose,
                 self.arm,
                 in_a_straight_line=True,
+                accompanying_goals=self.goals_held_while_withdrawing(),
             ),
         ]
 

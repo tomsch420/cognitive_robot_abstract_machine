@@ -18,11 +18,18 @@ from experiments.robocasa_atomic_tasks.skills import (
     FingerSidePressAction,
     FingerSideWithdrawAction,
     PushAction,
+    StandAction,
 )
 from experiments.robocasa_atomic_tasks.water_temperature import (
     AdjustWaterTemperatureAction,
+    StandAndAdjustWaterTemperatureAction,
 )
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
+from giskardpy.motion_statechart.goals.gripper import MovesGripperToConfiguration
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix,
+    Pose,
+    Vector3,
+)
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.semantic_annotations.semantic_annotations import MixerLever
 from semantic_digital_twin.world import World
@@ -316,3 +323,49 @@ def test_the_gripper_withdraws_from_where_the_push_leaves_the_post(
         withdraw.point, tap.pivot + swing @ (push.press.point - tap.pivot), atol=1e-9
     )
     np.testing.assert_allclose(withdraw.push, swing @ push.press.push, atol=1e-9)
+
+
+def test_the_gripper_withdraws_with_the_base_held(mixer_tap_with_a_post, panda_omron):
+    [_, withdraw] = adjustment(
+        mixer_tap_with_a_post, WaterTemperature.HOT, panda_omron
+    ).create_steps()
+
+    assert withdraw.hold_base
+
+
+# %% walking to a stand first
+
+
+def stand_and_adjustment(
+    tap: MixerTapWithAPost, robot: PandaOmron, through_free_space: bool
+) -> StandAndAdjustWaterTemperatureAction:
+    """
+    :return: The action walking to a stand in front of the tap and setting it to hot.
+    """
+    return StandAndAdjustWaterTemperatureAction(
+        navigate=StandAction(target_location=Pose(reference_frame=robot._world.root)),
+        adjustment=adjustment(tap, WaterTemperature.HOT, robot),
+        through_free_space=through_free_space,
+    )
+
+
+def test_the_robot_stands_and_opens_the_gripper_before_it_swings_the_lever(
+    mixer_tap_with_a_post, panda_omron
+):
+    action = stand_and_adjustment(mixer_tap_with_a_post, panda_omron, False)
+
+    [navigate, gripper, adjustment_step] = action.create_steps()
+
+    assert navigate is action.navigate
+    assert isinstance(gripper, MovesGripperToConfiguration)
+    assert adjustment_step is action.adjustment
+
+
+def test_the_gripper_may_be_led_through_free_space_to_where_the_press_begins(
+    mixer_tap_with_a_post, panda_omron
+):
+    action = stand_and_adjustment(mixer_tap_with_a_post, panda_omron, True)
+
+    [navigate, gripper, reach, adjustment_step] = action.create_steps()
+
+    assert adjustment_step is action.adjustment

@@ -12,12 +12,14 @@ import pytest
 
 from coraplex.plans.context_extensions import RobotAccess
 from coraplex.robot_plans.actions.base import Action
+from cramph.composites import Parallel
 from cramph.context import StatechartContext
 from cramph.node import StatechartNode
 from cramph.statechart import Statechart
 from experiments.robocasa_atomic_tasks import skills
 from experiments.robocasa_atomic_tasks.panda_omron import PandaOmron
 from giskardpy.motion_statechart.goals.cartesian_goals import CartesianPoseStraight
+from giskardpy.motion_statechart.tasks.cartesian_tasks import HoldPose
 from experiments.robocasa_atomic_tasks.skills import (
     FingerApproach,
     FingerPressAction,
@@ -130,21 +132,43 @@ def straight_tool_goal_in_the_root(step: StatechartNode) -> np.ndarray:
     return world.transform(goal.goal_pose, world.root).homogeneous_matrix.to_np()
 
 
-def test_a_finger_withdrawal_rises_straight_up_once_drawn_back(
-    panda_omron: PandaOmron,
-):
+def finger_withdrawal(panda_omron: PandaOmron, hold_base: bool) -> FingerWithdrawAction:
+    """
+    :return: A withdrawal of the open gripper from a point in front of the robot, in a
+        statechart acting with the robot.
+    """
     [arm] = panda_omron.all_arms
     withdrawal = FingerWithdrawAction(
         point=np.array([1.0, 0.0, 1.0]),
         approach=np.array([-1.0, 0.0, 0.0]),
         closing=np.array([0.0, -1.0, 0.0]),
         arm=arm,
+        hold_base=hold_base,
     )
     Statechart(
         context=StatechartContext.with_extensions(
             arm._world, [RobotAccess(panda_omron)]
         )
     ).add_node(withdrawal)
+    return withdrawal
+
+
+def base_holds_of(step: StatechartNode, panda_omron: PandaOmron) -> list[HoldPose]:
+    """
+    :return: The tasks of a step keeping the robot's base where it stands.
+    """
+    nodes = step.nodes if isinstance(step, Parallel) else [step]
+    return [
+        node
+        for node in nodes
+        if isinstance(node, HoldPose) and node.tip_link is panda_omron.root
+    ]
+
+
+def test_a_finger_withdrawal_rises_straight_up_once_drawn_back(
+    panda_omron: PandaOmron,
+):
+    withdrawal = finger_withdrawal(panda_omron, hold_base=False)
 
     drawn_back, risen = withdrawal.create_steps()
 
@@ -153,3 +177,23 @@ def test_a_finger_withdrawal_rises_straight_up_once_drawn_back(
     np.testing.assert_allclose(
         straight_tool_goal_in_the_root(risen), expected, atol=1e-9
     )
+
+
+def test_a_withdrawal_holding_the_base_holds_it_while_drawing_back_and_rising(
+    panda_omron: PandaOmron,
+):
+    withdrawal = finger_withdrawal(panda_omron, hold_base=True)
+
+    steps = withdrawal.create_steps()
+
+    assert [len(base_holds_of(step, panda_omron)) for step in steps] == [1, 1]
+
+
+def test_a_withdrawal_of_a_robot_moving_its_whole_body_leaves_the_base_free(
+    panda_omron: PandaOmron,
+):
+    withdrawal = finger_withdrawal(panda_omron, hold_base=False)
+
+    steps = withdrawal.create_steps()
+
+    assert [len(base_holds_of(step, panda_omron)) for step in steps] == [0, 0]
