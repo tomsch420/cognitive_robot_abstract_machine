@@ -136,10 +136,10 @@ class RoboCasaAtomicTask(ABC):
 
     def run(self) -> bool:
         """
-        Compose an episode, have the robot perform the task and judge it; a video, if
-        asked for, shows the episode as far as it got, and so does :attr:`recorded_run`,
-        with RoboCasa's judgement, if :attr:`records_the_run` and the episode is
-        simulated physically.
+        Compose an episode, have the robot perform the task and judge it, also when
+        performing it raises; a video, if asked for, shows the episode as far as it got,
+        and so does :attr:`recorded_run`, with RoboCasa's judgement, if
+        :attr:`records_the_run` and the episode is simulated physically.
 
         :return: Whether RoboCasa's own check finds the task accomplished.
         """
@@ -156,9 +156,9 @@ class RoboCasaAtomicTask(ABC):
                 ),
                 tool_frame=episode.arm.end_effector.tool_frame,
             )
+        recorder = None
         try:
             with episode.executed(self.collision_avoidance, self.physics):
-                recorder = None
                 if self.records_the_run and self.physics:
                     recorder = SimulatedMomentRecorder(
                         _world=episode.world, simulation=episode.simulation
@@ -167,10 +167,9 @@ class RoboCasaAtomicTask(ABC):
                     episode.executor_extensions.append(plan_recorder)
                 self.solve(episode)
                 episode.let_physics_run()
-                if recorder is not None:
-                    moments = recorder.finish()
             if video is not None:
                 video.stop()
+        finally:
             judgement = episode.judge.pass_judgement()
             if recorder is not None:
                 self.recorded_run = StoredTaskRun(
@@ -180,14 +179,13 @@ class RoboCasaAtomicTask(ABC):
                     seed=self.seed,
                     robot=self.robot,
                     degree_of_freedom_names=recorder.degree_of_freedom_names,
-                    moments=moments,
+                    moments=recorder.finish(),
                     judgement=judgement,
                     plans=plan_recorder.plans,
                 )
-            return judgement.accomplished
-        finally:
             if video is not None:
                 video.render(self.video)
+        return judgement.accomplished
 
 
 # %% kinds of tasks

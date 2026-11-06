@@ -79,18 +79,20 @@ if arguments.style:
     settings["style"] = StyleType[arguments.style]
 start = time.time()
 task = tasks[arguments.task](**settings)
-succeeded = task.run()
+try:
+    succeeded = task.run()
+finally:
+    if task.recorded_run is not None:
+        TaskRunDatabase.connect(arguments.database).add(task.recorded_run)
+        logger.info(
+            "Stored the run, %d moments, in %s",
+            len(task.recorded_run.moments),
+            arguments.database,
+        )
 logger.info(
     "%s %s after %.0f s",
     arguments.task,
     "succeeded" if succeeded else "failed",
     time.time() - start,
 )
-if task.recorded_run is not None:
-    TaskRunDatabase.connect(arguments.database).add(task.recorded_run)
-    logger.info(
-        "Stored the run, %d moments, in %s",
-        len(task.recorded_run.moments),
-        arguments.database,
-    )
 sys.exit(TaskExitStatus.ACCOMPLISHED if succeeded else TaskExitStatus.NOT_ACCOMPLISHED)
