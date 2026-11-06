@@ -75,10 +75,13 @@ class AdjustWaterTemperature(JointGoalTask):
         """
         Differs from :meth:`JointGoalTask.solve` in pushing the handle to the end of its
         travel on the side of its goal with one finger of the open gripper, see
-        :meth:`RoboCasaEpisode.push_with_a_finger`.
+        :meth:`RoboCasaEpisode.push_with_a_finger`, and then lifting it as
+        :class:`TurnOnSinkFaucet` does, since the push may tilt the handle down far
+        enough to stop the water.
         """
         [goal] = self.joint_goals(episode)
         episode.push_with_a_finger(goal.joint_name, goal.world_position)
+        TurnOnSinkFaucet().solve(episode)
 
 
 # %% the spout
