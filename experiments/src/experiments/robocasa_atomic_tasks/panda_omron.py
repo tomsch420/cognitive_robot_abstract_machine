@@ -471,12 +471,15 @@ class PandaOmronMobileBase(MobileBase[OmniDrive], HasTorso[PandaOmronLift]):
     @property
     def drive_servos(self) -> DriveServos:
         """
-        robosuite's velocity actuators of the base's forward, sideways and turning
-        motion; the forward and sideways ones drive both translations.
+        The velocity servos of the base's forward, sideways and turning motion, the
+        forward and sideways ones driving both translations; stiff enough that the base
+        stops within millimetres where its drive stops it.
+
+        .. note:: robosuite's own actuators of the base are far softer.
         """
         return DriveServos(
-            translation_gains=VelocityServoGains(damping=1000.0, torque_limit=600.0),
-            rotation_gains=VelocityServoGains(damping=1500.0, torque_limit=600.0),
+            translation_gains=VelocityServoGains(damping=20000.0, torque_limit=10000.0),
+            rotation_gains=VelocityServoGains(damping=5000.0, torque_limit=5000.0),
         )
 
     def _setup_servos(self) -> None:

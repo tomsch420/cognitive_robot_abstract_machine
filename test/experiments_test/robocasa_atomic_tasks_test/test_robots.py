@@ -7,8 +7,10 @@ from __future__ import annotations
 
 from xml.etree import ElementTree
 
+import mujoco
 import numpy as np
 import pytest
+from robosuite.models.bases import OmronMobileBase
 from robosuite.models.grippers import gripper_factory
 from robosuite.models.robots import create_robot
 
@@ -18,6 +20,7 @@ from experiments.robocasa_atomic_tasks.panda_omron import (
     PandaOmronJoint,
     RobosuiteModelName,
 )
+from experiments.robocasa_atomic_tasks.skills import StandAction
 from experiments.robocasa_atomic_tasks.robots import (
     PandaOmronRobot,
     PR2Robot,
@@ -170,6 +173,39 @@ def test_the_fingers_are_servoed_as_robosuites_position_actuators(panda_omron):
             float(actuator.get("kp")),
             force_limit,
         )
+
+
+def rolling_distance(
+    mass: float, speed: float, damping: float, force_limit: float
+) -> float:
+    """
+    :return: How far a body of ``mass`` rolls on from ``speed`` once a velocity servo
+        with ``damping`` and ``force_limit`` is commanded to stand still, in metres:
+        braking at the force limit while that is below the damping force, then decaying.
+    """
+    saturated_until = min(speed, force_limit / damping)
+    braking_at_the_limit = (speed**2 - saturated_until**2) * mass / (2.0 * force_limit)
+    return braking_at_the_limit + mass * saturated_until / damping
+
+
+def test_the_base_stops_from_top_speed_within_a_stands_tolerance():
+    world = World.create_with_root_body()
+    robot = PandaOmronRobot().place_in(
+        world, HomogeneousTransformationMatrix(reference_frame=world.root)
+    )
+    base = OmronMobileBase(idn=0)
+    base_mass = mujoco.MjModel.from_xml_string(base.get_xml()).body_subtreemass[0]
+    gains = robot.mobile_base.drive_servos.translation_gains
+    drive = robot.drive
+    top_speed = max(
+        dof.limits.upper.velocity for dof in drive.active_dofs if dof != drive.yaw
+    )
+
+    distance = rolling_distance(
+        base_mass + robot.mass, top_speed, gains.damping, gains.torque_limit
+    )
+
+    assert distance < StandAction.base_pose_threshold
 
 
 # %% placing the robots in a kitchen
