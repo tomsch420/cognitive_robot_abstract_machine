@@ -7,6 +7,13 @@ from __future__ import annotations
 
 from enum import StrEnum
 
+from typing_extensions import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from semantic_digital_twin.semantic_annotations.semantic_annotations import (
+        MixerLever,
+    )
+
 # %% RoboCasa's own robot
 
 
@@ -179,6 +186,16 @@ class WaterTemperature(StrEnum):
     """
     Cold water.
     """
+
+    def temperature_joint_position(self, lever: MixerLever) -> float:
+        """
+        :param lever: The lever of a mixer tap.
+        :return: The position of the lever's temperature joint, as far as it goes, at
+            which the water runs this hot.
+        """
+        if self is WaterTemperature.HOT:
+            return lever.hottest_position
+        return lever.coldest_position
 
 
 class MicrowaveButton(StrEnum):

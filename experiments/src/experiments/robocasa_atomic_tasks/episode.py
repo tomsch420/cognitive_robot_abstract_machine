@@ -102,7 +102,6 @@ from krrood_spatial_math.spatial_types import (
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection1DOF,
-    RevoluteConnection,
 )
 from semantic_digital_twin.world_description.geometry import CoordinateBounds
 from semantic_digital_twin.world_description.world_entity import Body
@@ -998,7 +997,7 @@ class RoboCasaEpisode:
             for body in self.task_robot.wrist_bodies(self.robot)
             if body.collision.shapes
         ]
-        point = self.point_for_a_fingertip(joint, part, end)
+        point = FixtureJoints.point_for_a_fingertip(joint, part, end)
         push = self.joints.push_direction(joint, end, point=point)
 
         def room_for_the_hand(finger_approach: FingerApproach) -> float:
@@ -1035,7 +1034,7 @@ class RoboCasaEpisode:
                 ),
             ):
                 outcome = self.press_and_push(
-                    self.point_for_a_fingertip(joint, part, end),
+                    FixtureJoints.point_for_a_fingertip(joint, part, end),
                     finger_approach.approach,
                     joint,
                     end,
@@ -1051,32 +1050,6 @@ class RoboCasaEpisode:
         raise JointNotPushedToItsEnd(
             joint_name=joint_name, position=joint.position, end=end
         )
-
-    def point_for_a_fingertip(
-        self, joint: RevoluteConnection, part: Body, end: float
-    ) -> np.ndarray:
-        """
-        :param joint: A joint of the kitchen that turns its part.
-        :param part: The part it turns, with collision geometry.
-        :param end: The position it is pushed towards.
-        :return: Where a fingertip rests to push the part towards ``end`` with the most
-            leverage: on the face it is pushed on of the box bounding the part's shape
-            farthest from the joint's axis, level with that box's middle, in the
-            world's root frame.
-        """
-        axis = self.joints.axis_of(joint)
-        boxes = [
-            box.to_array_bounds()
-            for box in part.collision.as_bounding_box_collection_in_frame(
-                self.world.root
-            ).bounding_boxes
-        ]
-        farthest = max(
-            boxes, key=lambda box: axis.distance_to((box.lower + box.upper) / 2.0)
-        )
-        center = (farthest.lower + farthest.upper) / 2.0
-        push = self.joints.push_direction(joint, end, point=center)
-        return Ray(point=center, direction=push).entry_into(farthest)
 
     def press_and_push(
         self,

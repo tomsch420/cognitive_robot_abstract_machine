@@ -259,8 +259,8 @@ class FixtureJoints:
             direction=world_T_connection[:3, :3] @ joint.axis.to_np()[:3],
         )
 
+    @staticmethod
     def push_direction(
-        self,
         joint: ActiveConnection1DOF,
         world_position: float,
         point: np.ndarray | None = None,
@@ -283,10 +283,37 @@ class FixtureJoints:
         )
         part_point = np.linalg.inv(world_T_part) @ np.append(before, 1.0)
         towards = 1.0 if world_position >= joint.position else -1.0
-        with self.world.reset_state_context():
+        with joint._world.reset_state_context():
             joint.position = joint.position + probing_distance * towards
             after = (joint.child.global_pose.to_np() @ part_point)[:3]
         return (after - before) / np.linalg.norm(after - before)
+
+    @classmethod
+    def point_for_a_fingertip(
+        cls, joint: RevoluteConnection, part: Body, end: float
+    ) -> np.ndarray:
+        """
+        :param joint: A joint of the world that turns its part.
+        :param part: The part it turns, with collision geometry.
+        :param end: The position it is pushed towards.
+        :return: Where a fingertip rests to push the part towards ``end`` with the most
+            leverage: on the face it is pushed on of the box bounding the part's shape
+            farthest from the joint's axis, level with that box's middle, in the
+            world's root frame.
+        """
+        axis = cls.axis_of(joint)
+        boxes = [
+            box.to_array_bounds()
+            for box in part.collision.as_bounding_box_collection_in_frame(
+                joint._world.root
+            ).bounding_boxes
+        ]
+        farthest = max(
+            boxes, key=lambda box: axis.distance_to((box.lower + box.upper) / 2.0)
+        )
+        center = (farthest.lower + farthest.upper) / 2.0
+        push = cls.push_direction(joint, end, point=center)
+        return Ray(point=center, direction=push).entry_into(farthest)
 
     def snap_to_end_stop(
         self, joint: ActiveConnection1DOF, end_stop: float, share: float = 0.1
