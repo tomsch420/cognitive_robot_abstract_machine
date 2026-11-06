@@ -4088,6 +4088,22 @@ class MujocoSynchronizer(MultiSimSynchronizer):
             self.connections_left_to_the_physics -= left
             self.read_simulation_into_world()
 
+    def simulated_position(self, connection: ActiveConnection1DOF) -> float:
+        """
+        :param connection: A connection backed by a joint of the MuJoCo model.
+        :return: The position the physics has moved ``connection`` to, which the world
+            does not hold while ``connection`` is left to the physics.
+        :raises MujocoEntityNotFoundError: If no joint of the model backs ``connection``.
+        """
+        qpos_address = self._resolve_qpos_address(connection)
+        if qpos_address is None:
+            raise MujocoEntityNotFoundError(
+                entity_name=self.element_names.of(connection),
+                entity_type=mujoco.mjtObj.mjOBJ_JOINT,
+            )
+        with self.simulator._model_lock:
+            return float(self.simulator._mj_data.qpos[qpos_address])
+
     def _resolve_qpos_address(self, connection: Connection) -> int | None:
         """
         Resolve the qpos address for the MuJoCo joint backing ``connection``,

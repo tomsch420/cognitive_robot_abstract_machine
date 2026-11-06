@@ -13,7 +13,7 @@ approach begins.
 from __future__ import annotations
 
 from abc import ABC
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 from scipy.spatial.transform import Rotation, Slerp
@@ -31,10 +31,12 @@ from coraplex.robot_plans.actions.core.robot_body import (
 )
 from coraplex.robot_plans.mixins import MovesToolCenterPoint, OperatesGripper
 from cramph.composites import Parallel
+from cramph.data_types import ObservationStateValues
 from cramph.monitors import CountSimulationTimeSeconds
 from cramph.node import CompositeNode, EndedByOwner, NodeArtifacts, StatechartNode
 from experiments.robocasa_atomic_tasks.free_space import FreeSpacePathPlanner
 from experiments.robocasa_atomic_tasks.geometry import ApproachFrame, BodyBounds
+from giskardpy.motion_statechart.graph_node import MotionNodeArtifacts
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose, HoldPose
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
 from giskardpy.motion_statechart.weights import DefaultWeights
@@ -48,7 +50,9 @@ from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech impor
     FunctionVerbalizationTemplates,
 )
 from krrood.ormatic.utils import classproperty
-from krrood.symbolic_math.symbolic_math import trinary_logic_and
+import krrood.symbolic_math.symbolic_math as sm
+from krrood.symbolic_math.symbolic_math import FloatVariable, trinary_logic_and
+from semantic_digital_twin.adapters.multi_sim import MujocoSynchronizer
 from semantic_digital_twin.collision_checking.collision_matrix import CollisionRule
 from semantic_digital_twin.collision_checking.collision_rules import (
     AllowCollisionForEndEffector,
@@ -269,6 +273,72 @@ class MayReachThroughFreeSpace:
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
+class MeasuredJointPosition(JointPositionList):
+    """
+    Differs from :class:`JointPositionList` in observing its goal as reached only once
+    the physics of the MuJoCo model the world is synchronized with has moved the joints
+    there, while the controller still drives the world's own positions of them.
+    Without such a model it observes the world's positions, as the base does.
+    """
+
+    _synchronizer: MujocoSynchronizer | None = field(
+        init=False, default=None, repr=False
+    )
+    """
+    The synchronization with the MuJoCo model the positions are measured in.
+    """
+
+    _measured_positions: dict[ActiveConnection1DOF, FloatVariable] = field(
+        init=False, default_factory=dict, repr=False
+    )
+    """
+    The variable holding each joint's position as the physics last measured it.
+    """
+
+    def set_up(self) -> None:
+        self._synchronizer = next(
+            iter(
+                MujocoSynchronizer.all_callbacks_of_this_type_from_world(
+                    self.context.world
+                )
+            ),
+            None,
+        )
+        if self._synchronizer is None:
+            return
+        self._measured_positions = {
+            connection: FloatVariable(f"{self.name}/measured {connection.name}")
+            for connection, _ in self.goal_state.items()
+        }
+        for variable in self._measured_positions.values():
+            self.context.float_variable_data.register_expression(variable)
+
+    def build(self) -> MotionNodeArtifacts:
+        """
+        Differs from :meth:`JointPositionList.build` in observing the measured positions.
+        """
+        artifacts = super().build()
+        if self._synchronizer is None:
+            return artifacts
+        measured_errors = [
+            sm.abs(
+                self.apply_limits_to_target(target, connection)
+                - self._measured_positions[connection]
+            )
+            for connection, target in self.goal_state.items()
+        ]
+        artifacts.observation = self.goal_reached_at(sm.max(sm.Vector(measured_errors)))
+        return artifacts
+
+    def on_tick(self) -> ObservationStateValues | None:
+        for connection, variable in self._measured_positions.items():
+            self.context.float_variable_data.set_value(
+                variable, self._synchronizer.simulated_position(connection)
+            )
+        return None
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
 class DriveJoint(EndedByOwner, CompositeNode):
     """
     Move one joint of the environment to a position while keeping the robot's tool
@@ -320,7 +390,7 @@ class DriveJoint(EndedByOwner, CompositeNode):
     def expand(self) -> None:
         self._add_children_to_statechart(
             [
-                JointPositionList(
+                MeasuredJointPosition(
                     name="joint goal",
                     goal_state=JointState.from_mapping(
                         {self.joint: self.goal_position}
@@ -934,8 +1004,35 @@ class FingerPressAction(PlacesOneFingertip, PressAction):
 class FingerWithdrawAction(PlacesOneFingertip, WithdrawAction):
     """
     Draws the open gripper straight back from a point it was brought to by a
-    :class:`FingerPressAction`, the way it came in.
+    :class:`FingerPressAction`, the way it came in, then straight up.
     """
+
+    rise: float = 0.15
+    """
+    How far the gripper rises straight up once drawn back, in metres, so that parking
+    the arm sets off above what stands around the pushed part.
+    """
+
+    def create_steps(self) -> list[StatechartNode]:
+        """
+        Differs from :meth:`WithdrawAction.create_steps` in rising by :attr:`rise` once
+        drawn back.
+        """
+        world = self.world
+        world_T_risen = world.transform(
+            self.fingertips_goal(self.distance), world.root
+        ).homogeneous_matrix.to_np()
+        world_T_risen[2, 3] += self.rise
+        return [
+            *super().create_steps(),
+            self.tool_center_point_goal(
+                HomogeneousTransformationMatrix(
+                    world_T_risen, reference_frame=world.root
+                ).pose,
+                self.arm,
+                in_a_straight_line=True,
+            ),
+        ]
 
 
 @dataclass(eq=False, repr=False, kw_only=True)

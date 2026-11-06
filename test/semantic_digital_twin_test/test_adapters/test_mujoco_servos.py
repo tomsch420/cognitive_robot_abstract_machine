@@ -442,6 +442,31 @@ def test_the_world_keeps_its_own_position_of_a_joint_left_to_the_physics():
 @pytest.mark.skipif(
     not runs_in_continuous_integration(), reason="MuJoCo tests only run in CI"
 )
+def test_the_simulated_position_of_a_joint_left_to_the_physics_is_the_physics_one():
+    pendulum = _pendulum_world()
+    world = pendulum.world
+
+    simulation = MujocoSim(world=world, headless=True)
+    simulation.start_stepped_simulation()
+    try:
+        simulator = simulation.simulator
+        with simulation.synchronizer.leave_to_the_physics(
+            [pendulum.hinge, pendulum.mirrored_hinge]
+        ):
+            world.state[pendulum.hinge.raw_dof.id].position = 0.5
+            world.notify_state_change()
+            simulation.step_simulation(timedelta(seconds=simulator.step_size))
+            read = simulation.synchronizer.simulated_position(pendulum.hinge)
+            simulated = simulator.get_joint_value("hinge").result
+    finally:
+        simulation.stop_simulation()
+
+    assert read == simulated
+
+
+@pytest.mark.skipif(
+    not runs_in_continuous_integration(), reason="MuJoCo tests only run in CI"
+)
 def test_the_world_takes_the_physics_position_of_a_joint_no_longer_left_to_it():
     pendulum = _pendulum_world()
     world = pendulum.world

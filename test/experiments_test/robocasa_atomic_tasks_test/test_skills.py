@@ -10,11 +10,18 @@ from abc import ABC
 import numpy as np
 import pytest
 
+from coraplex.plans.context_extensions import RobotAccess
 from coraplex.robot_plans.actions.base import Action
+from cramph.context import StatechartContext
+from cramph.node import StatechartNode
+from cramph.statechart import Statechart
 from experiments.robocasa_atomic_tasks import skills
+from experiments.robocasa_atomic_tasks.panda_omron import PandaOmron
+from giskardpy.motion_statechart.goals.cartesian_goals import CartesianPoseStraight
 from experiments.robocasa_atomic_tasks.skills import (
     FingerApproach,
     FingerPressAction,
+    FingerWithdrawAction,
     PressAction,
 )
 from semantic_digital_twin.datastructures.definitions import GripperState
@@ -102,4 +109,47 @@ def test_a_finger_press_puts_the_trailing_fingertip_on_the_point(panda_omron):
         press.trailing_fingertip_face().to_np()[:3]
         @ arm.end_effector.closing_axis.to_np()[:3]
         < 0.0
+    )
+
+
+# %% withdrawing the finger
+
+
+def straight_tool_goal_in_the_root(step: StatechartNode) -> np.ndarray:
+    """
+    :param step: A step moving the tool frame in a straight line, holding the tasks
+        beside it or held in a parallel with them.
+    :return: The pose it moves the tool frame to, in the world's root frame.
+    """
+    [goal] = (
+        [step]
+        if isinstance(step, CartesianPoseStraight)
+        else [node for node in step.nodes if isinstance(node, CartesianPoseStraight)]
+    )
+    world = goal.tip_link._world
+    return world.transform(goal.goal_pose, world.root).homogeneous_matrix.to_np()
+
+
+def test_a_finger_withdrawal_rises_straight_up_once_drawn_back(
+    panda_omron: PandaOmron,
+):
+    [arm] = panda_omron.all_arms
+    withdrawal = FingerWithdrawAction(
+        point=np.array([1.0, 0.0, 1.0]),
+        approach=np.array([-1.0, 0.0, 0.0]),
+        closing=np.array([0.0, -1.0, 0.0]),
+        arm=arm,
+    )
+    Statechart(
+        context=StatechartContext.with_extensions(
+            arm._world, [RobotAccess(panda_omron)]
+        )
+    ).add_node(withdrawal)
+
+    drawn_back, risen = withdrawal.create_steps()
+
+    expected = straight_tool_goal_in_the_root(drawn_back)
+    expected[2, 3] += withdrawal.rise
+    np.testing.assert_allclose(
+        straight_tool_goal_in_the_root(risen), expected, atol=1e-9
     )
