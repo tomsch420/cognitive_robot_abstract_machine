@@ -167,6 +167,38 @@ class DegreeOfFreedomLimits(Generic[T]):
         )
 
 
+class LimitSide(StrEnum):
+    """
+    One of the two ends of a degree of freedom's range of positions.
+    """
+
+    LOWER = "lower"
+    """
+    The end at the lowest position.
+    """
+
+    UPPER = "upper"
+    """
+    The end at the highest position.
+    """
+
+    @property
+    def opposite(self) -> LimitSide:
+        """
+        The other end of the range.
+        """
+        return LimitSide.UPPER if self is LimitSide.LOWER else LimitSide.LOWER
+
+    def position_in(self, limits: DegreeOfFreedomLimits) -> float:
+        """
+        :param limits: The limits of a degree of freedom.
+        :return: The position of this end of their range.
+        """
+        if self is LimitSide.LOWER:
+            return limits.lower.position
+        return limits.upper.position
+
+
 @dataclass(eq=False)
 class DegreeOfFreedom(WorldEntityWithID, SubclassJSONSerializer):
     """

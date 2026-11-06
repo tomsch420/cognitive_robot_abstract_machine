@@ -73,6 +73,31 @@ class NoJointStateWithType(DataclassException):
 
 
 @dataclass
+class NotAMixerLever(DataclassException):
+    """
+    Raised when a lever is read as that of a mixer tap but does not tilt on a revolute
+    hinge that sits on a revolute swivel.
+    """
+
+    lever_name: PrefixedName
+    """
+    The name of the lever's body.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{self.lever_name} does not tilt on a revolute hinge that sits on a "
+            f"revolute swivel, as the lever of a mixer tap does."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "annotate only a lever whose body hangs from a revolute connection whose "
+            "parent hangs from another revolute connection as a MixerLever."
+        )
+
+
+@dataclass
 class MalformedHexColor(DataclassException):
     """
     Raised when a string meant to name a color is not written as hex digits.

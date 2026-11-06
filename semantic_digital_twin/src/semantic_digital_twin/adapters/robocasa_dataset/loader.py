@@ -34,6 +34,8 @@ from semantic_digital_twin.part_finding.relationships import PartRelationshipIns
 from semantic_digital_twin.pipeline.pipeline import Pipeline
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     KnobWithHandle,
+    MixerLever,
+    Sink,
 )
 from semantic_digital_twin.semantic_annotations.mixins import (
     HasMovableJoint,
@@ -45,7 +47,11 @@ from semantic_digital_twin.semantic_annotations.natural_language import (
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.utils import camel_case_split
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
+from semantic_digital_twin.world_description.connections import (
+    ActiveConnection1DOF,
+    RevoluteConnection,
+)
+from semantic_digital_twin.world_description.degree_of_freedom import LimitSide
 from semantic_digital_twin.world_description.world_entity import (
     Body,
     SemanticAnnotation,
@@ -461,6 +467,7 @@ class RoboCasaDatasetLoader:
         )
         self._apply_joint_positions(world, environment, mirrored_joints)
         self._apply_kitchen_appliance_semantics(world, environment.fixtures)
+        self._annotate_mixer_levers(world, mirrored_joints)
         manipulated_objects = self._apply_task_object_semantics(
             world, environment.object_cfgs, environment.objects
         )
@@ -541,6 +548,48 @@ class RoboCasaDatasetLoader:
             connection.position = (
                 -position if connection.name.name in mirrored_joints else position
             )
+
+    @staticmethod
+    def _annotate_mixer_levers(world: World, mirrored_joints: set[str]) -> None:
+        """
+        Annotate, as a :class:`MixerLever`, the body of every sink's handle that tilts
+        on a revolute hinge sitting on a revolute swivel; RoboCasa runs the water
+        hottest at the upper end of the swivel's range.
+
+        :param world: The world the task scene was parsed into, its joints each moving a
+            body of its own.
+        :param mirrored_joints: The names of the joints the world holds mirrored, see
+            :meth:`_mirror_joints_opening_towards_negative`.
+        """
+        for sink in world.get_semantic_annotations_by_type(Sink):
+            if sink.handle is None:
+                continue
+            handle_bodies = [
+                sink.handle.root,
+                *world.compute_descendent_child_kinematic_structure_entities(
+                    sink.handle.root
+                ),
+            ]
+            levers = [
+                body
+                for body in handle_bodies
+                if isinstance(body, Body)
+                and isinstance(body.parent_connection, RevoluteConnection)
+                and isinstance(
+                    body.parent_connection.parent.parent_connection, RevoluteConnection
+                )
+            ]
+            if not levers:
+                continue
+            lever = levers[0]
+            swivel = lever.parent_connection.parent.parent_connection
+            hot_side = (
+                LimitSide.LOWER
+                if swivel.name.name in mirrored_joints
+                else LimitSide.UPPER
+            )
+            with world.modify_world():
+                world.add_semantic_annotation(MixerLever(root=lever, hot_side=hot_side))
 
     @staticmethod
     def _available_task_names() -> list[str]:

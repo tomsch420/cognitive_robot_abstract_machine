@@ -29,8 +29,11 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Dishwasher,
     Drawer,
     Floor,
+    MixerLever,
+    Sink,
 )
 from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
+from semantic_digital_twin.world_description.degree_of_freedom import LimitSide
 from semantic_digital_twin.world import World
 
 
@@ -388,6 +391,33 @@ def test_load_task_puts_a_drawer_on_its_rails_with_its_handle(robocasa_loader):
         drawer.handle.root.get_first_parent_connection_of_type(ActiveConnection1DOF)
         is drawer.movable_joint
     )
+
+
+def test_load_task_reads_a_sink_handle_as_a_mixer_lever(robocasa_loader):
+    """
+    RoboCasa's sink handle tilts on one hinge to let the water run and swings on another
+    to set its temperature, hottest at the upper end of that one's range.
+    """
+    from robocasa.models.scenes.scene_registry import LayoutType, StyleType
+
+    task = robocasa_loader.load_task(
+        "TurnOnSinkFaucet",
+        layout_id=LayoutType.LAYOUT001,
+        style_id=StyleType.STYLE001,
+        seed=0,
+    )
+    [sink] = task.world.get_semantic_annotations_by_type(Sink)
+    [lever] = task.world.get_semantic_annotations_by_type(MixerLever)
+
+    assert lever.root in [
+        sink.handle.root,
+        *task.world.compute_descendent_child_kinematic_structure_entities(
+            sink.handle.root
+        ),
+    ]
+    assert lever.root.collision.shapes
+    assert lever.hot_side is LimitSide.UPPER
+    assert lever.temperature_joint is not lever.flow_joint
 
 
 def test_load_task_weighs_a_body_as_robocasa_weighs_it(robocasa_loader):

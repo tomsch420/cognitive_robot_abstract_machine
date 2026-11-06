@@ -11,7 +11,9 @@ from typing_extensions import ClassVar, Sequence
 
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection1DOF,
+    RevoluteConnection,
 )
+from semantic_digital_twin.world_description.degree_of_freedom import LimitSide
 from semantic_digital_twin.world_description.geometry import Shape
 from semantic_digital_twin.world_description.inertial_properties import Inertial
 from semantic_digital_twin.world_description.shape_collection import (
@@ -32,6 +34,7 @@ from semantic_digital_twin.exceptions import (
     InvalidHingeActiveAxis,
     MissingSemanticAnnotationError,
     MissingMovableJointError,
+    NotAMixerLever,
 )
 from semantic_digital_twin.reasoning.predicates import InsideOf
 from semantic_digital_twin.semantic_annotations.part_whole import (
@@ -90,6 +93,7 @@ from semantic_digital_twin.world_description.shape_collection import (
 from semantic_digital_twin.world_description.world_entity import (
     SemanticAnnotation,
     Body,
+    KinematicStructureEntity,
 )
 from semantic_digital_twin.specifications.connections import ConnectionSpecification
 from semantic_digital_twin.specifications.kinematic_structure_entities import (
@@ -423,6 +427,61 @@ class Lever(HasRootBody):
     A control that is pushed, pulled or tilted to trigger a function, such as lowering
     the bread into a toaster.
     """
+
+
+@dataclass(eq=False)
+class MixerLever(Lever):
+    """
+    The lever of a single lever mixer tap: tilting it on its hinge sets how much water
+    flows, swinging it on the swivel that hinge sits on sets how hot the water runs.
+    """
+
+    hot_side: LimitSide = field(kw_only=True)
+    """
+    The end of the swivel's range at which the water runs hottest.
+    """
+
+    @property
+    def flow_joint(self) -> RevoluteConnection:
+        """
+        The hinge the lever tilts on to let the water flow.
+        """
+        return self._revolute_connection_above(self.root)
+
+    @property
+    def temperature_joint(self) -> RevoluteConnection:
+        """
+        The swivel the flow hinge sits on, which the lever swings on to set how hot the
+        water runs.
+        """
+        return self._revolute_connection_above(self.flow_joint.parent)
+
+    @property
+    def hottest_position(self) -> float:
+        """
+        The position of :attr:`temperature_joint` at which the water runs hottest.
+        """
+        return self.hot_side.position_in(self.temperature_joint.dof.limits)
+
+    @property
+    def coldest_position(self) -> float:
+        """
+        The position of :attr:`temperature_joint` at which the water runs coldest.
+        """
+        return self.hot_side.opposite.position_in(self.temperature_joint.dof.limits)
+
+    def _revolute_connection_above(
+        self, entity: KinematicStructureEntity
+    ) -> RevoluteConnection:
+        """
+        :param entity: The lever's body or a body it hangs from.
+        :return: The connection ``entity`` hangs from.
+        :raises NotAMixerLever: If that connection is not revolute.
+        """
+        connection = entity.parent_connection
+        if not isinstance(connection, RevoluteConnection):
+            raise NotAMixerLever(lever_name=self.root.name)
+        return connection
 
 
 @dataclass(eq=False)
