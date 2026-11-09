@@ -158,6 +158,13 @@ class RoboCasaEpisode:
     .robocasa_atomic_tasks.skills.OperateMechanismAction.settling_time`.
     """
 
+    leaves_the_environment_to_the_physics: bool = True
+    """
+    Whether the kitchen's joints are left to the physics while a plan runs in a physical
+    simulation, the world taking where the physics moved them only once the plan is
+    over; otherwise the world follows them as the physics moves them.
+    """
+
     simulation: MujocoSim | None = field(default=None, init=False, repr=False)
     """
     The physical simulation of the world the robot acts in, while one runs.
@@ -358,7 +365,8 @@ class RoboCasaEpisode:
             :attr:`executor_extensions`. In
             physics the bodies are carried by the grip of the fingers alone, the hand
             moves in straight lines around what it holds or lets go of, and only what
-            the robot does to the kitchen's joints moves them.
+            the robot does to the kitchen's joints moves them; whether the world follows
+            them during the plan is :attr:`leaves_the_environment_to_the_physics`.
         """
         context = StatechartContext.with_extensions(
             self.world,
@@ -379,7 +387,7 @@ class RoboCasaEpisode:
             collision_avoidance=self.collision_avoidance,
             extensions=list(self.executor_extensions),
             plan_adaptations=[LetContactCarryTheBodies(), MoveStraightAroundObjects()],
-            leaves_the_environment_to_the_physics=True,
+            leaves_the_environment_to_the_physics=self.leaves_the_environment_to_the_physics,
         )
 
     def run(self, steps: Sequence[StatechartNode | Match]) -> PlanOutcome:

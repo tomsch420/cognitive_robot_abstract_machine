@@ -25,6 +25,8 @@ world = episode.world
 task.physics = True
 episode.collision_avoidance = task.collision_avoidance
 episode.simulation = episode.start_physical_simulation()
+# the viewer shows the kitchen's joints move with the robot, not after each motion
+episode.leaves_the_environment_to_the_physics = False
 executor = episode.create_executor()
 
 # %% cell the world's lock takes the viewer's lock first

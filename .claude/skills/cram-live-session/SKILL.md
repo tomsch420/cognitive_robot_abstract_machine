@@ -117,5 +117,8 @@ change to the world's model (`SnapshotDoesNotFitSimulationError`).
   run detached and read a log instead. Do the same for anything you run by hand.
 - **A restore is refused** with `SnapshotDoesNotFitSimulationError`: the world's model
   changed (an object was spawned or removed); take new snapshots after such a change.
+- **A pushed or pulled joint moves only after the motion**: the world follows the
+  kitchen's joints during a plan only with `episode.leaves_the_environment_to_the_physics = False`,
+  which the template sets.
 - **The live view shows nothing new**: check the viewer log in the session directory, and
   that the tunnel on the developer's machine still runs.
