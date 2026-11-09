@@ -13,7 +13,10 @@ MEMORY_LIMIT_KB=${LIVE_MEMORY_LIMIT_KB:-150000000}
 
 mkdir -p "$SESSION_DIRECTORY"
 cd "$REPOSITORY"
+# ROS setup scripts read variables that may be unset
+set +u
 source "$ENVIRONMENT_SCRIPT"
+set -u
 export QT_QPA_PLATFORM=offscreen
 
 if ! pgrep -f "^[^ ]*python[^ ]* -m ipykernel_launcher -f $SESSION_DIRECTORY/kernel.json" > /dev/null; then
