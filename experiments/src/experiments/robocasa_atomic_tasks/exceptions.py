@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from coraplex.plans.failures import PlanFailure
 from krrood.exceptions import DataclassException
+from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
 from semantic_digital_twin.world_description.world_entity import Body
 
 # %% placing
@@ -171,3 +173,94 @@ class DegreesOfFreedomNotInTheWorld(DataclassException):
             "Compose the episode with the layout, style, seed and robot the run was "
             "recorded with."
         )
+
+
+# %% actions at the sink
+
+
+@dataclass
+class PreconditionsNotMet(PlanFailure):
+    """
+    Raised when an action starts in a world its preconditions do not hold in.
+    """
+
+    action_name: str
+    """
+    The name of the action.
+    """
+
+    false_preconditions: list[str]
+    """
+    The preconditions that do not hold, in words.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{self.action_name} cannot start: {'; '.join(self.false_preconditions)}."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Bring the world into a state these hold in first, by another action."
+
+
+@dataclass
+class FaucetNotTurnedOn(PlanFailure):
+    """
+    Raised when a push left the faucet's handle short of where the water runs.
+    """
+
+    lift_joint: ActiveConnection1DOF
+    """
+    The joint the handle is lifted about.
+    """
+
+    position: float
+    """
+    Where the handle stands after the push, in radians.
+    """
+
+    goal: float
+    """
+    Where the handle was to be lifted to, in radians.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{self.lift_joint.name} stands at {self.position:.3f} rad after the push, "
+            f"short of {self.goal:.3f} rad."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Push further, or put the finger closer to the handle."
+
+
+@dataclass
+class LeverSwungAside(PlanFailure):
+    """
+    Raised when turning the faucet on swung its handle about another of its joints, such
+    as the one choosing the water's temperature.
+    """
+
+    joint: ActiveConnection1DOF
+    """
+    The joint the handle was swung about.
+    """
+
+    change: float
+    """
+    How far the handle was swung about it, in radians.
+    """
+
+    tolerance: float
+    """
+    How far it may be swung, in radians.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{self.joint.name} moved by {self.change:.3f} rad, more than "
+            f"{self.tolerance:.3f} rad."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Bring the finger in beside the handle rather than against it."

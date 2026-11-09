@@ -105,6 +105,31 @@ change to the world's model (`SnapshotDoesNotFitSimulationError`).
 - Allow contact: `with episode.allowances.bodies_may_touch(hand_bodies, other_bodies): ...`.
 - Motions: `ReachThroughFreeSpaceAction(goal=pose, arm=episode.arm)` (path through free space), `FollowToolCenterPointPathAction(target_locations=PoseTrajectory([...]), arm=episode.arm)` (straight), `NavigateAction(target_location=pose)`, `MoveTorsoAction(torso_state=TorsoState.LOW)`, `SetGripperAction(configuration=gripper.default_configuration(GripperState.OPEN))`; run them with `episode.run([...])`, which returns the `PlanOutcome` to report.
 - Joint limits and what is near each arm link are the first things to measure when a motion stops with `MotionMadeNoProgress`.
+- Don't name kernel variables `m` or `d` in measuring cells: they are the MuJoCo model and data.
+
+## Turning a session into an action
+
+When the developer asks for an action from what worked, write it bottom-up from the cells
+that worked, not from existing actions of the same kind. See
+`experiments/robocasa_atomic_tasks/sink_actions.py` (`LiftTheHandOutOfTheSinkAction`,
+`TurnOnTheFaucetWithAFingerAction`) for the shape:
+
+- **Parameters** are fields defaulting to the values that worked, expressed relative to the
+  objects involved (a handle's extent, a joint's axis), never in world coordinates, so they
+  can later be varied and learned through the probabilistic backend.
+- **Preconditions** are an EQL condition from `preconditions()` (mixin `HasPreconditions`),
+  checked as the first step; give each predicate one operand as a `variable(...)` so the
+  condition is symbolic. A false one fails the action with `PreconditionsNotMet`.
+- **Tolerances** the session silently accepted (a motion that reported
+  `MotionMadeNoProgress` but was close enough) become explicit parameters.
+- Steps whose poses depend on where earlier steps left the robot are given as statements
+  (`a(StepAction)(...)`), which are expanded only when they start; plain nodes are expanded
+  when the plan is compiled.
+- Collision allowances that must hold from one step to the next belong to the outer
+  action's `create_temporary_collision_rules`, not to each step.
+- Load the new module into the kernel from the worktree (`importlib.util.spec_from_file_location`),
+  run the action as a cell from the snapshot the session began at, and let the developer
+  watch it before writing the tests.
 
 ## When something goes wrong
 
