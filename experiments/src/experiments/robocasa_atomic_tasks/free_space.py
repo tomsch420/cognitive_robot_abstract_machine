@@ -215,12 +215,9 @@ class FreeSpacePathPlanner:
         """
         nearest = NearestFreePoint(point=point, distance=np.inf)
         for box in graph.graph.nodes():
-            # a box of free space holds its extents about its own origin
-            offset = box.origin.to_np()[:3, 3]
             corners = box.to_array_bounds()
-            lower, upper = offset + corners.lower, offset + corners.upper
-            inset = np.minimum(self.box_inset, (upper - lower) / 2)
-            candidate = np.clip(point, lower + inset, upper - inset)
+            inset = np.minimum(self.box_inset, (corners.upper - corners.lower) / 2)
+            candidate = np.clip(point, corners.lower + inset, corners.upper - inset)
             distance = float(np.linalg.norm(candidate - point))
             if distance < nearest.distance:
                 nearest = NearestFreePoint(point=candidate, distance=distance)
