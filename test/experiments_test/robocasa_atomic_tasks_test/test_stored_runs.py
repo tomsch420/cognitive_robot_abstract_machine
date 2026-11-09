@@ -403,7 +403,7 @@ def test_a_replayed_plan_goes_through_every_state_it_was_recorded_in(
     world_with_a_lever, recorded_plan
 ):
     recorded_life_cycle_values = [
-        item.life_cycle_state.covering_every_node().data.tolist()
+        item.life_cycle_state.copy_covering_every_node().data.tolist()
         for item in recorded_plan.statechart.state_history.items
     ]
     shown = ExtensionNotingWhatItIsShown()

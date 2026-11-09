@@ -335,8 +335,8 @@ class ReplayedPlanExecutor(PlanExecutor, StatechartExecutor):
         recorded = self.recorded_states[self.shown_state_count]
         shown = StateHistoryItem(
             tick_count=recorded.tick_count,
-            life_cycle_state=recorded.life_cycle_state.covering_every_node(),
-            observation_state=recorded.observation_state.covering_every_node(),
+            life_cycle_state=recorded.life_cycle_state.copy_covering_every_node(),
+            observation_state=recorded.observation_state.copy_covering_every_node(),
         )
         self.tick_count = recorded.tick_count
         self.statechart.life_cycle_state.data = shown.life_cycle_state.data.copy()
