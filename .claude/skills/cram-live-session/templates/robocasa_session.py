@@ -1,4 +1,6 @@
 # %% cell setup: the task, its world and robot, shown live in cramera
+from __future__ import annotations
+
 import logging
 import time
 
