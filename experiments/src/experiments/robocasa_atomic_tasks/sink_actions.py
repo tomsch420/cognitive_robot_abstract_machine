@@ -1,7 +1,7 @@
 """
 Actions at the sink, written from what worked when the robot was driven there step by
-step: lifting the hand out of the basin, and turning the faucet on and off by pushing
-its handle with one finger.
+step: lifting the hand out of the basin, turning the faucet on and off by pushing its
+handle with one finger, and turning the water hot by pulling the handle with the base.
 
 Each parameter is a field defaulting to the value that worked, so that the values can be
 varied and what works learned; the preconditions are EQL conditions checked when the
@@ -30,11 +30,16 @@ from experiments.robocasa_atomic_tasks.exceptions import (
     FaucetNotTurnedOff,
     FaucetNotTurnedOn,
     HandleHasNoBar,
+    LeverNotSwungToItsEnd,
     LeverSwungAside,
     PreconditionsNotMet,
 )
 from experiments.robocasa_atomic_tasks.skills import ReachThroughFreeSpaceAction
-from giskardpy.motion_statechart.tasks.cartesian_tasks import HoldPose
+from giskardpy.motion_statechart.tasks.cartesian_tasks import (
+    CartesianPose,
+    HoldPose,
+    RigidCoupling,
+)
 from krrood.entity_query_language.factories import (
     a,
     and_,
@@ -62,6 +67,7 @@ from semantic_digital_twin.collision_checking.collision_matrix import CollisionR
 from semantic_digital_twin.collision_checking.collision_rules import (
     AllowCollisionBetweenGroups,
     AllowCollisionForEndEffector,
+    AvoidCollisionBetweenGroups,
 )
 from semantic_digital_twin.datastructures.definitions import GripperState, TorsoState
 from semantic_digital_twin.reasoning.predicates import InsideOf, PlaceIsOccupied
@@ -240,6 +246,21 @@ class FingerExtents:
                 for body in gripper.bodies_with_collision
                 if body not in hand
             ]
+        )
+
+    def side_of_the_lower_finger(self) -> np.ndarray:
+        """
+        :return: The middle of the face of the finger on the tool frame's negative x
+            side that faces the tool frame's negative y-axis, in the tool frame; with
+            the tool frame's x-axis pointing up, that finger is the lower one.
+        """
+        lower_finger = [
+            extent for extent in self.extents if extent.lower[0] + extent.upper[0] < 0.0
+        ]
+        lower = np.min([extent.lower for extent in lower_finger], axis=0)
+        upper = np.max([extent.upper for extent in lower_finger], axis=0)
+        return np.array(
+            [(lower[0] + upper[0]) / 2, lower[1], (lower[2] + upper[2]) / 2]
         )
 
 
@@ -769,6 +790,27 @@ class TouchesTheFaucetHandle(MovesToolCenterPoint, ABC):
             in_a_straight_line=in_a_straight_line,
         )
 
+    def tool_goal_with_the_arm_held(self, world_T_tool: np.ndarray) -> StatechartNode:
+        """
+        :param world_T_tool: Where the tool frame is to go, in the world's root frame.
+        :return: The goal moving the tool frame there in a straight line, the base
+            carrying it while the arm keeps its posture.
+        """
+        return self.tool_center_point_goal(
+            HomogeneousTransformationMatrix(
+                world_T_tool, reference_frame=self.world.root
+            ).pose,
+            self.arm,
+            in_a_straight_line=True,
+            accompanying_goals=(
+                RigidCoupling(
+                    name="arm keeps its posture",
+                    root_link=self.robot.root,
+                    tip_link=self.arm.end_effector.tool_frame,
+                ),
+            ),
+        )
+
 
 @dataclass(eq=False, repr=False, kw_only=True)
 class PushesTheFaucetHandle(TouchesTheFaucetHandle, GoalAction, ABC):
@@ -949,34 +991,12 @@ class PutTheLowerFingerBesideTheLeverBarAction(
         bar = LeverBar.from_handle(self.handle)
         beside = np.cross(handle.facing, bar.up_the_bar)
         rotation = np.column_stack([bar.up_the_bar, beside, handle.facing])
-        # the tool frame's x-axis points up the bar, so the lower finger is the one on
-        # its negative x side, and the bar is on the finger's negative y side
-        lower_finger = [
-            extent
-            for extent in FingerExtents.from_arm(self.arm).extents
-            if extent.lower[0] + extent.upper[0] < 0.0
-        ]
-        finger_side = np.array(
-            [
-                (
-                    min(extent.lower[0] for extent in lower_finger)
-                    + max(extent.upper[0] for extent in lower_finger)
-                )
-                / 2,
-                min(extent.lower[1] for extent in lower_finger),
-                (
-                    min(extent.lower[2] for extent in lower_finger)
-                    + max(extent.upper[2] for extent in lower_finger)
-                )
-                / 2,
-            ]
-        )
         world_T_in = np.eye(4)
         world_T_in[:3, :3] = rotation
         world_T_in[:3, 3] = (
             bar.point_up_the_bar(self.bar_share)
             + (bar.radius + self.finger_gap) * beside
-            - rotation @ finger_side
+            - rotation @ FingerExtents.from_arm(self.arm).side_of_the_lower_finger()
         )
         world_T_approach = world_T_in.copy()
         world_T_approach[:3, 3] -= self.approach_distance * handle.facing
@@ -1021,6 +1041,182 @@ class PullTheHandBackFromTheFaucetHandleAction(TouchesTheFaucetHandle, GoalActio
         world_T_back = self.arm.end_effector.tool_frame.global_pose.to_np().copy()
         world_T_back[:3, 3] -= self.retreat_distance * handle.facing
         return self.tool_goal_with_the_base_held(world_T_back, in_a_straight_line=True)
+
+
+# %% working behind the faucet's lever
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class WorksBehindTheFaucetLever(TouchesTheFaucetHandle, ABC):
+    """
+    An action whose hand works in the narrow space behind a faucet's lever, between the
+    lever, the faucet and the wall behind them.
+    """
+
+    small_buffer: float = 0.003
+    """
+    How far the arm keeps from every body other than the robot and the lever, in metres.
+    """
+
+    def create_temporary_collision_rules(self) -> list[CollisionRule]:
+        """
+        Differs from :meth:`TouchesTheFaucetHandle.create_temporary_collision_rules` in
+        letting the gripper touch only the lever, and the arm come within
+        :attr:`small_buffer` of everything else, since the arm otherwise swings away
+        from the wall as soon as it moves.
+        """
+        robot = set(self.robot.bodies)
+        surroundings = [
+            body
+            for body in self.world.bodies_with_collision
+            if body not in robot and body is not self.handle
+        ]
+        return [
+            AvoidCollisionBetweenGroups(
+                body_group_a=list(self.arm.bodies_with_collision),
+                body_group_b=surroundings,
+                buffer_zone_distance=self.small_buffer,
+            ),
+            AllowCollisionBetweenGroups(
+                body_group_a=list(self.arm.end_effector.bodies_with_collision),
+                body_group_b=[self.handle],
+            ),
+        ]
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class PutTheLowerFingerBehindTheLeverBarAction(
+    WorksBehindTheFaucetLever, SequentialAction
+):
+    """
+    Brings the open hand to the right of a faucet's lever, pointing left with its
+    fingers one above the other, and slides it straight left, the base carrying it,
+    until the lower finger stands behind the lever's bar.
+
+    The base moves along as needed on the way to the right of the lever.
+    """
+
+    bar_share: float
+    """
+    How far up the bar the lower finger comes, as a share of the bar's length.
+    """
+
+    finger_gap: float
+    """
+    How far the lower finger's collision stays from the bar's, in metres.
+    """
+
+    approach_distance: float
+    """
+    How far to the right of where it ends the tool frame starts sliding left, in metres.
+    """
+
+    def create_steps(self) -> list[StatechartNode]:
+        handle = FaucetHandle.from_lift_joint(self.lift_joint, self.handle)
+        bar = LeverBar.from_handle(self.handle)
+        pointing = -handle.push
+        up = np.array([0.0, 0.0, 1.0])
+        behind = np.cross(pointing, up)
+        rotation = np.column_stack([up, behind, pointing])
+        world_T_behind = np.eye(4)
+        world_T_behind[:3, :3] = rotation
+        world_T_behind[:3, 3] = (
+            bar.point_up_the_bar(self.bar_share)
+            + (bar.radius + self.finger_gap) * behind
+            - rotation @ FingerExtents.from_arm(self.arm).side_of_the_lower_finger()
+        )
+        world_T_right = world_T_behind.copy()
+        world_T_right[:3, 3] += self.approach_distance * handle.push
+        return [
+            self.tool_goal_with_the_base_free(world_T_right, in_a_straight_line=False),
+            self.tool_goal_with_the_arm_held(world_T_behind),
+        ]
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class PullTheFaucetLeverWithTheBaseAction(WorksBehindTheFaucetLever, GoalAction):
+    """
+    Backs the base off slowly, the hand behind a faucet's lever pulling the lever
+    towards the robot, until the lever is swung to near the upper limit of its
+    temperature joint or the base went a distance.
+    """
+
+    temperature_joint: ActiveConnection1DOF
+    """
+    The joint the lever is swung about to choose the water's temperature; pulling the
+    lever towards the robot moves it towards its upper limit.
+    """
+
+    temperature_margin: float
+    """
+    How far short of the temperature joint's upper limit the pull ends, in radians.
+    """
+
+    pull_distance: float
+    """
+    How far the base backs off at most, in metres.
+    """
+
+    pull_speed: float
+    """
+    How fast the base backs off, in metres per second.
+    """
+
+    def create_goal(self) -> StatechartNode:
+        world_T_base = self.robot.root.global_pose.to_np().copy()
+        world_T_base[:3, 3] -= self.pull_distance * world_T_base[:3, 0]
+        return Parallel(
+            name="pull the lever with the base",
+            nodes=[
+                CartesianPose(
+                    name="back off slowly",
+                    root_link=self.world.root,
+                    tip_link=self.robot.root,
+                    goal_pose=HomogeneousTransformationMatrix(
+                        world_T_base, reference_frame=self.world.root
+                    ).pose,
+                    cruise_linear_velocity=self.pull_speed,
+                ),
+                JointPositionAtLeast(
+                    name="lever swung to its end",
+                    joint=self.temperature_joint,
+                    position=self.temperature_joint.dof.limits.upper.position
+                    - self.temperature_margin,
+                ),
+            ],
+            minimum_success=1,
+        )
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class PullTheHandOutFromBehindTheLeverBarAction(
+    WorksBehindTheFaucetLever, SequentialAction
+):
+    """
+    Slides the hand straight right from behind a faucet's lever and then straight back
+    towards the robot, away from the wall, the base carrying it.
+    """
+
+    slide_distance: float
+    """
+    How far the hand slides right, in metres.
+    """
+
+    back_distance: float
+    """
+    How far the hand then comes back towards the robot, in metres.
+    """
+
+    def create_steps(self) -> list[StatechartNode]:
+        handle = FaucetHandle.from_lift_joint(self.lift_joint, self.handle)
+        world_T_out = self.arm.end_effector.tool_frame.global_pose.to_np().copy()
+        world_T_out[:3, 3] += self.slide_distance * handle.push
+        world_T_back = world_T_out.copy()
+        world_T_back[:3, 3] -= self.back_distance * handle.facing
+        return [
+            self.tool_goal_with_the_arm_held(world_T_out),
+            self.tool_goal_with_the_arm_held(world_T_back),
+        ]
 
 
 # %% moving the faucet's handle with a finger
@@ -1376,4 +1572,140 @@ class TurnOffTheFaucetWithAFingerAction(FaucetMovedWithAFingerAction):
         if lift > self.lowered_goal:
             raise FaucetNotTurnedOff(
                 lift_joint=self.lift_joint, position=lift, goal=self.lowered_goal
+            )
+
+
+# %% turning the water hot with a finger
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class TurnTheWaterHotWithAFingerAction(FaucetMovedWithAFingerAction):
+    """
+    Stands in front of a faucet's lever, opens the gripper, slides the lower finger in
+    behind the lever's bar from the right and backs the base off until the lever is
+    swung towards the robot, to hot, then slides the hand out and leaves the sink.
+
+    .. warning:: Sliding the finger in may push the lever down far enough to stop the
+        water; :class:`TurnOnTheFaucetWithAFingerAction` lifts it again.
+    """
+
+    temperature_joint: ActiveConnection1DOF
+    """
+    See :attr:`PullTheFaucetLeverWithTheBaseAction.temperature_joint`.
+    """
+
+    bar_share: float = 0.4
+    """
+    See :attr:`PutTheLowerFingerBehindTheLeverBarAction.bar_share`.
+    """
+
+    finger_gap: float = 0.002
+    """
+    See :attr:`PutTheLowerFingerBehindTheLeverBarAction.finger_gap`.
+    """
+
+    approach_distance: float = 0.13
+    """
+    See :attr:`PutTheLowerFingerBehindTheLeverBarAction.approach_distance`.
+    """
+
+    temperature_margin: float = 0.01
+    """
+    See :attr:`PullTheFaucetLeverWithTheBaseAction.temperature_margin`.
+    """
+
+    pull_distance: float = 0.15
+    """
+    See :attr:`PullTheFaucetLeverWithTheBaseAction.pull_distance`.
+    """
+
+    pull_speed: float = 0.01
+    """
+    See :attr:`PullTheFaucetLeverWithTheBaseAction.pull_speed`.
+    """
+
+    slide_distance: float = 0.12
+    """
+    See :attr:`PullTheHandOutFromBehindTheLeverBarAction.slide_distance`.
+    """
+
+    back_distance: float = 0.08
+    """
+    See :attr:`PullTheHandOutFromBehindTheLeverBarAction.back_distance`.
+    """
+
+    small_buffer: float = 0.003
+    """
+    See :attr:`WorksBehindTheFaucetLever.small_buffer`.
+    """
+
+    def preconditions(self) -> ConditionType:
+        return self.hand_is_outside_the_basin()
+
+    def create_temporary_collision_rules(self) -> list[CollisionRule]:
+        """
+        Differs from
+        :meth:`FaucetMovedWithAFingerAction.create_temporary_collision_rules` in
+        allowing the gripper to touch only the lever, from one step to the next.
+        """
+        return [
+            AllowCollisionBetweenGroups(
+                body_group_a=list(self.arm.end_effector.bodies_with_collision),
+                body_group_b=[self.handle],
+            )
+        ]
+
+    def create_steps_once_the_preconditions_hold(self) -> list[StatechartNode | Match]:
+        gripper = self.arm.end_effector
+        return [
+            self.create_navigation_in_front_of_the_handle(),
+            SetGripperAction(
+                configuration=gripper.default_configuration(GripperState.OPEN)
+            ),
+            a(PutTheLowerFingerBehindTheLeverBarAction)(
+                arm=self.arm,
+                handle=self.handle,
+                lift_joint=self.lift_joint,
+                small_buffer=self.small_buffer,
+                bar_share=self.bar_share,
+                finger_gap=self.finger_gap,
+                approach_distance=self.approach_distance,
+            ),
+            a(PullTheFaucetLeverWithTheBaseAction)(
+                arm=self.arm,
+                handle=self.handle,
+                lift_joint=self.lift_joint,
+                small_buffer=self.small_buffer,
+                temperature_joint=self.temperature_joint,
+                temperature_margin=self.temperature_margin,
+                pull_distance=self.pull_distance,
+                pull_speed=self.pull_speed,
+            ),
+            FunctionCall(
+                name="check the lever is swung to hot",
+                function=self.raise_unless_the_lever_is_swung_to_its_end,
+            ),
+            a(PullTheHandOutFromBehindTheLeverBarAction)(
+                arm=self.arm,
+                handle=self.handle,
+                lift_joint=self.lift_joint,
+                small_buffer=self.small_buffer,
+                slide_distance=self.slide_distance,
+                back_distance=self.back_distance,
+            ),
+            a(LeaveTheSinkAction)(arm=self.arm, basin=self.basin),
+        ]
+
+    def raise_unless_the_lever_is_swung_to_its_end(self) -> None:
+        """
+        :raises LeverNotSwungToItsEnd: If the lever stands short of
+            :attr:`temperature_margin` from the temperature joint's upper limit.
+        """
+        position = JointReading(self.world).position(self.temperature_joint)
+        goal = (
+            self.temperature_joint.dof.limits.upper.position - self.temperature_margin
+        )
+        if position < goal:
+            raise LeverNotSwungToItsEnd(
+                temperature_joint=self.temperature_joint, position=position, goal=goal
             )

@@ -21,10 +21,12 @@ from experiments.robocasa_atomic_tasks.sink_actions import (
     LiftTheHandOutOfTheSinkAction,
     TurnOffTheFaucetWithAFingerAction,
     TurnOnTheFaucetWithAFingerAction,
+    TurnTheWaterHotWithAFingerAction,
 )
 from krrood.entity_query_language.factories import evaluate_condition, variable
 from semantic_digital_twin.adapters.multi_sim import MujocoSimulationSnapshot
 from semantic_digital_twin.reasoning.predicates import InsideOf
+from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
 from semantic_digital_twin.world_description.world_entity import Body
 
 # %% the sink of a composed episode
@@ -64,9 +66,7 @@ class SinkOfAnEpisode:
             arm=self.episode.arm,
             handle=joints.part_moved_by(self.joint_name(SinkJoint.HANDLE)).root,
             lift_joint=joints.connection(self.joint_name(SinkJoint.HANDLE)),
-            temperature_joint=joints.connection(
-                self.joint_name(SinkJoint.TEMPERATURE_HANDLE)
-            ),
+            temperature_joint=self.temperature_joint,
             basin=self.basin,
         )
 
@@ -81,6 +81,30 @@ class SinkOfAnEpisode:
             handle=joints.part_moved_by(self.joint_name(SinkJoint.HANDLE)).root,
             lift_joint=joints.connection(self.joint_name(SinkJoint.HANDLE)),
             basin=self.basin,
+        )
+
+    def turn_the_water_hot(self) -> TurnTheWaterHotWithAFingerAction:
+        """
+        :return: A new action turning the water hot, with its parameters at their
+            defaults.
+        """
+        joints = self.episode.joints
+        return TurnTheWaterHotWithAFingerAction(
+            arm=self.episode.arm,
+            handle=joints.part_moved_by(self.joint_name(SinkJoint.HANDLE)).root,
+            lift_joint=joints.connection(self.joint_name(SinkJoint.HANDLE)),
+            temperature_joint=self.temperature_joint,
+            basin=self.basin,
+        )
+
+    @property
+    def temperature_joint(self) -> ActiveConnection1DOF:
+        """
+        :return: The joint the faucet's lever is swung about to choose the water's
+            temperature.
+        """
+        return self.episode.joints.connection(
+            self.joint_name(SinkJoint.TEMPERATURE_HANDLE)
         )
 
     def joint_name(self, joint: SinkJoint) -> str:
@@ -163,10 +187,9 @@ def test_turning_the_faucet_on_once_the_hand_is_out_makes_the_water_run(
 def test_turning_the_faucet_on_with_the_lever_swung_to_hot_makes_the_water_run(
     sink: SinkOfAnEpisode,
 ):
-    name = sink.joint_name(SinkJoint.TEMPERATURE_HANDLE)
-    sink.episode.joints.connection(
-        name
-    ).position = sink.episode.joints.world_position_along_range(name, 1.0)
+    sink.temperature_joint.position = sink.episode.joints.world_position_along_range(
+        sink.joint_name(SinkJoint.TEMPERATURE_HANDLE), 1.0
+    )
     sink.episode.run([sink.lift_the_hand_out()]).raise_if_failed()
 
     outcome = sink.episode.run([sink.turn_on_the_faucet()])
