@@ -165,7 +165,7 @@ class PandaOmronRobot(TaskRobot):
     def place_in(
         self, world: World, start_pose: HomogeneousTransformationMatrix
     ) -> PandaOmron:
-        return RobotSpecification(PandaOmron, odom_T_robot_start=start_pose).spawn(
+        return RobotSpecification(PandaOmron, odometry_T_robot_start=start_pose).spawn(
             world
         )
 
