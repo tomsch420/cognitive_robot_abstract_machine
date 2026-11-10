@@ -1072,9 +1072,9 @@ def test_a_trial_places_what_a_grip_by_contact_holds(pr2_gripping_milk_by_contac
         trial_executor_type=KinematicallySimulatedPlanExecutor,
     )
 
-    assert trial.succeeds(
-        PlaceAction(object_designator=milk, target_location=milk.root.global_pose)
-    )
+    place = PlaceAction(object_designator=milk, target_location=milk.root.global_pose)
+
+    assert trial.succeeds(SubtreeRebuild(root=place, candidates={}))
 
 
 def test_a_trial_hangs_what_a_grip_holds_by_contact_off_the_gripper(
