@@ -160,6 +160,22 @@ def test_turning_the_faucet_on_once_the_hand_is_out_makes_the_water_run(
     assert sink.episode.judge.pass_judgement().accomplished
 
 
+def test_turning_the_faucet_on_with_the_lever_swung_to_hot_makes_the_water_run(
+    sink: SinkOfAnEpisode,
+):
+    name = sink.joint_name(SinkJoint.TEMPERATURE_HANDLE)
+    sink.episode.joints.connection(
+        name
+    ).position = sink.episode.joints.world_position_along_range(name, 1.0)
+    sink.episode.run([sink.lift_the_hand_out()]).raise_if_failed()
+
+    outcome = sink.episode.run([sink.turn_on_the_faucet()])
+
+    assert outcome.succeeded
+    sink.episode.judge.mirror.synchronize()
+    assert sink.episode.judge.pass_judgement().accomplished
+
+
 def test_turning_the_faucet_on_is_refused_while_the_hand_is_in_the_sink(
     sink: SinkOfAnEpisode,
 ):

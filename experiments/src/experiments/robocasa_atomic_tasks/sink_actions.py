@@ -295,11 +295,6 @@ class FaucetHandle:
     it, in the world's root frame.
     """
 
-    anchor: np.ndarray
-    """
-    Where the lift joint's axis passes through, in the world's root frame.
-    """
-
     extent: Extent
     """
     How far the handle's collision reaches along :attr:`push`, :attr:`facing` and up.
@@ -333,7 +328,6 @@ class FaucetHandle:
         return cls(
             push=push,
             facing=facing,
-            anchor=anchor,
             extent=Extent.from_body(handle, world.root, axes),
         )
 
@@ -364,8 +358,9 @@ class FaucetHandle:
         self, distance: float, sideways_offset: float
     ) -> np.ndarray:
         """
-        :param distance: How far in front of the lift joint's axis the pose lies, in
-            metres.
+        :param distance: How far in front of the front of the handle's collision the
+            pose lies, in metres; the front comes closer as the handle is swung towards
+            the robot.
         :param sideways_offset: How far along :attr:`push` from the middle of the
             handle the pose lies, in metres.
         :return: The pose on the floor facing the handle, in the world's root frame.
@@ -377,9 +372,7 @@ class FaucetHandle:
             [self.facing, np.cross(up, self.facing), up]
         )
         world_T_stand[:3, 3] = self.point(
-            np.array(
-                [middle + sideways_offset, self.anchor @ self.facing - distance, 0.0]
-            )
+            np.array([middle + sideways_offset, self.extent.lower[1] - distance, 0.0])
         )
         return world_T_stand
 
@@ -1062,9 +1055,10 @@ class FaucetMovedWithAFingerAction(HasPreconditions, ABC):
     may touch.
     """
 
-    stand_distance: float = 0.84
+    stand_distance: float = 0.815
     """
-    How far in front of the lift joint's axis the robot's root stands, in metres.
+    How far in front of the front of the handle's collision the robot's root stands, in
+    metres.
     """
 
     stand_sideways_offset: float = 0.0
