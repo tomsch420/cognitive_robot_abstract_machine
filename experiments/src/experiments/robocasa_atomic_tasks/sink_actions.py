@@ -1,7 +1,7 @@
 """
 Actions at the sink, written from what worked when the robot was driven there step by
-step: lifting the hand out of the basin, and turning the faucet on by pushing its handle
-with one finger.
+step: lifting the hand out of the basin, and turning the faucet on and off by pushing
+its handle with one finger.
 
 Each parameter is a field defaulting to the value that worked, so that the values can be
 varied and what works learned; the preconditions are EQL conditions checked when the
@@ -27,7 +27,9 @@ from cramph.data_types import ObservationStateValues
 from cramph.node import EndedByOwner, StatechartNode
 from cramph.threaded_nodes import FunctionCall
 from experiments.robocasa_atomic_tasks.exceptions import (
+    FaucetNotTurnedOff,
     FaucetNotTurnedOn,
+    HandleHasNoBar,
     LeverSwungAside,
     PreconditionsNotMet,
 )
@@ -66,7 +68,10 @@ from semantic_digital_twin.reasoning.predicates import InsideOf, PlaceIsOccupied
 from semantic_digital_twin.robots.robot_parts import Arm
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
-from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
+from semantic_digital_twin.world_description.geometry import (
+    Cylinder,
+    VolumetricBoundingBox,
+)
 from semantic_digital_twin.world_description.world_entity import (
     Body,
     KinematicStructureEntity,
@@ -355,6 +360,86 @@ class FaucetHandle:
         """
         return np.column_stack([-self.push, [0.0, 0.0, 1.0], self.facing])
 
+    def standing_pose_in_front(
+        self, distance: float, sideways_offset: float
+    ) -> np.ndarray:
+        """
+        :param distance: How far in front of the lift joint's axis the pose lies, in
+            metres.
+        :param sideways_offset: How far along :attr:`push` from the middle of the
+            handle the pose lies, in metres.
+        :return: The pose on the floor facing the handle, in the world's root frame.
+        """
+        middle = (self.extent.lower[0] + self.extent.upper[0]) / 2
+        up = np.array([0.0, 0.0, 1.0])
+        world_T_stand = np.eye(4)
+        world_T_stand[:3, :3] = np.column_stack(
+            [self.facing, np.cross(up, self.facing), up]
+        )
+        world_T_stand[:3, 3] = self.point(
+            np.array(
+                [middle + sideways_offset, self.anchor @ self.facing - distance, 0.0]
+            )
+        )
+        return world_T_stand
+
+
+@dataclass
+class LeverBar:
+    """
+    The bar of a faucet's lever handle, the longest cylinder of the handle's collision.
+    """
+
+    bottom: np.ndarray
+    """
+    The middle of the bar's lower end, in the world's root frame.
+    """
+
+    up_the_bar: np.ndarray
+    """
+    The direction along the bar towards its upper end, in the world's root frame.
+    """
+
+    length: float
+    """
+    How long the bar is, in metres.
+    """
+
+    radius: float
+    """
+    How thick the bar is from its middle line, in metres.
+    """
+
+    @classmethod
+    def from_handle(cls, handle: Body) -> LeverBar:
+        """
+        :param handle: A lever handle.
+        :return: Its bar, as it stands now.
+        :raises HandleHasNoBar: If the handle's collision holds no cylinder.
+        """
+        cylinders = [
+            shape for shape in handle.collision.shapes if isinstance(shape, Cylinder)
+        ]
+        if not cylinders:
+            raise HandleHasNoBar(handle=handle)
+        bar = max(cylinders, key=lambda cylinder: cylinder.height)
+        world_T_bar = handle.global_pose.to_np() @ bar.origin.to_np()
+        axis = world_T_bar[:3, 2]
+        up_the_bar = axis if axis[2] > 0.0 else -axis
+        return cls(
+            bottom=world_T_bar[:3, 3] - bar.height / 2 * up_the_bar,
+            up_the_bar=up_the_bar,
+            length=bar.height,
+            radius=bar.width / 2,
+        )
+
+    def point_up_the_bar(self, share: float) -> np.ndarray:
+        """
+        :param share: How far up the bar, as a share of its length.
+        :return: The point on the bar's middle line there, in the world's root frame.
+        """
+        return self.bottom + share * self.length * self.up_the_bar
+
 
 # %% preconditions
 
@@ -435,19 +520,19 @@ class BackOffAction(NavigateAction):
         return super().create_goal()
 
 
-# %% lifting the hand out of the sink
+# %% leaving the sink
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class LiftTheHandOutOfTheSinkAction(HasPreconditions):
+class LeaveTheSinkAction(SequentialAction):
     """
-    Leads the hand out of a sink's basin through free space to a point above and in
-    front of the basin, turned as it is, then backs the base off.
+    Leads the hand through free space to a point above and in front of a sink's basin,
+    turned as it is, then backs the base off.
     """
 
     arm: Arm
     """
-    The arm whose hand is in the basin.
+    The arm whose hand leaves the sink.
     """
 
     basin: Body
@@ -476,17 +561,6 @@ class LiftTheHandOutOfTheSinkAction(HasPreconditions):
     How far the base backs off once the hand is out, in metres.
     """
 
-    def preconditions(self) -> ConditionType:
-        hand = variable(Body, self.arm.end_effector.bodies_with_collision)
-        return and_(
-            InsideOf(body=hand, other=self.basin),
-            not_(
-                self.space_behind_the_base().occupied(
-                    self.world, list(self.robot.bodies)
-                )
-            ),
-        )
-
     def space_behind_the_base(self) -> SpaceInTheWorld:
         """
         :return: The space the base sweeps through while it backs off.
@@ -514,7 +588,14 @@ class LiftTheHandOutOfTheSinkAction(HasPreconditions):
             self.world,
         )
 
-    def create_steps_once_the_preconditions_hold(self) -> list[StatechartNode | Match]:
+    def create_steps(self) -> list[StatechartNode | Match]:
+        return self.create_steps_leaving_the_sink()
+
+    def create_steps_leaving_the_sink(self) -> list[StatechartNode | Match]:
+        """
+        :return: New nodes leading the hand out above and in front of the basin and
+            backing the base off.
+        """
         world = self.world
         world_T_tool = self.arm.end_effector.tool_frame.global_pose.to_np()
         forward = self.robot.root.global_pose.to_np()[:3, 0]
@@ -544,13 +625,38 @@ class LiftTheHandOutOfTheSinkAction(HasPreconditions):
         ]
 
 
-# %% turning the faucet on with a finger
+# %% lifting the hand out of the sink
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class JointPositionAtLeast(EndedByOwner, StatechartNode):
+class LiftTheHandOutOfTheSinkAction(HasPreconditions, LeaveTheSinkAction):
     """
-    Observes whether a joint stands at a position or beyond it, as :class:`JointReading`
+    Differs from :class:`LeaveTheSinkAction` in starting only with the hand inside the
+    basin and the space behind the base free.
+    """
+
+    def preconditions(self) -> ConditionType:
+        hand = variable(Body, self.arm.end_effector.bodies_with_collision)
+        return and_(
+            InsideOf(body=hand, other=self.basin),
+            not_(
+                self.space_behind_the_base().occupied(
+                    self.world, list(self.robot.bodies)
+                )
+            ),
+        )
+
+    def create_steps_once_the_preconditions_hold(self) -> list[StatechartNode | Match]:
+        return self.create_steps_leaving_the_sink()
+
+
+# %% watching joints
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class JointPositionBound(EndedByOwner, StatechartNode, ABC):
+    """
+    Observes whether a joint stands on one side of a position, as :class:`JointReading`
     reads it.
     """
 
@@ -562,21 +668,51 @@ class JointPositionAtLeast(EndedByOwner, StatechartNode):
 
     position: float
     """
-    The position the joint has to stand at or beyond.
+    The position the joint is compared with.
     """
+
+    @abstractmethod
+    def is_on_the_side_observed(self, reading: float) -> bool:
+        """
+        :param reading: Where the joint stands.
+        :return: Whether that is on the side of :attr:`position` this node observes.
+        """
 
     def on_tick(self) -> ObservationStateValues | None:
         world = self.context.world
         joint = world.get_connection_by_name(self.joint.name)
-        if JointReading(world).position(joint) >= self.position:
+        if self.is_on_the_side_observed(JointReading(world).position(joint)):
             return ObservationStateValues.TRUE
         return ObservationStateValues.FALSE
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
+class JointPositionAtLeast(JointPositionBound):
+    """
+    Observes whether a joint stands at :attr:`position` or beyond it.
+    """
+
+    def is_on_the_side_observed(self, reading: float) -> bool:
+        return reading >= self.position
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class JointPositionAtMost(JointPositionBound):
+    """
+    Observes whether a joint stands at :attr:`position` or below it.
+    """
+
+    def is_on_the_side_observed(self, reading: float) -> bool:
+        return reading <= self.position
+
+
+# %% touching the faucet's handle
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
 class TouchesTheFaucetHandle(MovesToolCenterPoint, ABC):
     """
-    An action whose gripper comes against a faucet's handle with the base held still.
+    An action whose gripper comes against a faucet's handle.
     """
 
     arm: Arm
@@ -622,6 +758,64 @@ class TouchesTheFaucetHandle(MovesToolCenterPoint, ABC):
                     tip_link=self.robot.root,
                 ),
             ),
+        )
+
+    def tool_goal_with_the_base_free(
+        self, world_T_tool: np.ndarray, in_a_straight_line: bool
+    ) -> StatechartNode:
+        """
+        :param world_T_tool: Where the tool frame is to go, in the world's root frame.
+        :param in_a_straight_line: Whether the tool frame keeps to the line there.
+        :return: The goal moving the tool frame there, the base moving along as needed.
+        """
+        return self.tool_center_point_goal(
+            HomogeneousTransformationMatrix(
+                world_T_tool, reference_frame=self.world.root
+            ).pose,
+            self.arm,
+            in_a_straight_line=in_a_straight_line,
+        )
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class PushesTheFaucetHandle(TouchesTheFaucetHandle, GoalAction, ABC):
+    """
+    Moves the hand straight one way, with the base held still, until the faucet's handle
+    reaches a position or the hand went a distance.
+    """
+
+    push_distance: float
+    """
+    How far the hand goes at most, in metres.
+    """
+
+    @abstractmethod
+    def push_direction(self, handle: FaucetHandle) -> np.ndarray:
+        """
+        :param handle: The handle as it stands when the push starts.
+        :return: The level direction the hand goes, in the world's root frame.
+        """
+
+    @abstractmethod
+    def create_handle_position_reached(self) -> JointPositionBound:
+        """
+        :return: A new node observing whether the handle reached the position it is
+            pushed to.
+        """
+
+    def create_goal(self) -> StatechartNode:
+        handle = FaucetHandle.from_lift_joint(self.lift_joint, self.handle)
+        world_T_pushed = self.arm.end_effector.tool_frame.global_pose.to_np().copy()
+        world_T_pushed[:3, 3] += self.push_distance * self.push_direction(handle)
+        return Parallel(
+            name="push the handle",
+            nodes=[
+                self.tool_goal_with_the_base_held(
+                    world_T_pushed, in_a_straight_line=True
+                ),
+                self.create_handle_position_reached(),
+            ],
+            minimum_success=1,
         )
 
 
@@ -688,7 +882,7 @@ class PutAFingerBesideTheFaucetHandleAction(TouchesTheFaucetHandle, SequentialAc
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class PushTheFaucetHandleAction(TouchesTheFaucetHandle, GoalAction):
+class PushTheFaucetHandleAction(PushesTheFaucetHandle):
     """
     Moves the hand straight along the way that lifts a faucet's handle, until the handle
     is lifted to a position or the hand went a distance.
@@ -699,34 +893,151 @@ class PushTheFaucetHandleAction(TouchesTheFaucetHandle, GoalAction):
     How far the handle is to be lifted, in radians.
     """
 
-    push_distance: float
-    """
-    How far the hand goes at most, in metres.
-    """
+    def push_direction(self, handle: FaucetHandle) -> np.ndarray:
+        return handle.push
 
-    def create_goal(self) -> StatechartNode:
-        handle = FaucetHandle.from_lift_joint(self.lift_joint, self.handle)
-        world_T_pushed = self.arm.end_effector.tool_frame.global_pose.to_np().copy()
-        world_T_pushed[:3, 3] += self.push_distance * handle.push
-        return Parallel(
-            name="push until lifted",
-            nodes=[
-                self.tool_goal_with_the_base_held(
-                    world_T_pushed, in_a_straight_line=True
-                ),
-                JointPositionAtLeast(
-                    name="handle lifted", joint=self.lift_joint, position=self.lift_goal
-                ),
-            ],
-            minimum_success=1,
+    def create_handle_position_reached(self) -> JointPositionBound:
+        return JointPositionAtLeast(
+            name="handle lifted", joint=self.lift_joint, position=self.lift_goal
         )
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class TurnOnTheFaucetWithAFingerAction(HasPreconditions):
+class PushTheFaucetHandleDownAction(PushesTheFaucetHandle):
     """
-    Stands in front of a faucet's handle, lowers the torso, opens the gripper, puts one
-    finger beside the handle and pushes the handle up with it until the water runs.
+    Moves the hand straight against the way that lifts a faucet's handle, until the
+    handle is lowered to a position or the hand went a distance.
+    """
+
+    lowered_goal: float
+    """
+    How far down the handle is to be lowered, in radians of lift.
+    """
+
+    def push_direction(self, handle: FaucetHandle) -> np.ndarray:
+        return -handle.push
+
+    def create_handle_position_reached(self) -> JointPositionBound:
+        return JointPositionAtMost(
+            name="handle lowered", joint=self.lift_joint, position=self.lowered_goal
+        )
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class PutTheLowerFingerBesideTheLeverBarAction(
+    TouchesTheFaucetHandle, SequentialAction
+):
+    """
+    Brings the hand in front of a faucet's lever, its fingers spread up the lever's bar,
+    and straight in from there until the lower finger stands beside the bar, on the side
+    pushing the bar's top lowers the lever.
+
+    The base moves along as needed.
+    """
+
+    bar_share: float
+    """
+    How far up the bar the lower finger comes, as a share of the bar's length.
+    """
+
+    finger_gap: float
+    """
+    How far the lower finger's collision stays from the bar's, in metres.
+    """
+
+    approach_distance: float
+    """
+    How far in front of where it comes in the tool frame starts its straight way in, in
+    metres.
+    """
+
+    def create_steps(self) -> list[StatechartNode]:
+        handle = FaucetHandle.from_lift_joint(self.lift_joint, self.handle)
+        bar = LeverBar.from_handle(self.handle)
+        beside = np.cross(handle.facing, bar.up_the_bar)
+        rotation = np.column_stack([bar.up_the_bar, beside, handle.facing])
+        # the tool frame's x-axis points up the bar, so the lower finger is the one on
+        # its negative x side, and the bar is on the finger's negative y side
+        lower_finger = [
+            extent
+            for extent in FingerExtents.from_arm(self.arm).extents
+            if extent.lower[0] + extent.upper[0] < 0.0
+        ]
+        finger_side = np.array(
+            [
+                (
+                    min(extent.lower[0] for extent in lower_finger)
+                    + max(extent.upper[0] for extent in lower_finger)
+                )
+                / 2,
+                min(extent.lower[1] for extent in lower_finger),
+                (
+                    min(extent.lower[2] for extent in lower_finger)
+                    + max(extent.upper[2] for extent in lower_finger)
+                )
+                / 2,
+            ]
+        )
+        world_T_in = np.eye(4)
+        world_T_in[:3, :3] = rotation
+        world_T_in[:3, 3] = (
+            bar.point_up_the_bar(self.bar_share)
+            + (bar.radius + self.finger_gap) * beside
+            - rotation @ finger_side
+        )
+        world_T_approach = world_T_in.copy()
+        world_T_approach[:3, 3] -= self.approach_distance * handle.facing
+        return [
+            self.tool_goal_with_the_base_free(
+                world_T_approach, in_a_straight_line=False
+            ),
+            self.tool_goal_with_the_base_free(world_T_in, in_a_straight_line=True),
+        ]
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class PullTheHandBackFromTheFaucetHandleAction(TouchesTheFaucetHandle, GoalAction):
+    """
+    Moves the hand straight back from a faucet's handle, towards the robot in front of
+    it, with the base held still.
+    """
+
+    retreat_distance: float
+    """
+    How far the hand goes back, in metres.
+    """
+
+    def create_temporary_collision_rules(self) -> list[CollisionRule]:
+        """
+        Differs from :meth:`TouchesTheFaucetHandle.create_temporary_collision_rules` in
+        allowing the whole arm to touch, since pushing the handle may leave a link of
+        the arm against the faucet.
+        """
+        arm = set(self.arm.bodies_with_collision)
+        return [
+            AllowCollisionBetweenGroups(
+                body_group_a=list(arm),
+                body_group_b=[
+                    body for body in self.world.bodies_with_collision if body not in arm
+                ],
+            )
+        ]
+
+    def create_goal(self) -> StatechartNode:
+        handle = FaucetHandle.from_lift_joint(self.lift_joint, self.handle)
+        world_T_back = self.arm.end_effector.tool_frame.global_pose.to_np().copy()
+        world_T_back[:3, 3] -= self.retreat_distance * handle.facing
+        return self.tool_goal_with_the_base_held(world_T_back, in_a_straight_line=True)
+
+
+# %% moving the faucet's handle with a finger
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class FaucetMovedWithAFingerAction(HasPreconditions, ABC):
+    """
+    An action that stands in front of a faucet's handle and moves the handle with one
+    finger.
     """
 
     arm: Arm
@@ -744,15 +1055,11 @@ class TurnOnTheFaucetWithAFingerAction(HasPreconditions):
     The joint the handle is lifted about.
     """
 
-    temperature_joint: ActiveConnection1DOF
-    """
-    The joint the handle is swung about to choose the water's temperature.
-    """
-
     basin: Body
     """
-    The sink's basin, which the hand has to be out of; the bodies below it in the world,
-    such as the faucet's spout and handle, are what the finger may touch.
+    The sink's basin, which the hand has to be out of when the action starts; the bodies
+    below it in the world, such as the faucet's spout and handle, are what the gripper
+    may touch.
     """
 
     stand_distance: float = 0.84
@@ -764,6 +1071,70 @@ class TurnOnTheFaucetWithAFingerAction(HasPreconditions):
     """
     How far along the push from the middle of the handle the robot's root stands, in
     metres.
+    """
+
+    def create_navigation_in_front_of_the_handle(self) -> NavigateAction:
+        """
+        :return: A new action driving the robot to stand in front of the handle, facing
+            it.
+        """
+        handle = FaucetHandle.from_lift_joint(self.lift_joint, self.handle)
+        return NavigateAction(
+            target_location=HomogeneousTransformationMatrix(
+                handle.standing_pose_in_front(
+                    self.stand_distance, self.stand_sideways_offset
+                ),
+                reference_frame=self.world.root,
+            ).pose
+        )
+
+    def create_temporary_collision_rules(self) -> list[CollisionRule]:
+        """
+        :return: An allowance for the gripper to touch the sink's bodies, the handle and
+            the spout among them, from one step to the next.
+        """
+        return [
+            AllowCollisionBetweenGroups(
+                body_group_a=list(self.arm.end_effector.bodies_with_collision),
+                body_group_b=self.sink_bodies,
+            )
+        ]
+
+    @property
+    def sink_bodies(self) -> list[Body]:
+        """
+        :return: The bodies with collision of the sink, the basin and those below it.
+        """
+        branch = set(self.world.get_kinematic_structure_entities_of_branch(self.basin))
+        return [body for body in self.world.bodies_with_collision if body in branch]
+
+    def hand_is_outside_the_basin(self) -> ConditionType:
+        """
+        :return: The statement that no body of the gripper is inside the basin.
+        """
+        hand = variable(Body, self.arm.end_effector.bodies_with_collision)
+        return not_(InsideOf(body=hand, other=self.basin))
+
+    def faucet_is_on(self) -> FaucetIsOn:
+        """
+        :return: The statement that the water runs.
+        """
+        return FaucetIsOn(lift_joint=variable(ActiveConnection1DOF, [self.lift_joint]))
+
+
+# %% turning the faucet on with a finger
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class TurnOnTheFaucetWithAFingerAction(FaucetMovedWithAFingerAction):
+    """
+    Stands in front of a faucet's handle, lowers the torso, opens the gripper, puts one
+    finger beside the handle and pushes the handle up with it until the water runs.
+    """
+
+    temperature_joint: ActiveConnection1DOF
+    """
+    The joint the handle is swung about to choose the water's temperature.
     """
 
     torso_state: TorsoState = TorsoState.LOW
@@ -825,26 +1196,6 @@ class TurnOnTheFaucetWithAFingerAction(HasPreconditions):
     Where :attr:`temperature_joint` stood when the action started.
     """
 
-    def create_temporary_collision_rules(self) -> list[CollisionRule]:
-        """
-        :return: An allowance for the gripper to touch the sink's bodies, the handle and
-            the spout among them, from one step to the next.
-        """
-        return [
-            AllowCollisionBetweenGroups(
-                body_group_a=list(self.arm.end_effector.bodies_with_collision),
-                body_group_b=self.sink_bodies,
-            )
-        ]
-
-    @property
-    def sink_bodies(self) -> list[Body]:
-        """
-        :return: The bodies with collision of the sink, the basin and those below it.
-        """
-        branch = set(self.world.get_kinematic_structure_entities_of_branch(self.basin))
-        return [body for body in self.world.bodies_with_collision if body in branch]
-
     def on_start(self) -> None:
         super().on_start()
         self.temperature_at_the_start = JointReading(self.world).position(
@@ -852,12 +1203,9 @@ class TurnOnTheFaucetWithAFingerAction(HasPreconditions):
         )
 
     def preconditions(self) -> ConditionType:
-        hand = variable(Body, self.arm.end_effector.bodies_with_collision)
         return and_(
-            not_(
-                FaucetIsOn(lift_joint=variable(ActiveConnection1DOF, [self.lift_joint]))
-            ),
-            not_(InsideOf(body=hand, other=self.basin)),
+            not_(self.faucet_is_on()),
+            self.hand_is_outside_the_basin(),
             not_(
                 self.space_for_the_finger().occupied(
                     self.world, [*self.robot.bodies, *self.sink_bodies]
@@ -892,28 +1240,9 @@ class TurnOnTheFaucetWithAFingerAction(HasPreconditions):
         )
 
     def create_steps_once_the_preconditions_hold(self) -> list[StatechartNode | Match]:
-        handle = FaucetHandle.from_lift_joint(self.lift_joint, self.handle)
-        middle = (handle.extent.lower[0] + handle.extent.upper[0]) / 2
-        world_T_stand = np.eye(4)
-        world_T_stand[:3, :3] = np.column_stack(
-            [handle.facing, np.cross([0.0, 0.0, 1.0], handle.facing), [0.0, 0.0, 1.0]]
-        )
-        world_T_stand[:3, 3] = handle.point(
-            np.array(
-                [
-                    middle + self.stand_sideways_offset,
-                    handle.anchor @ handle.facing - self.stand_distance,
-                    0.0,
-                ]
-            )
-        )
         gripper = self.arm.end_effector
         return [
-            NavigateAction(
-                target_location=HomogeneousTransformationMatrix(
-                    world_T_stand, reference_frame=self.world.root
-                ).pose
-            ),
+            self.create_navigation_in_front_of_the_handle(),
             MoveTorsoAction(torso_state=self.torso_state),
             SetGripperAction(
                 configuration=gripper.default_configuration(GripperState.OPEN)
@@ -962,4 +1291,95 @@ class TurnOnTheFaucetWithAFingerAction(HasPreconditions):
                 joint=self.temperature_joint,
                 change=change,
                 tolerance=self.temperature_tolerance,
+            )
+
+
+# %% turning the faucet off with a finger
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class TurnOffTheFaucetWithAFingerAction(FaucetMovedWithAFingerAction):
+    """
+    Stands in front of a faucet's lever, opens the gripper, puts the lower finger beside
+    the lever's bar and pushes the bar down with it until the water stops, then pulls
+    the hand back and leaves the sink.
+    """
+
+    bar_share: float = 2 / 3
+    """
+    See :attr:`PutTheLowerFingerBesideTheLeverBarAction.bar_share`.
+    """
+
+    finger_gap: float = 0.01
+    """
+    See :attr:`PutTheLowerFingerBesideTheLeverBarAction.finger_gap`.
+    """
+
+    approach_distance: float = 0.13
+    """
+    See :attr:`PutTheLowerFingerBesideTheLeverBarAction.approach_distance`.
+    """
+
+    push_distance: float = 0.06
+    """
+    See :attr:`PushTheFaucetHandleDownAction.push_distance`.
+    """
+
+    lowered_goal: float = 0.005
+    """
+    How far down the lever is to be lowered, in radians of lift; the water stops at or
+    below 0.4 rad, and the lever stops at 0 rad.
+    """
+
+    retreat_distance: float = 0.13
+    """
+    See :attr:`PullTheHandBackFromTheFaucetHandleAction.retreat_distance`.
+    """
+
+    def preconditions(self) -> ConditionType:
+        return and_(self.faucet_is_on(), self.hand_is_outside_the_basin())
+
+    def create_steps_once_the_preconditions_hold(self) -> list[StatechartNode | Match]:
+        gripper = self.arm.end_effector
+        return [
+            self.create_navigation_in_front_of_the_handle(),
+            SetGripperAction(
+                configuration=gripper.default_configuration(GripperState.OPEN)
+            ),
+            a(PutTheLowerFingerBesideTheLeverBarAction)(
+                arm=self.arm,
+                handle=self.handle,
+                lift_joint=self.lift_joint,
+                bar_share=self.bar_share,
+                finger_gap=self.finger_gap,
+                approach_distance=self.approach_distance,
+            ),
+            a(PushTheFaucetHandleDownAction)(
+                arm=self.arm,
+                handle=self.handle,
+                lift_joint=self.lift_joint,
+                lowered_goal=self.lowered_goal,
+                push_distance=self.push_distance,
+            ),
+            FunctionCall(
+                name="check the water stopped",
+                function=self.raise_unless_the_lever_is_down,
+            ),
+            a(PullTheHandBackFromTheFaucetHandleAction)(
+                arm=self.arm,
+                handle=self.handle,
+                lift_joint=self.lift_joint,
+                retreat_distance=self.retreat_distance,
+            ),
+            a(LeaveTheSinkAction)(arm=self.arm, basin=self.basin),
+        ]
+
+    def raise_unless_the_lever_is_down(self) -> None:
+        """
+        :raises FaucetNotTurnedOff: If the lever stands above :attr:`lowered_goal`.
+        """
+        lift = JointReading(self.world).position(self.lift_joint)
+        if lift > self.lowered_goal:
+            raise FaucetNotTurnedOff(
+                lift_joint=self.lift_joint, position=lift, goal=self.lowered_goal
             )

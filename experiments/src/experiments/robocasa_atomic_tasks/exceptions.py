@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from abc import ABC
 from dataclasses import dataclass
 
 from coraplex.plans.failures import PlanFailure
@@ -204,9 +205,9 @@ class PreconditionsNotMet(PlanFailure):
 
 
 @dataclass
-class FaucetNotTurnedOn(PlanFailure):
+class FaucetHandleStoppedShort(PlanFailure, ABC):
     """
-    Raised when a push left the faucet's handle short of where the water runs.
+    Raised when a push left the faucet's handle short of where it was to be pushed.
     """
 
     lift_joint: ActiveConnection1DOF
@@ -221,7 +222,7 @@ class FaucetNotTurnedOn(PlanFailure):
 
     goal: float
     """
-    Where the handle was to be lifted to, in radians.
+    Where the handle was to be pushed to, in radians.
     """
 
     def error_message(self) -> str:
@@ -232,6 +233,38 @@ class FaucetNotTurnedOn(PlanFailure):
 
     def suggest_correction(self) -> str:
         return "Push further, or put the finger closer to the handle."
+
+
+@dataclass
+class FaucetNotTurnedOn(FaucetHandleStoppedShort):
+    """
+    Raised when a push left the faucet's handle short of where the water runs.
+    """
+
+
+@dataclass
+class FaucetNotTurnedOff(FaucetHandleStoppedShort):
+    """
+    Raised when a push left the faucet's handle above where the water stops.
+    """
+
+
+@dataclass
+class HandleHasNoBar(DataclassException):
+    """
+    Raised when a faucet's handle has no cylinder in its collision to push as its bar.
+    """
+
+    handle: Body
+    """
+    The handle.
+    """
+
+    def error_message(self) -> str:
+        return f"{self.handle.name} has no cylinder in its collision."
+
+    def suggest_correction(self) -> str:
+        return "Push a lever handle, whose bar is a cylinder."
 
 
 @dataclass

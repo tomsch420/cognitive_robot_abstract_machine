@@ -19,6 +19,7 @@ from experiments.robocasa_atomic_tasks.robots import RobotModel
 from experiments.robocasa_atomic_tasks.sink import TurnOnSinkFaucet
 from experiments.robocasa_atomic_tasks.sink_actions import (
     LiftTheHandOutOfTheSinkAction,
+    TurnOffTheFaucetWithAFingerAction,
     TurnOnTheFaucetWithAFingerAction,
 )
 from krrood.entity_query_language.factories import evaluate_condition, variable
@@ -66,6 +67,19 @@ class SinkOfAnEpisode:
             temperature_joint=joints.connection(
                 self.joint_name(SinkJoint.TEMPERATURE_HANDLE)
             ),
+            basin=self.basin,
+        )
+
+    def turn_off_the_faucet(self) -> TurnOffTheFaucetWithAFingerAction:
+        """
+        :return: A new action turning the faucet off, with its parameters at their
+            defaults.
+        """
+        joints = self.episode.joints
+        return TurnOffTheFaucetWithAFingerAction(
+            arm=self.episode.arm,
+            handle=joints.part_moved_by(self.joint_name(SinkJoint.HANDLE)).root,
+            lift_joint=joints.connection(self.joint_name(SinkJoint.HANDLE)),
             basin=self.basin,
         )
 
