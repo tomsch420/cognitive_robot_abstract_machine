@@ -43,21 +43,6 @@ tracks:
   name: Further backends and cleanup
   wave: consolidation
 items:
-- id: tensorized-row-scaling
-  title: Profile and fix the row scaling of tensorized log likelihoods
-  track: prerequisites
-  branch: tensorized-row-scaling
-  pull_request_number: 930
-  session: https://claude.ai/code/session_01LzY41J8tdcnmeAAuhPiVcT
-  depends_on: []
-  status: in progress
-  notes: 'The tensorized JPT is 3 to 7 times faster than the rustworkx circuit below a few
-    hundred rows but 2.5 times slower on 9769 rows (UCI Adult, 318 ms against 128 ms). Find
-    the per row cost (input layers are the suspects) and fix it as its own bug fix PR, so
-    the redesign does not carry it over. Reproduce with /root/ratspn_vs_jpt/evaluate.py in
-    tom-probabilistic-experiments on neem-4.
-
-    '
 - id: array-api-dependency
   title: Add array-api-compat and array-api-extra
   track: foundation
@@ -69,19 +54,20 @@ items:
     where these suffice.
 
     '
+  repository: cram2/cognitive_robot_abstract_machine
 - id: layer-structure-parameter-split
   title: Split every tensorized layer into host structure and parameters
   track: foundation
-  depends_on:
-  - tensorized-row-scaling
+  depends_on: []
   status: not started
-  notes: 'Structure (edge columns, gather matrices, contiguity, variable indices, remaps)
-    is plain numpy, computed once at construction and never during a query; parameters (weights,
-    locations, scales, tables) are the only backend arrays. No value dependent branches, shapes
-    or in place writes in numeric query paths. Maintenance PR, no behaviour change; exact
-    float64 test values must still hold.
+  notes: 'Structure (edge columns, gather matrices, entry positions by rank, variable indices,
+    remaps) is plain numpy, computed once at construction and never during a query; parameters
+    (weights, locations, scales, tables) are the only backend arrays. No value dependent branches,
+    shapes or in place writes in numeric query paths. Maintenance PR, no behaviour change;
+    exact float64 test values must still hold.
 
     '
+  repository: cram2/cognitive_robot_abstract_machine
 - id: backend-special-functions
   title: Per backend special functions
   track: foundation
@@ -93,6 +79,7 @@ items:
     The truncated multivariate Gaussian stays numpy only.
 
     '
+  repository: cram2/cognitive_robot_abstract_machine
 - id: input-layers-any-backend
   title: Numeric queries of input layers on any backend
   track: input-layers
@@ -105,6 +92,7 @@ items:
     the host. Tests run on numpy and jax with float64 enabled.
 
     '
+  repository: cram2/cognitive_robot_abstract_machine
 - id: inner-layers-any-backend
   title: Numeric queries of sum and product layers on any backend
   track: inner-layers
@@ -117,6 +105,7 @@ items:
     returns one of the same backend. Tests run on numpy and jax.
 
     '
+  repository: cram2/cognitive_robot_abstract_machine
 - id: host-only-structural-queries
   title: Structural queries and sampling stay on the host
   track: inner-layers
@@ -129,6 +118,7 @@ items:
     abstract them over backends.
 
     '
+  repository: cram2/cognitive_robot_abstract_machine
 - id: tensorized-training
   title: Train tensorized circuits through a functional loss
   track: training
@@ -143,6 +133,7 @@ items:
     constraints (normalized weights, minimum scales) are kept.
 
     '
+  repository: cram2/cognitive_robot_abstract_machine
 - id: region-graph-builds-tensorized
   title: RegionGraph builds tensorized circuits
   track: training
@@ -154,6 +145,7 @@ items:
     training time on the 12 UCI datasets).
 
     '
+  repository: cram2/cognitive_robot_abstract_machine
 - id: torch-backend
   title: Torch backend
   track: backends
@@ -165,6 +157,7 @@ items:
     Adding torch as a dependency needs the user''s approval first.
 
     '
+  repository: cram2/cognitive_robot_abstract_machine
 - id: remove-jax-package
   title: Remove the jax package and its adapters
   track: backends
@@ -176,3 +169,4 @@ items:
     from DifferentiableLayeredCircuit to the tensorized circuit.
 
     '
+  repository: cram2/cognitive_robot_abstract_machine

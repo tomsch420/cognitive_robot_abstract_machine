@@ -7,4 +7,3 @@ partnet-mine-drawer-cabinet	eql-relational-rule-mining
 partnet-rdr-bridge	eql-relational-rule-mining
 supervised-ilp-pass	eql-relational-rule-mining
 evaluate-against-ground-truth	eql-relational-rule-mining
-tensorized-row-scaling	tensorized-array-backends
