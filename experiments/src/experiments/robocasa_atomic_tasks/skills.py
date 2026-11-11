@@ -56,6 +56,7 @@ from semantic_digital_twin.adapters.multi_sim import MujocoSynchronizer
 from semantic_digital_twin.collision_checking.collision_matrix import CollisionRule
 from semantic_digital_twin.collision_checking.collision_rules import (
     AllowCollisionForEndEffector,
+    AvoidCollisionBetweenGroups,
 )
 from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
@@ -178,6 +179,12 @@ class ReachThroughFreeSpaceAction(MovesToolCenterPoint, SequentialAction):
     How close the tool frame has to come to each point of the path, in metres.
     """
 
+    surroundings_buffer: float | None = None
+    """
+    How far the whole robot keeps from everything else while the tool frame is led, in
+    metres; ``None`` keeps the distances it usually keeps.
+    """
+
     def tool_goal(self) -> Pose:
         """
         :return: The pose the tool frame is led to.
@@ -186,9 +193,26 @@ class ReachThroughFreeSpaceAction(MovesToolCenterPoint, SequentialAction):
 
     def create_temporary_collision_rules(self) -> list[CollisionRule]:
         """
-        :return: An allowance for the gripper to come close to what it reaches for.
+        :return: An allowance for the gripper to come close to what it reaches for,
+            after the robot is let come within :attr:`surroundings_buffer` of
+            everything else.
         """
-        return [AllowCollisionForEndEffector(end_effector=self.arm.end_effector)]
+        allowance = AllowCollisionForEndEffector(end_effector=self.arm.end_effector)
+        if self.surroundings_buffer is None:
+            return [allowance]
+        robot = set(self.robot.bodies)
+        return [
+            AvoidCollisionBetweenGroups(
+                body_group_a=list(self.robot.bodies_with_collision),
+                body_group_b=[
+                    body
+                    for body in self.world.bodies_with_collision
+                    if body not in robot
+                ],
+                buffer_zone_distance=self.surroundings_buffer,
+            ),
+            allowance,
+        ]
 
     def create_steps(self) -> list[StatechartNode]:
         world = self.world

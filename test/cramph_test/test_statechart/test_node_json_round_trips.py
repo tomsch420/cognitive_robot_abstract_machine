@@ -12,6 +12,7 @@ from cramph.composites import (
     CancelledWhenTrue,
     ChildChooserAccess,
     CompositeNodeChoosingItsChild,
+    Deferred,
     Parallel,
     PausedUntilTrue,
     StartedWhenTrue,
@@ -151,6 +152,10 @@ def _cases() -> list[NodeRoundTripCase]:
         NodeRoundTripCase(
             CompositeNodeChoosingItsChild,
             lambda world: [CompositeNodeChoosingItsChild()],
+        ),
+        NodeRoundTripCase(
+            Deferred,
+            lambda world: [Deferred(task=ConstTrueNode())],
         ),
         NodeRoundTripCase(
             StatementNode,

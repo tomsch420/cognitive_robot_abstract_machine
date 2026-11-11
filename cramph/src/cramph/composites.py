@@ -1307,6 +1307,53 @@ class CompositeNodeChoosingItsChild(SucceedsOnObservingTrue, CompositeNode):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
+class Deferred(CompositeNodeChoosingItsChild):
+    """
+    Runs a task that joins the statechart, and so expands, only once this node starts,
+    against the world as the nodes before it left it.
+
+    The task runs once: this node succeeds once it succeeds and fails once it fails.
+    """
+
+    task: StatechartNode
+    """
+    The node to run, not yet part of a statechart.
+    """
+
+    @classproperty
+    def required_context_extensions(cls) -> tuple[type[ContextExtension], ...]:
+        """
+        Differs from
+        :attr:`CompositeNodeChoosingItsChild.required_context_extensions` in not
+        requiring a :class:`ChildChooserAccess`, as this node chooses its task itself.
+        """
+        return tuple(
+            extension
+            for extension in super().required_context_extensions
+            if extension is not ChildChooserAccess
+        )
+
+    def choose_child(self) -> None:
+        """
+        Differs from :meth:`CompositeNodeChoosingItsChild.choose_child` in choosing with
+        a :class:`TaskHandOver` instead of a chooser of :attr:`context`.
+        """
+        self.choose_child_with(TaskHandOver())
+
+
+@dataclass
+class TaskHandOver(ChildChooser[Deferred]):
+    """
+    Hands a :class:`Deferred` node its task the first time it asks, and no child after.
+    """
+
+    def choose_child(self, node: Deferred) -> StatechartNode | None:
+        if node.latest_child is not None:
+            return None
+        return node.task
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
 class StatementNode(CompositeNodeChoosingItsChild):
     """
     Runs a node described by an underspecified `a(...)` / `an(...)` statement.

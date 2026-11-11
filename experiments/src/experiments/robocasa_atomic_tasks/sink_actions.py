@@ -1,7 +1,8 @@
 """
 Actions at the sink, written from what worked when the robot was driven there step by
 step: lifting the hand out of the basin, turning the faucet on and off by pushing its
-handle with one finger, and turning the water hot by swinging the handle with the base.
+handle with one finger, and turning the water hot or cold by swinging the handle with
+the base.
 
 Each parameter is a field defaulting to the value that worked, so that the values can be
 varied and what works learned; the preconditions are EQL conditions checked when the
@@ -22,7 +23,7 @@ from coraplex.robot_plans.actions.core.robot_body import (
     SetGripperAction,
 )
 from coraplex.robot_plans.mixins import MovesToolCenterPoint
-from cramph.composites import Parallel
+from cramph.composites import Deferred, Parallel
 from cramph.data_types import ObservationStateValues
 from cramph.node import EndedByOwner, StatechartNode
 from cramph.threaded_nodes import FunctionCall
@@ -40,6 +41,7 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     HoldPose,
     RigidCoupling,
 )
+from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
 from krrood.entity_query_language.factories import (
     a,
     and_,
@@ -246,6 +248,21 @@ class FingerExtents:
                 for body in gripper.bodies_with_collision
                 if body not in hand
             ]
+        )
+
+    def front_of_the_lower_fingertip(self) -> np.ndarray:
+        """
+        :return: The middle of the front of the finger on the tool frame's negative x
+            side, its end along the tool frame's z-axis, in the tool frame; with the
+            tool frame's x-axis pointing up, that finger is the lower one.
+        """
+        lower_finger = [
+            extent for extent in self.extents if extent.lower[0] + extent.upper[0] < 0.0
+        ]
+        lower = np.min([extent.lower for extent in lower_finger], axis=0)
+        upper = np.max([extent.upper for extent in lower_finger], axis=0)
+        return np.array(
+            [(lower[0] + upper[0]) / 2, (lower[1] + upper[1]) / 2, upper[2]]
         )
 
     def side_of_the_lower_finger(self) -> np.ndarray:
@@ -1188,6 +1205,215 @@ class PullTheFaucetLeverWithTheBaseAction(WorksCloseToTheFaucetLever, GoalAction
         )
 
 
+@dataclass
+class FingertipInFrontOfTheLeverBar:
+    """
+    Where the tool frame stands with the hand pointing at a faucet's lever, its fingers
+    one above the other, the front of the lower fingertip in front of the lever's bar.
+    """
+
+    world_T_touch: np.ndarray
+    """
+    The tool frame with the fingertip a gap in front of the bar, in the world's root
+    frame.
+    """
+
+    world_T_approach: np.ndarray
+    """
+    The tool frame further back towards the robot, in the world's root frame.
+    """
+
+    @classmethod
+    def from_lever(
+        cls,
+        arm: Arm,
+        handle: Body,
+        lift_joint: ActiveConnection1DOF,
+        bar_share: float,
+        fingertip_gap: float,
+        approach_distance: float,
+    ) -> FingertipInFrontOfTheLeverBar:
+        """
+        :param arm: The arm whose fingertip touches the bar.
+        :param handle: The faucet's lever.
+        :param lift_joint: The joint the lever is lifted about.
+        :param bar_share: How far up the bar the fingertip comes, as a share of the
+            bar's length.
+        :param fingertip_gap: How far the fingertip's collision stays in front of the
+            bar's, in metres.
+        :param approach_distance: How far further back towards the robot the approach
+            lies, in metres.
+        :return: The tool frame's poses, as the lever stands now.
+        """
+        faucet_handle = FaucetHandle.from_lift_joint(lift_joint, handle)
+        bar = LeverBar.from_handle(handle)
+        up = np.array([0.0, 0.0, 1.0])
+        facing = faucet_handle.facing
+        rotation = np.column_stack([up, np.cross(facing, up), facing])
+        world_T_touch = np.eye(4)
+        world_T_touch[:3, :3] = rotation
+        world_T_touch[:3, 3] = (
+            bar.point_up_the_bar(bar_share)
+            - (bar.radius + fingertip_gap) * facing
+            - rotation @ FingerExtents.from_arm(arm).front_of_the_lower_fingertip()
+        )
+        world_T_approach = world_T_touch.copy()
+        world_T_approach[:3, 3] -= approach_distance * facing
+        return cls(world_T_touch=world_T_touch, world_T_approach=world_T_approach)
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class PointTheHandAtTheLeverAction(ReachThroughFreeSpaceAction):
+    """
+    Leads the hand through the free space to the approach of its
+    :class:`FingertipInFrontOfTheLeverBar`, pointing at a faucet's lever with its fingers
+    one above the other.
+    """
+
+    handle: Body
+    """
+    The faucet's lever.
+    """
+
+    lift_joint: ActiveConnection1DOF
+    """
+    The joint the lever is lifted about.
+    """
+
+    bar_share: float
+    """
+    See :meth:`FingertipInFrontOfTheLeverBar.from_lever`.
+    """
+
+    fingertip_gap: float
+    """
+    See :meth:`FingertipInFrontOfTheLeverBar.from_lever`.
+    """
+
+    approach_distance: float
+    """
+    See :meth:`FingertipInFrontOfTheLeverBar.from_lever`.
+    """
+
+    def tool_goal(self) -> Pose:
+        """
+        Differs from :meth:`ReachThroughFreeSpaceAction.tool_goal` in finding the
+        approach from the fingers as they stand when the reach begins.
+        """
+        fingertip = FingertipInFrontOfTheLeverBar.from_lever(
+            self.arm,
+            self.handle,
+            self.lift_joint,
+            self.bar_share,
+            self.fingertip_gap,
+            self.approach_distance,
+        )
+        return HomogeneousTransformationMatrix(
+            fingertip.world_T_approach, reference_frame=self.world.root
+        ).pose
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class PushTheFaucetLeverWithTheBaseAction(WorksCloseToTheFaucetLever, GoalAction):
+    """
+    Drives the base forward slowly, every other joint of the robot held where it stands,
+    the hand in front of a faucet's lever pushing the lever away from the robot, until
+    the lever is swung to a position of its temperature joint or the base went a
+    distance.
+    """
+
+    temperature_joint: ActiveConnection1DOF
+    """
+    The joint the lever is swung about to choose the water's temperature; pushing the
+    lever away from the robot moves it towards its lower limit.
+    """
+
+    temperature_goal: float
+    """
+    The position of the temperature joint at or below which the push ends, in radians.
+    """
+
+    push_distance: float
+    """
+    How far the base drives at most, in metres.
+    """
+
+    push_speed: float
+    """
+    How fast the base drives, in metres per second.
+    """
+
+    base_buffer: float
+    """
+    How far the robot's bodies other than the arm keep from everything else, in metres.
+    """
+
+    def create_temporary_collision_rules(self) -> list[CollisionRule]:
+        """
+        Differs from :meth:`WorksCloseToTheFaucetLever.create_temporary_collision_rules`
+        in also letting the robot's bodies other than the arm come within
+        :attr:`base_buffer` of everything else.
+        """
+        robot = set(self.robot.bodies)
+        arm = set(self.arm.bodies_with_collision)
+        return [
+            AvoidCollisionBetweenGroups(
+                body_group_a=[
+                    body for body in self.robot.bodies_with_collision if body not in arm
+                ],
+                body_group_b=[
+                    body
+                    for body in self.world.bodies_with_collision
+                    if body not in robot and body is not self.handle
+                ],
+                buffer_zone_distance=self.base_buffer,
+            ),
+            *super().create_temporary_collision_rules(),
+        ]
+
+    def create_goal(self) -> StatechartNode:
+        world_T_base = self.robot.root.global_pose.to_np().copy()
+        world_T_base[:3, 3] += self.push_distance * world_T_base[:3, 0]
+        held = [
+            connection
+            for connection in self.robot.connections
+            if isinstance(connection, ActiveConnection1DOF)
+        ]
+        drive = Parallel(
+            name="drive forward with every other joint held",
+            nodes=[
+                CartesianPose(
+                    name="drive forward slowly",
+                    root_link=self.world.root,
+                    tip_link=self.robot.root,
+                    goal_pose=HomogeneousTransformationMatrix(
+                        world_T_base, reference_frame=self.world.root
+                    ).pose,
+                    cruise_linear_velocity=self.push_speed,
+                ),
+                JointPositionList(
+                    name="every other joint held",
+                    goal_state=JointState(
+                        connections=held,
+                        target_values=[connection.position for connection in held],
+                    ),
+                ),
+            ],
+        )
+        return Parallel(
+            name="push the lever with the base",
+            nodes=[
+                drive,
+                JointPositionAtMost(
+                    name="lever swung far enough",
+                    joint=self.temperature_joint,
+                    position=self.temperature_goal,
+                ),
+            ],
+            minimum_success=1,
+        )
+
+
 @dataclass(eq=False, repr=False, kw_only=True)
 class PullTheHandAwayFromTheLeverBarAction(
     WorksCloseToTheFaucetLever, SequentialAction
@@ -1761,6 +1987,138 @@ class TurnTheWaterHotWithAFingerAction(SwingsTheFaucetLeverWithTheBase):
                 temperature_margin=self.temperature_margin,
                 pull_distance=self.pull_distance,
                 pull_speed=self.pull_speed,
+            ),
+            *self.create_steps_leaving_the_lever(),
+        ]
+
+
+# %% turning the water cold with a finger
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class TurnTheWaterColdWithAFingerAction(SwingsTheFaucetLeverWithTheBase):
+    """
+    Stands in front of and to the right of a faucet's lever, opens the gripper, reaches
+    through the free space to point the hand at the lever, fingers one above the other,
+    and drives the base forward, every other joint held, until the front of the lower
+    fingertip has pushed the lever away from the robot far enough for the water to run
+    cold, then backs the base off and leaves the sink.
+
+    Pointing the hand at the lever and the push depend on where the robot stands, so
+    they are :class:`Deferred`, created once the steps before them ended; as statements
+    their trials would run the push in a world without contact, where the lever never
+    swings.
+    """
+
+    stand_distance: float = 0.855
+    """
+    See :attr:`FaucetMovedWithAFingerAction.stand_distance`.
+    """
+
+    stand_sideways_offset: float = 0.265
+    """
+    See :attr:`FaucetMovedWithAFingerAction.stand_sideways_offset`.
+    """
+
+    bar_share: float = 0.85
+    """
+    See :meth:`FingertipInFrontOfTheLeverBar.from_lever`.
+    """
+
+    fingertip_gap: float = 0.005
+    """
+    See :meth:`FingertipInFrontOfTheLeverBar.from_lever`.
+    """
+
+    approach_distance: float = 0.1
+    """
+    See :meth:`FingertipInFrontOfTheLeverBar.from_lever`.
+    """
+
+    reach_buffer: float = 0.005
+    """
+    How far the robot keeps from everything else on its way to point the hand at the
+    lever, in metres; at the usual distance the base stands too far back for the arm.
+    """
+
+    cold_share: float = 0.4
+    """
+    How far along the temperature joint's range the water still runs cold, as a share of
+    the range; RoboCasa's own threshold.
+    """
+
+    cold_margin: float = 0.02
+    """
+    How far beyond :attr:`cold_share` the lever is pushed, in radians.
+    """
+
+    push_distance: float = 0.17
+    """
+    See :attr:`PushTheFaucetLeverWithTheBaseAction.push_distance`.
+    """
+
+    push_speed: float = 0.01
+    """
+    See :attr:`PushTheFaucetLeverWithTheBaseAction.push_speed`.
+    """
+
+    base_buffer: float = 0.005
+    """
+    See :attr:`PushTheFaucetLeverWithTheBaseAction.base_buffer`.
+    """
+
+    retreat_distance: float = 0.13
+    """
+    How far the base backs off from the lever once it is pushed, in metres.
+    """
+
+    def swing_goal(self) -> float:
+        limits = self.temperature_joint.dof.limits
+        return (
+            limits.lower.position
+            + self.cold_share * (limits.upper.position - limits.lower.position)
+            - self.cold_margin
+        )
+
+    def is_swung_far_enough(self, position: float) -> bool:
+        return position <= self.swing_goal()
+
+    def create_steps_away_from_the_lever(self) -> list[StatechartNode | Match]:
+        return [a(BackOffAction)(distance=self.retreat_distance)]
+
+    def create_steps_once_the_preconditions_hold(self) -> list[StatechartNode | Match]:
+        gripper = self.arm.end_effector
+        return [
+            self.create_navigation_in_front_of_the_handle(),
+            SetGripperAction(
+                configuration=gripper.default_configuration(GripperState.OPEN)
+            ),
+            Deferred(
+                name="point the hand at the lever",
+                task=PointTheHandAtTheLeverAction(
+                    goal=None,
+                    arm=self.arm,
+                    handle=self.handle,
+                    lift_joint=self.lift_joint,
+                    bar_share=self.bar_share,
+                    fingertip_gap=self.fingertip_gap,
+                    approach_distance=self.approach_distance,
+                    surroundings_buffer=self.reach_buffer,
+                ),
+            ),
+            Deferred(
+                name="push the lever with the base",
+                task=PushTheFaucetLeverWithTheBaseAction(
+                    arm=self.arm,
+                    handle=self.handle,
+                    lift_joint=self.lift_joint,
+                    small_buffer=self.small_buffer,
+                    temperature_joint=self.temperature_joint,
+                    temperature_goal=self.swing_goal(),
+                    push_distance=self.push_distance,
+                    push_speed=self.push_speed,
+                    base_buffer=self.base_buffer,
+                ),
             ),
             *self.create_steps_leaving_the_lever(),
         ]
