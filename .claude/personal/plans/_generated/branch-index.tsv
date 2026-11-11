@@ -8,3 +8,4 @@ partnet-rdr-bridge	eql-relational-rule-mining
 supervised-ilp-pass	eql-relational-rule-mining
 evaluate-against-ground-truth	eql-relational-rule-mining
 ratspn-fit-compiles-whole-step	tensorized-array-backends
+tensorized-row-scaling	tensorized-array-backends

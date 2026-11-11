@@ -63,8 +63,11 @@ items:
   - id: tensorized-row-scaling
     title: "Profile and fix the row scaling of tensorized log likelihoods"
     track: prerequisites
+    branch: tensorized-row-scaling
+    pull_request_number: 930
+    session: https://claude.ai/code/session_01LzY41J8tdcnmeAAuhPiVcT
     depends_on: []
-    status: not started
+    status: in progress
     notes: >
       The tensorized JPT is 3 to 7 times faster than the rustworkx circuit below a few
       hundred rows but 2.5 times slower on 9769 rows (UCI Adult, 318 ms against 128
