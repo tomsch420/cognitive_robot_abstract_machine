@@ -1495,9 +1495,10 @@ class TurnOffTheFaucetWithAFingerAction(FaucetMovedWithAFingerAction):
     the hand back and leaves the sink.
     """
 
-    bar_share: float = 2 / 3
+    bar_share: float = 0.85
     """
-    See :attr:`PutTheLowerFingerBesideTheLeverBarAction.bar_share`.
+    See :attr:`PutTheLowerFingerBesideTheLeverBarAction.bar_share`; lower down, the hand
+    comes to rest on the disc at the lever's pivot and jams there while pushing.
     """
 
     finger_gap: float = 0.01
