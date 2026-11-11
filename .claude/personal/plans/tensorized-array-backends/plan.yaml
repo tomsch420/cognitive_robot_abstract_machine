@@ -46,8 +46,11 @@ items:
 - id: array-api-dependency
   title: Add array-api-compat and array-api-extra
   track: foundation
+  branch: array-api-dependency
+  pull_request_number: 932
+  session: https://claude.ai/code/session_01LzY41J8tdcnmeAAuhPiVcT
   depends_on: []
-  status: not started
+  status: in progress
   notes: 'Approved new dependencies of probabilistic_model (2026-11-11). array-api-compat
     gives one namespace (xp = array_namespace(x)) for numpy, jax and torch; array-api-extra
     adds at(x, index).set(value) for immutable backends. Never write our own backend interface
