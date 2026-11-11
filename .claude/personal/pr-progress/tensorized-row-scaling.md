@@ -1,11 +1,11 @@
 ## Plan
-- Decide with the user: remove embedded_logsumexp (test only now); stream the linear CDF and moment reductions too or leave them
-- Review of PR 930
+- Ask the user: remove group_by_row and is_contiguous (no callers left)
+- Clean container suite run once the neem-4 sweep is done
 
 ## Done
-- RowGroupedSparseArray.logsumexp_by_row streams logaddexp over entry slots without padding; SumLayer uses it
-- Tests for uneven rows, all -inf, rows without entries; full probabilistic_model suite green on neem-4
-- Benchmark: tensorized up to 4x faster, faster than rustworkx on 11 of 12 UCI datasets (Adult 156 vs 124 ms)
+- reduce_by_row(values, ufunc) replaces logsumexp_by_row; SumLayer log and linear sums use it
+- EntrySlot replaced by entry_positions_by_rank with a docstring example (review comment answered, resolved)
+- embedded_logsumexp and its tests removed; CDF 5 to 22 % faster locally
 
 ## Next
-- Act on the user's answers to the two open questions
+- Act on the answer about group_by_row
