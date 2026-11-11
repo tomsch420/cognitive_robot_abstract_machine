@@ -101,7 +101,7 @@ items:
   depends_on:
   - tensorized-training
   status: not started
-  notes: 'as_probabilistic_circuit returns a LayeredProbabilisticCircuit with jax parameters,
+  notes: 'to_probabilistic_circuit returns a LayeredProbabilisticCircuit with jax parameters,
     classification included. Check against the RAT-SPN vs JPT benchmark (log likelihoods and
     training time on the 12 UCI datasets).
 
