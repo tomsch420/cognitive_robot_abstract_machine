@@ -1,11 +1,10 @@
 ## Plan
-- Ask the user: remove group_by_row and is_contiguous (no callers left)
 - Clean container suite run once the neem-4 sweep is done
+- Discuss the api-break (removed embedded_logsumexp, group_by_row, is_contiguous) with the probabilistic_model code owners before review
 
 ## Done
-- reduce_by_row(values, ufunc) replaces logsumexp_by_row; SumLayer log and linear sums use it
-- EntrySlot replaced by entry_positions_by_rank with a docstring example (review comment answered, resolved)
-- embedded_logsumexp and its tests removed; CDF 5 to 22 % faster locally
+- reduce_by_row(values, ufunc) for every SumLayer reduction; entry_positions_by_rank documented with an example
+- Removed embedded_logsumexp, group_by_row, is_contiguous; api-break label and migration notes in the description
 
 ## Next
-- Act on the answer about group_by_row
+- Container suite, then report
