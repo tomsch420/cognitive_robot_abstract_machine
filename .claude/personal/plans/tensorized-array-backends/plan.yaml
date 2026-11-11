@@ -43,56 +43,15 @@ tracks:
   name: Further backends and cleanup
   wave: consolidation
 items:
-- id: array-api-dependency
-  title: Add array-api-compat and array-api-extra
-  track: foundation
-  branch: array-api-dependency
-  pull_request_number: 932
-  session: https://claude.ai/code/session_01LzY41J8tdcnmeAAuhPiVcT
-  depends_on: []
-  status: in progress
-  notes: 'Approved new dependencies of probabilistic_model (2026-11-11). array-api-compat
-    gives one namespace (xp = array_namespace(x)) for numpy, jax and torch; array-api-extra
-    adds at(x, index).set(value) for immutable backends. Never write our own backend interface
-    where these suffice.
-
-    '
-  repository: cram2/cognitive_robot_abstract_machine
-- id: layer-structure-parameter-split
-  title: Split every tensorized layer into host structure and parameters
-  track: foundation
-  depends_on: []
-  status: not started
-  notes: 'Structure (edge columns, gather matrices, entry positions by rank, variable indices,
-    remaps) is plain numpy, computed once at construction and never during a query; parameters
-    (weights, locations, scales, tables) are the only backend arrays. No value dependent branches,
-    shapes or in place writes in numeric query paths. Maintenance PR, no behaviour change;
-    exact float64 test values must still hold.
-
-    '
-  repository: cram2/cognitive_robot_abstract_machine
-- id: backend-special-functions
-  title: Per backend special functions
-  track: foundation
-  depends_on:
-  - array-api-dependency
-  status: not started
-  notes: 'The Array API has no special functions: provide logsumexp, erf, normal CDF and log
-    of the normal density per backend (scipy, jax.scipy, torch.special) behind one small class.
-    The truncated multivariate Gaussian stays numpy only.
-
-    '
-  repository: cram2/cognitive_robot_abstract_machine
 - id: input-layers-any-backend
   title: Numeric queries of input layers on any backend
   track: input-layers
   depends_on:
-  - layer-structure-parameter-split
-  - backend-special-functions
+  - structure-and-parameters
   status: not started
-  notes: 'Gaussian, uniform, Dirac delta and discrete layers compute log likelihood, CDF,
-    probability of a simple event and moments with xp. Encoding of symbolic values stays on
-    the host. Tests run on numpy and jax with float64 enabled.
+  notes: 'Gaussian, uniform, Dirac delta and discrete layers compute log likelihood, CDF, probability
+    of a simple event and moments with xp. Encoding of symbolic values stays on the host. Tests run
+    on numpy and jax with float64 enabled.
 
     '
   repository: cram2/cognitive_robot_abstract_machine
@@ -100,12 +59,11 @@ items:
   title: Numeric queries of sum and product layers on any backend
   track: inner-layers
   depends_on:
-  - layer-structure-parameter-split
-  - array-api-dependency
+  - structure-and-parameters
   status: not started
   notes: 'Sum and product layers gather, group by row and reduce with xp, using the host structure
-    from the split. LayeredProbabilisticCircuit.log_likelihood accepts a backend array and
-    returns one of the same backend. Tests run on numpy and jax.
+    from the split. LayeredProbabilisticCircuit.log_likelihood accepts a backend array and returns
+    one of the same backend. Tests run on numpy and jax.
 
     '
   repository: cram2/cognitive_robot_abstract_machine
@@ -170,6 +128,23 @@ items:
   notes: 'Delete probabilistic_circuit/jax and adapters/jax_tensorized once tensorized circuits
     train on jax and RegionGraph builds them. api-break PR: its description states the migration
     from DifferentiableLayeredCircuit to the tensorized circuit.
+
+    '
+  repository: cram2/cognitive_robot_abstract_machine
+
+- id: structure-and-parameters
+  title: Array API dependencies, host structure and parameters, special functions
+  track: foundation
+  branch: array-api-dependency
+  pull_request_number: 932
+  session: https://claude.ai/code/session_01LzY41J8tdcnmeAAuhPiVcT
+  depends_on: []
+  status: in progress
+  notes: 'One PR for the whole foundation wave. Adds array-api-compat and array-api-extra. Splits
+    every tensorized layer into numpy host structure, computed once at construction, and parameters,
+    the only arrays a backend may replace; numeric query paths get no value dependent branches, shapes
+    or in place writes. No behaviour change: exact float64 test values hold. Special functions the
+    Array API lacks live per backend (scipy, jax.scipy) behind one small class.
 
     '
   repository: cram2/cognitive_robot_abstract_machine
