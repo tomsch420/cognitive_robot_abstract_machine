@@ -1,4 +1,4 @@
-## PR #932 (array-api-dependency)
-- Plan: add array-api-compat>=1.15 and array-api-extra>=0.11 to probabilistic_model's dependencies; no code uses them yet
-- Done: dependencies added (803be3d2e0), checked on numpy and jax (incl. jax.jit) in tom-probabilistic-experiments; draft PR opened on cram2 with the maintenance label
-- Next: wait for CI and review
+## PR #932 (array-api-dependency, plan item structure-and-parameters)
+- Plan: the whole foundation wave in one PR: array API dependencies, host structure / parameter split of every tensorized layer, per backend special functions
+- Done: dependencies (803be3d2e0); split and SpecialFunctions (797108eed0), all probabilistic_model tests pass in tom-probabilistic-experiments
+- Next: before/after evaluate.py benchmark, push, PR description and labels (api-break: sum layer JSON format), ask about test-only helpers
