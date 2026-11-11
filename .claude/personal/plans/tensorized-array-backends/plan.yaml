@@ -1,181 +1,178 @@
 schema_version: 1
 id: tensorized-array-backends
-title: "Tensorized circuits on any array backend"
-description: >
-  Run the tensorized layered circuits of probabilistic_model on numpy, jax and torch
-  through the Python Array API standard, train them directly, and retire the duplicate
-  jax package. Layers split into host structure (numpy indices fixed at construction)
-  and backend parameters; numeric queries (log likelihood, CDF, probability of a simple
-  event, moments) run on any backend, structural queries and sampling stay numpy on the
-  host.
+title: Tensorized circuits on any array backend
+description: 'Run the tensorized layered circuits of probabilistic_model on numpy, jax and
+  torch through the Python Array API standard, train them directly, and retire the duplicate
+  jax package. Layers split into host structure (numpy indices fixed at construction) and
+  backend parameters; numeric queries (log likelihood, CDF, probability of a simple event,
+  moments) run on any backend, structural queries and sampling stay numpy on the host.
+
+  '
 default_repository: tomsch420/cognitive_robot_abstract_machine
-
 waves:
-  - id: prerequisites
-    name: "Prerequisites"
-    description: "Land the training fix and understand the row scaling before redesigning."
-  - id: foundation
-    name: "Structure and parameters"
-    description: "Separate what is fixed per layer from what is trained, with no behaviour change."
-  - id: numeric-queries
-    name: "Numeric queries on any backend"
-    description: "Route the numeric forward queries through the array namespace."
-  - id: consolidation
-    name: "Training and consolidation"
-    description: "Train tensorized circuits, build RAT-SPNs as tensorized circuits, add torch, retire the jax package."
-
+- id: prerequisites
+  name: Prerequisites
+  description: Land the training fix and understand the row scaling before redesigning.
+- id: foundation
+  name: Structure and parameters
+  description: Separate what is fixed per layer from what is trained, with no behaviour change.
+- id: numeric-queries
+  name: Numeric queries on any backend
+  description: Route the numeric forward queries through the array namespace.
+- id: consolidation
+  name: Training and consolidation
+  description: Train tensorized circuits, build RAT-SPNs as tensorized circuits, add torch,
+    retire the jax package.
 tracks:
-  - id: prerequisites
-    name: "Prerequisites"
-    wave: prerequisites
-  - id: foundation
-    name: "Structure and parameters split"
-    wave: foundation
-  - id: input-layers
-    name: "Input layers"
-    wave: numeric-queries
-  - id: inner-layers
-    name: "Inner layers"
-    wave: numeric-queries
-  - id: training
-    name: "Training and RAT-SPN"
-    wave: consolidation
-  - id: backends
-    name: "Further backends and cleanup"
-    wave: consolidation
-
+- id: prerequisites
+  name: Prerequisites
+  wave: prerequisites
+- id: foundation
+  name: Structure and parameters split
+  wave: foundation
+- id: input-layers
+  name: Input layers
+  wave: numeric-queries
+- id: inner-layers
+  name: Inner layers
+  wave: numeric-queries
+- id: training
+  name: Training and RAT-SPN
+  wave: consolidation
+- id: backends
+  name: Further backends and cleanup
+  wave: consolidation
 items:
-  - id: compile-training-step
-    title: "Compile the training step; fix region graph and classifier loss"
-    branch: ratspn-fit-compiles-whole-step
-    repository: cram2/cognitive_robot_abstract_machine
-    pull_request_number: 927
-    track: prerequisites
-    depends_on: []
-    status: in progress
-    notes: >
-      PR 927 (api-break): DifferentiableLayeredCircuit.minimize runs one jit compiled
-      step over the flat list of trainable arrays; RegionGraph gives single variable
-      regions above depth 0 a leaf; ClassificationCircuit trains each row on its own
-      class. Needs a discussion of the break with the probabilistic_model code owners
-      before review.
+- id: tensorized-row-scaling
+  title: Profile and fix the row scaling of tensorized log likelihoods
+  track: prerequisites
+  branch: tensorized-row-scaling
+  pull_request_number: 930
+  session: https://claude.ai/code/session_01LzY41J8tdcnmeAAuhPiVcT
+  depends_on: []
+  status: in progress
+  notes: 'The tensorized JPT is 3 to 7 times faster than the rustworkx circuit below a few
+    hundred rows but 2.5 times slower on 9769 rows (UCI Adult, 318 ms against 128 ms). Find
+    the per row cost (input layers are the suspects) and fix it as its own bug fix PR, so
+    the redesign does not carry it over. Reproduce with /root/ratspn_vs_jpt/evaluate.py in
+    tom-probabilistic-experiments on neem-4.
 
-  - id: tensorized-row-scaling
-    title: "Profile and fix the row scaling of tensorized log likelihoods"
-    track: prerequisites
-    branch: tensorized-row-scaling
-    pull_request_number: 930
-    session: https://claude.ai/code/session_01LzY41J8tdcnmeAAuhPiVcT
-    depends_on: []
-    status: in progress
-    notes: >
-      The tensorized JPT is 3 to 7 times faster than the rustworkx circuit below a few
-      hundred rows but 2.5 times slower on 9769 rows (UCI Adult, 318 ms against 128
-      ms). Find the per row cost (input layers are the suspects) and fix it as its own
-      bug fix PR, so the redesign does not carry it over. Reproduce with
-      /root/ratspn_vs_jpt/evaluate.py in tom-probabilistic-experiments on neem-4.
+    '
+- id: array-api-dependency
+  title: Add array-api-compat and array-api-extra
+  track: foundation
+  depends_on: []
+  status: not started
+  notes: 'Approved new dependencies of probabilistic_model (2026-11-11). array-api-compat
+    gives one namespace (xp = array_namespace(x)) for numpy, jax and torch; array-api-extra
+    adds at(x, index).set(value) for immutable backends. Never write our own backend interface
+    where these suffice.
 
-  - id: array-api-dependency
-    title: "Add array-api-compat and array-api-extra"
-    track: foundation
-    depends_on: []
-    status: not started
-    notes: >
-      Approved new dependencies of probabilistic_model (2026-11-11). array-api-compat
-      gives one namespace (xp = array_namespace(x)) for numpy, jax and torch;
-      array-api-extra adds at(x, index).set(value) for immutable backends. Never write
-      our own backend interface where these suffice.
+    '
+- id: layer-structure-parameter-split
+  title: Split every tensorized layer into host structure and parameters
+  track: foundation
+  depends_on:
+  - tensorized-row-scaling
+  status: not started
+  notes: 'Structure (edge columns, gather matrices, contiguity, variable indices, remaps)
+    is plain numpy, computed once at construction and never during a query; parameters (weights,
+    locations, scales, tables) are the only backend arrays. No value dependent branches, shapes
+    or in place writes in numeric query paths. Maintenance PR, no behaviour change; exact
+    float64 test values must still hold.
 
-  - id: layer-structure-parameter-split
-    title: "Split every tensorized layer into host structure and parameters"
-    track: foundation
-    depends_on: [compile-training-step, tensorized-row-scaling]
-    status: not started
-    notes: >
-      Structure (edge columns, gather matrices, contiguity, variable indices, remaps)
-      is plain numpy, computed once at construction and never during a query;
-      parameters (weights, locations, scales, tables) are the only backend arrays. No
-      value dependent branches, shapes or in place writes in numeric query paths.
-      Maintenance PR, no behaviour change; exact float64 test values must still hold.
+    '
+- id: backend-special-functions
+  title: Per backend special functions
+  track: foundation
+  depends_on:
+  - array-api-dependency
+  status: not started
+  notes: 'The Array API has no special functions: provide logsumexp, erf, normal CDF and log
+    of the normal density per backend (scipy, jax.scipy, torch.special) behind one small class.
+    The truncated multivariate Gaussian stays numpy only.
 
-  - id: backend-special-functions
-    title: "Per backend special functions"
-    track: foundation
-    depends_on: [array-api-dependency]
-    status: not started
-    notes: >
-      The Array API has no special functions: provide logsumexp, erf, normal CDF and
-      log of the normal density per backend (scipy, jax.scipy, torch.special) behind
-      one small class. The truncated multivariate Gaussian stays numpy only.
+    '
+- id: input-layers-any-backend
+  title: Numeric queries of input layers on any backend
+  track: input-layers
+  depends_on:
+  - layer-structure-parameter-split
+  - backend-special-functions
+  status: not started
+  notes: 'Gaussian, uniform, Dirac delta and discrete layers compute log likelihood, CDF,
+    probability of a simple event and moments with xp. Encoding of symbolic values stays on
+    the host. Tests run on numpy and jax with float64 enabled.
 
-  - id: input-layers-any-backend
-    title: "Numeric queries of input layers on any backend"
-    track: input-layers
-    depends_on: [layer-structure-parameter-split, backend-special-functions]
-    status: not started
-    notes: >
-      Gaussian, uniform, Dirac delta and discrete layers compute log likelihood, CDF,
-      probability of a simple event and moments with xp. Encoding of symbolic values
-      stays on the host. Tests run on numpy and jax with float64 enabled.
+    '
+- id: inner-layers-any-backend
+  title: Numeric queries of sum and product layers on any backend
+  track: inner-layers
+  depends_on:
+  - layer-structure-parameter-split
+  - array-api-dependency
+  status: not started
+  notes: 'Sum and product layers gather, group by row and reduce with xp, using the host structure
+    from the split. LayeredProbabilisticCircuit.log_likelihood accepts a backend array and
+    returns one of the same backend. Tests run on numpy and jax.
 
-  - id: inner-layers-any-backend
-    title: "Numeric queries of sum and product layers on any backend"
-    track: inner-layers
-    depends_on: [layer-structure-parameter-split, array-api-dependency]
-    status: not started
-    notes: >
-      Sum and product layers gather, group by row and reduce with xp, using the host
-      structure from the split. LayeredProbabilisticCircuit.log_likelihood accepts a
-      backend array and returns one of the same backend. Tests run on numpy and jax.
+    '
+- id: host-only-structural-queries
+  title: Structural queries and sampling stay on the host
+  track: inner-layers
+  depends_on:
+  - inner-layers-any-backend
+  - input-layers-any-backend
+  status: not started
+  notes: 'Support, marginal, truncation, simplify, rebuild, mode, determinism checks and sampling
+    convert backend parameters to numpy and run as today. Document them as host only; never
+    abstract them over backends.
 
-  - id: host-only-structural-queries
-    title: "Structural queries and sampling stay on the host"
-    track: inner-layers
-    depends_on: [inner-layers-any-backend, input-layers-any-backend]
-    status: not started
-    notes: >
-      Support, marginal, truncation, simplify, rebuild, mode, determinism checks and
-      sampling convert backend parameters to numpy and run as today. Document them as
-      host only; never abstract them over backends.
+    '
+- id: tensorized-training
+  title: Train tensorized circuits through a functional loss
+  track: training
+  depends_on:
+  - inner-layers-any-backend
+  - input-layers-any-backend
+  status: not started
+  notes: 'A pure function from parameters to log likelihood over the host structure, so jax.grad
+    and jax.jit apply without static arrays in pytrees. Build on GradientDescent (merged in
+    PR 927: a compiled bound step over the flat list of trainable arrays, losses in LikelihoodMaximization
+    and ClassConditionalLikelihoodMaximization) so it trains tensorized circuits; parameter
+    constraints (normalized weights, minimum scales) are kept.
 
-  - id: tensorized-training
-    title: "Train tensorized circuits through a functional loss"
-    track: training
-    depends_on: [inner-layers-any-backend, input-layers-any-backend]
-    status: not started
-    notes: >
-      A pure function from parameters to log likelihood over the host structure, so
-      jax.grad and jax.jit apply without static arrays in pytrees. Move minimize from
-      DifferentiableLayeredCircuit onto the tensorized circuit; parameter constraints
-      (normalized weights, minimum scales) are kept.
+    '
+- id: region-graph-builds-tensorized
+  title: RegionGraph builds tensorized circuits
+  track: training
+  depends_on:
+  - tensorized-training
+  status: not started
+  notes: 'as_probabilistic_circuit returns a LayeredProbabilisticCircuit with jax parameters,
+    classification included. Check against the RAT-SPN vs JPT benchmark (log likelihoods and
+    training time on the 12 UCI datasets).
 
-  - id: region-graph-builds-tensorized
-    title: "RegionGraph builds tensorized circuits"
-    track: training
-    depends_on: [tensorized-training]
-    status: not started
-    notes: >
-      as_probabilistic_circuit returns a LayeredProbabilisticCircuit with jax
-      parameters, classification included. Check against the RAT-SPN vs JPT
-      benchmark (log likelihoods and training time on the 12 UCI datasets).
+    '
+- id: torch-backend
+  title: Torch backend
+  track: backends
+  depends_on:
+  - region-graph-builds-tensorized
+  status: not started
+  notes: 'Numeric queries and training on torch: parameters registered for torch optimizers,
+    the functional loss differentiated with torch.func. Same test matrix as numpy and jax.
+    Adding torch as a dependency needs the user''s approval first.
 
-  - id: torch-backend
-    title: "Torch backend"
-    track: backends
-    depends_on: [region-graph-builds-tensorized]
-    status: not started
-    notes: >
-      Numeric queries and training on torch: parameters registered for torch
-      optimizers, the functional loss differentiated with torch.func. Same test
-      matrix as numpy and jax. Adding torch as a dependency needs the user's
-      approval first.
+    '
+- id: remove-jax-package
+  title: Remove the jax package and its adapters
+  track: backends
+  depends_on:
+  - region-graph-builds-tensorized
+  status: not started
+  notes: 'Delete probabilistic_circuit/jax and adapters/jax_tensorized once tensorized circuits
+    train on jax and RegionGraph builds them. api-break PR: its description states the migration
+    from DifferentiableLayeredCircuit to the tensorized circuit.
 
-  - id: remove-jax-package
-    title: "Remove the jax package and its adapters"
-    track: backends
-    depends_on: [region-graph-builds-tensorized]
-    status: not started
-    notes: >
-      Delete probabilistic_circuit/jax and adapters/jax_tensorized once tensorized
-      circuits train on jax and RegionGraph builds them. api-break PR: its description
-      states the migration from DifferentiableLayeredCircuit to the tensorized circuit.
+    '
