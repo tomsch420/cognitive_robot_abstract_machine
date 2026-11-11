@@ -1,7 +1,7 @@
 """
 Actions at the sink, written from what worked when the robot was driven there step by
 step: lifting the hand out of the basin, turning the faucet on and off by pushing its
-handle with one finger, and turning the water hot by pulling the handle with the base.
+handle with one finger, and turning the water hot by swinging the handle with the base.
 
 Each parameter is a field defaulting to the value that worked, so that the values can be
 varied and what works learned; the preconditions are EQL conditions checked when the
@@ -30,7 +30,7 @@ from experiments.robocasa_atomic_tasks.exceptions import (
     FaucetNotTurnedOff,
     FaucetNotTurnedOn,
     HandleHasNoBar,
-    LeverNotSwungToItsEnd,
+    LeverNotSwungFarEnough,
     LeverSwungAside,
     PreconditionsNotMet,
 )
@@ -1043,13 +1043,13 @@ class PullTheHandBackFromTheFaucetHandleAction(TouchesTheFaucetHandle, GoalActio
         return self.tool_goal_with_the_base_held(world_T_back, in_a_straight_line=True)
 
 
-# %% working behind the faucet's lever
+# %% working close to the faucet's lever
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class WorksBehindTheFaucetLever(TouchesTheFaucetHandle, ABC):
+class WorksCloseToTheFaucetLever(TouchesTheFaucetHandle, ABC):
     """
-    An action whose hand works in the narrow space behind a faucet's lever, between the
+    An action whose hand works in the narrow space around a faucet's lever, between the
     lever, the faucet and the wall behind them.
     """
 
@@ -1086,7 +1086,7 @@ class WorksBehindTheFaucetLever(TouchesTheFaucetHandle, ABC):
 
 @dataclass(eq=False, repr=False, kw_only=True)
 class PutTheLowerFingerBehindTheLeverBarAction(
-    WorksBehindTheFaucetLever, SequentialAction
+    WorksCloseToTheFaucetLever, SequentialAction
 ):
     """
     Brings the open hand to the right of a faucet's lever, pointing left with its
@@ -1134,7 +1134,7 @@ class PutTheLowerFingerBehindTheLeverBarAction(
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class PullTheFaucetLeverWithTheBaseAction(WorksBehindTheFaucetLever, GoalAction):
+class PullTheFaucetLeverWithTheBaseAction(WorksCloseToTheFaucetLever, GoalAction):
     """
     Backs the base off slowly, the hand behind a faucet's lever pulling the lever
     towards the robot, until the lever is swung to near the upper limit of its
@@ -1189,11 +1189,11 @@ class PullTheFaucetLeverWithTheBaseAction(WorksBehindTheFaucetLever, GoalAction)
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class PullTheHandOutFromBehindTheLeverBarAction(
-    WorksBehindTheFaucetLever, SequentialAction
+class PullTheHandAwayFromTheLeverBarAction(
+    WorksCloseToTheFaucetLever, SequentialAction
 ):
     """
-    Slides the hand straight right from behind a faucet's lever and then straight back
+    Slides the hand straight right, away from a faucet's lever, and then straight back
     towards the robot, away from the wall, the base carrying it.
     """
 
@@ -1576,11 +1576,97 @@ class TurnOffTheFaucetWithAFingerAction(FaucetMovedWithAFingerAction):
             )
 
 
+# %% swinging the faucet's lever with the base
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class SwingsTheFaucetLeverWithTheBase(FaucetMovedWithAFingerAction, ABC):
+    """
+    Stands in front of a faucet's lever, puts a finger against the lever's bar and
+    swings the lever about its temperature joint by moving the base, then takes the hand
+    away and leaves the sink.
+    """
+
+    temperature_joint: ActiveConnection1DOF
+    """
+    The joint the lever is swung about to choose the water's temperature.
+    """
+
+    small_buffer: float = 0.003
+    """
+    See :attr:`WorksCloseToTheFaucetLever.small_buffer`.
+    """
+
+    @abstractmethod
+    def swing_goal(self) -> float:
+        """
+        :return: The position of the temperature joint the lever is swung to, in
+            radians.
+        """
+
+    @abstractmethod
+    def is_swung_far_enough(self, position: float) -> bool:
+        """
+        :param position: Where the temperature joint stands, in radians.
+        :return: Whether that is :meth:`swing_goal` or beyond it.
+        """
+
+    @abstractmethod
+    def create_steps_away_from_the_lever(self) -> list[StatechartNode | Match]:
+        """
+        :return: New nodes taking the hand away from the swung lever.
+        """
+
+    def preconditions(self) -> ConditionType:
+        return self.hand_is_outside_the_basin()
+
+    def create_temporary_collision_rules(self) -> list[CollisionRule]:
+        """
+        Differs from
+        :meth:`FaucetMovedWithAFingerAction.create_temporary_collision_rules` in
+        allowing the gripper to touch only the lever, from one step to the next.
+        """
+        return [
+            AllowCollisionBetweenGroups(
+                body_group_a=list(self.arm.end_effector.bodies_with_collision),
+                body_group_b=[self.handle],
+            )
+        ]
+
+    def create_steps_leaving_the_lever(self) -> list[StatechartNode | Match]:
+        """
+        :return: New nodes checking that the lever is swung far enough, taking the hand
+            away from it and leaving the sink.
+        """
+        return [
+            FunctionCall(
+                name="check the lever is swung far enough",
+                function=self.raise_unless_the_lever_is_swung_far_enough,
+            ),
+            *self.create_steps_away_from_the_lever(),
+            a(LeaveTheSinkAction)(arm=self.arm, basin=self.basin),
+        ]
+
+    def raise_unless_the_lever_is_swung_far_enough(self) -> None:
+        """
+        :raises LeverNotSwungFarEnough: If the lever stands short of
+            :meth:`swing_goal`.
+        """
+        position = JointReading(self.world).position(self.temperature_joint)
+        if self.is_swung_far_enough(position):
+            return
+        raise LeverNotSwungFarEnough(
+            temperature_joint=self.temperature_joint,
+            position=position,
+            goal=self.swing_goal(),
+        )
+
+
 # %% turning the water hot with a finger
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class TurnTheWaterHotWithAFingerAction(FaucetMovedWithAFingerAction):
+class TurnTheWaterHotWithAFingerAction(SwingsTheFaucetLeverWithTheBase):
     """
     Stands in front of a faucet's lever, opens the gripper, slides the lower finger in
     behind the lever's bar from the right and backs the base off until the lever is
@@ -1588,11 +1674,6 @@ class TurnTheWaterHotWithAFingerAction(FaucetMovedWithAFingerAction):
 
     .. warning:: Sliding the finger in may push the lever down far enough to stop the
         water; :class:`TurnOnTheFaucetWithAFingerAction` lifts it again.
-    """
-
-    temperature_joint: ActiveConnection1DOF
-    """
-    See :attr:`PullTheFaucetLeverWithTheBaseAction.temperature_joint`.
     """
 
     bar_share: float = 0.4
@@ -1612,7 +1693,7 @@ class TurnTheWaterHotWithAFingerAction(FaucetMovedWithAFingerAction):
 
     temperature_margin: float = 0.01
     """
-    See :attr:`PullTheFaucetLeverWithTheBaseAction.temperature_margin`.
+    How far short of the temperature joint's upper limit the swing ends, in radians.
     """
 
     pull_distance: float = 0.15
@@ -1627,32 +1708,31 @@ class TurnTheWaterHotWithAFingerAction(FaucetMovedWithAFingerAction):
 
     slide_distance: float = 0.12
     """
-    See :attr:`PullTheHandOutFromBehindTheLeverBarAction.slide_distance`.
+    See :attr:`PullTheHandAwayFromTheLeverBarAction.slide_distance`.
     """
 
     back_distance: float = 0.08
     """
-    See :attr:`PullTheHandOutFromBehindTheLeverBarAction.back_distance`.
+    See :attr:`PullTheHandAwayFromTheLeverBarAction.back_distance`.
     """
 
-    small_buffer: float = 0.003
-    """
-    See :attr:`WorksBehindTheFaucetLever.small_buffer`.
-    """
+    def swing_goal(self) -> float:
+        return (
+            self.temperature_joint.dof.limits.upper.position - self.temperature_margin
+        )
 
-    def preconditions(self) -> ConditionType:
-        return self.hand_is_outside_the_basin()
+    def is_swung_far_enough(self, position: float) -> bool:
+        return position >= self.swing_goal()
 
-    def create_temporary_collision_rules(self) -> list[CollisionRule]:
-        """
-        Differs from
-        :meth:`FaucetMovedWithAFingerAction.create_temporary_collision_rules` in
-        allowing the gripper to touch only the lever, from one step to the next.
-        """
+    def create_steps_away_from_the_lever(self) -> list[StatechartNode | Match]:
         return [
-            AllowCollisionBetweenGroups(
-                body_group_a=list(self.arm.end_effector.bodies_with_collision),
-                body_group_b=[self.handle],
+            a(PullTheHandAwayFromTheLeverBarAction)(
+                arm=self.arm,
+                handle=self.handle,
+                lift_joint=self.lift_joint,
+                small_buffer=self.small_buffer,
+                slide_distance=self.slide_distance,
+                back_distance=self.back_distance,
             )
         ]
 
@@ -1682,31 +1762,5 @@ class TurnTheWaterHotWithAFingerAction(FaucetMovedWithAFingerAction):
                 pull_distance=self.pull_distance,
                 pull_speed=self.pull_speed,
             ),
-            FunctionCall(
-                name="check the lever is swung to hot",
-                function=self.raise_unless_the_lever_is_swung_to_its_end,
-            ),
-            a(PullTheHandOutFromBehindTheLeverBarAction)(
-                arm=self.arm,
-                handle=self.handle,
-                lift_joint=self.lift_joint,
-                small_buffer=self.small_buffer,
-                slide_distance=self.slide_distance,
-                back_distance=self.back_distance,
-            ),
-            a(LeaveTheSinkAction)(arm=self.arm, basin=self.basin),
+            *self.create_steps_leaving_the_lever(),
         ]
-
-    def raise_unless_the_lever_is_swung_to_its_end(self) -> None:
-        """
-        :raises LeverNotSwungToItsEnd: If the lever stands short of
-            :attr:`temperature_margin` from the temperature joint's upper limit.
-        """
-        position = JointReading(self.world).position(self.temperature_joint)
-        goal = (
-            self.temperature_joint.dof.limits.upper.position - self.temperature_margin
-        )
-        if position < goal:
-            raise LeverNotSwungToItsEnd(
-                temperature_joint=self.temperature_joint, position=position, goal=goal
-            )

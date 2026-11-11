@@ -11,12 +11,12 @@ import mujoco
 import numpy as np
 import pytest
 from robosuite.models.bases import OmronMobileBase
-from robosuite.models.grippers import gripper_factory
 from robosuite.models.robots import create_robot
 
 from experiments.robocasa_atomic_tasks.panda_omron import (
     PandaOmron,
     PandaOmronDescription,
+    PandaOmronGripper,
     PandaOmronJoint,
     RobosuiteModelName,
 )
@@ -158,20 +158,20 @@ def test_the_arm_exerts_at_most_the_torque_of_robosuites_motors(panda_omron):
         )
 
 
-def test_the_fingers_are_servoed_as_robosuites_position_actuators(panda_omron):
+def test_the_fingers_grasp_with_the_franka_hands_force_and_speed(panda_omron):
     world = panda_omron._world
     gains_by_degree_of_freedom = servo_gains_by_degree_of_freedom(world)
-    arm = RobosuiteModelName.ARM
-    model = create_robot(RobosuiteModelName.ROBOT, idn=0)
-    gripper = gripper_factory(model.default_gripper[arm], idn=f"0_{arm}")
+    [gripper] = world.get_semantic_annotations_by_type(PandaOmronGripper)
 
-    for actuator in gripper.actuator.iter("position"):
-        _, force_limit = map(float, actuator.get("forcerange").split())
-        connection = world.get_connection_by_name(actuator.get("joint"))
-        gains = gains_by_degree_of_freedom[connection.raw_dof]
-        assert (gains.stiffness, gains.torque_limit) == (
-            float(actuator.get("kp")),
-            force_limit,
+    for joint_name in (PandaOmronJoint.LEFT_FINGER, PandaOmronJoint.RIGHT_FINGER):
+        connection = world.get_connection_by_name(joint_name)
+        assert gains_by_degree_of_freedom[connection.raw_dof] == ServoGains(
+            stiffness=gripper.finger_stiffness,
+            damping=0.0,
+            torque_limit=gripper.grasping_force,
+        )
+        assert (
+            connection.dynamics.damping == gripper.grasping_force / gripper.finger_speed
         )
 
 

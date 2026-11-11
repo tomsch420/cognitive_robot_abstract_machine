@@ -272,6 +272,24 @@ class PandaOmronGripper(
     How far each finger slides out of the closed gripper when it opens, in metres.
     """
 
+    grasping_force: float = 70.0
+    """
+    The largest force each finger exerts, in newtons; the Franka Hand's continuous
+    grasping force.
+    """
+
+    finger_speed: float = 0.05
+    """
+    How fast a finger moves when it exerts :attr:`grasping_force` and nothing holds it,
+    in metres per second; the Franka Hand's travel speed per finger.
+    """
+
+    finger_stiffness: float = 20000.0
+    """
+    How hard a finger pushes back per metre it is pushed off its commanded position, in
+    newtons per metre, up to :attr:`grasping_force`.
+    """
+
     def setup_hardware_interfaces(self) -> None:
         for joint_name in (PandaOmronJoint.LEFT_FINGER, PandaOmronJoint.RIGHT_FINGER):
             self._world.get_connection_by_name(joint_name).has_hardware_interface = True
@@ -299,11 +317,17 @@ class PandaOmronGripper(
     @property
     def drive_of_each_joint(self) -> dict[str, JointDrive]:
         """
-        Each finger's joint, driven as robosuite's position actuators drive it, the
-        joint's own damping damping it.
+        Each finger's joint, driven with :attr:`finger_stiffness` up to
+        :attr:`grasping_force`, the joint damped so that the finger moves at
+        :attr:`finger_speed` when it exerts that force.
         """
         finger = JointDrive(
-            gains=ServoGains(stiffness=1000.0, damping=0.0, torque_limit=20.0)
+            gains=ServoGains(
+                stiffness=self.finger_stiffness,
+                damping=0.0,
+                torque_limit=self.grasping_force,
+            ),
+            joint_damping=self.grasping_force / self.finger_speed,
         )
         return {
             PandaOmronJoint.LEFT_FINGER: finger,

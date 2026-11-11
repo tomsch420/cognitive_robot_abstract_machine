@@ -300,10 +300,10 @@ class LeverSwungAside(PlanFailure):
 
 
 @dataclass
-class LeverNotSwungToItsEnd(PlanFailure):
+class LeverNotSwungFarEnough(PlanFailure):
     """
-    Raised when pulling a faucet's lever left it short of the end of its temperature
-    joint it was pulled towards.
+    Raised when swinging a faucet's lever about its temperature joint left it short of
+    the position it was swung towards.
     """
 
     temperature_joint: ActiveConnection1DOF
@@ -313,19 +313,19 @@ class LeverNotSwungToItsEnd(PlanFailure):
 
     position: float
     """
-    Where the lever stands after the pull, in radians.
+    Where the lever stands after the swing, in radians.
     """
 
     goal: float
     """
-    Where the lever was to be pulled to, in radians.
+    Where the lever was to be swung to, in radians.
     """
 
     def error_message(self) -> str:
         return (
             f"{self.temperature_joint.name} stands at {self.position:.3f} rad after "
-            f"the pull, short of {self.goal:.3f} rad."
+            f"the swing, short of {self.goal:.3f} rad."
         )
 
     def suggest_correction(self) -> str:
-        return "Pull further, or bring the finger closer behind the lever."
+        return "Swing further, or bring the finger closer to the lever."
