@@ -100,3 +100,10 @@ items:
 
     '
   repository: cram2/cognitive_robot_abstract_machine
+
+- id: tensorized-training
+  title: "Train tensorized circuits through a functional loss"
+  branch: null
+  track: training
+  depends_on: []
+  status: in progress
