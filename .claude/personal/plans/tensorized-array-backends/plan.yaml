@@ -80,9 +80,12 @@ items:
 - id: remove-jax-package
   title: Remove the jax package and its adapters
   track: backends
+  branch: remove-jax-package
+  pull_request_number: 38
+  session: local Claude Code session 979e5513-adbf-4494-91e0-87fd8fe46220
   depends_on:
   - region-graph-builds-tensorized
-  status: not started
+  status: in progress
   notes: 'Delete probabilistic_circuit/jax and adapters/jax_tensorized once tensorized circuits
     train on jax and RegionGraph builds them. api-break PR: its description states the migration
     from DifferentiableLayeredCircuit to the tensorized circuit.
