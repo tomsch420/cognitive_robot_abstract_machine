@@ -1,4 +1,4 @@
 ## PR #945 (inner-layers-any-backend)
-- Plan: inner layers on any backend through an abstract EdgeMatrix (sparse, dense), folded into this PR; benchmark against main
-- Done: EdgeMatrix with SparseEdgeMatrix and DenseEdgeMatrix, both layers written against it, store_edges_as, row_grouped_sparse_array removed (45e3d0c953); 1571 tests pass; gathers by integer indexing (take was 32 % slower)
-- Next: benchmark result into the PR; then the array_types cleanup the developer asked about (value aliases on BackendArray), once they confirm
+- Plan: inner layers on any backend through an abstract EdgeMatrix (sparse, dense); array_types split; plan items updated
+- Done: EdgeMatrix rework (45e3d0c953), array_types split and to_coo_array removed (6ffdee09b4); 1571 tests pass; benchmark: RAT-SPN inference +2 %, truncation -10 %, conditioning -33 %; later plan items and the indexing standing rule saved
+- Next: review
