@@ -57,7 +57,7 @@ from giskardpy.motion_statechart.exceptions import (
     CollisionViolatedError,
     NoProgressError,
 )
-from giskardpy.motion_statechart.goals.collision_avoidance import (
+from giskardpy.motion_statechart.tasks.collision_avoidance import (
     ExternalCollisionAvoidance,
     SelfCollisionAvoidance,
 )
@@ -81,7 +81,7 @@ logger = logging.getLogger(__name__)
 # %% executing a plan
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PlanOutcome:
     """
     How the run of a plan ended.
@@ -107,7 +107,7 @@ class PlanOutcome:
             raise self.failure
 
     @classmethod
-    def failed_by(cls, failure: PlanFailure, cause: BaseException) -> Self:
+    def failed_by(cls, *, failure: PlanFailure, cause: BaseException) -> Self:
         """
         :param failure: Why the plan failed.
         :param cause: The error the failure was made from, kept as its cause.
@@ -327,14 +327,16 @@ class PlanExecutor(Executor, ABC):
         try:
             self._run()
         except NoProgressError as stalled:
-            return PlanOutcome.failed_by(MotionMadeNoProgress(stalled), stalled)
+            return PlanOutcome.failed_by(
+                failure=MotionMadeNoProgress(stalled), cause=stalled
+            )
         except CollisionViolatedError as violation:
             return PlanOutcome.failed_by(
-                MotionViolatedCollisionAvoidance(violation), violation
+                failure=MotionViolatedCollisionAvoidance(violation), cause=violation
             )
         except InfeasibleException as infeasibility:
             return PlanOutcome.failed_by(
-                MotionWasInfeasible(infeasibility), infeasibility
+                failure=MotionWasInfeasible(infeasibility), cause=infeasibility
             )
         except PlanFailure as failure:
             return PlanOutcome(failure=failure)

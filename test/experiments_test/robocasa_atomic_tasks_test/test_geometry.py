@@ -43,14 +43,18 @@ def test_an_approach_frame_points_its_x_axis_along_the_approach(kitchen_of_boxes
 
 
 def test_a_ray_enters_a_box_on_the_side_it_comes_from():
-    bounds = CoordinateBounds(np.array([0.0, 0.0, 0.0]), np.array([2.0, 2.0, 2.0]))
+    bounds = CoordinateBounds(
+        lower=np.array([0.0, 0.0, 0.0]), upper=np.array([2.0, 2.0, 2.0])
+    )
     ray = Ray(point=np.array([1.0, 1.0, 1.0]), direction=np.array([1.0, 0.0, 0.0]))
 
     np.testing.assert_allclose(ray.entry_into(bounds), [0.0, 1.0, 1.0])
 
 
 def test_a_slanted_ray_enters_a_box_through_the_side_it_reaches_first():
-    bounds = CoordinateBounds(np.array([0.0, 0.0, 0.0]), np.array([4.0, 2.0, 2.0]))
+    bounds = CoordinateBounds(
+        lower=np.array([0.0, 0.0, 0.0]), upper=np.array([4.0, 2.0, 2.0])
+    )
     direction = np.array([1.0, 1.0, 0.0]) / np.sqrt(2)
     ray = Ray(point=np.array([2.0, 1.0, 1.0]), direction=direction)
 

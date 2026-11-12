@@ -1,7 +1,7 @@
 import sys, time, logging
 from experiments.robocasa_task_execution.counter_to_sink import CounterToSinkEpisode
 from robocasa.models.scenes.scene_registry import LayoutType, StyleType
-from giskardpy.motion_statechart.goals import collision_avoidance as ca
+from giskardpy.motion_statechart.tasks import collision_avoidance as ca
 
 added = []
 original = ca.ExternalCollisionAvoidance.__post_init__ if hasattr(ca.ExternalCollisionAvoidance, "__post_init__") else None

@@ -158,7 +158,7 @@ def composed_sink() -> Iterator[SinkOfAnEpisode]:
 
 @pytest.fixture
 def sink(composed_sink: SinkOfAnEpisode) -> SinkOfAnEpisode:
-    composed_sink.episode.simulation.restore_snapshot(composed_sink.composed)
+    composed_sink.episode.simulation.restore_snapshot(snapshot=composed_sink.composed)
     return composed_sink
 
 

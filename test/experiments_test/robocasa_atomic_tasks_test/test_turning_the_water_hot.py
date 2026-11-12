@@ -29,7 +29,9 @@ def composed_cold_sink() -> Iterator[SinkOfAnEpisode]:
 
 @pytest.fixture
 def cold_sink(composed_cold_sink: SinkOfAnEpisode) -> SinkOfAnEpisode:
-    composed_cold_sink.episode.simulation.restore_snapshot(composed_cold_sink.composed)
+    composed_cold_sink.episode.simulation.restore_snapshot(
+        snapshot=composed_cold_sink.composed
+    )
     return composed_cold_sink
 
 

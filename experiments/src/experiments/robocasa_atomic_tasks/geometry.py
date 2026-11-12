@@ -167,8 +167,8 @@ class BodyBounds:
             if isinstance(part, Body) and part.has_collision()
         ]
         return CoordinateBounds(
-            np.min([box.lower for box in boxes], axis=0),
-            np.max([box.upper for box in boxes], axis=0),
+            lower=np.min([box.lower for box in boxes], axis=0),
+            upper=np.max([box.upper for box in boxes], axis=0),
         )
 
     def distance_to_nearest_shape(self, body: Body, point: np.ndarray) -> float:

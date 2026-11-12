@@ -178,7 +178,7 @@ class FreeSpacePathPlanner:
         lower = np.minimum(start, goal) - self.margin
         upper = np.maximum(start, goal) + self.margin
         lower[2] = max(lower[2], self.floor_height)
-        return CoordinateBounds(lower, upper)
+        return CoordinateBounds(lower=lower, upper=upper)
 
     def obstacle_boxes(self, searched: CoordinateBounds) -> list[VolumetricBoundingBox]:
         """

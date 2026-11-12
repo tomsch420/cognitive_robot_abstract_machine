@@ -1,91 +1,67 @@
-# %% cell setup: the task, its world and robot, shown live in cramera
+# %% cell setup: a RoboCasa kitchen with a PR2 standing at a counter and an apple on it
 from __future__ import annotations
 
 import logging
-import time
+from datetime import timedelta
 
 import mujoco
 import numpy as np
 from scipy.spatial.transform import Rotation
 
+from coraplex.plans.context_extensions import RobotAccess
+from coraplex.plans.executors import PhysicallySimulatedPlanExecutor, PlanOutcome
+from cramph.composites import Sequence
+from cramph.context import StatechartContext
+from cramph.node import StatechartNode
+from cramph.statechart import Statechart
+from experiments.live_session.session import LiveSession
+from experiments.robocasa_kitchen_demo import (
+    _spawn_robot_and_prepare_pick_up,
+    load_kitchen,
+)
+from semantic_digital_twin.adapters.multi_sim import MujocoSim
+from semantic_digital_twin.adapters.robocasa_dataset.mujoco_compat import (
+    robocasa_version_assertions_relaxed,
+)
+from semantic_digital_twin.robots.pr2 import PR2
+
+with robocasa_version_assertions_relaxed():
+    from robocasa.models.scenes.scene_registry import LayoutType, StyleType
+
 logging.basicConfig(level=logging.INFO)
 logging.getLogger("physics_simulators").setLevel(logging.WARNING)
-from cramera_bridge.coraplex_backend import CoraplexBackendRegistration
 
-registration = CoraplexBackendRegistration()
-registration.__enter__()
-from experiments.robocasa_atomic_tasks.robots import RobotModel
-from experiments.robocasa_atomic_tasks.sink import TurnOnSinkFaucet
-
-task = TurnOnSinkFaucet(robot=RobotModel("panda_omron"))
-episode = task.compose()
-world = episode.world
+world = load_kitchen(layout=LayoutType.LAYOUT001, style=StyleType.STYLE001)
+_spawn_robot_and_prepare_pick_up(world=world)
+(robot,) = world.get_semantic_annotations_by_type(PR2)
+arm = robot.right_arm
 
 # %% cell physics
-task.physics = True
-episode.collision_avoidance = task.collision_avoidance
-episode.simulation = episode.start_physical_simulation()
-# the viewer shows the kitchen's joints move with the robot, not after each motion
-episode.leaves_the_environment_to_the_physics = False
-executor = episode.create_executor()
-
-# %% cell the world's lock takes the viewer's lock first
-# Workaround: cramera's callbacks take the publisher's lock inside the world's lock, while
-# its threads take them the other way round, which deadlocks a session. Drop this cell once
-# cramera keeps the world's lock outermost.
-import threading
-from dataclasses import dataclass
+simulation = MujocoSim(world=world, headless=True)
+simulation.start_stepped_simulation()
+simulation.step_simulation(timedelta(seconds=1))
 
 
-@dataclass
-class ViewerFirstLock:
+def run(*actions: StatechartNode) -> PlanOutcome:
     """
-    The world's lock, taken only together with the viewer's lock, the viewer's first.
+    Perform actions one after another in the physics.
+
+    :param actions: The actions.
+    :return: How the plan ended.
     """
+    executor = PhysicallySimulatedPlanExecutor(
+        StatechartContext.with_extensions(world=world, extensions=[RobotAccess(robot)]),
+        simulation=simulation,
+    )
+    statechart = Statechart(context=executor.context)
+    statechart.add_node(Sequence(nodes=list(actions)))
+    executor.compile(statechart)
+    outcome = executor.attempt()
+    executor.close()
+    return outcome
 
-    viewer_lock: threading.RLock
-    """
-    The cramera publisher's lock.
-    """
-
-    world_lock: threading.RLock
-    """
-    The world's own lock.
-    """
-
-    def acquire(self, blocking: bool = True, timeout: float = -1) -> bool:
-        """
-        :return: Whether both locks were taken; neither is held otherwise.
-        """
-        if not self.viewer_lock.acquire(blocking, timeout):
-            return False
-        if self.world_lock.acquire(blocking, timeout):
-            return True
-        self.viewer_lock.release()
-        return False
-
-    def release(self) -> None:
-        """
-        Release both locks, the world's first.
-        """
-        self.world_lock.release()
-        self.viewer_lock.release()
-
-    def __enter__(self) -> ViewerFirstLock:
-        self.acquire()
-        return self
-
-    def __exit__(self, *exception: object) -> None:
-        self.release()
-
-
-world._world_lock = ViewerFirstLock(
-    registration.live.publisher.world_lock, world._world_lock
-)
 
 # %% cell the live session
-from experiments.live_session.session import LiveSession
-
-session = LiveSession.from_episode(episode)
-session.take_snapshot("composed")
-session.report("session started")
+session = LiveSession(simulation=simulation)
+session.take_snapshot(name="composed")
+session.report(label="session started")

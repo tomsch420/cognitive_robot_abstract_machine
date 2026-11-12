@@ -659,8 +659,8 @@ class PartWholeRelationship(HasRootKinematicStructureEntity, Mixin):
             relationship field.
         :raises TooManyParts: If the field holds as many parts as it may already.
         """
-        candidate_fields = WrappedClass(type(self)).fields_with_metadata(
-            IsPartWholeRelationship
+        candidate_fields = WrappedClass(clazz=type(self)).fields_with_metadata(
+            metadata_type=IsPartWholeRelationship
         )
         if field_name:
             named_fields = [
@@ -689,7 +689,7 @@ class PartWholeRelationship(HasRootKinematicStructureEntity, Mixin):
             raise AmbiguousPart(self, part, [match.field for match in matches])
 
         [match] = matches
-        relationship = IsPartWholeRelationship.of_wrapped_field(match)
+        relationship = IsPartWholeRelationship.of_wrapped_field(wrapped_field=match)
         if match.is_many_to_many_relationship:
             parts = getattr(self, match.field.name)
             if (
@@ -713,8 +713,8 @@ class PartWholeRelationship(HasRootKinematicStructureEntity, Mixin):
         """
         parts = []
         for wrapped_part_whole_relationship_field in WrappedClass(
-            type(self)
-        ).fields_with_metadata(IsPartWholeRelationship):
+            clazz=type(self)
+        ).fields_with_metadata(metadata_type=IsPartWholeRelationship):
             value = getattr(self, wrapped_part_whole_relationship_field.field.name)
             if wrapped_part_whole_relationship_field.is_many_to_many_relationship:
                 parts.extend(value)

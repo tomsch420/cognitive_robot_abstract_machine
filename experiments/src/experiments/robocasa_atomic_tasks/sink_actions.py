@@ -311,7 +311,9 @@ class FaucetIsOn(Predicate):
 
         :param fields: The rendered fragment for each field, keyed by field name.
         """
-        return clause(Noun(fields["lift_joint"]), Copula(), Adjective("open"))
+        return clause(
+            Noun(content=fields["lift_joint"]), Copula(), Adjective(word="open")
+        )
 
 
 @dataclass
@@ -516,7 +518,7 @@ class HasPreconditions(SequentialAction, ABC):
         raise PreconditionsNotMet(
             action_name=type(self).__name__,
             false_preconditions=[
-                pipeline.verbalize(statement)
+                pipeline.verbalize(expression=statement)
                 for statement in get_false_statements(condition)
             ],
         )

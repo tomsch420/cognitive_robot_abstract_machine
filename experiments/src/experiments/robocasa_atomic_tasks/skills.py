@@ -336,7 +336,7 @@ class MeasuredJointPosition(JointPositionList):
             for connection, _ in self.goal_state.items()
         }
         for variable in self._measured_positions.values():
-            self.context.float_variable_data.register_expression(variable)
+            self.context.float_variable_data.register_expression(expression=variable)
 
     def build(self) -> MotionNodeArtifacts:
         """
@@ -358,7 +358,8 @@ class MeasuredJointPosition(JointPositionList):
     def on_tick(self) -> ObservationStateValues | None:
         for connection, variable in self._measured_positions.items():
             self.context.float_variable_data.set_value(
-                variable, self._synchronizer.simulated_position(connection)
+                expression=variable,
+                value=self._synchronizer.simulated_position(connection),
             )
         return None
 
@@ -371,7 +372,7 @@ class DriveJoint(EndedByOwner, CompositeNode):
     part would.
 
     Unlike
-    :class:`~giskardpy.motion_statechart.goals.grasped_mechanism.ArticulateGraspedMechanism`,
+    :class:`~giskardpy.motion_statechart.tasks.grasped_mechanism.ArticulateGraspedMechanism`,
     the joint is named rather than taken to be the first one above the part.
     """
 
@@ -403,13 +404,13 @@ class DriveJoint(EndedByOwner, CompositeNode):
     mechanism_weight: float = DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE
     """
     Weight of the goal on the joint, see
-    :attr:`~giskardpy.motion_statechart.goals.grasped_mechanism.ArticulateGraspedMechanism.mechanism_weight`.
+    :attr:`~giskardpy.motion_statechart.tasks.grasped_mechanism.ArticulateGraspedMechanism.mechanism_weight`.
     """
 
     grasp_weight: float = DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE
     """
     Weight of the goal keeping the tool frame fixed to the part, see
-    :attr:`~giskardpy.motion_statechart.goals.grasped_mechanism.ArticulateGraspedMechanism.grasp_weight`.
+    :attr:`~giskardpy.motion_statechart.tasks.grasped_mechanism.ArticulateGraspedMechanism.grasp_weight`.
     """
 
     def expand(self) -> None:

@@ -8,9 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import StrEnum
 
-import numpy as np
-from numpy.typing import NDArray
-from typing_extensions import TYPE_CHECKING, Any, Self
+from typing_extensions import Any
 
 from coraplex.plans.executors import PlanOutcome
 from experiments.live_session.cells import Cell
@@ -19,12 +17,6 @@ from experiments.live_session.exceptions import (
     UnknownSnapshotError,
 )
 from semantic_digital_twin.adapters.multi_sim import MujocoSim, MujocoSimulationSnapshot
-from semantic_digital_twin.world_description.world_entity import (
-    KinematicStructureEntity,
-)
-
-if TYPE_CHECKING:
-    from experiments.robocasa_atomic_tasks.episode import RoboCasaEpisode
 
 # %% reports
 
@@ -46,10 +38,10 @@ class StepStatus(StrEnum):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StepReport:
     """
-    What a developer is told after a step: how its plan ended and where the robot is.
+    What a developer is told after a step about how its plan ended.
     """
 
     label: str
@@ -60,16 +52,6 @@ class StepReport:
     outcome: PlanOutcome | None
     """
     How the plan the step ran ended; ``None`` if it ran none.
-    """
-
-    tool_position: NDArray[np.float64]
-    """
-    Where the tool frame was afterwards, in the world's frame.
-    """
-
-    base_position: NDArray[np.float64]
-    """
-    Where the robot's base was afterwards, in the world's frame.
     """
 
     @property
@@ -85,21 +67,16 @@ class StepReport:
 
     def to_line(self) -> str:
         """
-        :return: The report as one line of text, its columns aligned with every other
-            report's.
+        :return: The label and the status as one line of text, the statuses aligned with
+            every other report's.
         """
-        return "%-34s %-34s tool %s base %s" % (
-            self.label,
-            self.status,
-            self.tool_position.round(3),
-            self.base_position.round(3),
-        )
+        return f"{self.label:<34} {self.status}"
 
 
 # %% performed cells
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PerformedCell:
     """
     A cell a session performed, and the moment before it, to go back to.
@@ -129,7 +106,7 @@ class PerformedCell:
 # %% the session
 
 
-@dataclass
+@dataclass(kw_only=True)
 class LiveSession:
     """
     A developer driving a simulated robot one cell at a time, with every moment before a
@@ -139,16 +116,6 @@ class LiveSession:
     simulation: MujocoSim
     """
     The stepped simulation the robot acts in.
-    """
-
-    tool_frame: KinematicStructureEntity
-    """
-    The frame of the tool the steps move, reported after every step.
-    """
-
-    robot_base: KinematicStructureEntity
-    """
-    The robot's base, reported after every step.
     """
 
     snapshots: dict[str, MujocoSimulationSnapshot] = field(default_factory=dict)
@@ -161,40 +128,22 @@ class LiveSession:
     The cells performed, first to last.
     """
 
-    @classmethod
-    def from_episode(cls, episode: RoboCasaEpisode) -> Self:
+    def report(self, *, label: str, outcome: PlanOutcome | None = None) -> StepReport:
         """
-        :param episode: A RoboCasa episode whose physical simulation runs.
-        :return: A session over the episode's simulation, reporting the tool frame of
-            the episode's arm and the robot's base.
-        """
-        return cls(
-            simulation=episode.simulation,
-            tool_frame=episode.arm.end_effector.tool_frame,
-            robot_base=episode.robot.root,
-        )
-
-    def report(self, label: str, outcome: PlanOutcome | None = None) -> StepReport:
-        """
-        Tell the developer how a step ended and where the robot is now, and keep that
-        with the cell being performed.
+        Tell the developer how a step ended, and keep how it ended with the cell being
+        performed.
 
         :param label: What the step did.
         :param outcome: How the plan the step ran ended, if it ran one.
         :return: The report.
         """
-        report = StepReport(
-            label=label,
-            outcome=outcome,
-            tool_position=self.tool_frame.global_pose.to_np()[:3, 3],
-            base_position=self.robot_base.global_pose.to_np()[:3, 3],
-        )
+        report = StepReport(label=label, outcome=outcome)
         if self.history and not self.history[-1].finished:
             self.history[-1].reports.append(report)
         print(report.to_line())
         return report
 
-    def take_snapshot(self, name: str) -> MujocoSimulationSnapshot:
+    def take_snapshot(self, *, name: str) -> MujocoSimulationSnapshot:
         """
         Keep the current moment of the simulation under a name.
 
@@ -206,7 +155,7 @@ class LiveSession:
         self.snapshots[name] = snapshot
         return snapshot
 
-    def restore_snapshot(self, name: str) -> None:
+    def restore_snapshot(self, *, name: str) -> None:
         """
         Put the simulation back to a moment kept by :meth:`take_snapshot`.
 
@@ -214,10 +163,12 @@ class LiveSession:
         :raises UnknownSnapshotError: If no moment was kept under that name.
         """
         if name not in self.snapshots:
-            raise UnknownSnapshotError(name, list(self.snapshots))
-        self.simulation.restore_snapshot(self.snapshots[name])
+            raise UnknownSnapshotError(
+                snapshot_name=name, known_names=list(self.snapshots)
+            )
+        self.simulation.restore_snapshot(snapshot=self.snapshots[name])
 
-    def perform(self, cell: Cell, namespace: dict[str, Any]) -> None:
+    def perform(self, *, cell: Cell, namespace: dict[str, Any]) -> None:
         """
         Run a cell and keep it in :attr:`history`, together with the moment before it.
 
@@ -239,12 +190,12 @@ class LiveSession:
         :return: The cell that was dropped.
         :raises NoPerformedCellError: If no cell has been performed.
         """
-        last = self._performed_cell(len(self.history) - 1)
-        self.simulation.restore_snapshot(last.snapshot_before)
+        last = self._performed_cell(cell_index=len(self.history) - 1)
+        self.simulation.restore_snapshot(snapshot=last.snapshot_before)
         self.history.pop()
         return last.cell
 
-    def replay(self, first_cell: int, namespace: dict[str, Any]) -> None:
+    def replay(self, *, first_cell: int, namespace: dict[str, Any]) -> None:
         """
         Put the simulation back to the moment before a cell and perform that cell and
         every cell after it again.
@@ -253,19 +204,21 @@ class LiveSession:
         :param namespace: The names the cells' code runs with.
         :raises NoPerformedCellError: If no cell was performed at that position.
         """
-        first = self._performed_cell(first_cell)
+        first = self._performed_cell(cell_index=first_cell)
         cells = [performed.cell for performed in self.history[first_cell:]]
-        self.simulation.restore_snapshot(first.snapshot_before)
+        self.simulation.restore_snapshot(snapshot=first.snapshot_before)
         del self.history[first_cell:]
         for cell in cells:
-            self.perform(cell, namespace)
+            self.perform(cell=cell, namespace=namespace)
 
-    def _performed_cell(self, cell_index: int) -> PerformedCell:
+    def _performed_cell(self, *, cell_index: int) -> PerformedCell:
         """
         :param cell_index: A position in :attr:`history`.
         :return: The cell performed at that position.
         :raises NoPerformedCellError: If no cell was performed at that position.
         """
         if not 0 <= cell_index < len(self.history):
-            raise NoPerformedCellError(cell_index, len(self.history))
+            raise NoPerformedCellError(
+                cell_index=cell_index, performed_cells=len(self.history)
+            )
         return self.history[cell_index]

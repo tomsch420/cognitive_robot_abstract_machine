@@ -8,11 +8,11 @@ from coraplex.robot_plans.actions.base import Action
 from cramph.node import StatechartNode
 from cramph.world_modification_nodes import MoveBranch
 from cramph.composites import Parallel
-from giskardpy.motion_statechart.goals.gripper import (
+from giskardpy.motion_statechart.tasks.gripper import (
     MoveFingers,
     MovesGripperToConfiguration,
 )
-from giskardpy.motion_statechart.goals.cartesian_goals import CartesianPoseStraight
+from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPoseStraight
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode
 from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianPose,
@@ -130,7 +130,7 @@ class PickUpTuningParameters(ReachTuningParameters):
     grasp_stall_minimum_time: float | None = None
     """
     Minimum stall dwell time (in seconds, see
-    :attr:`~giskardpy.motion_statechart.goals.gripper.MoveFingers.stall_minimum_time`)
+    :attr:`~giskardpy.motion_statechart.tasks.gripper.MoveFingers.stall_minimum_time`)
     for the CLOSE motion. ``None`` keeps the default.
     """
 

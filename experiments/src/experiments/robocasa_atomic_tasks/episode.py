@@ -751,7 +751,7 @@ class RoboCasaEpisode:
         with self.allowances.gripper_may_touch(
             self.arm,
             self.fixtures.bodies_near(
-                CoordinateBounds(spread.min(axis=0), spread.max(axis=0)),
+                CoordinateBounds(lower=spread.min(axis=0), upper=spread.max(axis=0)),
                 margin=self.handling_margin,
             ),
         ):
@@ -1230,8 +1230,8 @@ class RoboCasaEpisode:
             ]
             point = Ray(point=center, direction=approach).entry_into(
                 CoordinateBounds(
-                    np.min([box.lower for box in boxes], axis=0),
-                    np.max([box.upper for box in boxes], axis=0),
+                    lower=np.min([box.lower for box in boxes], axis=0),
+                    upper=np.max([box.upper for box in boxes], axis=0),
                 )
             )
             logger.info(
@@ -1309,7 +1309,7 @@ class RoboCasaEpisode:
             half_extents = np.array([radius, radius, half_length])
         local_entry = Ray(
             point=np.zeros(3), direction=rotation.T @ approach
-        ).entry_into(CoordinateBounds(-half_extents, half_extents))
+        ).entry_into(CoordinateBounds(lower=-half_extents, upper=half_extents))
         return self.geom_center(geom_name) + rotation @ local_entry
 
     def fingertips_touch(self, point: np.ndarray, tolerance: float = 0.02) -> bool:

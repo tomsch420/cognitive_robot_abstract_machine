@@ -44,7 +44,7 @@ def composed_running_sink() -> Iterator[SinkOfAnEpisode]:
 @pytest.fixture
 def running_sink(composed_running_sink: SinkOfAnEpisode) -> SinkOfAnEpisode:
     composed_running_sink.episode.simulation.restore_snapshot(
-        composed_running_sink.composed
+        snapshot=composed_running_sink.composed
     )
     return composed_running_sink
 

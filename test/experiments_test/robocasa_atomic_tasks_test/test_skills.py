@@ -18,7 +18,7 @@ from cramph.node import StatechartNode
 from cramph.statechart import Statechart
 from experiments.robocasa_atomic_tasks import skills
 from experiments.robocasa_atomic_tasks.panda_omron import PandaOmron
-from giskardpy.motion_statechart.goals.cartesian_goals import CartesianPoseStraight
+from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPoseStraight
 from giskardpy.motion_statechart.tasks.cartesian_tasks import HoldPose
 from experiments.robocasa_atomic_tasks.skills import (
     FingerApproach,

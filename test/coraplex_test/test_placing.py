@@ -5,10 +5,10 @@ from coraplex.exceptions import ObjectIsNotHeld
 from coraplex.robot_plans.actions.core.pick_up import PickUpAction
 from coraplex.robot_plans.actions.core.placing import PlaceAction
 from cramph.composites import Sequence
-from giskardpy.motion_statechart.goals.cartesian_goals import CartesianPoseStraight
+from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPoseStraight
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from coraplex.robot_plans.plan_transformations import MoveStraightAroundObjects
-from giskardpy.motion_statechart.goals.gripper import MoveGripper
+from giskardpy.motion_statechart.tasks.gripper import MoveGripper
 from semantic_digital_twin.robots.robot_parts import Arm
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
