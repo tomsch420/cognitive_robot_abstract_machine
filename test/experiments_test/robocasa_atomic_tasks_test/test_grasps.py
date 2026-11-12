@@ -111,3 +111,27 @@ def test_level_grasps_come_before_rising_ones_and_those_from_above_last(
     assert np.isclose(rises[0], 0.0)
     assert rises[-1] <= -0.5
     assert rises == sorted(rises, key=lambda rise: (rise <= -0.5, abs(rise) > 0.3))
+
+
+# %% grasps the gripper opens around
+
+
+def test_a_grasp_across_a_side_wider_than_the_gripper_opens_is_left_out(
+    kitchen_of_boxes, panda_omron
+):
+    kitchen_grasps = grasps_facing_along_x(kitchen_of_boxes)
+    grasps = kitchen_grasps.on_part(kitchen_of_boxes.handle)
+    [arm] = panda_omron.all_arms
+    opening = arm.end_effector.separation_when_open
+
+    kept = kitchen_grasps.keep_the_grasps_that_fit(grasps, opening)
+
+    tall_side = 2
+    closing_along_the_tall_side = [
+        grasp for grasp in grasps if abs(grasp.grasp_pose.to_np()[tall_side, 1]) > 0.5
+    ]
+    assert kitchen_of_boxes.handle_scale.z > opening
+    assert closing_along_the_tall_side
+    assert kept == [
+        grasp for grasp in grasps if grasp not in closing_along_the_tall_side
+    ]

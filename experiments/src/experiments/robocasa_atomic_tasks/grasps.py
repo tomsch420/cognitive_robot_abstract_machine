@@ -182,6 +182,24 @@ class KitchenGrasps:
         from_above = [grasp for grasp in grasps if approach_of(grasp)[2] <= lowest_rise]
         return level_or_rising + from_above
 
+    @staticmethod
+    def keep_the_grasps_that_fit(
+        grasps: list[GraspCandidate], opening: float
+    ) -> list[GraspCandidate]:
+        """
+        :param grasps: Grasps on parts or objects.
+        :param opening: How far apart the gripper's fingertips stand when it is open,
+            in metres.
+        :return: The grasps, in their order, whose object is no wider along the axis the
+            fingers close along than ``opening``, or that carries no collision to measure.
+        """
+        return [
+            grasp
+            for grasp in grasps
+            if not grasp.graspable.root.has_collision()
+            or grasp.width_along_closing_axis <= opening
+        ]
+
     @property
     def horizontal_kitchen_direction(self) -> np.ndarray:
         """

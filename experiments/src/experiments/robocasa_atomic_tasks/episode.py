@@ -690,9 +690,13 @@ class RoboCasaEpisode:
         position = graspable.root.global_pose.to_np()[:3, 3]
         self.raise_torso_for(position)
         stands = self.stands.stands_facing(position)
-        grasps = self.grasps.from_above(graspable) + (
-            self.grasps.approaching_along_the_kitchen(graspable.grasp_candidates())
-            or graspable.grasp_candidates()
+        grasps = self.grasps.keep_the_grasps_that_fit(
+            self.grasps.from_above(graspable)
+            + (
+                self.grasps.approaching_along_the_kitchen(graspable.grasp_candidates())
+                or graspable.grasp_candidates()
+            ),
+            self.arm.end_effector.separation_when_open,
         )
         self.perform_reaching(
             lambda through_free_space: [
@@ -860,6 +864,9 @@ class RoboCasaEpisode:
             grasps = (
                 knob.turning_grasp_candidates(self.stands.kitchen_direction) + grasps
             )
+        grasps = self.grasps.keep_the_grasps_that_fit(
+            grasps, self.arm.end_effector.separation_when_open
+        )
         self.perform_reaching(
             lambda through_free_space: [
                 self.create_parking_step(),
