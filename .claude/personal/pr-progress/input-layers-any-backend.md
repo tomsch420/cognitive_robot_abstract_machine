@@ -1,0 +1,3 @@
+- Plan: backend tests first (numpy vs jax, jit); parameters + namespace on input layers and tables; continuous layers on xp; discrete layers and dense table on xp; benchmark before/after on neem-4
+- Done: draft PR #939 opened from b0e961c745 (upstream main with #932)
+- Next: write the failing backend tests in the neem-4 worktree
