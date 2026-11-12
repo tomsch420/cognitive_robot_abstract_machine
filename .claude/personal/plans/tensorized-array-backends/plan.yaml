@@ -51,11 +51,13 @@ items:
   session: local Claude Code session 979e5513-adbf-4494-91e0-87fd8fe46220
   depends_on: []
   status: in progress
-  notes: 'Sum and product layers gather, group by row and reduce with xp, using the host structure
-    from the split. LayeredProbabilisticCircuit.log_likelihood accepts a backend array and
-    returns one of the same backend. Tests run on numpy and jax. At the developer''s request
-    the edges of both layers are an abstract EdgeMatrix with sparse and dense subclasses,
-    handled by polymorphism, and structural queries keep the type of a layer''s edge matrix.
+  notes: 'Sum and product layers compute log likelihood, CDF, probability of a simple event
+    and moments with xp. LayeredProbabilisticCircuit.log_likelihood accepts a backend array
+    and returns one of the same backend. Tests run on numpy and jax. At the developer''s
+    request the edges of both layers are an abstract EdgeMatrix with SparseEdgeMatrix and
+    DenseEdgeMatrix subclasses, handled by polymorphism; structural queries keep the type of
+    a layer''s edge matrix and store_edges_as converts. array_types splits into aliases of
+    values of any backend and numpy arrays on the host.
 
     '
   repository: cram2/cognitive_robot_abstract_machine
@@ -65,9 +67,14 @@ items:
   depends_on:
   - inner-layers-any-backend
   status: not started
-  notes: 'Support, marginal, truncation, simplify, rebuild, mode, determinism checks and sampling
-    convert backend parameters to numpy and run as today. Document them as host only; never
-    abstract them over backends.
+  notes: 'Support, marginal, truncation, simplify, rebuild, mode, determinism checks and
+    sampling convert backend parameters to numpy and run as today. Document them as host
+    only; never abstract them over backends. Inner layers already run them on the host
+    entries of their EdgeMatrix (rows, columns, edge_values) and rebuild with
+    type(layer.edges), so they keep a layer''s edge matrix type; what is left is converting
+    backend parameters, for example SumLayer.edge_log_weights and
+    DenseEdgeMatrix.stored_values, to numpy first. The root mixture the batched truncation
+    creates is built sparse.
 
     '
   repository: cram2/cognitive_robot_abstract_machine
@@ -77,11 +84,13 @@ items:
   depends_on:
   - inner-layers-any-backend
   status: not started
-  notes: 'A pure function from parameters to log likelihood over the host structure, so jax.grad
-    and jax.jit apply without static arrays in pytrees. Build on GradientDescent (merged in
-    PR 927: a compiled bound step over the flat list of trainable arrays, losses in LikelihoodMaximization
-    and ClassConditionalLikelihoodMaximization) so it trains tensorized circuits; parameter
-    constraints (normalized weights, minimum scales) are kept.
+  notes: 'A pure function from parameters to log likelihood over the host structure, so
+    jax.grad and jax.jit apply without static arrays in pytrees. Build on GradientDescent
+    (PR 927: a compiled bound step over the flat list of trainable arrays) so it trains
+    tensorized circuits, keeping parameter constraints (normalized weights, minimum scales).
+    The trainable sum layer parameter is SumLayer.log_weights in the layout of its edge
+    matrix (per edge when sparse, a full matrix with -inf outside the edges when dense); the
+    edge matrix is static host structure.
 
     '
   repository: cram2/cognitive_robot_abstract_machine
@@ -91,9 +100,12 @@ items:
   depends_on:
   - tensorized-training
   status: not started
-  notes: 'to_probabilistic_circuit returns a LayeredProbabilisticCircuit with jax parameters,
-    classification included. Check against the RAT-SPN vs JPT benchmark (log likelihoods and
-    training time on the 12 UCI datasets).
+  notes: 'to_probabilistic_circuit returns a LayeredProbabilisticCircuit with jax
+    parameters, classification included. Its fully connected sum layers use DenseEdgeMatrix,
+    which was 1.6 to 2.2 times faster than SparseEdgeMatrix on fully connected layers on
+    numpy and under jax.jit in PR 945, and 7 to 23 times slower on sparsely connected ones.
+    Check against the RAT-SPN vs JPT benchmark (log likelihoods and training time on the 12
+    UCI datasets).
 
     '
   repository: cram2/cognitive_robot_abstract_machine
@@ -104,8 +116,10 @@ items:
   - region-graph-builds-tensorized
   status: not started
   notes: 'Numeric queries and training on torch: parameters registered for torch optimizers,
-    the functional loss differentiated with torch.func. Same test matrix as numpy and jax.
-    Adding torch as a dependency needs the user''s approval first.
+    the functional loss differentiated with torch.func. Same test matrix as numpy and jax,
+    both edge matrix types included. Edge matrices gather by indexing with numpy integer
+    arrays; check that torch accepts them or convert the indices once per matrix. Adding
+    torch as a dependency needs the user''s approval first.
 
     '
   repository: cram2/cognitive_robot_abstract_machine

@@ -3,6 +3,9 @@
 - Backend neutral code uses the Python Array API standard through
   array-api-compat (xp = array_namespace(x)) and array-api-extra; never write our
   own backend interface where these suffice.
+- Gathers index with numpy integer arrays (values[..., index]) instead of xp.take,
+  which was 32 % slower on numpy; numpy, jax and torch support such indexing,
+  although the Array API standard does not require it.
 - Structure is numpy on the host and fixed at construction; only parameters and
   query values are backend arrays. Never store a backend array in a static field.
 - Numeric query paths have no branches on array values, no data dependent shapes,
