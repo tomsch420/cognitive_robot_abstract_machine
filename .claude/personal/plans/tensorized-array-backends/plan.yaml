@@ -43,25 +43,14 @@ tracks:
   name: Further backends and cleanup
   wave: consolidation
 items:
-- id: input-layers-any-backend
-  title: Numeric queries of input layers on any backend
-  track: input-layers
-  branch: input-layers-any-backend
-  pull_request_number: 939
-  session: local Claude Code session 979e5513-adbf-4494-91e0-87fd8fe46220
-  depends_on: []
-  status: in progress
-  notes: 'Gaussian, uniform, Dirac delta and discrete layers compute log likelihood, CDF,
-    probability of a simple event and moments with xp. Encoding of symbolic values stays on
-    the host. Tests run on numpy and jax with float64 enabled.
-
-    '
-  repository: cram2/cognitive_robot_abstract_machine
 - id: inner-layers-any-backend
   title: Numeric queries of sum and product layers on any backend
   track: inner-layers
+  branch: inner-layers-any-backend
+  pull_request_number: 945
+  session: local Claude Code session 979e5513-adbf-4494-91e0-87fd8fe46220
   depends_on: []
-  status: not started
+  status: in progress
   notes: 'Sum and product layers gather, group by row and reduce with xp, using the host structure
     from the split. LayeredProbabilisticCircuit.log_likelihood accepts a backend array and
     returns one of the same backend. Tests run on numpy and jax.
@@ -73,7 +62,6 @@ items:
   track: inner-layers
   depends_on:
   - inner-layers-any-backend
-  - input-layers-any-backend
   status: not started
   notes: 'Support, marginal, truncation, simplify, rebuild, mode, determinism checks and sampling
     convert backend parameters to numpy and run as today. Document them as host only; never
@@ -86,7 +74,6 @@ items:
   track: training
   depends_on:
   - inner-layers-any-backend
-  - input-layers-any-backend
   status: not started
   notes: 'A pure function from parameters to log likelihood over the host structure, so jax.grad
     and jax.jit apply without static arrays in pytrees. Build on GradientDescent (merged in
