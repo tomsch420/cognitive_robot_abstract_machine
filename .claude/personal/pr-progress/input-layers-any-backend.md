@@ -1,3 +1,3 @@
 - Plan: input layer numeric queries on xp (numpy, jax, jit), benchmark before and after
-- Done: tests and implementation (4f34c6fde7), compat clip replaced (8c9ec4fb40); probabilistic_model suite green on neem-4; benchmark in PR description (truncation +8 % JPT from array_namespace calls, rest unchanged)
-- Next: review on draft PR #939; possibly cache the namespace per layer if truncation cost matters
+- Done: implementation and 67 backend tests; compat clip replaced; namespace cached with field only deep copies; local xp aliases removed (b912996d8b); benchmark in PR description (truncation +3 % JPT, +1 % RAT-SPN, rest unchanged); decided to stay with array-api-compat, no own backend abstraction
+- Next: review on draft PR #939
