@@ -1,3 +1,3 @@
-- Plan: backend tests first (numpy vs jax, jit); parameters + namespace on input layers and tables; continuous layers on xp; discrete layers and dense table on xp; benchmark before/after on neem-4
-- Done: draft PR #939; tests (55 new, numpy and jax, jit) and implementation in 4f34c6fde7; probabilistic_model suite green on neem-4; krrood check clean on changed code
-- Next: benchmark main vs branch (running in tom-probabilistic-experiments, /root/work/input_layers_bench); write results into the PR description
+- Plan: input layer numeric queries on xp (numpy, jax, jit), benchmark before and after
+- Done: tests and implementation (4f34c6fde7), compat clip replaced (8c9ec4fb40); probabilistic_model suite green on neem-4; benchmark in PR description (truncation +8 % JPT from array_namespace calls, rest unchanged)
+- Next: review on draft PR #939; possibly cache the namespace per layer if truncation cost matters
