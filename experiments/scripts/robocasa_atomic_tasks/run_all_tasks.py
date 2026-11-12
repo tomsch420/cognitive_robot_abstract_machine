@@ -1,14 +1,15 @@
 """
 Run every one of RoboCasa's atomic tasks, each in a process of its own running
-``run_task.py``, and report which the PR2 accomplished.
+``run_task.py``, and report which the robot accomplished.
 
 Run with::
 
     python experiments/scripts/robocasa_atomic_tasks/run_all_tasks.py --workers 8 --results ~/atomic_tasks
     python experiments/scripts/robocasa_atomic_tasks/run_all_tasks.py --tasks OpenDrawer TurnOnStove
     python experiments/scripts/robocasa_atomic_tasks/run_all_tasks.py --videos --physics
+    python experiments/scripts/robocasa_atomic_tasks/run_all_tasks.py --physics --robot panda_omron
 
-Every task writes its log, and with ``--videos`` a video seen from the PR2's head
+Every task writes its log, and with ``--videos`` a video seen from the robot's
 camera, into the results directory; the outcomes are collected there too.
 """
 
@@ -29,6 +30,7 @@ from experiments.robocasa_atomic_tasks.command_line import (
     TaskExitStatus,
     TaskRunOption,
 )
+from experiments.robocasa_atomic_tasks.robots import RobotModel
 from krrood.adapters.json_serializer import DataclassJSONSerializer
 
 # %% one task's run
@@ -94,6 +96,11 @@ class TaskRun:
     Whether the tasks are simulated physically in MuJoCo.
     """
 
+    robot: RobotModel
+    """
+    The robot that performs the tasks.
+    """
+
     def run(self, task: str) -> TaskOutcome:
         """
         :param task: The name of a task.
@@ -108,6 +115,8 @@ class TaskRun:
             str(self.seed),
             TaskRunOption.TIME_LIMIT,
             str(self.time_limit),
+            TaskRunOption.ROBOT,
+            self.robot,
         ]
         if self.video:
             command += [
@@ -137,6 +146,9 @@ parser.add_argument("--seed", type=int, default=0)
 parser.add_argument("--time-limit", type=int, default=1800)
 parser.add_argument("--videos", action="store_true")
 parser.add_argument("--physics", action="store_true")
+parser.add_argument(
+    "--robot", type=RobotModel, choices=list(RobotModel), default=RobotModel.PR2
+)
 arguments = parser.parse_args()
 
 # %% running every task
@@ -148,12 +160,13 @@ task_run = TaskRun(
     time_limit=arguments.time_limit,
     video=arguments.videos,
     physics=arguments.physics,
+    robot=arguments.robot,
 )
 with ThreadPoolExecutor(arguments.workers) as pool:
     outcomes = list(pool.map(task_run.run, arguments.tasks or sorted(tasks)))
 (arguments.results / ResultFile.OUTCOMES).write_text(
     json.dumps(
-        [DataclassJSONSerializer.to_json(outcome) for outcome in outcomes], indent=2
+        [DataclassJSONSerializer.to_json(instance=outcome) for outcome in outcomes], indent=2
     )
 )
 for outcome in outcomes:

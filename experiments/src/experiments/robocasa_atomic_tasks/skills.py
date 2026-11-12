@@ -647,7 +647,13 @@ class StandAndOperateMechanismAction(MayReachThroughFreeSpace, SequentialAction)
         return a(cls)(
             navigate=a(StandAction)(target_location=stand),
             operate=a(OperateMechanismAction)(
-                grasp=flat_variable(GraspsClosestTo(grasps, stand, number_of_grasps)),
+                grasp=flat_variable(
+                    GraspsClosestTo(
+                        grasps=grasps,
+                        standing_position=stand,
+                        number_of_grasps=number_of_grasps,
+                    )
+                ),
                 arm=arm,
                 joint=joint,
                 goal_position=goal_position,
@@ -1243,7 +1249,13 @@ class StandAndPickUpAction(MayReachThroughFreeSpace, SequentialAction):
         return a(cls)(
             navigate=a(StandAction)(target_location=stand),
             pick_up=a(PickUpAction)(
-                grasp=flat_variable(GraspsClosestTo(grasps, stand, number_of_grasps)),
+                grasp=flat_variable(
+                    GraspsClosestTo(
+                        grasps=grasps,
+                        standing_position=stand,
+                        number_of_grasps=number_of_grasps,
+                    )
+                ),
                 arm=arm,
             ),
             through_free_space=through_free_space,
