@@ -61,23 +61,6 @@ items:
 
     '
   repository: cram2/cognitive_robot_abstract_machine
-- id: host-only-structural-queries
-  title: Structural queries and sampling stay on the host
-  track: inner-layers
-  depends_on:
-  - inner-layers-any-backend
-  status: not started
-  notes: 'Support, marginal, truncation, simplify, rebuild, mode, determinism checks and
-    sampling convert backend parameters to numpy and run as today. Document them as host
-    only; never abstract them over backends. Inner layers already run them on the host
-    entries of their EdgeMatrix (rows, columns, edge_values) and rebuild with
-    type(layer.edges), so they keep a layer''s edge matrix type; what is left is converting
-    backend parameters, for example SumLayer.edge_log_weights and
-    DenseEdgeMatrix.stored_values, to numpy first. The root mixture the batched truncation
-    creates is built sparse.
-
-    '
-  repository: cram2/cognitive_robot_abstract_machine
 - id: tensorized-training
   title: Train tensorized circuits through a functional loss
   track: training
@@ -85,12 +68,11 @@ items:
   - inner-layers-any-backend
   status: not started
   notes: 'A pure function from parameters to log likelihood over the host structure, so
-    jax.grad and jax.jit apply without static arrays in pytrees. Build on GradientDescent
-    (PR 927: a compiled bound step over the flat list of trainable arrays) so it trains
-    tensorized circuits, keeping parameter constraints (normalized weights, minimum scales).
-    The trainable sum layer parameter is SumLayer.log_weights in the layout of its edge
-    matrix (per edge when sparse, a full matrix with -inf outside the edges when dense); the
-    edge matrix is static host structure.
+    jax.grad and jax.jit apply. Build on GradientDescent (PR 927) and keep the parameter
+    constraints. The trainable sum layer parameter is log_weights in the layout of its edge
+    matrix. Adds moving a circuit''s parameters to a backend and back; structural queries
+    and sampling then convert to numpy first or raise a dedicated exception, and are
+    documented as host only (absorbs the former host-only-structural-queries item).
 
     '
   repository: cram2/cognitive_robot_abstract_machine
