@@ -103,7 +103,9 @@ items:
 
 - id: tensorized-training
   title: "Train tensorized circuits through a functional loss"
-  branch: null
+  branch: tensorized-training
   track: training
+  pull_request_number: 35
+  session: local Claude Code session 979e5513-adbf-4494-91e0-87fd8fe46220
   depends_on: []
   status: in progress
