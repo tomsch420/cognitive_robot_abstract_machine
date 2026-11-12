@@ -1,3 +1,3 @@
 - Plan: backend tests first (numpy vs jax, jit); parameters + namespace on input layers and tables; continuous layers on xp; discrete layers and dense table on xp; benchmark before/after on neem-4
-- Done: draft PR #939 opened from b0e961c745 (upstream main with #932)
-- Next: write the failing backend tests in the neem-4 worktree
+- Done: draft PR #939; tests (55 new, numpy and jax, jit) and implementation in 4f34c6fde7; probabilistic_model suite green on neem-4; krrood check clean on changed code
+- Next: benchmark main vs branch (running in tom-probabilistic-experiments, /root/work/input_layers_bench); write results into the PR description
