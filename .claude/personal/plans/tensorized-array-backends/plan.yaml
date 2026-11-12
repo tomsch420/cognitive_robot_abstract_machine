@@ -46,24 +46,25 @@ items:
 - id: input-layers-any-backend
   title: Numeric queries of input layers on any backend
   track: input-layers
-  depends_on:
-  - structure-and-parameters
-  status: not started
-  notes: 'Gaussian, uniform, Dirac delta and discrete layers compute log likelihood, CDF, probability
-    of a simple event and moments with xp. Encoding of symbolic values stays on the host. Tests run
-    on numpy and jax with float64 enabled.
+  branch: input-layers-any-backend
+  pull_request_number: 939
+  session: local Claude Code session 979e5513-adbf-4494-91e0-87fd8fe46220
+  depends_on: []
+  status: in progress
+  notes: 'Gaussian, uniform, Dirac delta and discrete layers compute log likelihood, CDF,
+    probability of a simple event and moments with xp. Encoding of symbolic values stays on
+    the host. Tests run on numpy and jax with float64 enabled.
 
     '
   repository: cram2/cognitive_robot_abstract_machine
 - id: inner-layers-any-backend
   title: Numeric queries of sum and product layers on any backend
   track: inner-layers
-  depends_on:
-  - structure-and-parameters
+  depends_on: []
   status: not started
   notes: 'Sum and product layers gather, group by row and reduce with xp, using the host structure
-    from the split. LayeredProbabilisticCircuit.log_likelihood accepts a backend array and returns
-    one of the same backend. Tests run on numpy and jax.
+    from the split. LayeredProbabilisticCircuit.log_likelihood accepts a backend array and
+    returns one of the same backend. Tests run on numpy and jax.
 
     '
   repository: cram2/cognitive_robot_abstract_machine
@@ -128,23 +129,6 @@ items:
   notes: 'Delete probabilistic_circuit/jax and adapters/jax_tensorized once tensorized circuits
     train on jax and RegionGraph builds them. api-break PR: its description states the migration
     from DifferentiableLayeredCircuit to the tensorized circuit.
-
-    '
-  repository: cram2/cognitive_robot_abstract_machine
-
-- id: structure-and-parameters
-  title: Array API dependencies, host structure and parameters, special functions
-  track: foundation
-  branch: array-api-dependency
-  pull_request_number: 932
-  session: https://claude.ai/code/session_01LzY41J8tdcnmeAAuhPiVcT
-  depends_on: []
-  status: in progress
-  notes: 'One PR for the whole foundation wave. Adds array-api-compat and array-api-extra. Splits
-    every tensorized layer into numpy host structure, computed once at construction, and parameters,
-    the only arrays a backend may replace; numeric query paths get no value dependent branches, shapes
-    or in place writes. No behaviour change: exact float64 test values hold. Special functions the
-    Array API lacks live per backend (scipy, jax.scipy) behind one small class.
 
     '
   repository: cram2/cognitive_robot_abstract_machine
