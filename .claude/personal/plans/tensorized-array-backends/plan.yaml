@@ -64,7 +64,8 @@ items:
 - id: region-graph-builds-tensorized
   title: RegionGraph builds tensorized circuits
   track: training
-  depends_on: []
+  depends_on:
+  - tensorized-training
   status: not started
   notes: 'to_probabilistic_circuit returns a LayeredProbabilisticCircuit with jax parameters,
     classification included. Its fully connected sum layers use DenseEdgeMatrix, which was
@@ -107,5 +108,14 @@ items:
   track: training
   pull_request_number: 35
   session: local Claude Code session 979e5513-adbf-4494-91e0-87fd8fe46220
-  depends_on: []
+  depends_on:
+  - inner-layers-any-backend
   status: in progress
+  notes: 'A pure function from parameters to log likelihood over the host structure, so
+    jax.grad and jax.jit apply. Build on GradientDescent (PR 927) and keep the parameter
+    constraints. The trainable sum layer parameter is log_weights in the layout of its edge
+    matrix. Adds moving a circuit''s parameters to a backend and back; structural queries
+    and sampling then raise a dedicated exception, and are documented as host only (absorbs
+    the former host-only-structural-queries item).
+
+    '
