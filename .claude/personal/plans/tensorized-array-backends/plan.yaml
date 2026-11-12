@@ -53,41 +53,24 @@ items:
   status: in progress
   notes: 'Sum and product layers compute log likelihood, CDF, probability of a simple event
     and moments with xp. LayeredProbabilisticCircuit.log_likelihood accepts a backend array
-    and returns one of the same backend. Tests run on numpy and jax. At the developer''s
-    request the edges of both layers are an abstract EdgeMatrix with SparseEdgeMatrix and
-    DenseEdgeMatrix subclasses, handled by polymorphism; structural queries keep the type of
-    a layer''s edge matrix and store_edges_as converts. array_types splits into aliases of
-    values of any backend and numpy arrays on the host.
-
-    '
-  repository: cram2/cognitive_robot_abstract_machine
-- id: tensorized-training
-  title: Train tensorized circuits through a functional loss
-  track: training
-  depends_on:
-  - inner-layers-any-backend
-  status: not started
-  notes: 'A pure function from parameters to log likelihood over the host structure, so
-    jax.grad and jax.jit apply. Build on GradientDescent (PR 927) and keep the parameter
-    constraints. The trainable sum layer parameter is log_weights in the layout of its edge
-    matrix. Adds moving a circuit''s parameters to a backend and back; structural queries
-    and sampling then convert to numpy first or raise a dedicated exception, and are
-    documented as host only (absorbs the former host-only-structural-queries item).
+    and returns one of the same backend. Tests run on numpy and jax. At the developer''s request
+    the edges of both layers are an abstract EdgeMatrix with SparseEdgeMatrix and DenseEdgeMatrix
+    subclasses, handled by polymorphism; structural queries keep the type of a layer''s edge
+    matrix and store_edges_as converts. array_types splits into aliases of values of any backend
+    and numpy arrays on the host.
 
     '
   repository: cram2/cognitive_robot_abstract_machine
 - id: region-graph-builds-tensorized
   title: RegionGraph builds tensorized circuits
   track: training
-  depends_on:
-  - tensorized-training
+  depends_on: []
   status: not started
-  notes: 'to_probabilistic_circuit returns a LayeredProbabilisticCircuit with jax
-    parameters, classification included. Its fully connected sum layers use DenseEdgeMatrix,
-    which was 1.6 to 2.2 times faster than SparseEdgeMatrix on fully connected layers on
-    numpy and under jax.jit in PR 945, and 7 to 23 times slower on sparsely connected ones.
-    Check against the RAT-SPN vs JPT benchmark (log likelihoods and training time on the 12
-    UCI datasets).
+  notes: 'to_probabilistic_circuit returns a LayeredProbabilisticCircuit with jax parameters,
+    classification included. Its fully connected sum layers use DenseEdgeMatrix, which was
+    1.6 to 2.2 times faster than SparseEdgeMatrix on fully connected layers on numpy and under
+    jax.jit in PR 945, and 7 to 23 times slower on sparsely connected ones. Check against
+    the RAT-SPN vs JPT benchmark (log likelihoods and training time on the 12 UCI datasets).
 
     '
   repository: cram2/cognitive_robot_abstract_machine
@@ -99,9 +82,9 @@ items:
   status: not started
   notes: 'Numeric queries and training on torch: parameters registered for torch optimizers,
     the functional loss differentiated with torch.func. Same test matrix as numpy and jax,
-    both edge matrix types included. Edge matrices gather by indexing with numpy integer
-    arrays; check that torch accepts them or convert the indices once per matrix. Adding
-    torch as a dependency needs the user''s approval first.
+    both edge matrix types included. Edge matrices gather by indexing with numpy integer arrays;
+    check that torch accepts them or convert the indices once per matrix. Adding torch as
+    a dependency needs the user''s approval first.
 
     '
   repository: cram2/cognitive_robot_abstract_machine
