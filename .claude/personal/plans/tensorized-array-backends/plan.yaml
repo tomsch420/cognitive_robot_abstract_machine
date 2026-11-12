@@ -53,7 +53,9 @@ items:
   status: in progress
   notes: 'Sum and product layers gather, group by row and reduce with xp, using the host structure
     from the split. LayeredProbabilisticCircuit.log_likelihood accepts a backend array and
-    returns one of the same backend. Tests run on numpy and jax.
+    returns one of the same backend. Tests run on numpy and jax. At the developer''s request
+    the edges of both layers are an abstract EdgeMatrix with sparse and dense subclasses,
+    handled by polymorphism, and structural queries keep the type of a layer''s edge matrix.
 
     '
   repository: cram2/cognitive_robot_abstract_machine
