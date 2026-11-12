@@ -21,7 +21,7 @@ from scipy.spatial.transform import Rotation, Slerp
 from coraplex.datastructures.trajectory import PoseTrajectory
 from coraplex.querying.grasp_closeness import GraspCloseness
 from coraplex.querying.predicates import GripperHolds
-from coraplex.robot_plans.actions.base import SequentialAction
+from coraplex.robot_plans.actions.base import GoalAction, SequentialAction
 from coraplex.robot_plans.actions.core.container import MovesContainerByItsHandle
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.pick_up import PickUpAction
@@ -34,6 +34,8 @@ from cramph.composites import Parallel
 from cramph.data_types import ObservationStateValues
 from cramph.monitors import CountSimulationTimeSeconds
 from cramph.node import CompositeNode, EndedByOwner, NodeArtifacts, StatechartNode
+from cramph.threaded_nodes import FunctionCall
+from experiments.robocasa_atomic_tasks.exceptions import NothingTouched
 from experiments.robocasa_atomic_tasks.free_space import FreeSpacePathPlanner
 from experiments.robocasa_atomic_tasks.geometry import ApproachFrame, BodyBounds
 from giskardpy.motion_statechart.graph_node import MotionNodeArtifacts
@@ -68,6 +70,7 @@ from krrood_spatial_math.spatial_types import (
     Point3,
     Pose,
 )
+from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
 from semantic_digital_twin.world_description.geometry import CoordinateBounds
 from semantic_digital_twin.world_description.world_entity import (
@@ -1337,3 +1340,305 @@ class StandAndPlaceAction(MayReachThroughFreeSpace, SequentialAction):
             ),
             self.place,
         ]
+
+
+# %% touching
+
+
+@dataclass
+class BodyContacts:
+    """
+    Tells whether bodies of a world touch: by the contacts of the MuJoCo model the
+    world is synchronized with, or, without such a model, by the world's own collision
+    checking.
+    """
+
+    world: World
+    """
+    The world the bodies are looked up in by their names.
+    """
+
+    def touch(self, bodies: list[Body], others: list[Body]) -> bool:
+        """
+        :param bodies: Bodies of one group.
+        :param others: Bodies of the other group.
+        :return: Whether one of ``bodies`` touches one of ``others``.
+        """
+        bodies = [self.world.get_body_by_name(body.name) for body in bodies]
+        others = [self.world.get_body_by_name(body.name) for body in others]
+        synchronizer = next(
+            iter(MujocoSynchronizer.all_callbacks_of_this_type_from_world(self.world)),
+            None,
+        )
+        if synchronizer is None:
+            return self.touch_in_the_world(bodies, others)
+        return self.touch_in_the_physics(synchronizer, bodies, others)
+
+    @staticmethod
+    def touch_in_the_physics(
+        synchronizer: MujocoSynchronizer, bodies: list[Body], others: list[Body]
+    ) -> bool:
+        """
+        :param synchronizer: The synchronization with the MuJoCo model.
+        :param bodies: Bodies of the world.
+        :param others: Other bodies of the world.
+        :return: Whether MuJoCo reports a contact between one of ``bodies`` and one of
+            ``others``.
+        """
+        names = synchronizer.element_names
+        names_of_the_others = {names.of(other) for other in others}
+        return any(
+            names_of_the_others
+            & synchronizer.simulator.get_contact_bodies(
+                body_name=names.of(body), including_children=False
+            ).result
+            for body in bodies
+        )
+
+    def touch_in_the_world(self, bodies: list[Body], others: list[Body]) -> bool:
+        """
+        :param bodies: Bodies of the world.
+        :param others: Other bodies of the world.
+        :return: Whether the collision geometry of one of ``bodies`` touches or
+            penetrates that of one of ``others``.
+        """
+        detector = self.world.collision_manager.collision_detector
+        detector.sync_world_state()
+        return any(
+            detector.check_collision_between_bodies(body, other, 0.0) is not None
+            for body in bodies
+            for other in others
+        )
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class BodiesTouch(EndedByOwner, StatechartNode):
+    """
+    Observes whether a body of one group touches a body of another, as
+    :class:`BodyContacts` tells it in the world the node runs in.
+    """
+
+    bodies: list[Body]
+    """
+    The bodies of one group; the bodies of the same names are observed in the world the
+    node runs in, which may be a copy of theirs.
+    """
+
+    others: list[Body]
+    """
+    The bodies of the other group.
+    """
+
+    def on_tick(self) -> ObservationStateValues:
+        if BodyContacts(world=self.context.world).touch(self.bodies, self.others):
+            return ObservationStateValues.TRUE
+        return ObservationStateValues.FALSE
+
+
+# %% moving the tool straight up or down
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class MovesTheToolVertically(HoldsBase, ABC):
+    """
+    An action that moves the tool frame straight up or down from where it is, turned as
+    it is.
+    """
+
+    arm: Arm
+    """
+    The arm whose tool frame moves.
+    """
+
+    hold_base: bool = False
+    """
+    Whether the base stands still while the tool frame moves, even where the robot
+    otherwise moves its whole body.
+    """
+
+    def vertical_tool_goal(
+        self, height: float, max_linear_velocity: float | None = None
+    ) -> StatechartNode:
+        """
+        :param height: How far the tool frame rises, in metres; it goes down where this
+            is negative.
+        :param max_linear_velocity: Cap on the speed of the tool frame, in m/s.
+        :return: A new goal moving the tool frame there in a straight line.
+        """
+        world_T_tool = self.arm.end_effector.tool_frame.global_pose.to_np().copy()
+        world_T_tool[2, 3] += height
+        return self.tool_center_point_goal(
+            HomogeneousTransformationMatrix(
+                world_T_tool, reference_frame=self.world.root
+            ).pose,
+            self.arm,
+            max_linear_velocity=max_linear_velocity,
+            in_a_straight_line=True,
+            accompanying_goals=(self.base_hold(),) if self.hold_base else (),
+        )
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class RaiseTheToolAction(MovesTheToolVertically, GoalAction):
+    """
+    Raises the tool frame straight up.
+    """
+
+    height: float
+    """
+    How far the tool frame rises, in metres.
+    """
+
+    def create_goal(self) -> StatechartNode:
+        return self.vertical_tool_goal(self.height)
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class LowerTheToolUntilTouchingAction(MovesTheToolVertically, SequentialAction):
+    """
+    Lowers the tool frame straight down until a body of one group touches a body of
+    another, as :class:`BodiesTouch` observes it, and fails with
+    :class:`~experiments.robocasa_atomic_tasks.exceptions.NothingTouched` where the tool
+    frame went the whole distance without them touching.
+    """
+
+    bodies: list[Body]
+    """
+    The bodies of one group, such as the palm of the gripper or the object it holds.
+    """
+
+    others: list[Body]
+    """
+    The bodies of the other group, such as the object below the gripper or the floor
+    the held object is set down on.
+    """
+
+    distance: float = 0.25
+    """
+    How far the tool frame goes down at most, in metres.
+    """
+
+    linear_velocity: float = 0.03
+    """
+    How fast the tool frame goes down, in m/s, slow enough to stop soon after the
+    bodies touch.
+    """
+
+    def create_steps(self) -> list[StatechartNode]:
+        return [
+            Parallel(
+                name="lower until touching",
+                nodes=[
+                    self.vertical_tool_goal(-self.distance, self.linear_velocity),
+                    BodiesTouch(
+                        name="touching", bodies=self.bodies, others=self.others
+                    ),
+                ],
+                minimum_success=1,
+            ),
+            FunctionCall(
+                name="check the bodies touch",
+                function=self.raise_unless_the_bodies_touch,
+            ),
+        ]
+
+    def raise_unless_the_bodies_touch(self) -> None:
+        """
+        :raises NothingTouched: If no body of :attr:`bodies` touches one of
+            :attr:`others`.
+        """
+        if BodyContacts(world=self.world).touch(self.bodies, self.others):
+            return
+        raise NothingTouched(
+            body_names=[body.name.name for body in self.bodies],
+            other_names=[body.name.name for body in self.others],
+            distance=self.distance,
+        )
+
+
+# %% carrying an object through free space
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class CarryThroughFreeSpaceAction(HoldsBase, SequentialAction):
+    """
+    Leads the middle of an object the gripper holds along a path through the free space
+    around it to a goal, the tool frame turned as it is; straight to the goal where no
+    path is found.
+    """
+
+    arm: Arm
+    """
+    The arm whose gripper holds the object.
+    """
+
+    carried: Body
+    """
+    The object the gripper holds, which is no obstacle to its own path.
+    """
+
+    goal: Point3
+    """
+    Where the middle of the box bounding the object is led.
+    """
+
+    clearance: float = 0.01
+    """
+    How far beyond half the height of the object the path keeps its middle from
+    everything else, in metres.
+    """
+
+    room_below_obstacles: float = 0.0
+    """
+    How far below every obstacle the path also stays out, in metres: the room the arm
+    above the object needs.
+    """
+
+    waypoint_threshold: float = 0.03
+    """
+    How close the tool frame has to come to each point of the path, in metres.
+    """
+
+    hold_base: bool = False
+    """
+    Whether the base stands still while the object is carried, even where the robot
+    otherwise moves its whole body.
+    """
+
+    def create_steps(self) -> list[StatechartNode]:
+        world = self.world
+        bounds = BodyBounds(world=world).of_body(self.carried)
+        middle = (np.asarray(bounds.lower) + np.asarray(bounds.upper)) / 2
+        half_height = (bounds.upper[2] - bounds.lower[2]) / 2
+        goal = world.transform(self.goal, world.root).to_np()[:3]
+        path = FreeSpacePathPlanner(
+            world=world,
+            robot=self.robot,
+            clearance=half_height + self.clearance,
+            room_below_obstacles=self.room_below_obstacles,
+            ignored=[self.carried],
+        ).path(middle, goal) or [middle, goal]
+        world_T_tool = self.arm.end_effector.tool_frame.global_pose.to_np()
+        tool_poses = []
+        for point in path[1:]:
+            world_T_waypoint = world_T_tool.copy()
+            world_T_waypoint[:3, 3] = point + world_T_tool[:3, 3] - middle
+            tool_poses.append(
+                HomogeneousTransformationMatrix(
+                    world_T_waypoint, reference_frame=world.root
+                ).pose
+            )
+        accompanying_goals = (self.base_hold(),) if self.hold_base else ()
+        onto_the_goal = self.tool_center_point_goal(
+            tool_poses[-1], self.arm, accompanying_goals=accompanying_goals
+        )
+        if len(tool_poses) == 1:
+            return [onto_the_goal]
+        along_the_path = FollowToolCenterPointPathAction(
+            target_locations=PoseTrajectory(tool_poses[:-1]),
+            arm=self.arm,
+            position_threshold=self.waypoint_threshold,
+        )
+        if self.hold_base:
+            along_the_path = Parallel(nodes=[along_the_path, self.base_hold()])
+        return [along_the_path, onto_the_goal]

@@ -379,3 +379,41 @@ class SpoutNotTurned(PlanFailure):
 
     def suggest_correction(self) -> str:
         return "Press the gripper harder against the bar, or turn further."
+
+
+# %% touching
+
+
+@dataclass
+class NothingTouched(PlanFailure):
+    """
+    Raised when the tool frame went its whole way down without a body of one group
+    coming to touch a body of the other.
+    """
+
+    body_names: list[str]
+    """
+    The names of the bodies that were to touch.
+    """
+
+    other_names: list[str]
+    """
+    The names of the bodies they were to touch.
+    """
+
+    distance: float
+    """
+    How far the tool frame went down, in metres.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"None of {', '.join(self.body_names)} touched any of "
+            f"{', '.join(self.other_names)} within {self.distance:.3f} m."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Start lower or above the bodies to touch, or let the tool frame go further "
+            "down."
+        )

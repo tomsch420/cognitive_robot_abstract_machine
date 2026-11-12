@@ -103,6 +103,12 @@ class FreeSpacePathPlanner:
     Bodies that are no obstacles, such as a part to be taken hold of.
     """
 
+    room_below_obstacles: float = 0.0
+    """
+    How far below every obstacle, beyond :attr:`clearance`, the path also stays out, in
+    metres: the room an arm above the point needs, such as one carrying an object.
+    """
+
     def path(self, start: np.ndarray, goal: np.ndarray) -> list[np.ndarray] | None:
         """
         :param start: Where the path starts, in the world's root frame.
@@ -184,8 +190,9 @@ class FreeSpacePathPlanner:
         """
         :param searched: The space searched, in the world's root frame.
         :return: The boxes bounding every shape of every body with collision geometry
-            but the robot's and :attr:`ignored`, bloated by :attr:`clearance`, that
-            reach into the space searched.
+            but the robot's and :attr:`ignored`, bloated by :attr:`clearance` and
+            reaching :attr:`room_below_obstacles` further down, that reach into the
+            space searched.
         """
         skipped = set(
             self.world.get_kinematic_structure_entities_of_branch(self.robot.root)
@@ -199,10 +206,20 @@ class FreeSpacePathPlanner:
             ):
                 box = box.bloat(self.clearance, self.clearance, self.clearance)
                 corners = box.to_array_bounds()
+                lower = np.asarray(corners.lower, dtype=float).copy()
+                lower[2] -= self.room_below_obstacles
                 if np.all(corners.upper > searched.lower) and np.all(
-                    corners.lower < searched.upper
+                    lower < searched.upper
                 ):
-                    boxes.append(box)
+                    boxes.append(
+                        VolumetricBoundingBox(
+                            *lower,
+                            *corners.upper,
+                            HomogeneousTransformationMatrix(
+                                reference_frame=self.world.root
+                            ),
+                        )
+                    )
         return boxes
 
     def nearest_free_point(
