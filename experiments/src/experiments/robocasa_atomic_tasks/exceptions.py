@@ -329,3 +329,53 @@ class LeverNotSwungFarEnough(PlanFailure):
 
     def suggest_correction(self) -> str:
         return "Swing further, or bring the finger closer to the lever."
+
+
+@dataclass
+class SpoutHasNoBar(DataclassException):
+    """
+    Raised when a faucet's spout has no level cylinder in its collision to push as its
+    bar.
+    """
+
+    spout: Body
+    """
+    The spout.
+    """
+
+    def error_message(self) -> str:
+        return f"{self.spout.name} has no level cylinder in its collision."
+
+    def suggest_correction(self) -> str:
+        return "Turn a spout whose bar is a level cylinder."
+
+
+@dataclass
+class SpoutNotTurned(PlanFailure):
+    """
+    Raised when turning a faucet's spout left it short of the position it was turned to.
+    """
+
+    spout_joint: ActiveConnection1DOF
+    """
+    The joint the spout turns about.
+    """
+
+    position: float
+    """
+    Where the spout stands after the turn, in radians.
+    """
+
+    goal: float
+    """
+    Where the spout was to be turned to, in radians.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{self.spout_joint.name} stands at {self.position:.3f} rad after the "
+            f"turn, short of {self.goal:.3f} rad."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Press the gripper harder against the bar, or turn further."

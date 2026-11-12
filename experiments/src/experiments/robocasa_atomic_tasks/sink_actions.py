@@ -34,8 +34,14 @@ from experiments.robocasa_atomic_tasks.exceptions import (
     LeverNotSwungFarEnough,
     LeverSwungAside,
     PreconditionsNotMet,
+    SpoutHasNoBar,
+    SpoutNotTurned,
 )
-from experiments.robocasa_atomic_tasks.skills import ReachThroughFreeSpaceAction
+from experiments.robocasa_atomic_tasks.geometry import ApproachFrame
+from experiments.robocasa_atomic_tasks.skills import (
+    DriveJoint,
+    ReachThroughFreeSpaceAction,
+)
 from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianPose,
     HoldPose,
@@ -522,6 +528,40 @@ class HasPreconditions(SequentialAction, ABC):
                 for statement in get_false_statements(condition)
             ],
         )
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class WorksAtTheSink(HasPreconditions, ABC):
+    """
+    An action with preconditions whose gripper works at a sink's faucet.
+    """
+
+    arm: Arm
+    """
+    The arm whose gripper works at the faucet.
+    """
+
+    basin: Body
+    """
+    The sink's basin, which the hand has to be out of when the action starts; the bodies
+    below it in the world, such as the faucet's spout and handle, are what the gripper
+    may touch.
+    """
+
+    @property
+    def sink_bodies(self) -> list[Body]:
+        """
+        :return: The bodies with collision of the sink, the basin and those below it.
+        """
+        branch = set(self.world.get_kinematic_structure_entities_of_branch(self.basin))
+        return [body for body in self.world.bodies_with_collision if body in branch]
+
+    def hand_is_outside_the_basin(self) -> ConditionType:
+        """
+        :return: The statement that no body of the gripper is inside the basin.
+        """
+        hand = variable(Body, self.arm.end_effector.bodies_with_collision)
+        return not_(InsideOf(body=hand, other=self.basin))
 
 
 # %% backing off
@@ -1451,15 +1491,10 @@ class PullTheHandAwayFromTheLeverBarAction(
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class FaucetMovedWithAFingerAction(HasPreconditions, ABC):
+class FaucetMovedWithAFingerAction(WorksAtTheSink, ABC):
     """
     An action that stands in front of a faucet's handle and moves the handle with one
     finger.
-    """
-
-    arm: Arm
-    """
-    The arm whose finger pushes the handle.
     """
 
     handle: Body
@@ -1470,13 +1505,6 @@ class FaucetMovedWithAFingerAction(HasPreconditions, ABC):
     lift_joint: ActiveConnection1DOF
     """
     The joint the handle is lifted about.
-    """
-
-    basin: Body
-    """
-    The sink's basin, which the hand has to be out of when the action starts; the bodies
-    below it in the world, such as the faucet's spout and handle, are what the gripper
-    may touch.
     """
 
     stand_distance: float = 0.815
@@ -1517,21 +1545,6 @@ class FaucetMovedWithAFingerAction(HasPreconditions, ABC):
                 body_group_b=self.sink_bodies,
             )
         ]
-
-    @property
-    def sink_bodies(self) -> list[Body]:
-        """
-        :return: The bodies with collision of the sink, the basin and those below it.
-        """
-        branch = set(self.world.get_kinematic_structure_entities_of_branch(self.basin))
-        return [body for body in self.world.bodies_with_collision if body in branch]
-
-    def hand_is_outside_the_basin(self) -> ConditionType:
-        """
-        :return: The statement that no body of the gripper is inside the basin.
-        """
-        hand = variable(Body, self.arm.end_effector.bodies_with_collision)
-        return not_(InsideOf(body=hand, other=self.basin))
 
     def faucet_is_on(self) -> FaucetIsOn:
         """
@@ -2124,3 +2137,415 @@ class TurnTheWaterColdWithAFingerAction(SwingsTheFaucetLeverWithTheBase):
             ),
             *self.create_steps_leaving_the_lever(),
         ]
+
+
+# %% turning the spout with the side of the gripper
+
+
+@dataclass
+class SpoutBar:
+    """
+    The level bar of a faucet's spout, the longest level cylinder of the spout's
+    collision, as it stands.
+    """
+
+    end: np.ndarray
+    """
+    The middle of the bar's free end, in the world's root frame.
+    """
+
+    outward: np.ndarray
+    """
+    The level direction along the bar towards its free end, away from the post the spout
+    turns on, in the world's root frame.
+    """
+
+    radius: float
+    """
+    How thick the bar is from its middle line, in metres.
+    """
+
+    turning: np.ndarray
+    """
+    The level direction the bar's end moves in while the spout's joint position grows,
+    in the world's root frame.
+    """
+
+    @classmethod
+    def from_spout(
+        cls, spout: Body, spout_joint: ActiveConnection1DOF, level_share: float = 0.5
+    ) -> SpoutBar:
+        """
+        :param spout: A faucet's spout.
+        :param spout_joint: The joint it turns about.
+        :param level_share: How far at most a cylinder's axis may rise, as the share of
+            its length, for the cylinder to count as level.
+        :return: Its bar, as it stands now.
+        :raises SpoutHasNoBar: If the spout's collision holds no level cylinder.
+        """
+        world_T_spout = spout.global_pose.to_np()
+        cylinders = [
+            (world_T_spout @ shape.origin.to_np(), shape)
+            for shape in spout.collision.shapes
+            if isinstance(shape, Cylinder)
+        ]
+        level = [
+            (world_T_cylinder, shape)
+            for world_T_cylinder, shape in cylinders
+            if abs(world_T_cylinder[2, 2]) < level_share
+        ]
+        if not level:
+            raise SpoutHasNoBar(spout=spout)
+        world_T_bar, bar = max(level, key=lambda pair: pair[1].height)
+        world_T_joint_parent = spout_joint.parent.global_pose.to_np()
+        joint_axis = (
+            world_T_joint_parent[:3, :3]
+            @ spout_joint.parent_T_connection_expression.to_np()[:3, :3]
+            @ spout_joint.axis.to_np()[:3]
+        )
+        world_P_joint = (
+            world_T_joint_parent @ spout_joint.parent_T_connection_expression.to_np()
+        )[:3, 3]
+        axis = world_T_bar[:3, 2].copy()
+        axis[2] = 0.0
+        axis = axis / np.linalg.norm(axis)
+        middle = world_T_bar[:3, 3]
+        outward = axis if (middle - world_P_joint) @ axis > 0.0 else -axis
+        turning = np.cross(joint_axis, outward)
+        turning[2] = 0.0
+        return cls(
+            end=middle + bar.height / 2 * outward,
+            outward=outward,
+            radius=bar.width / 2,
+            turning=turning / np.linalg.norm(turning),
+        )
+
+    def push_direction(self, joint_position: float, goal_position: float) -> np.ndarray:
+        """
+        :param joint_position: Where the spout's joint stands.
+        :param goal_position: Where it is to be turned to.
+        :return: The level direction the bar's end is pushed in to turn the spout there.
+        """
+        return self.turning if goal_position >= joint_position else -self.turning
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class TouchesTheSpoutBar(MovesToolCenterPoint, ABC):
+    """
+    An action whose gripper comes against the bar of a faucet's spout, the base, torso
+    and arm moving it together.
+    """
+
+    arm: Arm
+    """
+    The arm whose gripper touches the bar.
+    """
+
+    spout: Body
+    """
+    The faucet's spout.
+    """
+
+    spout_joint: ActiveConnection1DOF
+    """
+    The joint the spout turns about.
+    """
+
+    def create_temporary_collision_rules(self) -> list[CollisionRule]:
+        """
+        :return: An allowance for the gripper to touch the spout and what stands around
+            it.
+        """
+        return [AllowCollisionForEndEffector(end_effector=self.arm.end_effector)]
+
+    def tool_goal_shifted_by(self, shifts: list[np.ndarray]) -> list[StatechartNode]:
+        """
+        :param shifts: Straight moves of the tool frame, one after another, in the
+            world's root frame.
+        :return: New goals moving the tool frame by them, turned as it is now.
+        """
+        world_T_tool = self.arm.end_effector.tool_frame.global_pose.to_np().copy()
+        goals = []
+        for shift in shifts:
+            world_T_tool = world_T_tool.copy()
+            world_T_tool[:3, 3] += shift
+            goals.append(
+                self.tool_center_point_goal(
+                    HomogeneousTransformationMatrix(
+                        world_T_tool, reference_frame=self.world.root
+                    ).pose,
+                    self.arm,
+                    in_a_straight_line=True,
+                )
+            )
+        return goals
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class PressTheGripperAgainstTheSpoutBarAction(TouchesTheSpoutBar, SequentialAction):
+    """
+    Moves the gripper, standing beside the bar of a faucet's spout, straight sideways
+    until its side presses against the bar, on the side the bar is pushed from.
+    """
+
+    goal_position: float
+    """
+    The position the spout is to be turned to, which decides the side pressed.
+    """
+
+    distance: float
+    """
+    How far the gripper moves, in metres: the gap to the bar and how far it presses in.
+    """
+
+    def create_steps(self) -> list[StatechartNode]:
+        bar = SpoutBar.from_spout(self.spout, self.spout_joint)
+        push = bar.push_direction(self.spout_joint.position, self.goal_position)
+        return self.tool_goal_shifted_by([self.distance * push])
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class TakeTheGripperOffTheSpoutBarAction(TouchesTheSpoutBar, SequentialAction):
+    """
+    Moves the gripper, pressed against the bar of a faucet's spout, straight off the
+    bar's side and then out along the bar past its end.
+    """
+
+    pushed_as_the_joint_grows: bool
+    """
+    Whether the bar was pushed the way its end moves while the joint position grows,
+    which decides the side the gripper is on.
+    """
+
+    release_distance: float
+    """
+    How far the gripper moves off the bar's side, in metres.
+    """
+
+    exit_distance: float
+    """
+    How far the gripper then moves out along the bar, in metres.
+    """
+
+    def create_steps(self) -> list[StatechartNode]:
+        bar = SpoutBar.from_spout(self.spout, self.spout_joint)
+        push = bar.turning if self.pushed_as_the_joint_grows else -bar.turning
+        return self.tool_goal_shifted_by(
+            [-self.release_distance * push, self.exit_distance * bar.outward]
+        )
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class TurnTheSpoutWithTheGripperAction(WorksAtTheSink):
+    """
+    Stands in front of a faucet's spout, to the side its bar is pushed from, leads the
+    level gripper, fingers one above the other, along a path through free space beside
+    the bar near its end, presses the gripper's side against the bar and turns the spout
+    to a position with the gripper following the bar round; then takes the gripper off
+    the bar and leaves the sink.
+
+    The steps after standing depend on where the robot stands and how far the spout
+    turned, so they are :class:`Deferred`.
+    """
+
+    spout: Body
+    """
+    The faucet's spout.
+    """
+
+    spout_joint: ActiveConnection1DOF
+    """
+    The joint the spout turns about.
+    """
+
+    goal_position: float
+    """
+    The position the spout is turned to, in radians.
+    """
+
+    stand_distance: float = 0.854
+    """
+    How far out along the bar from its end the robot's root stands, in metres.
+    """
+
+    stand_sideways_offset: float = 0.1
+    """
+    How far from the bar's end, against the push, the robot's root stands, in metres.
+    """
+
+    inset: float = 0.068
+    """
+    How far in from the bar's end, along the bar, the tool frame comes beside it, in
+    metres.
+    """
+
+    approach_gap: float = 0.04
+    """
+    The gap between the gripper's side and the bar where the gripper comes beside it, in
+    metres.
+    """
+
+    press_depth: float = 0.015
+    """
+    How far the gripper presses beyond where the bounding box of its collision would
+    touch the bar, in metres; the box reaches wider than the gripper at the bar's height.
+    """
+
+    path_clearance: float = 0.02
+    """
+    How far the path beside the bar keeps the tool frame from everything else, in
+    metres.
+    """
+
+    reach_buffer: float = 0.005
+    """
+    How far the robot keeps from everything else on its way beside the bar, in metres;
+    at the usual distance the wall cabinet above the spout holds the wrist back.
+    """
+
+    threshold: float = 0.02
+    """
+    How close the spout has to come to :attr:`goal_position`, in radians.
+    """
+
+    release_distance: float = 0.04
+    """
+    See :attr:`TakeTheGripperOffTheSpoutBarAction.release_distance`.
+    """
+
+    exit_distance: float = 0.08
+    """
+    See :attr:`TakeTheGripperOffTheSpoutBarAction.exit_distance`.
+    """
+
+    def preconditions(self) -> ConditionType:
+        return self.hand_is_outside_the_basin()
+
+    def create_temporary_collision_rules(self) -> list[CollisionRule]:
+        """
+        :return: An allowance for the gripper to touch the sink's bodies, the spout
+            among them, from one step to the next.
+        """
+        return [
+            AllowCollisionBetweenGroups(
+                body_group_a=list(self.arm.end_effector.bodies_with_collision),
+                body_group_b=self.sink_bodies,
+            )
+        ]
+
+    def push_direction(self) -> np.ndarray:
+        """
+        :return: The level direction the bar's end is pushed in, as the spout stands
+            now.
+        """
+        bar = SpoutBar.from_spout(self.spout, self.spout_joint)
+        return bar.push_direction(self.spout_joint.position, self.goal_position)
+
+    def standing_pose(self) -> Pose:
+        """
+        :return: Where the robot's root stands, facing along the bar towards the spout's
+            post.
+        """
+        bar = SpoutBar.from_spout(self.spout, self.spout_joint)
+        forward = -bar.outward
+        world_T_root = np.eye(4)
+        world_T_root[:3, 0] = forward
+        world_T_root[:3, 1] = np.cross([0.0, 0.0, 1.0], forward)
+        world_T_root[:3, 3] = (
+            bar.end
+            + self.stand_distance * bar.outward
+            - self.stand_sideways_offset * self.push_direction()
+        )
+        world_T_root[2, 3] = 0.0
+        return HomogeneousTransformationMatrix(
+            world_T_root, reference_frame=self.world.root
+        ).pose
+
+    def beside_the_bar(self) -> Pose:
+        """
+        :return: The tool frame goal beside the bar near its end, gripper level and
+            pointing along the bar towards the post, fingers one above the other,
+            :attr:`approach_gap` between the gripper's side and the bar.
+        """
+        bar = SpoutBar.from_spout(self.spout, self.spout_joint)
+        push = self.push_direction()
+        gripper = self.arm.end_effector
+        frame = ApproachFrame(
+            position=bar.end - self.inset * bar.outward,
+            approach=-bar.outward,
+            closing=np.array([0.0, 0.0, 1.0]),
+        ).in_reference_frame(self.world.root)
+        world_T_tool = self.world.transform(
+            gripper.tool_frame_goal_for_grasp(frame.pose), self.world.root
+        ).homogeneous_matrix.to_np()
+        push_in_the_tool = world_T_tool[:3, :3].T @ push
+        side = max(
+            Extent.from_body(body, gripper.tool_frame, push_in_the_tool[None]).upper[0]
+            for body in gripper.bodies_with_collision
+        )
+        world_T_tool[:3, 3] -= (bar.radius + side + self.approach_gap) * push
+        return HomogeneousTransformationMatrix(
+            world_T_tool, reference_frame=self.world.root
+        ).pose
+
+    def create_steps_once_the_preconditions_hold(self) -> list[StatechartNode | Match]:
+        return [
+            NavigateAction(target_location=self.standing_pose()),
+            Deferred(
+                name="beside the spout's bar",
+                task=ReachThroughFreeSpaceAction(
+                    goal=self.beside_the_bar(),
+                    arm=self.arm,
+                    clearance=self.path_clearance,
+                    surroundings_buffer=self.reach_buffer,
+                ),
+            ),
+            Deferred(
+                name="press the gripper against the bar",
+                task=PressTheGripperAgainstTheSpoutBarAction(
+                    arm=self.arm,
+                    spout=self.spout,
+                    spout_joint=self.spout_joint,
+                    goal_position=self.goal_position,
+                    distance=self.approach_gap + self.press_depth,
+                ),
+            ),
+            DriveJoint(
+                name="turn the spout",
+                tip_link=self.arm.end_effector.tool_frame,
+                environment_link=self.spout,
+                joint=self.spout_joint,
+                goal_position=self.goal_position,
+                threshold=self.threshold,
+            ),
+            FunctionCall(
+                name="check the spout is turned",
+                function=self.raise_unless_the_spout_is_turned,
+            ),
+            Deferred(
+                name="take the gripper off the bar",
+                task=TakeTheGripperOffTheSpoutBarAction(
+                    arm=self.arm,
+                    spout=self.spout,
+                    spout_joint=self.spout_joint,
+                    pushed_as_the_joint_grows=(
+                        self.goal_position >= self.spout_joint.position
+                    ),
+                    release_distance=self.release_distance,
+                    exit_distance=self.exit_distance,
+                ),
+            ),
+            a(LeaveTheSinkAction)(arm=self.arm, basin=self.basin),
+        ]
+
+    def raise_unless_the_spout_is_turned(self) -> None:
+        """
+        :raises SpoutNotTurned: If the spout stands farther than :attr:`threshold` from
+            :attr:`goal_position`.
+        """
+        position = JointReading(self.world).position(self.spout_joint)
+        if abs(position - self.goal_position) <= self.threshold:
+            return
+        raise SpoutNotTurned(
+            spout_joint=self.spout_joint, position=position, goal=self.goal_position
+        )

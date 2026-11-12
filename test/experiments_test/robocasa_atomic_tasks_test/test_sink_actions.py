@@ -21,6 +21,7 @@ from experiments.robocasa_atomic_tasks.sink_actions import (
     LiftTheHandOutOfTheSinkAction,
     TurnOffTheFaucetWithAFingerAction,
     TurnOnTheFaucetWithAFingerAction,
+    TurnTheSpoutWithTheGripperAction,
     TurnTheWaterColdWithAFingerAction,
     TurnTheWaterHotWithAFingerAction,
 )
@@ -109,6 +110,21 @@ class SinkOfAnEpisode:
             handle=joints.part_moved_by(self.joint_name(SinkJoint.HANDLE)).root,
             lift_joint=joints.connection(self.joint_name(SinkJoint.HANDLE)),
             temperature_joint=self.temperature_joint,
+            basin=self.basin,
+        )
+
+    def turn_the_spout(self, goal_position: float) -> TurnTheSpoutWithTheGripperAction:
+        """
+        :param goal_position: The position the spout is turned to, in radians.
+        :return: A new action turning the spout there, with its other parameters at
+            their defaults.
+        """
+        joints = self.episode.joints
+        return TurnTheSpoutWithTheGripperAction(
+            arm=self.episode.arm,
+            spout=joints.part_moved_by(self.joint_name(SinkJoint.SPOUT)).root,
+            spout_joint=joints.connection(self.joint_name(SinkJoint.SPOUT)),
+            goal_position=goal_position,
             basin=self.basin,
         )
 
