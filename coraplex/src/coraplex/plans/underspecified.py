@@ -43,6 +43,7 @@ from semantic_digital_twin.reasoning.robot_predicates import (
     fractions_of_rays_between_fingers_hitting_bodies,
 )
 from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
+from semantic_digital_twin.world_description.connections import Connection6DoF
 
 if TYPE_CHECKING:
     from coraplex.plans.executors import PlanExecutor
@@ -479,10 +480,10 @@ class ActionTrial:
 
     def _hang_gripped_bodies_off_their_grippers(self, executor: PlanExecutor) -> None:
         """
-        Hang every graspable body a gripper of the robot holds by contact alone off that
-        gripper's tool frame, the way a pick-up leaves it in a kinematically moved
+        Hang every free graspable body a gripper of the robot holds by contact alone off
+        that gripper's tool frame, the way a pick-up leaves it in a kinematically moved
         world, so that it moves with the gripper in the trial as the grip moves it in
-        physics.
+        physics. A body on a joint, such as a faucet's spout, stays on its joint.
 
         :param executor: The executor the trial runs in, on the copy.
         """
@@ -490,6 +491,7 @@ class ActionTrial:
         graspable_bodies = {
             annotation.root
             for annotation in world.get_semantic_annotations_by_type(HasGraspCandidates)
+            if isinstance(annotation.root.parent_connection, Connection6DoF)
         }
         robot = executor.context.require_extension(RobotAccess).robot
         for arm in robot.all_arms:

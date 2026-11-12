@@ -57,9 +57,16 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Handle,
     Milk,
 )
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Pose
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix,
+    Pose,
+    Vector3,
+)
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connections import FixedConnection
+from semantic_digital_twin.world_description.connections import (
+    FixedConnection,
+    RevoluteConnection,
+)
 from semantic_digital_twin.world_description.world_entity import Body
 from ...plan_running import run_plan, simulated_executor, statechart_of, with_grounding
 from coraplex.plans.context_extensions import StatementGrounding
@@ -1095,6 +1102,36 @@ def test_a_trial_hangs_what_a_grip_holds_by_contact_off_the_gripper(
     trial._hang_gripped_bodies_off_their_grippers(executor)
 
     assert milk.root.parent_connection.parent is robot.left_arm.end_effector.tool_frame
+
+
+def test_a_trial_leaves_what_turns_on_a_joint_on_that_joint(
+    pr2_gripping_milk_by_contact,
+):
+    """
+    A body the fingers hold that turns on a joint, as a faucet's spout does while a
+    fingertip pushes it, stays on its joint in a trial, so the push still turns the joint.
+    """
+    world, robot, extensions, milk = pr2_gripping_milk_by_contact
+    free_connection = milk.root.parent_connection
+    parent_T_milk = free_connection.origin
+    with world.modify_world():
+        world.remove_connection(free_connection)
+        hinge = RevoluteConnection.create_with_dofs(
+            world=world,
+            parent=free_connection.parent,
+            child=milk.root,
+            parent_T_connection_expression=parent_T_milk,
+            axis=Vector3.Z(),
+        )
+        world.add_connection(hinge)
+    executor = simulated_executor(extensions)
+    trial = ActionTrial(
+        executor=executor, trial_executor_type=KinematicallySimulatedPlanExecutor
+    )
+
+    trial._hang_gripped_bodies_off_their_grippers(executor)
+
+    assert milk.root.parent_connection is hinge
 
 
 # %% which statements of a parallel are grounded together
