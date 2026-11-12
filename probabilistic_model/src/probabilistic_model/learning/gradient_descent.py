@@ -9,7 +9,6 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
-import equinox as eqx
 import jax
 import jax.numpy as jnp
 import optax
@@ -19,9 +18,6 @@ from array_api_compat import array_namespace
 from typing_extensions import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from probabilistic_model.probabilistic_circuit.jax.inner_layer import (
-        DifferentiableLayer,
-    )
     from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.base import (
         Layer,
     )
@@ -29,7 +25,9 @@ if TYPE_CHECKING:
 # %% gradient descent
 
 
-class TrainingState(eqx.Module):
+@jax.tree_util.register_dataclass
+@dataclass
+class TrainingState:
     """
     The values one compiled training step reads and returns.
     """
@@ -62,7 +60,7 @@ class GradientDescent(ABC):
     list.
     """
 
-    layer: Layer | DifferentiableLayer
+    layer: Layer
     """
     The root of the circuit to train, which is left unchanged.
     """
@@ -79,10 +77,19 @@ class GradientDescent(ABC):
     The parameter arrays of the circuit before training.
     """
 
+    impossible: list[jax.Array] = field(init=False)
+    """
+    Where every parameter array is ``-inf`` before training, a log-probability or log-
+    weight of zero probability, which training keeps.
+    """
+
     def __post_init__(self) -> None:
         if self.optimizer is None:
             self.optimizer = optax.adam(1e-3)
         self.initial_parameters = list(self.layer.circuit_parameters)
+        self.impossible = [
+            jnp.isneginf(parameter) for parameter in self.initial_parameters
+        ]
 
     @abstractmethod
     def loss(self, layer: Any, *arguments: jax.Array) -> jax.Array:
@@ -116,9 +123,13 @@ class GradientDescent(ABC):
         updates, optimizer_state = self.optimizer.update(
             gradients, state.optimizer_state, state.parameters
         )
-        parameters = self.layer.projected_circuit_parameters(
-            optax.apply_updates(state.parameters, updates)
-        )
+        updated = [
+            jnp.where(impossible, -jnp.inf, parameter)
+            for impossible, parameter in zip(
+                self.impossible, optax.apply_updates(state.parameters, updates)
+            )
+        ]
+        parameters = self.layer.projected_circuit_parameters(updated)
         return TrainingState(parameters, optimizer_state, loss)
 
     def minimize(self, epochs: int, *arguments: jax.Array) -> Any:

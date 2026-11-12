@@ -55,11 +55,18 @@ class TorchGradientDescent(ABC):
     The leaf tensors the optimizer updates, copies of the parameters of the circuit.
     """
 
+    impossible: list[torch.Tensor] = field(init=False)
+    """
+    Where every parameter is ``-inf`` before training, a log-probability or log-weight
+    of zero probability, which training keeps.
+    """
+
     def __post_init__(self) -> None:
         self.parameters = [
             parameter.detach().clone().requires_grad_(True)
             for parameter in self.layer.circuit_parameters
         ]
+        self.impossible = [torch.isneginf(parameter) for parameter in self.parameters]
 
     @abstractmethod
     def loss(self, layer: Any, *arguments: torch.Tensor) -> torch.Tensor:
@@ -85,6 +92,8 @@ class TorchGradientDescent(ABC):
             loss.backward()
             optimizer.step()
             with torch.no_grad():
+                for parameter, impossible in zip(self.parameters, self.impossible):
+                    parameter.masked_fill_(impossible, -torch.inf)
                 projected = self.layer.projected_circuit_parameters(self.parameters)
                 for parameter, valid in zip(self.parameters, projected):
                     parameter.copy_(valid)
