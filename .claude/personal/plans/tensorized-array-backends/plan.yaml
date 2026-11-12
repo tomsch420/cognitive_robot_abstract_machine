@@ -75,20 +75,6 @@ items:
 
     '
   repository: cram2/cognitive_robot_abstract_machine
-- id: torch-backend
-  title: Torch backend
-  track: backends
-  depends_on:
-  - region-graph-builds-tensorized
-  status: not started
-  notes: 'Numeric queries and training on torch: parameters registered for torch optimizers,
-    the functional loss differentiated with torch.func. Same test matrix as numpy and jax,
-    both edge matrix types included. Edge matrices gather by indexing with numpy integer arrays;
-    check that torch accepts them or convert the indices once per matrix. Adding torch as
-    a dependency needs the user''s approval first.
-
-    '
-  repository: cram2/cognitive_robot_abstract_machine
 - id: remove-jax-package
   title: Remove the jax package and its adapters
   track: backends
@@ -101,9 +87,8 @@ items:
 
     '
   repository: cram2/cognitive_robot_abstract_machine
-
 - id: tensorized-training
-  title: "Train tensorized circuits through a functional loss"
+  title: Train tensorized circuits through a functional loss
   branch: tensorized-training
   track: training
   pull_request_number: 35
@@ -111,11 +96,11 @@ items:
   depends_on:
   - inner-layers-any-backend
   status: in progress
-  notes: 'A pure function from parameters to log likelihood over the host structure, so
-    jax.grad and jax.jit apply. Build on GradientDescent (PR 927) and keep the parameter
-    constraints. The trainable sum layer parameter is log_weights in the layout of its edge
-    matrix. Adds moving a circuit''s parameters to a backend and back; structural queries
-    and sampling then raise a dedicated exception, and are documented as host only (absorbs
-    the former host-only-structural-queries item).
+  notes: 'A pure function from parameters to log likelihood over the host structure, so jax.grad
+    and jax.jit apply. Build on GradientDescent (PR 927) and keep the parameter constraints.
+    The trainable sum layer parameter is log_weights in the layout of its edge matrix. Adds
+    moving a circuit''s parameters to a backend and back; structural queries and sampling
+    then raise a dedicated exception, and are documented as host only (absorbs the former
+    host-only-structural-queries item).
 
     '
