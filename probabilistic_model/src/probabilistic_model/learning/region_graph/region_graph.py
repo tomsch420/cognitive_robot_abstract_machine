@@ -14,7 +14,7 @@ import jax.random
 import rustworkx as rx
 import numpy as np
 from jax.experimental.sparse import BCOO
-from random_events.variable import Continuous, Symbolic
+from random_events.variable import Continuous, Symbolic, Variable
 from sortedcontainers import SortedSet
 from typing_extensions import Iterable, Self
 
@@ -34,7 +34,34 @@ from probabilistic_model.probabilistic_circuit.jax.probabilistic_circuit import 
     ClassificationCircuit,
 )
 from probabilistic_model.graph import DirectedAcyclicGraph
+from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.base import Layer
+from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.edge_matrix import (
+    DenseEdgeMatrix,
+    SparseEntries,
+)
+from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.product_layer import (
+    ProductLayer,
+)
+from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.sum_layer import (
+    SumLayer,
+)
+from probabilistic_model.probabilistic_circuit.tensorized.input_layer.discrete_layer import (
+    SymbolicLayer,
+)
+from probabilistic_model.probabilistic_circuit.tensorized.input_layer.gaussian_layer import (
+    GaussianLayer,
+)
+from probabilistic_model.probabilistic_circuit.tensorized.input_layer.probability_table import (
+    DenseProbabilityTable,
+)
+from probabilistic_model.probabilistic_circuit.tensorized.layered_probabilistic_circuit import (
+    LayeredProbabilisticCircuit,
+)
+from probabilistic_model.probabilistic_circuit.tensorized.symbolic_encoding import (
+    SymbolicEncoding,
+)
 from probabilistic_model.learning.region_graph.exceptions import (
+    ClassVariableMismatchError,
     MultipleRootsError,
     UnequalFactorSizesError,
     UnsupportedRegionVariableError,
@@ -50,11 +77,14 @@ class RegionGraphNode(ABC):
     A node of a region graph, compared by identity.
     """
 
-    layer: DifferentiableLayer | None = field(default=None, init=False, repr=False)
+    layer: DifferentiableLayer | Layer | None = field(
+        default=None, init=False, repr=False
+    )
     """
     The layer that models this node in the circuit of the region graph, once
-    :meth:`RegionGraph.to_probabilistic_circuit` built it: an input or sum layer for a
-    region, a product layer for a partition.
+    :meth:`RegionGraph.to_probabilistic_circuit` or
+    :meth:`RegionGraph.to_layered_probabilistic_circuit` built it: an input or sum layer
+    for a region, a product layer for a partition.
     """
 
 
@@ -325,3 +355,183 @@ class RegionGraph(DirectedAcyclicGraph[RegionGraphNode]):
             model = DifferentiableLayeredCircuit(self.variables, root.layer)
 
         return model
+
+    # %% tensorized circuits
+
+    def to_layered_probabilistic_circuit(
+        self,
+        input_units: int = 5,
+        sum_units: int = 5,
+        key: jax.Array = jax.random.PRNGKey(69),
+        class_variable: Symbolic | None = None,
+    ) -> LayeredProbabilisticCircuit:
+        """
+        Convert the region graph to a layered circuit with jax parameters, in the
+        floating point type jax computes in by default.
+
+        Every sum layer is fully connected and stores its edges densely. With more than
+        one class, the root mixes one class conditional circuit per class, each
+        multiplied by the indicator of its class, so that training the joint likelihood
+        trains a classifier.
+
+        :param input_units: The number of input units of each leaf region.
+        :param sum_units: The number of sum units of each inner region.
+        :param key: The random key of every initial parameter.
+        :param class_variable: The variable whose domain elements are the classes, if
+            :attr:`classes` is more than one.
+        :return: The layered circuit.
+        :raises ClassVariableMismatchError: If the class variable does not fit
+            :attr:`classes`.
+        """
+        if self.classes > 1 and (
+            class_variable is None
+            or len(class_variable.domain.simple_sets) != self.classes
+            or class_variable in self.variables
+        ):
+            raise ClassVariableMismatchError(self.classes, class_variable)
+        variables = SortedSet(self.variables)
+        if self.classes > 1:
+            variables = variables | SortedSet([class_variable])
+        keys = iter(jax.random.split(key, len(self.nodes()) + 1))
+
+        for layer in reversed(rx.bfs_layers(self.graph, [self.index_of(self.root)])):
+            for node in map(self.graph.__getitem__, layer):
+                children = list(self.successors(node))
+                if isinstance(node, Partition):
+                    node.layer = self.product_of_children(children)
+                elif children:
+                    number_of_nodes = (
+                        self.classes if self.in_degree(node) == 0 else sum_units
+                    )
+                    node.layer = self.fully_connected_sum_layer(
+                        children, number_of_nodes, next(keys)
+                    )
+                else:
+                    node.layer = self.input_layer(
+                        node.variables[0], variables, input_units, next(keys)
+                    )
+
+        root = self.root.layer
+        if self.classes > 1:
+            root = self.mixture_of_classes(root, class_variable, variables)
+        circuit = LayeredProbabilisticCircuit(variables, root)
+        return circuit.to_namespace(jnp, dtype=jnp.result_type(float))
+
+    @staticmethod
+    def product_of_children(children: list[RegionGraphNode]) -> ProductLayer:
+        """
+        :param children: The regions a partition multiplies, all with as many units.
+        :return: The product layer whose node ``i`` multiplies node ``i`` of every
+            child.
+        :raises UnequalFactorSizesError: If the children have different numbers of
+            units.
+        """
+        node_lengths = [child.layer.number_of_nodes for child in children]
+        if len(set(node_lengths)) != 1:
+            raise UnequalFactorSizesError(node_lengths)
+        return ProductLayer.node_wise_product_of([child.layer for child in children])
+
+    @staticmethod
+    def fully_connected_sum_layer(
+        children: list[RegionGraphNode], number_of_nodes: int, key: jax.Array
+    ) -> SumLayer:
+        """
+        :param children: The partitions a region mixes.
+        :param number_of_nodes: The number of sum units of the region.
+        :param key: The random key of the initial weights.
+        :return: The sum layer that connects every unit to every unit of every child,
+            with dense edges and weights drawn uniformly from [0.1, 1].
+        """
+        child_layers = [child.layer for child in children]
+        number_of_columns = sum(layer.number_of_nodes for layer in child_layers)
+        rows, columns = np.nonzero(np.ones((number_of_nodes, number_of_columns)))
+        weights = np.asarray(
+            jax.random.uniform(key, shape=(len(rows),), minval=0.1, maxval=1.0)
+        )
+        return SumLayer.from_entries(
+            child_layers,
+            SparseEntries(np.log(weights.astype(float)), rows, columns),
+            number_of_nodes,
+            DenseEdgeMatrix,
+        )
+
+    @staticmethod
+    def input_layer(
+        variable: Variable,
+        variables: SortedSet,
+        input_units: int,
+        key: jax.Array,
+    ) -> GaussianLayer | SymbolicLayer:
+        """
+        :param variable: The variable of a leaf region.
+        :param variables: The variables of the circuit.
+        :param input_units: The number of input units.
+        :param key: The random key of the initial parameters.
+        :return: Gaussians with locations in [-1, 1] and scales in [0.5, 3] for a
+            continuous variable, categorical distributions with probabilities drawn
+            from [0.1, 1] and normalized for a symbolic one.
+        :raises UnsupportedRegionVariableError: If the variable is of another type.
+        """
+        variable_index = variables.index(variable)
+        location_key, scale_key = jax.random.split(key)
+        if isinstance(variable, Continuous):
+            return GaussianLayer(
+                variable_index,
+                np.asarray(
+                    jax.random.uniform(
+                        location_key, (input_units,), minval=-1.0, maxval=1.0
+                    )
+                ).astype(float),
+                np.asarray(
+                    jax.random.uniform(
+                        scale_key, (input_units,), minval=0.5, maxval=3.0
+                    )
+                ).astype(float),
+            )
+        if isinstance(variable, Symbolic):
+            number_of_states = len(variable.domain.simple_sets)
+            probabilities = np.asarray(
+                jax.random.uniform(
+                    location_key,
+                    (input_units, number_of_states),
+                    minval=0.1,
+                    maxval=1.0,
+                )
+            ).astype(float)
+            probabilities /= probabilities.sum(axis=1, keepdims=True)
+            return SymbolicLayer(
+                variable_index,
+                np.arange(number_of_states),
+                DenseProbabilityTable(np.log(probabilities)),
+                SymbolicEncoding(variable).hashes,
+            )
+        raise UnsupportedRegionVariableError(variable)
+
+    def mixture_of_classes(
+        self, class_conditionals: Layer, class_variable: Symbolic, variables: SortedSet
+    ) -> SumLayer:
+        """
+        :param class_conditionals: The layer with one node per class.
+        :param class_variable: The variable whose domain elements are the classes.
+        :param variables: The variables of the circuit.
+        :return: The root that mixes, with equal weights, the product of every class
+            conditional node with the indicator of its class.
+        """
+        with np.errstate(divide="ignore"):
+            indicators = SymbolicLayer(
+                variables.index(class_variable),
+                np.arange(self.classes),
+                DenseProbabilityTable(np.log(np.eye(self.classes))),
+                SymbolicEncoding(class_variable).hashes,
+            )
+        products = ProductLayer.node_wise_product_of([class_conditionals, indicators])
+        return SumLayer.from_entries(
+            [products],
+            SparseEntries(
+                np.full(self.classes, -np.log(self.classes)),
+                np.zeros(self.classes, dtype=np.int64),
+                np.arange(self.classes),
+            ),
+            1,
+            DenseEdgeMatrix,
+        )

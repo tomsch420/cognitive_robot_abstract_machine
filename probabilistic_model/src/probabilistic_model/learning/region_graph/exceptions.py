@@ -77,3 +77,33 @@ class UnsupportedRegionVariableError(ProbabilisticModelException, ValueError):
 
     def suggest_correction(self) -> str:
         return "Use continuous or symbolic variables."
+
+
+@dataclass
+class ClassVariableMismatchError(ProbabilisticModelException, ValueError):
+    """
+    Exception raised when the class variable of a classifying region graph is missing or
+    has another number of classes than the graph.
+    """
+
+    classes: int
+    """
+    The number of classes of the region graph.
+    """
+
+    class_variable: Variable | None
+    """
+    The class variable that was given, if any.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The region graph has {self.classes} classes, but the class variable is "
+            f"{self.class_variable}."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Pass a symbolic class variable with one domain element per class, which is "
+            "not among the variables of the region graph."
+        )

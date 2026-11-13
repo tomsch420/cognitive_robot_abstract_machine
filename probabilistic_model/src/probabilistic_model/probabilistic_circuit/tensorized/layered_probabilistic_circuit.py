@@ -6,6 +6,7 @@ import copy
 from dataclasses import dataclass
 
 import numpy as np
+import optax
 from array_api_compat import array_namespace, is_numpy_array
 from random_events.product_algebra import Event, SimpleEvent, VariableMap
 from random_events.variable import Symbolic, Variable
@@ -27,6 +28,7 @@ from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     SampleArray,
     SampleValues,
 )
+from probabilistic_model.learning.gradient_descent import LikelihoodMaximization
 from probabilistic_model.probabilistic_circuit.tensorized.exceptions import (
     HostOnlyQueryError,
 )
@@ -320,6 +322,26 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
                 for parameter in self.parameters
             ]
         )
+
+    def fit(
+        self,
+        data: SampleArray,
+        epochs: int = 100,
+        optimizer: optax.GradientTransformation | None = None,
+    ) -> Self:
+        """
+        Maximize the average log-likelihood of the data by gradient descent with jax, in
+        place.
+
+        :param data: The data, an array of the backend of the parameters.
+        :param epochs: The number of full batch steps.
+        :param optimizer: The optimizer, Adam with a learning rate of 1e-3 if ``None``.
+        :return: This circuit.
+        """
+        self.root = LikelihoodMaximization(self.root, optimizer).minimize(
+            epochs, self.encoded(data)
+        )
+        return self
 
     def raise_if_parameters_are_not_on_host(self):
         """
