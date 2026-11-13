@@ -57,6 +57,7 @@ from krrood_spatial_math.spatial_types import (
     RotationMatrix,
     Vector3,
 )
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Floor
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     RevoluteConnection,
@@ -2030,6 +2031,9 @@ class MujocoWheeledDriveJoints(MujocoConnectionJoints[DriveType], ABC):
     ``odom`` frame: the servos push its base across the floor at the commanded
     velocity, and the positions the joints reach are the drive's odometry. Otherwise it
     is built as no joint at all and its base stays where it is built.
+
+    The joints hold the base at its height, so no floor can carry it; the bodies the
+    drive carries do not collide with any :class:`Floor`, which would only drag them.
     """
 
     @classproperty
@@ -2063,14 +2067,46 @@ class MujocoWheeledDriveJoints(MujocoConnectionJoints[DriveType], ABC):
         :param world: The world the drive belongs to.
         :return: Whether servos drive every degree of freedom `drive` is commanded with.
         """
-        actuated = {
+        return {
+            degree_of_freedom.id for degree_of_freedom in drive.active_dofs
+        } <= MujocoWheeledDriveJoints._actuated_degree_of_freedom_ids(world)
+
+    @staticmethod
+    def _actuated_degree_of_freedom_ids(world: World) -> set[UUID]:
+        """
+        :param world: The world whose actuators are read.
+        :return: The id of every degree of freedom of `world` a servo drives.
+        """
+        return {
             degree_of_freedom.id
             for actuator in world.actuators
             for degree_of_freedom in actuator.dofs
         }
-        return {
-            degree_of_freedom.id for degree_of_freedom in drive.active_dofs
-        } <= actuated
+
+    @property
+    def carried_bodies(self) -> list[Body]:
+        """
+        :return: The colliding bodies the drive holds at its base's height: the base
+            and every body hanging from it through joints no servo drives, such as its
+            wheels and casters.
+        """
+        actuated = self._actuated_degree_of_freedom_ids(self.world)
+        carried = []
+        unvisited = [self.connection.child]
+        while unvisited:
+            entity = unvisited.pop()
+            if isinstance(entity, Body) and entity.collision:
+                carried.append(entity)
+            unvisited += [
+                child
+                for child in entity.child_kinematic_structure_entities
+                if not {
+                    degree_of_freedom.id
+                    for degree_of_freedom in child.parent_connection.dofs
+                }
+                & actuated
+            ]
+        return carried
 
     @property
     def axes(self) -> list[DriveAxis]:
@@ -2095,6 +2131,10 @@ class MujocoWheeledDriveJoints(MujocoConnectionJoints[DriveType], ABC):
                 axis=(child_T_connection[:3, :3] @ axis.direction).tolist(),
                 pos=child_T_connection[:3, 3].tolist(),
             )
+        carried_bodies = self.carried_bodies
+        for floor in self.world.get_semantic_annotations_by_type(Floor):
+            for body in carried_bodies:
+                builder.exclude_contact(body, floor.root)
 
     def home_joint_positions(self) -> list[float]:
         return [self.world.state[axis.measured.id].position for axis in self.axes]
@@ -3267,6 +3307,16 @@ class MujocoBuilder(MultiSimBuilder):
         if pair in excluded:
             return
         excluded.add(pair)
+        self.exclude_contact(body_a, body_b)
+
+    def exclude_contact(self, body_a: Body, body_b: Body) -> None:
+        """
+        Tell MuJoCo never to check the two bodies for contact with each other.
+
+        :param body_a: One of the two bodies.
+        :param body_b: The other.
+        """
+        pair = sorted((self.body_spec_of(body_a).name, self.body_spec_of(body_b).name))
         self.spec.add_exclude(name="_".join(pair), bodyname1=pair[0], bodyname2=pair[1])
 
     def _build_equalities(self):

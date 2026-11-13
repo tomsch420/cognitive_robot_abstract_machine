@@ -105,9 +105,11 @@ class LiftProbability:
 
     def __post_init__(self):
         parameters = UnderspecifiedParameters(
-            self.part.grasp_strategy.statement(self.part, GraspResult.lifting_pattern)
+            statement=self.part.grasp_strategy.statement(
+                self.part, GraspResult.lifting_pattern
+            )
         )
-        circuit = self.model.model_registry().get_model(parameters)
+        circuit = self.model.model_registry().get_model(parameters=parameters)
         grasp_variables = SurfaceGraspVariables(circuit).of_the_grasp
         lifting, self.lift_probability = circuit.conditional(
             parameters.conditioning_assignments_from_literal_values

@@ -282,7 +282,7 @@ class PhysicalPickUp:
             ]
         )
         motion_statechart = MotionStatechart()
-        motion_statechart.add_nodes([steps, EndMotion.when_true(steps)])
+        motion_statechart.add_nodes(nodes=[steps, EndMotion.when_true(node=steps)])
         return motion_statechart
 
     def _move_tool_frame(

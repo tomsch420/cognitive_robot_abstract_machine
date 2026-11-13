@@ -171,10 +171,14 @@ class PreparedModel:
         statement allows them.
         """
         parameters = UnderspecifiedParameters(
-            self.part.grasp_strategy.statement(self.part, GraspResult.lifting_pattern)
+            statement=self.part.grasp_strategy.statement(
+                self.part, GraspResult.lifting_pattern
+            )
         )
-        model = self.model.model_registry().get_model(parameters)
-        return parameters.resolve_conditioned_and_truncated_model(model) is not None
+        model = self.model.model_registry().get_model(parameters=parameters)
+        return (
+            parameters.resolve_conditioned_and_truncated_model(model=model) is not None
+        )
 
     @cached_property
     def lift_probability(self) -> LiftProbability:

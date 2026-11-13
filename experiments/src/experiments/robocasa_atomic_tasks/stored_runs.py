@@ -270,7 +270,7 @@ class PlanRecorder(ExecutorExtension):
         )
         self.plans.append(plan)
         statechart.state_history.add_observer(
-            PlanStateChangeTimer(plan=plan, simulation=self.simulation)
+            observer=PlanStateChangeTimer(plan=plan, simulation=self.simulation)
         )
 
 
@@ -300,7 +300,7 @@ class ReplayedPlanExecutor(PlanExecutor, StatechartExecutor):
     How many of :attr:`recorded_states` were shown.
     """
 
-    def compile(self, statechart: Statechart) -> None:
+    def compile(self, *, statechart: Statechart) -> None:
         """
         Take `statechart`, which performed the plan, with its recorded states to show
         again and its history emptied, and tell every extension; the statechart is
@@ -308,9 +308,10 @@ class ReplayedPlanExecutor(PlanExecutor, StatechartExecutor):
 
         :param statechart: The statechart, built in :attr:`context`.
         """
-        Executor.compile(self, statechart)
+        Executor.compile(self, statechart=statechart)
         self.plan_nodes = [
-            statechart.get_node_by_index(index) for index in self.plan_node_indices
+            statechart.get_node_by_index(index=index)
+            for index in self.plan_node_indices
         ]
         self.recorded_states = list(statechart.state_history.items)
         self.shown_state_count = 0
@@ -331,7 +332,7 @@ class ReplayedPlanExecutor(PlanExecutor, StatechartExecutor):
         """
         ticking_extensions = self.ticking_extensions
         for extension in ticking_extensions:
-            extension.before_tick(self)
+            extension.before_tick(executor=self)
         recorded = self.recorded_states[self.shown_state_count]
         shown = StateHistoryItem(
             tick_count=recorded.tick_count,
@@ -341,10 +342,10 @@ class ReplayedPlanExecutor(PlanExecutor, StatechartExecutor):
         self.tick_count = recorded.tick_count
         self.statechart.life_cycle_state.data = shown.life_cycle_state.data.copy()
         self.statechart.observation_state.data = shown.observation_state.data.copy()
-        self.statechart.state_history.append(shown)
+        self.statechart.state_history.append(next_item=shown)
         self.shown_state_count += 1
         for extension in ticking_extensions:
-            extension.after_tick(self)
+            extension.after_tick(executor=self)
 
     def _run(self) -> None:
         """
@@ -390,12 +391,12 @@ class PlanReplay:
         """
         if self.executor is None:
             self.executor = ReplayedPlanExecutor(
-                self.context,
+                context=self.context,
                 plan_node_indices=self.plan.plan_node_indices,
                 extensions=list(self.executor_extensions),
             )
             self.plan.statechart.context = self.context
-            self.executor.compile(self.plan.statechart)
+            self.executor.compile(statechart=self.plan.statechart)
         self.executor.tick()
         if self.executor.has_shown_every_state:
             self.executor.finish_run()
@@ -472,11 +473,13 @@ class TaskRunReplay:
         """
         changes = []
         for plan in self.run.plans:
-            context_extensions = [] if self.robot is None else [RobotAccess(self.robot)]
+            context_extensions = (
+                [] if self.robot is None else [RobotAccess(robot=self.robot)]
+            )
             replay = PlanReplay(
                 plan=plan,
                 context=StatechartContext.with_extensions(
-                    self.world, context_extensions
+                    world=self.world, extensions=context_extensions
                 ),
                 executor_extensions=self.executor_extensions,
             )

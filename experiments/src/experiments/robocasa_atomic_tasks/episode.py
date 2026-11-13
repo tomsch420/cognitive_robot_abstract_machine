@@ -369,20 +369,20 @@ class RoboCasaEpisode:
             them during the plan is :attr:`leaves_the_environment_to_the_physics`.
         """
         context = StatechartContext.with_extensions(
-            self.world,
-            [
-                RobotAccess(self.robot),
+            world=self.world,
+            extensions=[
+                RobotAccess(robot=self.robot),
                 StatementGrounding(sampling_seed=sampling_seed),
             ],
         )
         if not self.physically_simulated:
             return KinematicallySimulatedPlanExecutor(
-                context,
+                context=context,
                 collision_avoidance=self.collision_avoidance,
                 extensions=list(self.executor_extensions),
             )
         return PhysicallySimulatedPlanExecutor(
-            context,
+            context=context,
             simulation=self.simulation,
             collision_avoidance=self.collision_avoidance,
             extensions=list(self.executor_extensions),
@@ -397,8 +397,8 @@ class RoboCasaEpisode:
         """
         executor = self.create_executor()
         statechart = Statechart(context=executor.context)
-        statechart.add_node(SequenceOfSteps(nodes=list(steps)))
-        executor.compile(statechart)
+        statechart.add_node(node=SequenceOfSteps(nodes=list(steps)))
+        executor.compile(statechart=statechart)
         return executor.attempt()
 
     def perform(

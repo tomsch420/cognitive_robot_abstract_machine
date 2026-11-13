@@ -568,12 +568,14 @@ def test_a_plan_in_physics_can_leave_the_joints_of_the_environment_to_the_physic
         nodes=[JointPositionList(goal_state=JointState.from_mapping({slider: 0.3}))]
     )
     executor = PhysicallySimulatedPlanExecutor(
-        StatechartContext.with_extensions(slider._world, extensions),
+        context=StatechartContext.with_extensions(
+            world=slider._world, extensions=extensions
+        ),
         simulation=simulation,
         leaves_the_environment_to_the_physics=True,
     )
 
-    executor.compile(statechart_of(executor, plan))
+    executor.compile(statechart=statechart_of(executor, plan))
     executor.execute()
 
     assert slider.position == pytest.approx(0.0, abs=1e-6)
@@ -639,7 +641,7 @@ def test_a_pick_up_failing_after_its_grasp_grasps_the_held_box_again(
     plan = Sequence(nodes=[ParkArmsAction(arms=view.all_arms), pick_up])
     executor = simulated_executor(extensions, plan_adaptations=[FailTheFirstLift()])
 
-    executor.compile(statechart_of(executor, plan))
+    executor.compile(statechart=statechart_of(executor, plan))
     executor.execute()
 
     first, second = pick_up.grounded_nodes

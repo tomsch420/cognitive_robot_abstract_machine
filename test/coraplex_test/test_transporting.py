@@ -633,7 +633,7 @@ def test_a_pick_up_of_a_graspable_tries_the_grasps_a_model_expects_to_lift_it(
     )
 
     [pick_up] = itertools.islice(
-        EntityQueryLanguageGenerativeBackend().evaluate(step), 1
+        EntityQueryLanguageGenerativeBackend().evaluate(expression=step), 1
     )
 
     assert [_grasp_signature(pick_up.pick_up.grasp)] == [
@@ -974,7 +974,7 @@ def _navigation_targets(action: Action) -> list[Pose]:
     """
     return [
         node.target_location
-        for node in action.statechart.get_nodes_by_type(NavigateAction)
+        for node in action.statechart.get_nodes_by_type(node_type=NavigateAction)
     ]
 
 

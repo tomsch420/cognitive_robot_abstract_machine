@@ -69,7 +69,9 @@ def milk_circuit(milk_scene):
     )
     part = milk_scene.graspable.grasped_part()
     statement = part.grasp_strategy.statement(part)
-    return model.model_registry().get_model(UnderspecifiedParameters(statement))
+    return model.model_registry().get_model(
+        parameters=UnderspecifiedParameters(statement=statement)
+    )
 
 
 # %% grasps as points

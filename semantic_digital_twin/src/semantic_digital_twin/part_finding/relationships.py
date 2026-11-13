@@ -140,7 +140,7 @@ class PartRelationshipInspector:
         if not self.holds_many:
             return 1
         return IsPartWholeRelationship.of_wrapped_field(
-            self.relationship_field
+            wrapped_field=self.relationship_field
         ).maximum_parts
 
     @property

@@ -418,7 +418,7 @@ class DriveJoint(EndedByOwner, CompositeNode):
 
     def expand(self) -> None:
         self._add_children_to_statechart(
-            [
+            nodes=[
                 MeasuredJointPosition(
                     name="joint goal",
                     goal_state=JointState.from_mapping(

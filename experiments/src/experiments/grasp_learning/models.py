@@ -69,7 +69,9 @@ class GraspModel:
         :return: A model registry that answers statements about surface grasps with this
             model.
         """
-        return RelationalCircuitRegistry(from_json(json.loads(self.circuit)))
+        return RelationalCircuitRegistry(
+            relational_probabilistic_circuit=from_json(json.loads(self.circuit))
+        )
 
 
 # %% learning

@@ -91,10 +91,14 @@ def observation_of_the_block_on_the_base(
     )
     executor = StatechartExecutor(
         context=StatechartContext(world=block_above_a_base.world),
-        **({} if simulation is None else {"pacer": SteppedSimulationPacer(simulation)}),
+        **(
+            {}
+            if simulation is None
+            else {"pacer": SteppedSimulationPacer(simulation=simulation)}
+        ),
     )
     statechart = Statechart(context=executor.context)
-    statechart.add_node(touching)
+    statechart.add_node(node=touching)
     executor.compile(statechart=statechart)
     for _ in range(ticks):
         executor.tick()

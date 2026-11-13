@@ -147,9 +147,9 @@ def finger_withdrawal(panda_omron: PandaOmron, hold_base: bool) -> FingerWithdra
     )
     Statechart(
         context=StatechartContext.with_extensions(
-            arm._world, [RobotAccess(panda_omron)]
+            world=arm._world, extensions=[RobotAccess(robot=panda_omron)]
         )
-    ).add_node(withdrawal)
+    ).add_node(node=withdrawal)
     return withdrawal
 
 

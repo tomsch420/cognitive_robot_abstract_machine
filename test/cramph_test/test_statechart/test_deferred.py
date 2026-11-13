@@ -55,7 +55,7 @@ class NodeNotingWhatRanBeforeItExpanded(SucceedsOnObservingTrue, CompositeNode):
         self.child = NodeSucceedingOnObservingTrue(
             name="child", observation=ObservationStateValues.TRUE
         )
-        self._add_child_to_statechart(self.child)
+        self._add_child_to_statechart(node=self.child)
 
     def build_artifacts(self) -> NodeArtifacts:
         return NodeArtifacts(observation=self.child.observation_variable)
@@ -70,10 +70,10 @@ def _run_until_it_ends(
     :return: The statechart that ran.
     """
     statechart = Statechart(context=executor.context)
-    statechart.add_node(node)
-    statechart.add_node(EndStatechart.when_true(node))
-    statechart.add_node(EndStatechart.when_failed(node))
-    executor.compile(statechart)
+    statechart.add_node(node=node)
+    statechart.add_node(node=EndStatechart.when_true(node=node))
+    statechart.add_node(node=EndStatechart.when_failed(node=node))
+    executor.compile(statechart=statechart)
     executor.tick_until_end(timeout=30)
     return statechart
 

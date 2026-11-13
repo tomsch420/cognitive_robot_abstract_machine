@@ -160,7 +160,7 @@ class PickUpExperiment:
             video was asked for.
         """
         if video_path is None:
-            return SteppedSimulationPacer(simulation)
+            return SteppedSimulationPacer(simulation=simulation)
         return FilmingSimulationPacer(simulation, camera_name=CAMERA_NAME)
 
     def _add_camera(self) -> None:

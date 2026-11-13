@@ -150,14 +150,22 @@ class SamplingDensities:
             return self.circuits[key]
         part = self.parts[object_name]
         if model_index is None:
-            parameters = UnderspecifiedParameters(part.grasp_strategy.statement(part))
-            model = UniformPriorRegistry().get_model(parameters)
+            parameters = UnderspecifiedParameters(
+                statement=part.grasp_strategy.statement(part)
+            )
+            model = UniformPriorRegistry().get_model(parameters=parameters)
         else:
             parameters = UnderspecifiedParameters(
-                part.grasp_strategy.statement(part, GraspResult.lifting_pattern)
+                statement=part.grasp_strategy.statement(
+                    part, GraspResult.lifting_pattern
+                )
             )
-            model = self.models[model_index].model_registry().get_model(parameters)
-        truncated = parameters.resolve_conditioned_and_truncated_model(model)
+            model = (
+                self.models[model_index]
+                .model_registry()
+                .get_model(parameters=parameters)
+            )
+        truncated = parameters.resolve_conditioned_and_truncated_model(model=model)
         self.circuits[key] = truncated.marginal(
             SurfaceGraspVariables(truncated).of_the_grasp
         )
@@ -486,7 +494,9 @@ class ConvergenceMeter:
         model = self.learner.learn(self.task, attempts)
         part = self.densities.parts[self.main_object]
         return model.model_registry().get_model(
-            UnderspecifiedParameters(part.grasp_strategy.statement(part))
+            parameters=UnderspecifiedParameters(
+                statement=part.grasp_strategy.statement(part)
+            )
         )
 
     @staticmethod

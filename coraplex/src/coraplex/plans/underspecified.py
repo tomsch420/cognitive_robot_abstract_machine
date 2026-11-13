@@ -54,7 +54,7 @@ logger = logging.getLogger(__name__)
 # %% preparing a chosen child
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PlanChildChooser(ChildChooser[GenericChoosingNode], ABC):
     """
     Chooses children that are part of a plan: each is rewritten by the plan
@@ -64,6 +64,7 @@ class PlanChildChooser(ChildChooser[GenericChoosingNode], ABC):
 
     def prepare_chosen_child(
         self,
+        *,
         node: GenericChoosingNode,
         child: StatechartNode,
     ) -> None:
@@ -72,12 +73,13 @@ class PlanChildChooser(ChildChooser[GenericChoosingNode], ABC):
         watching it for a stall collects what it watches, see
         :meth:`~cramph.composites.ChildChooser.prepare_chosen_child`.
         """
-        rewriting = node.context.get_extension(PlanRewriting)
+        rewriting = node.context.get_extension(extension_type=PlanRewriting)
         if rewriting is not None:
             rewriting.rewrite(child)
 
     def failure_monitors_for(
         self,
+        *,
         node: GenericChoosingNode,
         child: StatechartNode,
     ) -> list[StatechartNode]:
@@ -93,7 +95,7 @@ class PlanChildChooser(ChildChooser[GenericChoosingNode], ABC):
 # %% handing a statement a candidate grounded beforehand
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CandidateHandOver(PlanChildChooser[StatementNode]):
     """
     Hands a statement the candidate it was grounded to beforehand, prepared and watched
@@ -108,20 +110,22 @@ class CandidateHandOver(PlanChildChooser[StatementNode]):
     The candidate the statement runs.
     """
 
-    def choose_child(self, node: StatementNode) -> StatechartNode | None:
+    def choose_child(self, *, node: StatementNode) -> StatechartNode | None:
         """
         :return: :attr:`candidate`, in a sequence of its own for the nodes a plan
             transformation puts beside it.
         """
         return Sequence(name=f"{self.candidate.name}/steps", nodes=[self.candidate])
 
-    def prepare_chosen_child(self, node: StatementNode, child: StatechartNode) -> None:
+    def prepare_chosen_child(
+        self, *, node: StatementNode, child: StatechartNode
+    ) -> None:
         """
         Differs from :meth:`PlanChildChooser.prepare_chosen_child` in also keeping the
         plan transformations from rewriting `node`.
         """
-        super().prepare_chosen_child(node, child)
-        rewriting = node.context.get_extension(PlanRewriting)
+        super().prepare_chosen_child(node=node, child=child)
+        rewriting = node.context.get_extension(extension_type=PlanRewriting)
         if rewriting is not None:
             rewriting.treat_as_offered(node)
 
@@ -129,7 +133,7 @@ class CandidateHandOver(PlanChildChooser[StatementNode]):
 # %% rebuilding part of a plan onto a world
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SubtreeRebuild(NodeRebuild):
     """
     Rebuilds a node of a plan and everything below it onto a world to be tried, putting
@@ -235,7 +239,7 @@ class SubtreeRebuild(NodeRebuild):
         self._world = world
         self._rebuilt = {}
         self._cut = False
-        return self.rebuilt(self.root)
+        return self.rebuilt(node=self.root)
 
     def carry_over_conditions(self) -> None:
         """
@@ -256,13 +260,14 @@ class SubtreeRebuild(NodeRebuild):
                 continue
             for transition_kind in TransitionKind:
                 rebuilt.set_condition(
-                    transition_kind,
-                    DerivedConditionVariable.reading_counterparts(
-                        node.get_condition(transition_kind), counterparts.get
+                    transition_kind=transition_kind,
+                    expression=DerivedConditionVariable.reading_counterparts(
+                        condition=node.get_condition(transition_kind=transition_kind),
+                        counterpart_of=counterparts.get,
                     ),
                 )
 
-    def rebuilt(self, node: StatechartNode) -> StatechartNode | None:
+    def rebuilt(self, *, node: StatechartNode) -> StatechartNode | None:
         """
         :return: `node` rebuilt onto :attr:`_world`, or None if it is left out, if a
             branch is cut at it, or if it cannot be rebuilt without what is left out.
@@ -283,7 +288,7 @@ class SubtreeRebuild(NodeRebuild):
             return self._rebuild_running_child(node)
         if isinstance(node, Action):
             return node.rebound_to(self._world)
-        return node.rebuilt_by(self)
+        return node.rebuilt_by(rebuild=self)
 
     def _rebuild_statement(self, statement: StatementNode) -> StatechartNode | None:
         """
@@ -305,12 +310,13 @@ class SubtreeRebuild(NodeRebuild):
         """
         latest_child = node.latest_child
         if latest_child is not None and not latest_child.life_cycle_state.is_terminal:
-            return self.rebuilt(latest_child)
+            return self.rebuilt(node=latest_child)
         self._cut = True
         return None
 
     def rebuilt_children(
         self,
+        *,
         owner: StatechartNode,
         children: list[StatechartNode],
     ) -> list[StatechartNode]:
@@ -324,7 +330,7 @@ class SubtreeRebuild(NodeRebuild):
         rebuilt_children = []
         for child in children:
             self._cut = False
-            rebuilt = self.rebuilt(child)
+            rebuilt = self.rebuilt(node=child)
             if rebuilt is not None:
                 rebuilt_children.append(rebuilt)
             cut_in_children = cut_in_children or self._cut
@@ -335,7 +341,7 @@ class SubtreeRebuild(NodeRebuild):
         self._cut = cut_before or cut_in_children
         return rebuilt_children
 
-    def rebound(self, value: Any) -> Any:
+    def rebound(self, *, value: Any) -> Any:
         """
         :return: `value` referring to :attr:`_world`.
         """
@@ -453,9 +459,11 @@ class ActionTrial:
                     self._hang_gripped_bodies_off_their_grippers(executor)
                 statechart = Statechart(context=executor.context)
                 # A parallel is ended by what holds it.
-                statechart.add_node(Sequence(nodes=[rebuild.build_for_trial(world)]))
+                statechart.add_node(
+                    node=Sequence(nodes=[rebuild.build_for_trial(world)])
+                )
                 rebuild.carry_over_conditions()
-                executor.compile(statechart)
+                executor.compile(statechart=statechart)
                 executor.execute()
                 return True
             except ExecutionFailure as failure:
@@ -493,7 +501,7 @@ class ActionTrial:
             for annotation in world.get_semantic_annotations_by_type(HasGraspCandidates)
             if isinstance(annotation.root.parent_connection, Connection6DoF)
         }
-        robot = executor.context.require_extension(RobotAccess).robot
+        robot = executor.context.require_extension(extension_type=RobotAccess).robot
         for arm in robot.all_arms:
             end_effector = arm.end_effector
             fractions = fractions_of_rays_between_fingers_hitting_bodies(end_effector)
@@ -512,9 +520,9 @@ class ActionTrial:
             and showing `world` in RViz while it is debugging.
         """
         return self.trial_executor_type(
-            StatechartContext.with_extensions(
-                world,
-                [
+            context=StatechartContext.with_extensions(
+                world=world,
+                extensions=[
                     world.rebind_world_entities(extension)
                     for extension in self.executor.supplied_context_extensions
                 ],
@@ -597,7 +605,7 @@ class ActionTrial:
 # %% grounding underspecified actions while the statechart runs
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnderspecifiedChildChooser(PlanChildChooser[StatementNode]):
     """
     Grounds the statement of every :class:`~cramph.composites.StatementNode` of a
@@ -636,14 +644,14 @@ class UnderspecifiedChildChooser(PlanChildChooser[StatementNode]):
             executor=self.executor, trial_executor_type=self.trial_executor_type
         )
 
-    def choose_child(self, node: StatementNode) -> StatechartNode | None:
+    def choose_child(self, *, node: StatementNode) -> StatechartNode | None:
         """
         :return: The sequence holding the next candidate of `node` that succeeds its
             trial, beside the candidates handed to the statements grounded together
             with it, see :meth:`statements_grounded_with`; or None once no candidate,
             or no combination of them, is left that succeeds its trial.
         """
-        grounding = node.context.require_extension(StatementGrounding)
+        grounding = node.context.require_extension(extension_type=StatementGrounding)
         root = SubtreeRebuild.root_around(node)
         statements = self.statements_grounded_with(node)
         if len(statements) == 1:
@@ -661,7 +669,8 @@ class UnderspecifiedChildChooser(PlanChildChooser[StatementNode]):
             trial, or None once there is none.
         """
         candidate = node.next_candidate(
-            grounding.query_backend, grounding.candidates_to_try
+            query_backend=grounding.query_backend,
+            default_candidate_limit=grounding.candidates_to_try,
         )
         while candidate is not None:
             if self.trial.succeeds(
@@ -669,7 +678,8 @@ class UnderspecifiedChildChooser(PlanChildChooser[StatementNode]):
             ):
                 return Sequence(name=f"{candidate.name}/steps", nodes=[candidate])
             candidate = node.next_candidate(
-                grounding.query_backend, grounding.candidates_to_try
+                query_backend=grounding.query_backend,
+                default_candidate_limit=grounding.candidates_to_try,
             )
         node.stop_grounding()
         return None
@@ -701,11 +711,11 @@ class UnderspecifiedChildChooser(PlanChildChooser[StatementNode]):
                 SubtreeRebuild.unfinished_nodes(root, combination)
             ):
                 continue
-            combinations.take(combination)
+            combinations.take(combination=combination)
             for statement in statements:
                 if statement is not node:
                     statement.choose_child_with(
-                        CandidateHandOver(candidate=combination[statement])
+                        chooser=CandidateHandOver(candidate=combination[statement])
                     )
             candidate = combination[node]
             return Sequence(name=f"{candidate.name}/steps", nodes=[candidate])

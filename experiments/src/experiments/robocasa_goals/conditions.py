@@ -316,7 +316,7 @@ class ConditionObserver:
         Create the context the detectors are judged in.
         """
         self.context = MotionStatechartContext(world=self.world)
-        self.context.add_extension(SegmindContext())
+        self.context.add_extension(extension=SegmindContext())
 
     def observe(self) -> list[DetectionEvent]:
         """
@@ -327,5 +327,5 @@ class ConditionObserver:
         """
         for detector in self.detectors:
             detector.on_tick(self.context)
-        logger = self.context.require_extension(SegmindContext).logger
+        logger = self.context.require_extension(extension_type=SegmindContext).logger
         return list(iter(logger.get_next_event, None))

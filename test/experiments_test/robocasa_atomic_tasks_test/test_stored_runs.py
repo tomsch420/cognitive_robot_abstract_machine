@@ -182,11 +182,11 @@ def recorded_plan(world_with_a_lever) -> RecordedPlan:
     simulated_time = AdvancingSimulatedTime()
     recorder = PlanRecorder(simulation=simulated_time)
     executor = KinematicallySimulatedPlanExecutor(
-        StatechartContext(world=world_with_a_lever.world), extensions=[recorder]
+        context=StatechartContext(world=world_with_a_lever.world), extensions=[recorder]
     )
     statechart = Statechart(context=executor.context)
     statechart.add_node(
-        Sequence(
+        node=Sequence(
             name="count ticks twice",
             nodes=[
                 CountTicks(name="count two ticks", ticks=2),
@@ -194,7 +194,7 @@ def recorded_plan(world_with_a_lever) -> RecordedPlan:
             ],
         )
     )
-    executor.compile(statechart)
+    executor.compile(statechart=statechart)
     while not statechart.is_ended():
         simulated_time.current_simulation_time += TICK_DURATION
         executor.tick()
@@ -221,7 +221,8 @@ def test_a_recorded_plan_names_its_top_level_nodes_without_what_the_executor_add
 ):
     statechart = recorded_plan.statechart
     plan_nodes = [
-        statechart.get_node_by_index(index) for index in recorded_plan.plan_node_indices
+        statechart.get_node_by_index(index=index)
+        for index in recorded_plan.plan_node_indices
     ]
 
     assert plan_nodes == [

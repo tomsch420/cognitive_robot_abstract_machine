@@ -68,7 +68,7 @@ class DrawerOnRails:
         :return: Every event the detector reported, in order.
         """
         return self.executor.context.require_extension(
-            SegmindContext
+            extension_type=SegmindContext
         ).logger.get_events()
 
 
@@ -81,7 +81,9 @@ def segmenting_executor(world: World, detector: OpeningDetector) -> StatechartEx
     executor = StatechartExecutor(
         context=StatechartContext(world=world), extensions=[EpisodeSegmentation()]
     )
-    executor.compile(DetectorStatechartBuilder([detector]).build(executor.context))
+    executor.compile(
+        statechart=DetectorStatechartBuilder([detector]).build(executor.context)
+    )
     return executor
 
 
@@ -197,4 +199,9 @@ def test_a_body_without_a_joint_is_never_reported():
     executor.tick()
     executor.tick()
 
-    assert executor.context.require_extension(SegmindContext).logger.get_events() == []
+    assert (
+        executor.context.require_extension(
+            extension_type=SegmindContext
+        ).logger.get_events()
+        == []
+    )

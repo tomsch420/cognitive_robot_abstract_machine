@@ -122,7 +122,7 @@ def observation_after_driving_the_hinge(
     try:
         executor = StatechartExecutor(
             context=StatechartContext(world=world),
-            pacer=SteppedSimulationPacer(simulation),
+            pacer=SteppedSimulationPacer(simulation=simulation),
             extensions=[
                 MotionControl(
                     qp_controller_config=QPControllerConfig.create_with_physical_simulation_defaults()
@@ -130,7 +130,7 @@ def observation_after_driving_the_hinge(
             ],
         )
         statechart = Statechart(context=executor.context)
-        statechart.add_node(goal)
+        statechart.add_node(node=goal)
         executor.compile(statechart=statechart)
         connections = [door_on_a_hinge.hinge] if left_to_the_physics else []
         with simulation.synchronizer.leave_to_the_physics(connections):

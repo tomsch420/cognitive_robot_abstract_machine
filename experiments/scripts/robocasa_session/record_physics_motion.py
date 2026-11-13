@@ -123,7 +123,9 @@ def perform(name: str, *tasks) -> None:
     are done.
     """
     motion_statechart = MotionStatechart()
-    motion_statechart.add_nodes([*tasks, EndMotion.when_all_true(list(tasks))])
+    motion_statechart.add_nodes(
+        nodes=[*tasks, EndMotion.when_all_true(nodes=list(tasks))]
+    )
     executor = Executor(
         context=MotionStatechartContext(
             world=world,
