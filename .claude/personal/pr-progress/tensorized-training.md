@@ -1,4 +1,4 @@
-## PR tomsch420#35 (tensorized-training)
-- Plan: Train tensorized circuits by gradient descent (e54a898551), stacked draft PR on the fork
-- Done: parameters as one flat list, projection, to_namespace, dtype of the parameters, HostOnlyQueryError, gradient descent moved to learning.gradient_descent; 1583 tests pass
-- Next: developer review; benchmark numbers go into the report
+## PR cram2#953 (tensorized-training)
+- Plan: Train tensorized circuits by gradient descent, on cram2 as a draft after #945 merged
+- Done: cram2 main merged in (bed669a59b), 1583 tests pass, check clean; fork PR #35 closed in favour of cram2#953; stack below merged forward
+- Next: developer review; api-break, so the code owners discuss it first
