@@ -10,10 +10,7 @@ import jax.numpy as jnp
 import numpy as np
 import optax
 import pytest
-from random_events.set import Set
-from random_events.variable import Symbolic
 
-from probabilistic_model.adapters.circuit_representations import CircuitRepresentations
 from probabilistic_model.learning.region_graph.exceptions import (
     ClassVariableMismatchError,
 )
@@ -24,14 +21,11 @@ from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.edge_matri
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.sum_layer import (
     SumLayer,
 )
-from probabilistic_model.probabilistic_circuit.tensorized.layered_probabilistic_circuit import (
-    LayeredProbabilisticCircuit,
-)
 from probabilistic_model.probabilistic_circuit.tensorized.symbolic_encoding import (
     SymbolicEncoding,
 )
 
-from .test_region_graph import Target, continuous_variables
+from .test_region_graph import continuous_variables, target
 
 # %% structure
 
@@ -51,7 +45,7 @@ def test_a_region_graph_builds_a_layered_circuit_with_jax_parameters(region_grap
     The layered circuit of a region graph has jax parameters and gives every row a
     finite log-likelihood.
     """
-    circuit = region_graph.to_layered_probabilistic_circuit(input_units=4, sum_units=3)
+    circuit = region_graph.to_probabilistic_circuit(input_units=4, sum_units=3)
     assert all(isinstance(parameter, jax.Array) for parameter in circuit.parameters)
     data = jnp.asarray(np.random.default_rng(0).normal(size=(50, 6)))
     assert bool(jnp.all(jnp.isfinite(circuit.log_likelihood(data))))
@@ -62,25 +56,12 @@ def test_the_sum_layers_of_a_region_graph_are_fully_connected_and_dense(region_g
     Every sum layer connects every unit to every unit of its children and stores its
     edges densely.
     """
-    circuit = region_graph.to_layered_probabilistic_circuit(input_units=4, sum_units=3)
+    circuit = region_graph.to_probabilistic_circuit(input_units=4, sum_units=3)
     sum_layers = [layer for layer in circuit.layers if isinstance(layer, SumLayer)]
     assert sum_layers
     for layer in sum_layers:
         assert isinstance(layer.edges, DenseEdgeMatrix)
         assert bool(layer.edges.is_edge.all())
-
-
-def test_the_layered_circuit_has_as_many_nodes_as_the_jax_circuit(region_graph):
-    """
-    The layered circuit of a region graph has the nodes of the jax circuit of the same
-    graph.
-    """
-    jax_circuit = region_graph.to_probabilistic_circuit(input_units=4, sum_units=3)
-    converted = CircuitRepresentations().convert(
-        jax_circuit, LayeredProbabilisticCircuit
-    )
-    layered = region_graph.to_layered_probabilistic_circuit(input_units=4, sum_units=3)
-    assert layered.number_of_nodes == converted.number_of_nodes
 
 
 # %% learning
@@ -91,7 +72,7 @@ def test_fitting_a_layered_circuit_raises_the_log_likelihood_of_its_data(region_
     Fitting the layered circuit of a region graph raises the average log-likelihood of
     the data.
     """
-    circuit = region_graph.to_layered_probabilistic_circuit(input_units=4, sum_units=3)
+    circuit = region_graph.to_probabilistic_circuit(input_units=4, sum_units=3)
     data = jnp.asarray(np.random.default_rng(0).normal(size=(500, 6)) * 0.5 + 1.0)
     before = float(jnp.mean(circuit.log_likelihood(data)))
     circuit.fit(data, epochs=100, optimizer=optax.adam(0.05))
@@ -99,14 +80,6 @@ def test_fitting_a_layered_circuit_raises_the_log_likelihood_of_its_data(region_
 
 
 # %% classification
-
-
-@pytest.fixture
-def target() -> Symbolic:
-    """
-    The variable a classification circuit predicts.
-    """
-    return Symbolic(name="target", domain=Set.from_iterable(Target))
 
 
 def test_a_classifying_region_graph_needs_a_class_variable_of_its_classes(target):
@@ -118,7 +91,7 @@ def test_a_classifying_region_graph_needs_a_class_variable_of_its_classes(target
         continuous_variables(4), depth=1, repetitions=2, classes=3
     ).create_random_region_graph()
     with pytest.raises(ClassVariableMismatchError):
-        region_graph.to_layered_probabilistic_circuit(class_variable=target)
+        region_graph.to_probabilistic_circuit(class_variable=target)
 
 
 def test_a_trained_classifying_circuit_separates_two_classes(target):
@@ -130,7 +103,7 @@ def test_a_trained_classifying_circuit_separates_two_classes(target):
     region_graph = RegionGraph(
         features, partitions=2, depth=1, repetitions=4, classes=2
     ).create_random_region_graph()
-    circuit = region_graph.to_layered_probabilistic_circuit(
+    circuit = region_graph.to_probabilistic_circuit(
         input_units=3, sum_units=3, class_variable=target
     )
     generator = np.random.default_rng(0)

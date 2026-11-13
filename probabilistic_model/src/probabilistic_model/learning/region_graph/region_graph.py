@@ -11,28 +11,12 @@ from dataclasses import dataclass, field
 
 import jax.numpy as jnp
 import jax.random
-import rustworkx as rx
 import numpy as np
-from jax.experimental.sparse import BCOO
+import rustworkx as rx
 from random_events.variable import Continuous, Symbolic, Variable
 from sortedcontainers import SortedSet
 from typing_extensions import Iterable, Self
 
-from probabilistic_model.probabilistic_circuit.jax.inner_layer import (
-    DifferentiableLayer,
-    DifferentiableProductLayer,
-    DifferentiableDenseSumLayer,
-)
-from probabilistic_model.probabilistic_circuit.jax.discrete_layer import (
-    DifferentiableDiscreteLayer,
-)
-from probabilistic_model.probabilistic_circuit.jax.gaussian_layer import (
-    DifferentiableGaussianLayer,
-)
-from probabilistic_model.probabilistic_circuit.jax.probabilistic_circuit import (
-    DifferentiableLayeredCircuit,
-    ClassificationCircuit,
-)
 from probabilistic_model.graph import DirectedAcyclicGraph
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.base import Layer
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.edge_matrix import (
@@ -77,14 +61,11 @@ class RegionGraphNode(ABC):
     A node of a region graph, compared by identity.
     """
 
-    layer: DifferentiableLayer | Layer | None = field(
-        default=None, init=False, repr=False
-    )
+    layer: Layer | None = field(default=None, init=False, repr=False)
     """
     The layer that models this node in the circuit of the region graph, once
-    :meth:`RegionGraph.to_probabilistic_circuit` or
-    :meth:`RegionGraph.to_layered_probabilistic_circuit` built it: an input or sum layer
-    for a region, a product layer for a partition.
+    :meth:`RegionGraph.to_probabilistic_circuit` built it: an input or sum layer for a
+    region, a product layer for a partition.
     """
 
 
@@ -254,111 +235,9 @@ class RegionGraph(DirectedAcyclicGraph[RegionGraphNode]):
             raise MultipleRootsError(possible_roots)
         return possible_roots[0]
 
+    # %% circuits
+
     def to_probabilistic_circuit(
-        self,
-        input_units: int = 5,
-        sum_units: int = 5,
-        key: jax.Array = jax.random.PRNGKey(69),
-    ) -> DifferentiableLayeredCircuit | ClassificationCircuit:
-        """
-        Convert the region graph to a jax probabilistic circuit.
-
-        :param input_units: The number of input units to use in each input layer.
-        :param sum_units: The number of sum units to use in each sum layer.
-        :param key: The random key to use for all trainable parameters.
-        :return: The layered circuit in jax.
-        """
-        root = self.root
-
-        # create nodes for each region
-        for layer in reversed(rx.bfs_layers(self.graph, [self.index_of(root)])):
-            for node in map(self.graph.__getitem__, layer):
-                children = list(self.successors(node))
-                parents = list(self.predecessors(node))
-                if isinstance(node, Region):
-                    # if the region is a leaf
-                    if len(children) == 0:
-                        variable = node.variables[0]
-                        variable_index = self.variables.index(variable)
-                        if isinstance(variable, Continuous):
-                            location = jax.random.uniform(
-                                key, shape=(input_units,), minval=-1.0, maxval=1.0
-                            )
-                            log_scale = jnp.log(
-                                jax.random.uniform(
-                                    key, shape=(input_units,), minval=0.5, maxval=3.0
-                                )
-                            )
-                            node.layer = DifferentiableGaussianLayer(
-                                variable_index,
-                                location=location,
-                                log_scale=log_scale,
-                                minimum_scale=jnp.full_like(location, 0.1),
-                            )
-                            node.layer.validate()
-                        elif isinstance(variable, Symbolic):
-                            log_probabilities = jax.random.uniform(
-                                key,
-                                shape=(input_units, len(variable.domain.simple_sets)),
-                                minval=0.1,
-                                maxval=1.0,
-                            )
-                            log_probabilities = jnp.log(log_probabilities)
-                            node.layer = DifferentiableDiscreteLayer(
-                                variable_index, log_probabilities=log_probabilities
-                            )
-                        else:
-                            raise UnsupportedRegionVariableError(variable)
-
-                    # if the region is root or in the middle
-                    else:
-                        # if the region is root
-                        if len(parents) == 0:
-                            sum_units = self.classes
-
-                        log_weights = [
-                            jnp.log(
-                                jax.random.uniform(
-                                    key,
-                                    shape=(sum_units, child.layer.number_of_nodes),
-                                    minval=0.1,
-                                    maxval=1.0,
-                                )
-                            )
-                            for child in children
-                        ]
-                        node.layer = DifferentiableDenseSumLayer(
-                            [child.layer for child in children], log_weights=log_weights
-                        )
-                        node.layer.validate()
-
-                elif isinstance(node, Partition):
-                    node_lengths = [child.layer.number_of_nodes for child in children]
-                    if not len(set(node_lengths)) == 1:
-                        raise UnequalFactorSizesError(node_lengths)
-
-                    edges = (
-                        jnp.arange(node_lengths[0])
-                        .reshape(1, -1)
-                        .repeat(len(children), axis=0)
-                    )
-                    sparse_edges = BCOO.fromdense(jnp.ones_like(edges))
-                    sparse_edges.data = edges.flatten()
-                    node.layer = DifferentiableProductLayer(
-                        [child.layer for child in children], sparse_edges
-                    )
-                    node.layer.validate()
-
-        if self.classes > 1:
-            model = ClassificationCircuit(self.variables, root.layer)
-        else:
-            model = DifferentiableLayeredCircuit(self.variables, root.layer)
-
-        return model
-
-    # %% tensorized circuits
-
-    def to_layered_probabilistic_circuit(
         self,
         input_units: int = 5,
         sum_units: int = 5,
