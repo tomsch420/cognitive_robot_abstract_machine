@@ -1,4 +1,3 @@
 region-graph-builds-tensorized	tensorized-array-backends
 remove-jax-package	tensorized-array-backends
-tensorized-training	tensorized-array-backends
 torch-backend	tensorized-array-backends

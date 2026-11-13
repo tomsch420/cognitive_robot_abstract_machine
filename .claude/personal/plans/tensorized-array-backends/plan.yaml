@@ -49,8 +49,7 @@ items:
   branch: region-graph-builds-tensorized
   pull_request_number: 37
   session: local Claude Code session 979e5513-adbf-4494-91e0-87fd8fe46220
-  depends_on:
-  - tensorized-training
+  depends_on: []
   status: in progress
   notes: 'to_probabilistic_circuit returns a LayeredProbabilisticCircuit with jax parameters,
     classification included. Its fully connected sum layers use DenseEdgeMatrix, which was
@@ -73,31 +72,13 @@ items:
     from DifferentiableLayeredCircuit to the tensorized circuit.
 
     '
-- id: tensorized-training
-  title: Train tensorized circuits through a functional loss
-  branch: tensorized-training
-  track: training
-  pull_request_number: 953
-  session: local Claude Code session 979e5513-adbf-4494-91e0-87fd8fe46220
-  depends_on: []
-  status: in progress
-  notes: 'A pure function from parameters to log likelihood over the host structure, so jax.grad
-    and jax.jit apply. Build on GradientDescent (PR 927) and keep the parameter constraints.
-    The trainable sum layer parameter is log_weights in the layout of its edge matrix. Adds
-    moving a circuit''s parameters to a backend and back; structural queries and sampling
-    then raise a dedicated exception, and are documented as host only (absorbs the former
-    host-only-structural-queries item).
-
-    '
-  repository: cram2/cognitive_robot_abstract_machine
 - id: torch-backend
   title: Torch backend
   branch: torch-backend
   track: backends
-  pull_request_number: 36
+  pull_request_number: 961
   session: local Claude Code session 979e5513-adbf-4494-91e0-87fd8fe46220
-  depends_on:
-  - tensorized-training
+  depends_on: []
   status: in progress
   notes: 'Numeric queries and training on torch, CPU and CUDA: TorchNormalDistributionFunctions
     through torch.special, arrays created on the device of the parameters, TorchGradientDescent
@@ -106,3 +87,4 @@ items:
     as fork PR 36; it goes to cram2 once its base is merged.
 
     '
+  repository: cram2/cognitive_robot_abstract_machine
