@@ -28,7 +28,10 @@ from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     SampleArray,
     SampleValues,
 )
-from probabilistic_model.learning.gradient_descent import LikelihoodMaximization
+from probabilistic_model.learning.gradient_descent import (
+    AverageNegativeLogLikelihood,
+    GradientDescent,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.exceptions import (
     HostOnlyQueryError,
 )
@@ -345,7 +348,9 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
         :param optimizer: The optimizer, Adam with a learning rate of 1e-3 if ``None``.
         :return: This circuit.
         """
-        self.root = LikelihoodMaximization(self.root, optimizer).minimize(
+        self.root = GradientDescent(
+            self.root, AverageNegativeLogLikelihood(), optimizer
+        ).minimize(
             epochs, self.encoded(data)
         )
         return self
