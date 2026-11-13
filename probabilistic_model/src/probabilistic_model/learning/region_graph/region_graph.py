@@ -294,7 +294,7 @@ class RegionGraph(DirectedAcyclicGraph[RegionGraphNode]):
         if self.classes > 1:
             root = self.mixture_of_classes(root, class_variable, variables)
         circuit = LayeredProbabilisticCircuit(variables, root)
-        return circuit.to_namespace(jnp, dtype=jnp.result_type(float))
+        return circuit.to_namespace(jnp, floating_point_type=jnp.result_type(float))
 
     @staticmethod
     def product_of_children(children: list[RegionGraphNode]) -> ProductLayer:
