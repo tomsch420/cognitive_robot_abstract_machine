@@ -43,24 +43,6 @@ tracks:
   name: Further backends and cleanup
   wave: consolidation
 items:
-- id: inner-layers-any-backend
-  title: Numeric queries of sum and product layers on any backend
-  track: inner-layers
-  branch: inner-layers-any-backend
-  pull_request_number: 945
-  session: local Claude Code session 979e5513-adbf-4494-91e0-87fd8fe46220
-  depends_on: []
-  status: in progress
-  notes: 'Sum and product layers compute log likelihood, CDF, probability of a simple event
-    and moments with xp. LayeredProbabilisticCircuit.log_likelihood accepts a backend array
-    and returns one of the same backend. Tests run on numpy and jax. At the developer''s request
-    the edges of both layers are an abstract EdgeMatrix with SparseEdgeMatrix and DenseEdgeMatrix
-    subclasses, handled by polymorphism; structural queries keep the type of a layer''s edge
-    matrix and store_edges_as converts. array_types splits into aliases of values of any backend
-    and numpy arrays on the host.
-
-    '
-  repository: cram2/cognitive_robot_abstract_machine
 - id: region-graph-builds-tensorized
   title: RegionGraph builds tensorized circuits
   track: training
@@ -95,10 +77,9 @@ items:
   title: Train tensorized circuits through a functional loss
   branch: tensorized-training
   track: training
-  pull_request_number: 35
+  pull_request_number: 953
   session: local Claude Code session 979e5513-adbf-4494-91e0-87fd8fe46220
-  depends_on:
-  - inner-layers-any-backend
+  depends_on: []
   status: in progress
   notes: 'A pure function from parameters to log likelihood over the host structure, so jax.grad
     and jax.jit apply. Build on GradientDescent (PR 927) and keep the parameter constraints.
@@ -108,7 +89,7 @@ items:
     host-only-structural-queries item).
 
     '
-
+  repository: cram2/cognitive_robot_abstract_machine
 - id: torch-backend
   title: Torch backend
   branch: torch-backend
@@ -118,11 +99,10 @@ items:
   depends_on:
   - tensorized-training
   status: in progress
-  notes: 'Numeric queries and training on torch, CPU and CUDA:
-    TorchNormalDistributionFunctions through torch.special, arrays created on the device of
-    the parameters, TorchGradientDescent with torch optimizers and autograd sharing the
-    likelihood losses with jax. Torch is an optional extra, approved by the developer''s
-    request for a torch backend. Stacked on tensorized-training as fork PR 36; it goes to
-    cram2 once its base is merged.
+  notes: 'Numeric queries and training on torch, CPU and CUDA: TorchNormalDistributionFunctions
+    through torch.special, arrays created on the device of the parameters, TorchGradientDescent
+    with torch optimizers and autograd sharing the likelihood losses with jax. Torch is an
+    optional extra, approved by the developer''s request for a torch backend. Stacked on tensorized-training
+    as fork PR 36; it goes to cram2 once its base is merged.
 
     '
