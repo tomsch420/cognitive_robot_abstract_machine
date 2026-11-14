@@ -33,6 +33,7 @@ from probabilistic_model.benchmark.methods import (
     StrudelMethod,
 )
 from probabilistic_model.benchmark.runner import BenchmarkRunner, RunStatus
+from probabilistic_model.benchmark.summary import BenchmarkSummary, ResultColumn
 
 
 # %% datasets in the cache
@@ -159,3 +160,37 @@ def test_runner_appends_one_record_per_run(cache_directory, tmp_path: Path):
     (record,) = [json.loads(line) for line in output.read_text().splitlines()]
     assert record["status"] == RunStatus.FINISHED
     assert record["method"] == MethodName.LEARN_SPN
+
+
+# %% summary
+
+
+def test_summary_keeps_the_latest_record_and_ranks_by_likelihood(tmp_path: Path):
+    """
+    A later file's record of a run replaces an earlier one, and the method of higher
+    test log-likelihood ranks first.
+    """
+
+    def record(method: MethodName, test_log_likelihood: float) -> str:
+        """
+        :return: The JSON line of a finished run of the method on NLTCS.
+        """
+        return json.dumps(
+            {
+                ResultColumn.DATASET: str(BinaryDatasetName.NLTCS),
+                ResultColumn.METHOD: str(method),
+                ResultColumn.STATUS: str(RunStatus.FINISHED),
+                ResultColumn.TEST_LOG_LIKELIHOOD: test_log_likelihood,
+            }
+        )
+
+    first, second = tmp_path / "first.jsonl", tmp_path / "second.jsonl"
+    first.write_text(
+        record(MethodName.LEARN_SPN, -9.0) + "\n" + record(MethodName.STRUDEL, -7.0)
+    )
+    second.write_text(record(MethodName.LEARN_SPN, -6.0))
+    summary = BenchmarkSummary(result_files=[first, second])
+    table = summary.test_log_likelihoods(datasets=[str(BinaryDatasetName.NLTCS)])
+    assert table.loc[str(BinaryDatasetName.NLTCS), str(MethodName.LEARN_SPN)] == -6.0
+    ranks = summary.average_ranks(table=table)
+    assert list(ranks.index) == [str(MethodName.LEARN_SPN), str(MethodName.STRUDEL)]
