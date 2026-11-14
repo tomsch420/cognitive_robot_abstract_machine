@@ -102,7 +102,7 @@ Data softening and entropy regularization {cite}`liu2021tractable`
 
 Probabilistic dropout {cite}`peharz2020random`
 : Drops input distributions and sum children at random during gradient training.
-  Costs nothing beyond the mask. It mainly helps the circuit as a classifier.
+  Costs nothing beyond the mask.
 
 Latent variable distillation {cite}`liu2023scaling`
 : Assigns the latent variables of a circuit by clustering embeddings of a deep
@@ -136,8 +136,9 @@ LearnSPN {cite}`gens2013learning`
 
 Strudel {cite}`dang2020strudel`
 : Greedily grows a smooth, deterministic and structured-decomposable circuit from a
-  Chow-Liu based vtree. Determinism makes maximum a posteriori queries tractable, but no
-  metric of the shared benchmark rewards it, and HCLT beats it on every dataset above.
+  Chow-Liu based vtree. HCLT beats it in likelihood on every dataset above, but
+  determinism makes most likely assignment queries tractable, which HCLT circuits do not
+  answer exactly.
 
 ID-SPN {cite}`rooshenas2014learning`
 : LearnSPN with Markov networks, compiled into arithmetic circuits, as leaves. It ties
@@ -152,15 +153,18 @@ ID-SPN {cite}`rooshenas2014learning`
 | Data softening and entropy regularization | implement after mini-batch expectation maximization |
 | Anemone                                  | add; implement after mini-batch expectation maximization |
 | Pruning and growing                      | implement after hidden Chow-Liu trees and mini-batch expectation maximization |
-| Probabilistic dropout                    | implement for gradient training and classification |
+| Strudel                                  | implement after hidden Chow-Liu trees; the deterministic learner, for exact most likely assignments |
+| Probabilistic dropout                    | implement for gradient training |
 | LearnSPN                                 | implement as the classical baseline, after checking its overlap with the joint probability tree induction |
 | Latent variable distillation             | implement last, once its deep generative model is approved as a dependency |
-| Strudel                                  | drop; beaten by HCLT on every dataset, and determinism is not measured |
 | ID-SPN                                   | leave out; its leaves are not available as layers |
 
 ```{note}
 Results from different papers come from different hyperparameter searches and
 implementations. The shared benchmark of this package measures every implemented method
 again, on the twenty binary datasets and on continuous UCI datasets, against RAT-SPN and
-joint probability trees.
+joint probability trees. It measures training time, peak memory, and train and test
+log-likelihood; the speed of likelihood, conditioning, truncation, sampling and grounding
+of relational circuits; and which queries, causal ones included, the circuit answers
+exactly.
 ```
