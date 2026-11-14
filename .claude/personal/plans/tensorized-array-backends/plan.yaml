@@ -44,47 +44,18 @@ tracks:
   wave: consolidation
 items:
 - id: region-graph-builds-tensorized
-  title: RegionGraph builds tensorized circuits
+  title: RegionGraph builds tensorized RAT-SPNs; remove the jax package
   track: training
-  branch: region-graph-builds-tensorized
-  pull_request_number: 37
-  session: local Claude Code session 979e5513-adbf-4494-91e0-87fd8fe46220
+  branch: region-graphs-tensorized
+  pull_request_number: 40
+  session: local Claude Code session b2255295-8f97-432c-8420-621c5810b1cc
   depends_on: []
   status: in progress
-  notes: 'to_probabilistic_circuit returns a LayeredProbabilisticCircuit with jax parameters,
-    classification included. Its fully connected sum layers use DenseEdgeMatrix, which was
-    1.6 to 2.2 times faster than SparseEdgeMatrix on fully connected layers on numpy and under
-    jax.jit in PR 945, and 7 to 23 times slower on sparsely connected ones. Check against
-    the RAT-SPN vs JPT benchmark (log likelihoods and training time on the 12 UCI datasets).
+  notes: 'Combines the former items region-graph-builds-tensorized (fork PR 37) and remove-jax-package
+    (fork PR 38) at the developer''s request. Region graphs follow Algorithm 1 of the RAT-SPN
+    paper: cross products in partitions, fully factorized leaf regions without a sum layer,
+    regions of one variable are leaves. Classifiers train the joint likelihood; a cross-entropy
+    loss as in the paper is a proposed follow-up. api-break: CouplingCircuit removed without
+    replacement.
 
     '
-- id: remove-jax-package
-  title: Remove the jax package and its adapters
-  track: backends
-  branch: remove-jax-package
-  pull_request_number: 38
-  session: local Claude Code session 979e5513-adbf-4494-91e0-87fd8fe46220
-  depends_on:
-  - region-graph-builds-tensorized
-  status: in progress
-  notes: 'Delete probabilistic_circuit/jax and adapters/jax_tensorized once tensorized circuits
-    train on jax and RegionGraph builds them. api-break PR: its description states the migration
-    from DifferentiableLayeredCircuit to the tensorized circuit.
-
-    '
-- id: torch-backend
-  title: Torch backend
-  branch: torch-backend
-  track: backends
-  pull_request_number: 961
-  session: local Claude Code session 979e5513-adbf-4494-91e0-87fd8fe46220
-  depends_on: []
-  status: in progress
-  notes: 'Numeric queries and training on torch, CPU and CUDA: TorchNormalDistributionFunctions
-    through torch.special, arrays created on the device of the parameters, TorchGradientDescent
-    with torch optimizers and autograd sharing the likelihood losses with jax. Torch is an
-    optional extra, approved by the developer''s request for a torch backend. Stacked on tensorized-training
-    as fork PR 36; it goes to cram2 once its base is merged.
-
-    '
-  repository: cram2/cognitive_robot_abstract_machine
