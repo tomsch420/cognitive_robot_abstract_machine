@@ -6,6 +6,8 @@
 - Merged remove-jax-package (contains #37) with cram/main; #37/#38 closed as superseded
 - Fixed region graph deviations from the paper; tests on eq. (1)/(2) counts; 1558 probabilistic_model tests pass on neem-4 (tom-probabilistic-experiments, worktree /root/region-graphs-tensorized)
 
+- CrossEntropy loss (paper eq. 4) and fit(loss=...); 1561 tests pass
+
 ## Next
 - Promote to cram2 (stacked-pr-maintenance) once the developer agrees; labels api-break + new-feature
-- Follow-up proposal: cross-entropy loss for classifiers as in the paper (eq. 4/5)
+- Ask whether ClassConditionalAverageNegativeLogLikelihood (unused since the jax package is gone) can be removed
