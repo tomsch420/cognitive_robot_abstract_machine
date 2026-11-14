@@ -253,8 +253,8 @@ class CategoricalLayerMaximization(LayerMaximization):
 @dataclass(kw_only=True)
 class GaussianLayerMaximization(LayerMaximization):
     """
-    The location and the scale of a Gaussian node follow from the flow-weighted first and
-    second moment of its values.
+    The location and the scale of a Gaussian node follow from the flow-weighted first
+    and second moment of its values.
     """
 
     def handles(self, *, layer: Layer) -> bool:

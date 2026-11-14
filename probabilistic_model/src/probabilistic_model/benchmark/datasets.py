@@ -60,6 +60,9 @@ class BenchmarkDataset:
     """
 
     def __post_init__(self) -> None:
+        """
+        Infer :attr:`variables` from the values of all splits.
+        """
         frames = pd.concat([self.train, self.validation, self.test])
         variables: list[Variable] = []
         for column in self.train.columns:
@@ -67,7 +70,9 @@ class BenchmarkDataset:
                 variables.append(Continuous(column))
             else:
                 values = sorted(frames[column].unique())
-                variables.append(Symbolic(name=column, domain=Set.from_iterable(values)))
+                variables.append(
+                    Symbolic(name=column, domain=Set.from_iterable(values))
+                )
         self.variables = SortedSet(variables)
 
     @property
@@ -211,8 +216,8 @@ class BinaryDatasetSource(DatasetSource):
 
 class MixedDatasetName(StrEnum):
     """
-    The UCI datasets the joint probability tree paper :cite:`nyga2023joint` evaluates on,
-    table 3.
+    The UCI datasets the joint probability tree paper :cite:`nyga2023joint` evaluates
+    on, table 3.
     """
 
     IRIS = "iris"
@@ -288,7 +293,9 @@ class MixedDatasetSource(DatasetSource):
         ]
         train = frame.iloc[order[number_of_test_rows + number_of_validation_rows :]]
         continuous = [
-            column for column in frame.columns if pd.api.types.is_float_dtype(frame[column])
+            column
+            for column in frame.columns
+            if pd.api.types.is_float_dtype(frame[column])
         ]
         mean = train[continuous].mean()
         scale = train[continuous].std().replace(0.0, 1.0)

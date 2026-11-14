@@ -30,6 +30,9 @@ from probabilistic_model.learning.layered.expectation_maximization import (
 from probabilistic_model.learning.layered.hidden_chow_liu_tree import (
     HiddenChowLiuTree,
 )
+from probabilistic_model.learning.layered.latent_variable_distillation import (
+    LatentVariableDistillation,
+)
 from probabilistic_model.learning.layered.learn_spn import LearnSPN
 from probabilistic_model.learning.layered.strudel import Strudel
 from probabilistic_model.learning.layered.pruning_and_growing import (
@@ -65,6 +68,7 @@ class MethodName(StrEnum):
     PRUNING_AND_GROWING = "pruning_and_growing"
     LEARN_SPN = "learn_spn"
     STRUDEL = "strudel"
+    LATENT_VARIABLE_DISTILLATION = "latent_variable_distillation"
 
 
 # %% methods
@@ -107,8 +111,8 @@ class RandomTensorizedSumProductNetwork(BenchmarkMethod, ABC):
 
     depth: int = 3
     """
-    The number of splits of a region graph repetition, at most the base two logarithm
-    of the number of variables.
+    The number of splits of a region graph repetition, at most the base two logarithm of
+    the number of variables.
     """
 
     repetitions: int = 10
@@ -121,7 +125,9 @@ class RandomTensorizedSumProductNetwork(BenchmarkMethod, ABC):
     The number of input distributions of a leaf region and sum units of a region.
     """
 
-    def random_circuit(self, *, dataset: BenchmarkDataset) -> LayeredProbabilisticCircuit:
+    def random_circuit(
+        self, *, dataset: BenchmarkDataset
+    ) -> LayeredProbabilisticCircuit:
         """
         :param dataset: The dataset.
         :return: The randomly initialized RAT-SPN over the variables of the dataset.
@@ -347,6 +353,23 @@ class StrudelMethod(BenchmarkMethod):
         )
 
 
+@dataclass(kw_only=True)
+class LatentVariableDistillationMethod(BenchmarkMethod):
+    """
+    Latent variable distillation :cite:`liu2023scaling` of a hidden Chow-Liu tree
+    circuit with a masked autoencoder trained on the training rows.
+    """
+
+    @property
+    def name(self) -> MethodName:
+        return MethodName.LATENT_VARIABLE_DISTILLATION
+
+    def learn(self, *, dataset: BenchmarkDataset) -> LayeredProbabilisticCircuit:
+        return LatentVariableDistillation(
+            variables=dataset.variables, seed=self.seed
+        ).build_circuit(data=dataset.encoded(frame=dataset.train))
+
+
 # %% all methods
 
 
@@ -360,9 +383,7 @@ class BenchmarkMethods:
         default_factory=lambda: [
             RandomTensorizedSumProductNetworkByGradientDescent(),
             RandomTensorizedSumProductNetworkByGradientDescent(
-                dropout=ProbabilisticDropout(
-                    input_probability=0.1, sum_probability=0.1
-                )
+                dropout=ProbabilisticDropout(input_probability=0.1, sum_probability=0.1)
             ),
             RandomTensorizedSumProductNetworkByExpectationMaximization(
                 method_name=MethodName.RAT_SPN_EXPECTATION_MAXIMIZATION,
@@ -399,6 +420,7 @@ class BenchmarkMethods:
             PruningAndGrowingMethod(),
             LearnSPNMethod(),
             StrudelMethod(),
+            LatentVariableDistillationMethod(),
         ]
     )
     """

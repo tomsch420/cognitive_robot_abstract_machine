@@ -1,7 +1,7 @@
 """
-Runs the circuit learning benchmark: every chosen method on every chosen dataset, each in
-a process of its own so that its peak memory is its own, and appends one JSON line per
-run to a results file.
+Runs the circuit learning benchmark: every chosen method on every chosen dataset, each
+in a process of its own so that its peak memory is its own, and appends one JSON line
+per run to a results file.
 """
 
 from __future__ import annotations
@@ -178,7 +178,9 @@ class BenchmarkRunner:
                     record.update(json.loads(result_path.read_text()))
                     result_path.unlink()
                 else:
-                    record["log_tail"] = log_path.read_text()[-self.log_tail_characters :]
+                    record["log_tail"] = log_path.read_text()[
+                        -self.log_tail_characters :
+                    ]
                 with self.output.open("a") as file:
                     file.write(json.dumps(record) + "\n")
                 print(json.dumps(record), flush=True)

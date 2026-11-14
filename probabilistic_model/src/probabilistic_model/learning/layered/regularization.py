@@ -75,7 +75,10 @@ class DataSoftening(ParameterTransformation):
             (log_probabilities,) = arrays
             namespace = array_namespace(log_probabilities)
             probabilities = namespace.exp(log_probabilities)
-            other = (1 - probabilities) / (layer.number_of_states - 1)
+            # the mass of the other states is summed rather than taken as one minus the
+            # state's own, so that the gradient reaches every state a value may come from
+            totals = namespace.sum(probabilities, axis=1, keepdims=True)
+            other = (totals - probabilities) / (layer.number_of_states - 1)
             arrays_of_layers[layer] = [
                 namespace.log(
                     self.keep_probability * probabilities
@@ -261,10 +264,7 @@ class EntropyRegularization:
         for _ in range(self.newton_steps):
             exponential = average_counts * np.exp(-log_weights)
             residual = (
-                exponential
-                - pull * log_weights
-                + pull * child_entropies
-                - multiplier
+                exponential - pull * log_weights + pull * child_entropies - multiplier
             )
             slope = -exponential - pull
             with np.errstate(divide="ignore", invalid="ignore"):

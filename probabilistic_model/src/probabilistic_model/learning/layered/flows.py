@@ -70,7 +70,9 @@ class TopDownPass(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def sum_edge_values(self, *, layer: SumLayer, node_values: np.ndarray) -> np.ndarray:
+    def sum_edge_values(
+        self, *, layer: SumLayer, node_values: np.ndarray
+    ) -> np.ndarray:
         """
         :param layer: A sum layer.
         :param node_values: The value of every node of the layer.
@@ -116,7 +118,9 @@ class TopDownProbabilities(TopDownPass):
     def root_value(self) -> float:
         return 1.0
 
-    def sum_edge_values(self, *, layer: SumLayer, node_values: np.ndarray) -> np.ndarray:
+    def sum_edge_values(
+        self, *, layer: SumLayer, node_values: np.ndarray
+    ) -> np.ndarray:
         weights = HasParameterArrays.host_copy(
             layer.edges.edge_values(layer.normalized_weights)
         )
@@ -146,7 +150,9 @@ class ExpectedFlows(TopDownPass):
     def root_value(self) -> float:
         return float(self.number_of_rows)
 
-    def sum_edge_values(self, *, layer: SumLayer, node_values: np.ndarray) -> np.ndarray:
+    def sum_edge_values(
+        self, *, layer: SumLayer, node_values: np.ndarray
+    ) -> np.ndarray:
         # the forward pass normalizes the weights, so the gradient of a log-weight is the
         # flow of its edge minus its weight times the flow of its node; rounding can make
         # a vanishing flow slightly negative, which no flow is

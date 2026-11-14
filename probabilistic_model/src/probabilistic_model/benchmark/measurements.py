@@ -234,7 +234,9 @@ class Measurement:
             ]
         )
 
-    def query_seconds(self, *, circuit: LayeredProbabilisticCircuit) -> dict[str, float]:
+    def query_seconds(
+        self, *, circuit: LayeredProbabilisticCircuit
+    ) -> dict[str, float]:
         """
         :param circuit: The circuit with host parameters.
         :return: The time of every query of :class:`QueryName`.

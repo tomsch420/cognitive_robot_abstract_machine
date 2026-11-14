@@ -42,8 +42,8 @@ from probabilistic_model.probabilistic_circuit.tensorized.query_cache import (
 @dataclass(kw_only=True)
 class ProbabilisticDropout:
     """
-    Drops, independently for every row, input distributions by marginalizing them and the
-    children of every sum layer below the root by excluding them from the mixture.
+    Drops, independently for every row, input distributions by marginalizing them and
+    the children of every sum layer below the root by excluding them from the mixture.
     """
 
     input_probability: float = 0.0

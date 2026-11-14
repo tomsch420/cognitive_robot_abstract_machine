@@ -159,9 +159,7 @@ class LogLikelihoodGradient(ABC):
         if is_jax_array(parameter):
             return JaxLogLikelihoodGradient(root=root, transformation=transformation)
         if is_torch_array(parameter):
-            return TorchLogLikelihoodGradient(
-                root=root, transformation=transformation
-            )
+            return TorchLogLikelihoodGradient(root=root, transformation=transformation)
         raise UndifferentiableBackendError(parameter_type=type(parameter))
 
 

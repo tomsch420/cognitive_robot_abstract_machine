@@ -70,7 +70,9 @@ class DatasetEdgeFlows:
         :return: The flow of every edge of every sum layer, by the position of the layer
             in :meth:`Layer.all_layers`.
         """
-        positions = {layer: position for position, layer in enumerate(self.root.all_layers())}
+        positions = {
+            layer: position for position, layer in enumerate(self.root.all_layers())
+        }
         gradient = LogLikelihoodGradient.from_root(root=self.root)
         totals: dict[int, np.ndarray] = {}
         for start in range(0, len(data), self.batch_size):
@@ -95,8 +97,9 @@ class DatasetEdgeFlows:
 @dataclass(kw_only=True)
 class Pruning:
     """
-    Removes the given fraction of all sum edges, those of least expected flow on the data,
-    the E-FLOW heuristic of the paper; every sum unit keeps its edge of largest flow.
+    Removes the given fraction of all sum edges, those of least expected flow on the
+    data, the E-FLOW heuristic of the paper; every sum unit keeps its edge of largest
+    flow.
     """
 
     pruned_fraction: float
@@ -111,7 +114,9 @@ class Pruning:
             position of the layer in :meth:`Layer.all_layers`.
         :return: The root layer of the pruned circuit.
         """
-        positions = {layer: position for position, layer in enumerate(root.all_layers())}
+        positions = {
+            layer: position for position, layer in enumerate(root.all_layers())
+        }
         all_flows = np.concatenate(list(edge_flows.values()))
         threshold = np.quantile(all_flows, self.pruned_fraction)
         rebuilt: dict[Layer, Layer] = {}
@@ -149,8 +154,8 @@ class Pruning:
 @dataclass(kw_only=True)
 class Growing:
     """
-    Doubles every unit of a circuit below its root, algorithm 3 of the paper: a copy of a
-    product unit multiplies the copies of its children, both copies of a sum unit mix
+    Doubles every unit of a circuit below its root, algorithm 3 of the paper: a copy of
+    a product unit multiplies the copies of its children, both copies of a sum unit mix
     the original and the copied children with noisy copies of the original weights, and
     input units are copied unchanged.
     """

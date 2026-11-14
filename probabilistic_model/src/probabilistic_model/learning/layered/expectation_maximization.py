@@ -96,7 +96,9 @@ class Momentum:
         :param values: The statistics of the current batch.
         :return: The bias-corrected averages including the current batch.
         """
-        previous = self.averages.get(position, [np.zeros_like(value) for value in values])
+        previous = self.averages.get(
+            position, [np.zeros_like(value) for value in values]
+        )
         current = [
             self.decay * average + (1 - self.decay) * value
             for average, value in zip(previous, values)

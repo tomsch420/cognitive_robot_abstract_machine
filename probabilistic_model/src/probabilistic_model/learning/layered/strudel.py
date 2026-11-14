@@ -256,9 +256,8 @@ class Strudel:
     Learns a deterministic, structured-decomposable circuit over symbolic variables by
     greedy splitting, algorithm 2 of the paper with the eFLOW and vMI heuristics.
 
-    A split copies the sub-circuit below the chosen edge once per state of the chosen
-    variable, conditioned on that state; nodes whose scope does not hold the variable are
-    shared rather than copied.
+    A split copies the sub-circuit below the edge once per state of the variable,
+    conditioned on it, sharing the nodes whose scope does not hold the variable.
     """
 
     variables: SortedSet
@@ -361,7 +360,11 @@ class Strudel:
         order = [center]
         for variable in order:
             for neighbour in np.flatnonzero(adjacency[variable]):
-                if neighbour != center and parents[neighbour] < 0 and neighbour not in order:
+                if (
+                    neighbour != center
+                    and parents[neighbour] < 0
+                    and neighbour not in order
+                ):
                     parents[neighbour] = variable
                     order.append(int(neighbour))
         products: dict[int, list[StrudelNode]] = {}
@@ -400,7 +403,10 @@ class Strudel:
             scope = np.array(sorted(child.scope))
             child_states = states[np.ix_(rows, scope)]
             varying = np.array(
-                [len(np.unique(child_states[:, index])) > 1 for index in range(len(scope))]
+                [
+                    len(np.unique(child_states[:, index])) > 1
+                    for index in range(len(scope))
+                ]
             )
             if not varying.any():
                 continue
@@ -454,7 +460,9 @@ class Strudel:
             result = node if node.state == state else None
         else:
             children = [
-                self.conditioned(node=child, variable=variable, state=state, cache=cache)
+                self.conditioned(
+                    node=child, variable=variable, state=state, cache=cache
+                )
                 for child in node.children
             ]
             if isinstance(node, StrudelProduct):
@@ -501,13 +509,18 @@ class Strudel:
                     units[node].add_subcircuit(units[child])
             else:
                 units[node] = SumUnit(probabilistic_circuit=circuit)
-                counts = np.array(
-                    [
-                        flows.rows_of_edges[(node, position)].sum()
-                        for position in range(len(node.children))
-                    ],
-                    dtype=float,
-                ) + self.pseudocount
+                counts = (
+                    np.array(
+                        [
+                            flows.rows_of_edges[(node, position)].sum()
+                            for position in range(len(node.children))
+                        ],
+                        dtype=float,
+                    )
+                    + self.pseudocount
+                )
                 for child, count in zip(node.children, counts):
-                    units[node].add_subcircuit(units[child], np.log(count / counts.sum()))
+                    units[node].add_subcircuit(
+                        units[child], np.log(count / counts.sum())
+                    )
         return CircuitRepresentations().convert(circuit, LayeredProbabilisticCircuit)

@@ -114,7 +114,9 @@ class PairwiseMutualInformation:
         state_of_variable = np.zeros((int(offsets[-1]), number_of_variables))
         state_of_variable[
             np.arange(int(offsets[-1])),
-            np.repeat(np.arange(number_of_variables), self.discretized.number_of_states),
+            np.repeat(
+                np.arange(number_of_variables), self.discretized.number_of_states
+            ),
         ] = 1.0
         result = state_of_variable.T @ terms @ state_of_variable
         np.fill_diagonal(result, 0.0)

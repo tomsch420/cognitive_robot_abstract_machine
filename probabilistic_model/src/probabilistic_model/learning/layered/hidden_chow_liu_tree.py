@@ -7,6 +7,7 @@ latent variable with a fixed number of states that the observed variable hangs b
 from __future__ import annotations
 
 # %% imports
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 import jax.numpy as jnp
@@ -89,18 +90,195 @@ class ChowLiuTree:
         return cls(parents=parents, order=order)
 
 
+# %% parameters
+
+
+@dataclass(kw_only=True)
+class HiddenChowLiuTreeParameters(ABC):
+    """
+    Where the parameters of a hidden Chow-Liu tree circuit come from.
+    """
+
+    variables: SortedSet
+    """
+    The variables of the circuit, one per column of the data.
+    """
+
+    data: np.ndarray
+    """
+    The rows, encoded as the circuits read them.
+    """
+
+    hidden_states: int
+    """
+    The number of states of every latent variable.
+    """
+
+    @abstractmethod
+    def symbolic_probabilities(self, *, variable_index: int) -> np.ndarray:
+        """
+        :param variable_index: The index of a symbolic variable.
+        :return: The probability of every state of the variable given every state of its
+            latent variable, shape (#hidden states, #states).
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def gaussian_parameters(
+        self, *, variable_index: int
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """
+        :param variable_index: The index of a continuous variable.
+        :return: The location and the scale of the Gaussian of the variable given every
+            state of its latent variable.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def transition_weights(self, *, parent: int | None, child: int) -> np.ndarray:
+        """
+        :param parent: The index of the parent variable, ``None`` for the root.
+        :param child: The index of the child variable.
+        :return: The weight of every state of the child's latent variable given every
+            state of the parent's, shape (#hidden states or 1 for the root, #hidden
+            states).
+        """
+        raise NotImplementedError
+
+    def input_layer(self, *, variable_index: int) -> Layer:
+        """
+        :param variable_index: The index of the variable.
+        :return: One input distribution of the variable per state of its latent
+            variable.
+        :raises UnsupportedStructureVariableError: If the variable is neither symbolic
+            nor continuous.
+        """
+        variable: Variable = self.variables[variable_index]
+        if isinstance(variable, Symbolic):
+            probabilities = self.symbolic_probabilities(variable_index=variable_index)
+            with np.errstate(divide="ignore"):
+                log_probabilities = np.log(probabilities)
+            return SymbolicLayer(
+                variable_index,
+                np.arange(probabilities.shape[1]),
+                DenseProbabilityTable(log_probabilities),
+                SymbolicEncoding(variable).hashes,
+            )
+        if isinstance(variable, Continuous):
+            location, scale = self.gaussian_parameters(variable_index=variable_index)
+            return GaussianLayer(variable_index, location, scale)
+        raise UnsupportedStructureVariableError(variable=variable)
+
+
+@dataclass(kw_only=True)
+class RandomParameters(HiddenChowLiuTreeParameters):
+    """
+    Random initial parameters: categorical probabilities and transition weights drawn
+    from [0.1, 1] and normalized, Gaussians centered at random rows with the scale of
+    the column.
+    """
+
+    random_number_generator: np.random.Generator
+    """
+    The source of the parameters.
+    """
+
+    def symbolic_probabilities(self, *, variable_index: int) -> np.ndarray:
+        number_of_states = len(self.variables[variable_index].domain.simple_sets)
+        probabilities = self.random_number_generator.uniform(
+            0.1, 1.0, size=(self.hidden_states, number_of_states)
+        )
+        return probabilities / probabilities.sum(axis=1, keepdims=True)
+
+    def gaussian_parameters(
+        self, *, variable_index: int
+    ) -> tuple[np.ndarray, np.ndarray]:
+        column = self.data[:, variable_index]
+        return (
+            self.random_number_generator.choice(column, size=self.hidden_states),
+            np.full(
+                self.hidden_states,
+                max(float(column.std()), GaussianLayer.minimum_scale),
+            ),
+        )
+
+    def transition_weights(self, *, parent: int | None, child: int) -> np.ndarray:
+        rows = 1 if parent is None else self.hidden_states
+        return self.random_number_generator.uniform(
+            0.1, 1.0, size=(rows, self.hidden_states)
+        )
+
+
+@dataclass(kw_only=True)
+class CountedParameters(HiddenChowLiuTreeParameters):
+    """
+    The maximum likelihood parameters of the rows completed with an assignment of every
+    latent variable, step 3 of latent variable distillation :cite:`liu2023scaling`.
+    """
+
+    latent_states: np.ndarray
+    """
+    The state of every latent variable in every row, shape (#rows, #variables).
+    """
+
+    pseudocount: float = 0.1
+    """
+    The count added to every state and every transition.
+    """
+
+    def symbolic_probabilities(self, *, variable_index: int) -> np.ndarray:
+        variable = self.variables[variable_index]
+        states = (
+            SymbolicEncoding(variable)
+            .indices_of_hashes(self.data[:, variable_index])
+            .astype(int)
+        )
+        counts = np.full(
+            (self.hidden_states, len(variable.domain.simple_sets)), self.pseudocount
+        )
+        np.add.at(counts, (self.latent_states[:, variable_index], states), 1.0)
+        return counts / counts.sum(axis=1, keepdims=True)
+
+    def gaussian_parameters(
+        self, *, variable_index: int
+    ) -> tuple[np.ndarray, np.ndarray]:
+        column = self.data[:, variable_index]
+        latent = self.latent_states[:, variable_index]
+        counts = np.bincount(latent, minlength=self.hidden_states)
+        sums = np.bincount(latent, weights=column, minlength=self.hidden_states)
+        squares = np.bincount(latent, weights=column**2, minlength=self.hidden_states)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            location = np.where(counts > 0, sums / counts, column.mean())
+            variance = np.where(
+                counts > 1, squares / counts - location**2, column.var()
+            )
+        return location, np.sqrt(np.maximum(variance, GaussianLayer.minimum_scale**2))
+
+    def transition_weights(self, *, parent: int | None, child: int) -> np.ndarray:
+        if parent is None:
+            counts = np.full((1, self.hidden_states), self.pseudocount)
+            np.add.at(counts, (0, self.latent_states[:, child]), 1.0)
+            return counts
+        counts = np.full((self.hidden_states, self.hidden_states), self.pseudocount)
+        np.add.at(
+            counts,
+            (self.latent_states[:, parent], self.latent_states[:, child]),
+            1.0,
+        )
+        return counts
+
+
 # %% hidden Chow-Liu tree
 
 
 @dataclass(kw_only=True)
 class HiddenChowLiuTree:
     """
-    Builds a hidden Chow-Liu tree circuit from data, with random parameters.
+    Builds a hidden Chow-Liu tree circuit from data.
 
-    The latent variable of every tree node becomes a layer of :attr:`hidden_states`
-    product units; each multiplies an input distribution of its variable with one
-    mixture over the units of every child, so a unit and its mixtures stand for one
-    state of the latent variable and its transitions to the children's states.
+    Every latent variable is a layer of :attr:`hidden_states` product units, each an input distribution of its variable
+    times one mixture over the units of every child: one latent state and its
+    transitions to the children's states.
     """
 
     variables: SortedSet
@@ -125,9 +303,13 @@ class HiddenChowLiuTree:
     The seed of the random initial parameters.
     """
 
-    def build_circuit(self, *, data: np.ndarray) -> LayeredProbabilisticCircuit:
+    def build_circuit(
+        self, *, data: np.ndarray, latent_states: np.ndarray | None = None
+    ) -> LayeredProbabilisticCircuit:
         """
         :param data: The rows, encoded as the circuits read them.
+        :param latent_states: The state of every latent variable in every row, if the
+            parameters are to be counted from them; random parameters if ``None``.
         :return: The hidden Chow-Liu tree circuit with jax parameters.
         """
         tree = ChowLiuTree.from_mutual_information(
@@ -139,21 +321,30 @@ class HiddenChowLiuTree:
                 )
             ).compute()
         )
-        random_number_generator = np.random.default_rng(self.seed)
+        parameters = (
+            RandomParameters(
+                variables=self.variables,
+                data=data,
+                hidden_states=self.hidden_states,
+                random_number_generator=np.random.default_rng(self.seed),
+            )
+            if latent_states is None
+            else CountedParameters(
+                variables=self.variables,
+                data=data,
+                hidden_states=self.hidden_states,
+                latent_states=latent_states,
+            )
+        )
         units: dict[int, Layer] = {}
         for variable_index in tree.order[::-1]:
-            factors = [
-                self.input_layer(
-                    variable_index=int(variable_index),
-                    data=data,
-                    random_number_generator=random_number_generator,
-                )
-            ]
+            factors = [parameters.input_layer(variable_index=int(variable_index))]
             factors.extend(
                 self.mixture_layer(
                     child_layer=units.pop(int(child)),
-                    number_of_nodes=self.hidden_states,
-                    random_number_generator=random_number_generator,
+                    weights=parameters.transition_weights(
+                        parent=int(variable_index), child=int(child)
+                    ),
                 )
                 for child in np.flatnonzero(tree.parents == variable_index)
             )
@@ -162,78 +353,27 @@ class HiddenChowLiuTree:
                 if len(factors) == 1
                 else ProductLayer.node_wise_product_of(factors)
             )
+        root_variable = int(tree.order[0])
         root = self.mixture_layer(
-            child_layer=units[int(tree.order[0])],
-            number_of_nodes=1,
-            random_number_generator=random_number_generator,
+            child_layer=units[root_variable],
+            weights=parameters.transition_weights(parent=None, child=root_variable),
         )
-        return LayeredProbabilisticCircuit(SortedSet(self.variables), root).to_namespace(
-            jnp, floating_point_type=jnp.result_type(float)
-        )
+        return LayeredProbabilisticCircuit(
+            SortedSet(self.variables), root
+        ).to_namespace(jnp, floating_point_type=jnp.result_type(float))
 
     @staticmethod
-    def mixture_layer(
-        *,
-        child_layer: Layer,
-        number_of_nodes: int,
-        random_number_generator: np.random.Generator,
-    ) -> SumLayer:
+    def mixture_layer(*, child_layer: Layer, weights: np.ndarray) -> SumLayer:
         """
         :param child_layer: The layer whose units are mixed.
-        :param number_of_nodes: The number of mixtures.
-        :param random_number_generator: The source of the initial weights.
-        :return: A layer of mixtures over every unit of the child layer, with weights
-            drawn uniformly from [0.1, 1].
+        :param weights: The unnormalized weight of every unit of the child layer in
+            every mixture, shape (#mixtures, #child units).
+        :return: The layer of the mixtures.
         """
-        rows, columns = np.nonzero(
-            np.ones((number_of_nodes, child_layer.number_of_nodes))
-        )
-        weights = random_number_generator.uniform(0.1, 1.0, size=len(rows))
+        rows, columns = np.nonzero(np.ones_like(weights))
         return SumLayer.from_entries(
             [child_layer],
-            SparseEntries(np.log(weights), rows, columns),
-            number_of_nodes,
+            SparseEntries(np.log(weights[rows, columns]), rows, columns),
+            weights.shape[0],
             DenseEdgeMatrix,
         )
-
-    def input_layer(
-        self,
-        *,
-        variable_index: int,
-        data: np.ndarray,
-        random_number_generator: np.random.Generator,
-    ) -> Layer:
-        """
-        :param variable_index: The index of the variable.
-        :param data: The rows, encoded as the circuits read them.
-        :param random_number_generator: The source of the initial parameters.
-        :return: One input distribution of the variable per state of its latent
-            variable: categorical distributions with probabilities drawn from [0.1, 1],
-            or Gaussians centered at random rows with the scale of the column.
-        :raises UnsupportedStructureVariableError: If the variable is neither symbolic
-            nor continuous.
-        """
-        variable: Variable = self.variables[variable_index]
-        if isinstance(variable, Symbolic):
-            number_of_states = len(variable.domain.simple_sets)
-            probabilities = random_number_generator.uniform(
-                0.1, 1.0, size=(self.hidden_states, number_of_states)
-            )
-            probabilities /= probabilities.sum(axis=1, keepdims=True)
-            return SymbolicLayer(
-                variable_index,
-                np.arange(number_of_states),
-                DenseProbabilityTable(np.log(probabilities)),
-                SymbolicEncoding(variable).hashes,
-            )
-        if isinstance(variable, Continuous):
-            column = data[:, variable_index]
-            return GaussianLayer(
-                variable_index,
-                random_number_generator.choice(column, size=self.hidden_states),
-                np.full(
-                    self.hidden_states,
-                    max(float(column.std()), GaussianLayer.minimum_scale),
-                ),
-            )
-        raise UnsupportedStructureVariableError(variable=variable)

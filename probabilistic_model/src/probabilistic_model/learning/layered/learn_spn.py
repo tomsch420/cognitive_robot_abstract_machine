@@ -120,12 +120,16 @@ class LearnSPN:
         :return: The root unit of the learned subcircuit.
         """
         if len(columns) == 1:
-            return self.leaf_unit(circuit=circuit, values=data[rows, columns[0]], column=int(columns[0]))
+            return self.leaf_unit(
+                circuit=circuit, values=data[rows, columns[0]], column=int(columns[0])
+            )
         if len(rows) < self.minimum_rows:
             return self.product_unit(
                 circuit=circuit,
                 children=[
-                    self.leaf_unit(circuit=circuit, values=data[rows, column], column=int(column))
+                    self.leaf_unit(
+                        circuit=circuit, values=data[rows, column], column=int(column)
+                    )
                     for column in columns
                 ],
             )
@@ -143,7 +147,12 @@ class LearnSPN:
             return self.product_unit(
                 circuit=circuit,
                 children=[
-                    self.learn(circuit=circuit, data=data, rows=rows, columns=np.array([column]))
+                    self.learn(
+                        circuit=circuit,
+                        data=data,
+                        rows=rows,
+                        columns=np.array([column]),
+                    )
                     for column in columns
                 ],
             )
@@ -182,7 +191,9 @@ class LearnSPN:
             data=data[np.ix_(rows, columns)],
             number_of_bins=self.number_of_bins,
         )
-        mutual_information = PairwiseMutualInformation(discretized=discretized).compute()
+        mutual_information = PairwiseMutualInformation(
+            discretized=discretized
+        ).compute()
         # the G statistic is twice the number of rows times the mutual information in nats
         statistic = 2 * len(rows) * mutual_information
         freedom = np.outer(
@@ -246,10 +257,13 @@ class LearnSPN:
         variable: Variable = self.variables[column]
         if isinstance(variable, Symbolic):
             encoding = SymbolicEncoding(variable)
-            counts = np.bincount(
-                encoding.indices_of_hashes(values).astype(int),
-                minlength=len(encoding.hashes),
-            ) + self.pseudocount
+            counts = (
+                np.bincount(
+                    encoding.indices_of_hashes(values).astype(int),
+                    minlength=len(encoding.hashes),
+                )
+                + self.pseudocount
+            )
             probabilities = counts / counts.sum()
             return leaf(
                 SymbolicDistribution(
