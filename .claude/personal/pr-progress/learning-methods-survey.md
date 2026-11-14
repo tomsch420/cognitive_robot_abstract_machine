@@ -5,7 +5,8 @@ Plan
 
 Done
 - probabilistic_model/doc/learning_methods.md + 11 bib entries + _toc entry, pushed in 13a32acd66.
-- plan.yaml: strudel dropped, anemone added (approved); announced on #41.
+- plan.yaml: anemone added, strudel kept; benchmark metrics and first standing rule set by the developer (no accuracy, capability list only); announced on #41.
+- Page updated in 8ef1543c2d.
 - PR description written.
 
 Next
