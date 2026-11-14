@@ -8,5 +8,7 @@
 
 - CrossEntropy loss (paper eq. 4) and fit(loss=...); removed unused ClassConditionalAverageNegativeLogLikelihood; 1561 tests pass
 
+- Draft upstream PR cram2#976 (api-break, new-feature), head bc9337518a
+
 ## Next
-- Promote to cram2 (stacked-pr-maintenance) once the developer agrees; labels api-break + new-feature
+- Discuss the api-break with the probabilistic_model code owners (or Cramgineers), then request review on cram2#976
