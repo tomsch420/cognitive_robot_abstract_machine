@@ -51,10 +51,12 @@ items:
   - tensorized-array-backends/region-graph-builds-tensorized
   status: not started
   notes: >
-    One harness every method item reports against: test log-likelihood (bits per dimension)
-    on the 20 binary density estimation datasets and the UCI datasets of the RAT-SPN vs JPT
-    comparison, accuracy where a method classifies, training time. Baselines: RAT-SPN
-    (generative and cross entropy), JPT, EM. Datasets are downloaded, never committed.
+    One harness for the metrics of the first standing rule, on the 20 binary density estimation
+    datasets and the UCI datasets of the RAT-SPN vs JPT comparison. Resources are peak memory.
+    Quality is a capability list of the queries answered exactly (marginal, conditional,
+    truncation, most likely assignment, causal); no answer-error scoring, no classification
+    accuracy. Baselines: RAT-SPN (generative and cross entropy), JPT, EM. Datasets are
+    downloaded, never committed.
 
 - id: minibatch-em-tensorized
   title: Mini-batch expectation maximization on layered circuits
@@ -143,3 +145,15 @@ items:
     mini-batch EM with a learning rate per parameter scaled by its contribution to the batch
     likelihood; beats full-batch and mini-batch EM in final log-likelihood and epochs. Uses
     the expected counts of minibatch-em-tensorized. Added by the survey.
+
+- id: strudel
+  title: Strudel structure learning
+  track: structure-learning
+  depends_on:
+  - hidden-chow-liu-trees
+  status: not started
+  notes: >
+    Dang et al. 2020: greedy structure learning of smooth, deterministic and decomposable
+    circuits from a Chow-Liu based vtree; shares the Chow-Liu tree of hidden-chow-liu-trees.
+    Restored after the benchmark gained a capability list: its determinism makes most likely
+    assignment queries tractable, which HCLT circuits cannot answer exactly.
