@@ -1,0 +1,140 @@
+schema_version: 1
+id: circuit-learning-methods
+title: State-of-the-art learning methods for probabilistic circuits
+description: >
+  Survey current parameter and structure learning methods for probabilistic circuits,
+  measure them on one shared benchmark, and implement the ones that pay off in
+  probabilistic_model on the tensorized layered circuits. Starts once region graphs
+  build tensorized RAT-SPNs (cram2#976).
+default_repository: tomsch420/cognitive_robot_abstract_machine
+tracking_issue: 41
+
+waves:
+- id: foundation
+  name: Survey and benchmark
+  description: Decide what to build and how every method is measured.
+- id: methods
+  name: Learning methods
+  description: Parameter and structure learning, in parallel tracks.
+
+tracks:
+- id: survey-and-benchmark
+  name: Survey and benchmark
+  wave: foundation
+- id: parameter-learning
+  name: Parameter learning
+  wave: methods
+- id: structure-learning
+  name: Structure learning
+  wave: methods
+
+items:
+- id: learning-methods-survey
+  title: Survey state-of-the-art learning methods for probabilistic circuits
+  track: survey-and-benchmark
+  depends_on: []
+  status: not started
+  notes: >
+    Parameter and structure learning only (the developer excluded expressive architectures
+    and Bayesian learning). Compare published methods by reported results on standard
+    benchmarks, cost, and fit with the tensorized layered circuits; deliver a short doc page in
+    probabilistic_model/doc. Confirms, reorders or drops the candidate items below and adds
+    missing ones, announced on the tracking PR.
+
+- id: learning-benchmark
+  title: Shared benchmark for circuit learning methods
+  track: survey-and-benchmark
+  depends_on:
+  - tensorized-array-backends/region-graph-builds-tensorized
+  status: not started
+  notes: >
+    One harness every method item reports against: test log-likelihood (bits per dimension)
+    on the 20 binary density estimation datasets and the UCI datasets of the RAT-SPN vs JPT
+    comparison, accuracy where a method classifies, training time. Baselines: RAT-SPN
+    (generative and cross entropy), JPT, EM. Datasets are downloaded, never committed.
+
+- id: minibatch-em-tensorized
+  title: Mini-batch expectation maximization on layered circuits
+  track: parameter-learning
+  depends_on:
+  - learning-methods-survey
+  - learning-benchmark
+  status: not started
+  notes: >
+    Stochastic EM for layered circuits on any array backend, with the expected counts taken
+    from the gradient of the log-likelihood (Peharz et al. 2020, Einsum Networks). The
+    existing expectation_maximization.py works on rustworkx circuits only.
+
+- id: tractable-regularization
+  title: Data softening and entropy regularization
+  track: parameter-learning
+  depends_on:
+  - minibatch-em-tensorized
+  status: not started
+  notes: >
+    Liu and Van den Broeck 2021, Tractable Regularization of Probabilistic Circuits:
+    data softening and entropy regularization, usable with EM and gradient descent.
+
+- id: probabilistic-dropout
+  title: Probabilistic dropout at inputs and sums
+  track: parameter-learning
+  depends_on:
+  - learning-benchmark
+  status: not started
+  notes: >
+    Dropout at input distributions and at sum children (Peharz et al. 2019, RAT-SPN section
+    3.3) for gradient training of layered circuits.
+
+- id: latent-variable-distillation
+  title: Latent variable distillation
+  track: parameter-learning
+  depends_on:
+  - minibatch-em-tensorized
+  status: not started
+  notes: >
+    Liu et al. 2023: guide the latent assignments of a circuit with a deep generative model
+    before EM. Needs a deep generative model, so the developer approves the dependency first.
+
+- id: learnspn
+  title: LearnSPN structure learning
+  track: structure-learning
+  depends_on:
+  - learning-methods-survey
+  - learning-benchmark
+  status: not started
+  notes: >
+    Gens and Domingos 2013: recursive clustering of rows into sums and independence splits
+    of variables into products. Check overlap with the existing JPT and Nyga induction first.
+
+- id: hidden-chow-liu-trees
+  title: Hidden Chow-Liu tree circuits
+  track: structure-learning
+  depends_on:
+  - learning-methods-survey
+  - learning-benchmark
+  status: not started
+  notes: >
+    Liu and Van den Broeck 2021: a Chow-Liu tree over the variables with a latent variable per
+    node, compiled into a tensorized layered circuit; the standard strong baseline of recent
+    circuit papers.
+
+- id: strudel
+  title: Strudel structure learning
+  track: structure-learning
+  depends_on:
+  - hidden-chow-liu-trees
+  status: not started
+  notes: >
+    Dang et al. 2020: greedy structure learning of smooth, deterministic and decomposable
+    circuits from a Chow-Liu based vtree; shares the Chow-Liu tree of hidden-chow-liu-trees.
+
+- id: prune-and-grow
+  title: Sparse circuits by pruning and growing
+  track: structure-learning
+  depends_on:
+  - hidden-chow-liu-trees
+  - minibatch-em-tensorized
+  status: not started
+  notes: >
+    Dang et al. 2022: alternately prune low-flow edges and grow the circuit by copying and
+    perturbing nodes, starting from a hidden Chow-Liu tree circuit.
