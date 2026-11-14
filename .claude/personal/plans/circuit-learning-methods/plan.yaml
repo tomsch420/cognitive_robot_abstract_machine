@@ -32,8 +32,11 @@ items:
 - id: learning-methods-survey
   title: Survey state-of-the-art learning methods for probabilistic circuits
   track: survey-and-benchmark
+  branch: learning-methods-survey
+  pull_request_number: 42
+  session: https://claude.ai/code/session_01LzY41J7dEMMTMGn2EDVH97
   depends_on: []
-  status: not started
+  status: in progress
   notes: >
     Parameter and structure learning only (the developer excluded expressive architectures
     and Bayesian learning). Compare published methods by reported results on standard
