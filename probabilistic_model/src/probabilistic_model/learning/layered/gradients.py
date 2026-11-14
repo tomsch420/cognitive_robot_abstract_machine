@@ -82,6 +82,19 @@ class GradientOfBatch:
     The gradient with respect to every array of :attr:`Layer.circuit_parameters`.
     """
 
+    def without_impossible_rows(self) -> GradientOfBatch:
+        """
+        :return: The gradient with the undefined contributions of rows the circuit gives
+            probability zero replaced by zero, so that such rows have no flow.
+        """
+        return GradientOfBatch(
+            log_likelihood=self.log_likelihood,
+            gradients=[
+                np.nan_to_num(gradient, nan=0.0, posinf=0.0, neginf=0.0)
+                for gradient in self.gradients
+            ],
+        )
+
 
 @dataclass(kw_only=True)
 class LogLikelihoodGradient(ABC):
@@ -173,7 +186,7 @@ class JaxLogLikelihoodGradient(LogLikelihoodGradient):
         return GradientOfBatch(
             log_likelihood=float(value),
             gradients=[np.asarray(gradient) for gradient in gradients],
-        )
+        ).without_impossible_rows()
 
 
 @dataclass(kw_only=True)
@@ -194,4 +207,4 @@ class TorchLogLikelihoodGradient(LogLikelihoodGradient):
             gradients=[
                 HasParameterArrays.host_copy(parameter.grad) for parameter in parameters
             ],
-        )
+        ).without_impossible_rows()

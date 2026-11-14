@@ -148,12 +148,14 @@ class ExpectedFlows(TopDownPass):
 
     def sum_edge_values(self, *, layer: SumLayer, node_values: np.ndarray) -> np.ndarray:
         # the forward pass normalizes the weights, so the gradient of a log-weight is the
-        # flow of its edge minus its weight times the flow of its node
+        # flow of its edge minus its weight times the flow of its node; rounding can make
+        # a vanishing flow slightly negative, which no flow is
         weights = HasParameterArrays.host_copy(
             layer.edges.edge_values(layer.normalized_weights)
         )
-        return (
-            self.log_weight_gradients[layer] + weights * node_values[layer.edges.rows]
+        return np.maximum(
+            self.log_weight_gradients[layer] + weights * node_values[layer.edges.rows],
+            0.0,
         )
 
     @classmethod
