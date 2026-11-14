@@ -121,16 +121,6 @@ items:
     node, compiled into a tensorized layered circuit; the standard strong baseline of recent
     circuit papers.
 
-- id: strudel
-  title: Strudel structure learning
-  track: structure-learning
-  depends_on:
-  - hidden-chow-liu-trees
-  status: not started
-  notes: >
-    Dang et al. 2020: greedy structure learning of smooth, deterministic and decomposable
-    circuits from a Chow-Liu based vtree; shares the Chow-Liu tree of hidden-chow-liu-trees.
-
 - id: prune-and-grow
   title: Sparse circuits by pruning and growing
   track: structure-learning
@@ -141,3 +131,15 @@ items:
   notes: >
     Dang et al. 2022: alternately prune low-flow edges and grow the circuit by copying and
     perturbing nodes, starting from a hidden Chow-Liu tree circuit.
+
+- id: anemone
+  title: Anemone mini-batch expectation maximization
+  track: parameter-learning
+  depends_on:
+  - minibatch-em-tensorized
+  status: not started
+  notes: >
+    Liu, Shao and Van den Broeck 2026, Rethinking Probabilistic Circuit Parameter Learning:
+    mini-batch EM with a learning rate per parameter scaled by its contribution to the batch
+    likelihood; beats full-batch and mini-batch EM in final log-likelihood and epochs. Uses
+    the expected counts of minibatch-em-tensorized. Added by the survey.
