@@ -51,12 +51,12 @@ items:
   - tensorized-array-backends/region-graph-builds-tensorized
   status: not started
   notes: >
-    One harness for the metrics of the first standing rule, on the 20 binary density estimation
-    datasets and the UCI datasets of the RAT-SPN vs JPT comparison. Resources are peak memory.
-    Quality is a capability list of the queries answered exactly (marginal, conditional,
-    truncation, most likely assignment, causal); no answer-error scoring, no classification
-    accuracy. Baselines: RAT-SPN (generative and cross entropy), JPT, EM. Datasets are
-    downloaded, never committed.
+    Harness for the metrics of the first standing rule; every method remeasured, no published
+    numbers reused. 14 datasets without preprocessing of our own: binary NLTCS, MSNBC, Plants,
+    Ad; continuous POWER, GAS, HEPMASS, MINIBOONE, BSDS300; mixed OpenML 42225, 42571, 42729,
+    42746, 45045. Full grid of library, device, float type and edges; one seed; train until
+    convergence. Conditioning and truncation at 5 to 100 variables or simple sets. Baselines:
+    RAT-SPN, JPT, EM. Full spec: https://claude.ai/artifact/3eGnQibyJjzzRH1HLAZn3W
 
 - id: minibatch-em-tensorized
   title: Mini-batch expectation maximization on layered circuits
