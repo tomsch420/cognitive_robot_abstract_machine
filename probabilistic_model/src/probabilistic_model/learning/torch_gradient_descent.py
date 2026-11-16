@@ -27,8 +27,10 @@ from probabilistic_model.learning.device_memory import (
 )
 from probabilistic_model.learning.training_schedule import (
     Convergence,
+    LearningRatePlateau,
     MiniBatches,
     MiniBatchTraining,
+    PlateauScheduledTraining,
 )
 
 
@@ -107,6 +109,7 @@ class TorchGradientDescent(Generic[LayerType], SubClassSafeGeneric):
         *arguments: torch.Tensor,
         convergence: Convergence | None = None,
         mini_batches: MiniBatches | None = None,
+        learning_rate_plateau: LearningRatePlateau | None = None,
     ) -> TrainingRun[LayerType]:
         """
         Minimize the :attr:`loss` on shuffled mini-batches, one optimizer step per
@@ -118,6 +121,8 @@ class TorchGradientDescent(Generic[LayerType], SubClassSafeGeneric):
             if ``None``.
         :param mini_batches: How the rows are split into the batches of every epoch,
             :class:`MiniBatches` with its defaults, one batch of all rows, if ``None``.
+        :param learning_rate_plateau: The schedule of the learning rate, a constant
+            :attr:`learning_rate` if ``None``.
         :return: The trained circuit and the losses of its epochs.
         """
         training = TorchGradientDescentTraining(
@@ -125,6 +130,7 @@ class TorchGradientDescent(Generic[LayerType], SubClassSafeGeneric):
             mini_batches=MiniBatches() if mini_batches is None else mini_batches,
             gradient_descent=self,
             optimizer=self.optimizer_type(self.parameters, lr=self.learning_rate),
+            learning_rate_plateau=learning_rate_plateau,
         )
         history = (
             Convergence() if convergence is None else convergence
@@ -233,7 +239,7 @@ class TorchGradientDescent(Generic[LayerType], SubClassSafeGeneric):
 
 
 @dataclass(kw_only=True)
-class TorchGradientDescentTraining(MiniBatchTraining):
+class TorchGradientDescentTraining(PlateauScheduledTraining):
     """
     Mini-batch training by :class:`TorchGradientDescent`, one optimizer step per batch.
     """
@@ -250,6 +256,10 @@ class TorchGradientDescentTraining(MiniBatchTraining):
 
     def step_on_batch(self, *, batch: tuple[torch.Tensor, ...]) -> float:
         return self.gradient_descent.step(optimizer=self.optimizer, arguments=batch)
+
+    def scale_learning_rate(self, *, scale: float) -> None:
+        for group in self.optimizer.param_groups:
+            group["lr"] = self.gradient_descent.learning_rate * scale
 
 
 # %% device memory

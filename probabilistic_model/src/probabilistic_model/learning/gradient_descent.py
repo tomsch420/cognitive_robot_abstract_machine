@@ -28,11 +28,14 @@ from probabilistic_model.learning.device_memory import (
     ProbeMeasurement,
     StepMemory,
 )
+from probabilistic_model.learning.exceptions import UnscheduledOptimizerError
 from probabilistic_model.learning.training_schedule import (
     Convergence,
     ConvergenceHistory,
+    LearningRatePlateau,
     MiniBatches,
     MiniBatchTraining,
+    PlateauScheduledTraining,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     BackendArray,
@@ -278,6 +281,7 @@ class GradientDescent(Generic[LayerType], SubClassSafeGeneric):
         *arguments: jax.Array,
         convergence: Convergence | None = None,
         mini_batches: MiniBatches | None = None,
+        learning_rate_plateau: LearningRatePlateau | None = None,
     ) -> TrainingRun[LayerType]:
         """
         Minimize the :attr:`loss` on shuffled mini-batches, one compiled step per batch,
@@ -289,12 +293,16 @@ class GradientDescent(Generic[LayerType], SubClassSafeGeneric):
             if ``None``.
         :param mini_batches: How the rows are split into the batches of every epoch,
             :class:`MiniBatches` with its defaults, one batch of all rows, if ``None``.
+        :param learning_rate_plateau: The schedule of the learning rate, which needs an
+            optimizer built with :func:`optax.inject_hyperparams`; a constant learning
+            rate if ``None``.
         :return: The trained circuit and the losses of its epochs.
         """
         training = GradientDescentTraining(
             arguments=arguments,
             mini_batches=MiniBatches() if mini_batches is None else mini_batches,
             gradient_descent=self,
+            learning_rate_plateau=learning_rate_plateau,
         )
         history = (
             Convergence() if convergence is None else convergence
@@ -371,7 +379,7 @@ class GradientDescent(Generic[LayerType], SubClassSafeGeneric):
 
 
 @dataclass(kw_only=True)
-class GradientDescentTraining(MiniBatchTraining):
+class GradientDescentTraining(PlateauScheduledTraining):
     """
     Mini-batch training by :class:`GradientDescent`, one compiled step per batch.
     """
@@ -391,12 +399,32 @@ class GradientDescentTraining(MiniBatchTraining):
     The state after the last step.
     """
 
+    initial_learning_rate: jax.Array | None = field(init=False, default=None)
+    """
+    The learning rate before any reduction, ``None`` without a schedule.
+    """
+
     def __post_init__(self) -> None:
         """
         Compile the step and start from the state before training.
+
+        :raises UnscheduledOptimizerError: If a schedule is given for an optimizer
+            whose learning rate cannot be changed.
         """
         self.compiled_step = jax.jit(self.gradient_descent.step)
         self.state = self.gradient_descent.initial_state()
+        if self.learning_rate_plateau is None:
+            return
+        if not isinstance(self.state.optimizer_state, optax.InjectHyperparamsState):
+            raise UnscheduledOptimizerError()
+        self.initial_learning_rate = self.state.optimizer_state.hyperparams[
+            "learning_rate"
+        ]
+
+    def scale_learning_rate(self, *, scale: float) -> None:
+        self.state.optimizer_state.hyperparams["learning_rate"] = (
+            self.initial_learning_rate * scale
+        )
 
     def step_on_batch(self, *, batch: tuple[jax.Array, ...]) -> float:
         self.state = self.compiled_step(self.state, *batch)

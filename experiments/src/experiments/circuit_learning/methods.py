@@ -65,6 +65,7 @@ from probabilistic_model.learning.torch_gradient_descent import TorchGradientDes
 from probabilistic_model.learning.training_schedule import (
     Convergence,
     ConvergenceHistory,
+    LearningRatePlateau,
     MiniBatches,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.layered_probabilistic_circuit import (
@@ -276,13 +277,26 @@ class RandomTensorizedSumProductNetworkByGradientDescent(
     RandomTensorizedSumProductNetwork
 ):
     """
-    A RAT-SPN trained generatively by mini-batch gradient descent with Adam, in batches
-    of the most rows that fit in memory.
+    A RAT-SPN trained generatively by mini-batch gradient descent with Adam, whose
+    learning rate is reduced on plateaus of the training loss.
     """
 
     learning_rate: float = 1e-2
     """
-    The learning rate of Adam.
+    The initial learning rate of Adam.
+    """
+
+    batch_size: int = 1024
+    """
+    The most rows per step, fewer if they do not fit in memory; the largest batch size
+    :cite:`liu2025rethinking` tune Adam over.
+    """
+
+    learning_rate_plateau: LearningRatePlateau = field(
+        default_factory=LearningRatePlateau
+    )
+    """
+    The schedule of the learning rate, copied for every training.
     """
 
     @property
@@ -304,7 +318,10 @@ class RandomTensorizedSumProductNetworkByGradientDescent(
         host = self.random_circuit(dataset=dataset)
         rows = dataset.encoded(frame=dataset.train)
         mini_batches = MiniBatches(
-            batch_size=context.rows_per_step(circuit=host, setting=setting, rows=rows),
+            batch_size=min(
+                self.batch_size,
+                context.rows_per_step(circuit=host, setting=setting, rows=rows),
+            ),
             seed=self.seed,
         )
         circuit = setting.placed(circuit=host)
@@ -319,10 +336,13 @@ class RandomTensorizedSumProductNetworkByGradientDescent(
             trainer = GradientDescent(
                 circuit.root,
                 AverageNegativeLogLikelihood(),
-                optax.adam(self.learning_rate),
+                optax.inject_hyperparams(optax.adam)(learning_rate=self.learning_rate),
             )
         run = trainer.minimize_until_converged(
-            data, convergence=context.convergence, mini_batches=mini_batches
+            data,
+            convergence=context.convergence,
+            mini_batches=mini_batches,
+            learning_rate_plateau=dataclasses.replace(self.learning_rate_plateau),
         )
         circuit.root = run.trained_root
         return LearnedCircuit(circuit=circuit, history=run.history)
@@ -331,8 +351,9 @@ class RandomTensorizedSumProductNetworkByGradientDescent(
 @dataclass(kw_only=True)
 class RandomTensorizedSumProductNetworkByDropout(RandomTensorizedSumProductNetwork):
     """
-    A RAT-SPN trained generatively by mini-batch gradient descent under probabilistic
-    dropout, in batches of the most rows that fit in memory.
+    A RAT-SPN trained generatively by mini-batch gradient descent with Adam under
+    probabilistic dropout, whose learning rate is reduced on plateaus of the training
+    loss.
     """
 
     dropout: ProbabilisticDropout = field(
@@ -346,7 +367,19 @@ class RandomTensorizedSumProductNetworkByDropout(RandomTensorizedSumProductNetwo
 
     learning_rate: float = 1e-2
     """
-    The learning rate of Adam.
+    The initial learning rate of Adam.
+    """
+
+    batch_size: int = 1024
+    """
+    The most rows per step, fewer if they do not fit in memory.
+    """
+
+    learning_rate_plateau: LearningRatePlateau = field(
+        default_factory=LearningRatePlateau
+    )
+    """
+    The schedule of the learning rate, copied for every training.
     """
 
     @property
@@ -367,9 +400,15 @@ class RandomTensorizedSumProductNetworkByDropout(RandomTensorizedSumProductNetwo
         rows = dataset.encoded(frame=dataset.train)
         trainer = MiniBatchGradientDescent(
             convergence=context.convergence,
-            batch_size=context.rows_per_step(circuit=host, setting=setting, rows=rows),
-            optimizer=optax.adam(self.learning_rate),
+            batch_size=min(
+                self.batch_size,
+                context.rows_per_step(circuit=host, setting=setting, rows=rows),
+            ),
+            optimizer=optax.inject_hyperparams(optax.adam)(
+                learning_rate=self.learning_rate
+            ),
             dropout=self.dropout,
+            learning_rate_plateau=dataclasses.replace(self.learning_rate_plateau),
             seed=self.seed,
         )
         circuit = trainer.fit(circuit=setting.placed(circuit=host), data=rows)

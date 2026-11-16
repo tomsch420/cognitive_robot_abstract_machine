@@ -21,6 +21,7 @@ from probabilistic_model.learning.gradient_descent import (
 )
 from probabilistic_model.learning.training_schedule import (
     Convergence,
+    LearningRatePlateau,
     MiniBatches,
     MiniBatchTraining,
 )
@@ -119,6 +120,34 @@ def test_a_loss_that_keeps_improving_ends_training_at_the_epoch_limit(convergenc
 
     assert not history.converged
     assert history.epochs == convergence.maximum_epochs
+
+
+# %% learning rate plateau
+
+
+def test_a_plateau_reduces_the_learning_rate_after_the_patience():
+    """
+    The learning rate is reduced once more epochs than the patience brought no
+    relative improvement, and not before.
+    """
+    plateau = LearningRatePlateau(factor=0.5, patience=2, relative_tolerance=0.01)
+    for loss in [10.0, 9.0, 8.95, 8.95]:
+        plateau.record(average_loss=loss)
+    assert plateau.scale == 1.0
+    plateau.record(average_loss=8.95)
+    assert plateau.scale == plateau.factor
+
+
+def test_a_plateau_settles_after_its_reductions():
+    """
+    A constant loss reduces the learning rate every patience plus one epochs until the
+    plateau has settled.
+    """
+    plateau = LearningRatePlateau(patience=1, reductions_until_settled=2)
+    for _ in range(1 + 2 * (plateau.patience + 1)):
+        plateau.record(average_loss=1.0)
+    assert plateau.is_settled
+    assert plateau.reductions == plateau.reductions_until_settled
 
 
 # %% mini-batches

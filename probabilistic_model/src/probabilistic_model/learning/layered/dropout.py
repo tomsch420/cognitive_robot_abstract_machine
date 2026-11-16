@@ -15,11 +15,13 @@ import numpy as np
 import optax
 from typing_extensions import Callable
 
+from probabilistic_model.learning.exceptions import UnscheduledOptimizerError
 from probabilistic_model.learning.training_schedule import (
     Convergence,
     ConvergenceHistory,
+    LearningRatePlateau,
     MiniBatches,
-    MiniBatchTraining,
+    PlateauScheduledTraining,
 )
 
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
@@ -152,6 +154,12 @@ class MiniBatchGradientDescent:
     The dropout during training, none by default.
     """
 
+    learning_rate_plateau: LearningRatePlateau | None = None
+    """
+    The schedule of the learning rate, which needs an optimizer built with
+    :func:`optax.inject_hyperparams`; a constant learning rate if ``None``.
+    """
+
     seed: int = 0
     """
     The seed of the order of the rows and of the dropout masks.
@@ -210,6 +218,7 @@ class MiniBatchGradientDescent:
             key=jax.random.PRNGKey(self.seed),
             floating_point_type=root.floating_point_type,
             device=root.device,
+            learning_rate_plateau=self.learning_rate_plateau,
         )
         convergence = (
             Convergence(tolerance=-math.inf, maximum_epochs=self.epochs)
@@ -228,7 +237,7 @@ class MiniBatchGradientDescent:
 
 
 @dataclass(kw_only=True)
-class DropoutTraining(MiniBatchTraining):
+class DropoutTraining(PlateauScheduledTraining):
     """
     Mini-batch gradient descent under dropout, one compiled step per batch.
     """
@@ -263,6 +272,29 @@ class DropoutTraining(MiniBatchTraining):
     """
     The device of the parameters.
     """
+
+    initial_learning_rate: jax.Array | None = field(init=False, default=None)
+    """
+    The learning rate before any reduction, ``None`` without a schedule.
+    """
+
+    def __post_init__(self) -> None:
+        """
+        Read the initial learning rate of a schedule.
+
+        :raises UnscheduledOptimizerError: If a schedule is given for an optimizer
+            whose learning rate cannot be changed.
+        """
+        if self.learning_rate_plateau is None:
+            return
+        if not isinstance(self.optimizer_state, optax.InjectHyperparamsState):
+            raise UnscheduledOptimizerError()
+        self.initial_learning_rate = self.optimizer_state.hyperparams["learning_rate"]
+
+    def scale_learning_rate(self, *, scale: float) -> None:
+        self.optimizer_state.hyperparams["learning_rate"] = (
+            self.initial_learning_rate * scale
+        )
 
     def step_on_batch(self, *, batch: tuple[np.ndarray, ...]) -> float:
         (rows,) = batch
