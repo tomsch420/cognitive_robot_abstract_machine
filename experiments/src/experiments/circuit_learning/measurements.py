@@ -184,7 +184,20 @@ class TrainingMeasurement:
             average_train_log_likelihood=float(train.mean()),
             average_test_log_likelihood=float(test.mean()),
             fraction_of_test_rows_without_support=float(np.isneginf(test).mean()),
+            average_test_log_likelihood_of_supported_rows=self.supported_mean(
+                log_likelihoods=test
+            ),
         )
+
+    @staticmethod
+    def supported_mean(*, log_likelihoods: np.ndarray) -> float:
+        """
+        :param log_likelihoods: The log-likelihood of every row.
+        :return: The mean over the rows of positive likelihood, minus infinity if there
+            are none.
+        """
+        supported = log_likelihoods[~np.isneginf(log_likelihoods)]
+        return float(supported.mean()) if len(supported) else -np.inf
 
     def peak_device_memory_bytes(self) -> int:
         """

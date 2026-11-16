@@ -95,7 +95,7 @@ class BenchmarkSummary:
             first = training.sort_values("training_seconds").drop_duplicates(
                 ["learning_method", "dataset", "setting"]
             )
-            sections.append("## Test log-likelihood, every setting averaged\n")
+            sections.append("## Test log-likelihood, best setting\n")
             sections.append(
                 first.pivot_table(
                     index="learning_method",
@@ -105,6 +105,33 @@ class BenchmarkSummary:
                 )
                 .round(2)
                 .to_markdown()
+            )
+            sections.append(
+                "\n## Test log-likelihood of the supported rows, and percentage of "
+                "impossible test rows\n"
+            )
+            supported = first.pivot_table(
+                index="learning_method",
+                columns="dataset",
+                values="average_test_log_likelihood_of_supported_rows",
+                aggfunc="max",
+            ).round(2)
+            impossible = (
+                first.pivot_table(
+                    index="learning_method",
+                    columns="dataset",
+                    values="fraction_of_test_rows_without_support",
+                    aggfunc="min",
+                )
+                * 100
+            ).round(2)
+            sections.append(
+                (
+                    supported.astype(str)
+                    + " ("
+                    + impossible.astype(str)
+                    + "%)"
+                ).to_markdown()
             )
             sections.append("\n## Training, every setting\n")
             sections.append(
@@ -116,6 +143,7 @@ class BenchmarkSummary:
                         "average_train_log_likelihood",
                         "average_test_log_likelihood",
                         "fraction_of_test_rows_without_support",
+                        "average_test_log_likelihood_of_supported_rows",
                         "training_seconds",
                         "epochs_until_convergence",
                         "converged",

@@ -166,6 +166,12 @@ class TrainingResult(ExperimentResult):
     test log-likelihood minus infinity.
     """
 
+    average_test_log_likelihood_of_supported_rows: float
+    """
+    Mean log-likelihood of the test rows of positive likelihood, minus infinity if
+    there are none.
+    """
+
 
 @dataclass(kw_only=True)
 class ExactQueriesResult(ExperimentResult):
