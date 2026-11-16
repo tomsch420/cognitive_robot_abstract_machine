@@ -1,12 +1,11 @@
 PR tomsch420#43 (draft) - mini-batch gradient descent until convergence, plan circuit-learning-methods / minibatch-training-until-convergence. learning-benchmark stacks on it.
 
 Plan
-- Backend-free Convergence criterion (tolerance 0.001, patience 3, at most 1,000 epochs) in learning/convergence.py.
-- minimize_until_converged on GradientDescent and TorchGradientDescent: shuffled mini-batches, returns trained root, epochs, converged.
-- Tests first: stops at convergence, stops at the epoch limit, raises the log-likelihood on jax and torch.
+- Developer reviews the draft; mark ready only when told.
 
 Done
-- Branch, draft PR #43, plan record.
+- Convergence, ConvergenceHistory, MiniBatches (learning/training_schedule.py); TrainingRun and minimize_until_converged on GradientDescent and TorchGradientDescent.
+- Tests: 1,576 of test/probabilistic_model_test pass on neem-4; krrood check clean. Pushed; description updated.
 
 Next
-- Write the tests, then the implementation; krrood format/check; probabilistic_model tests.
+- Start learning-benchmark stacked on this branch.
