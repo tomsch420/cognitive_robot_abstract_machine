@@ -1,11 +1,11 @@
-PR tomsch420#43 (draft) - mini-batch gradient descent until convergence, plan circuit-learning-methods / minibatch-training-until-convergence. learning-benchmark stacks on it.
+PR tomsch420#43 (draft), upstream cram2#980 (draft) - mini-batch gradient descent until convergence, plan circuit-learning-methods / minibatch-training-until-convergence. learning-benchmark stacks on it.
 
 Plan
-- Developer reviews the draft; mark ready only when told.
+- Developer reviews cram2#980; mark ready only when told.
 
 Done
-- Convergence, ConvergenceHistory, MiniBatches (learning/training_schedule.py); TrainingRun and minimize_until_converged on GradientDescent and TorchGradientDescent.
-- Tests: 1,576 of test/probabilistic_model_test pass on neem-4; krrood check clean. Pushed; description updated.
+- Convergence, MiniBatches, abstract MiniBatchTraining with GradientDescentTraining and TorchGradientDescentTraining; minimize_until_converged on both trainers.
+- First review answered at 9c6e61cb38 (no inner functions, interface instead of callables, cheaper tests); 4 threads replied to and resolved. 1,575 tests pass, krrood check clean.
 
 Next
 - Start learning-benchmark stacked on this branch.
