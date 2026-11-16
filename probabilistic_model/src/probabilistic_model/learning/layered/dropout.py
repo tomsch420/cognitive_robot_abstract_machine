@@ -6,13 +6,21 @@ Mini-batch gradient training of layered circuits with the probabilistic dropout 
 from __future__ import annotations
 
 # %% imports
+import math
 from dataclasses import dataclass, field
 
 import jax
 import jax.numpy as jnp
 import numpy as np
 import optax
-import tqdm
+from typing_extensions import Callable
+
+from probabilistic_model.learning.training_schedule import (
+    Convergence,
+    ConvergenceHistory,
+    MiniBatches,
+    MiniBatchTraining,
+)
 
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     SampleArray,
@@ -119,7 +127,12 @@ class MiniBatchGradientDescent:
 
     epochs: int = 10
     """
-    The number of passes over the data.
+    The number of passes over the data when :attr:`convergence` is ``None``.
+    """
+
+    convergence: Convergence | None = None
+    """
+    When training stops, after exactly :attr:`epochs` if ``None``.
     """
 
     batch_size: int = 512
@@ -147,6 +160,11 @@ class MiniBatchGradientDescent:
     average_log_likelihoods: list[float] = field(default_factory=list, init=False)
     """
     The average log-likelihood of the training rows under dropout in every epoch.
+    """
+
+    history: ConvergenceHistory | None = field(default=None, init=False)
+    """
+    The losses of the epochs of the last :meth:`fit`.
     """
 
     def fit(
@@ -183,24 +201,76 @@ class MiniBatchGradientDescent:
             ]
             return parameters, optimizer_state, value
 
-        compiled_step = jax.jit(step)
-        parameters = list(root.circuit_parameters)
-        optimizer_state = self.optimizer.init(parameters)
-        random_number_generator = np.random.default_rng(self.seed)
-        key = jax.random.PRNGKey(self.seed)
-        for _ in tqdm.tqdm(range(self.epochs), desc="Gradient descent"):
-            order = random_number_generator.permutation(len(encoded))
-            summed = 0.0
-            for start in range(0, len(encoded), self.batch_size):
-                batch = encoded[order[start : start + self.batch_size]]
-                key, step_key = jax.random.split(key)
-                parameters, optimizer_state, value = compiled_step(
-                    parameters,
-                    optimizer_state,
-                    jnp.asarray(batch, dtype=root.floating_point_type),
-                    step_key,
-                )
-                summed -= float(value) * len(batch)
-            self.average_log_likelihoods.append(summed / len(encoded))
-        circuit.root = root.copy_with_circuit_parameters(parameters)
+        training = DropoutTraining(
+            arguments=(encoded,),
+            mini_batches=MiniBatches(batch_size=self.batch_size, seed=self.seed),
+            compiled_step=jax.jit(step),
+            parameters=list(root.circuit_parameters),
+            optimizer_state=self.optimizer.init(list(root.circuit_parameters)),
+            key=jax.random.PRNGKey(self.seed),
+            floating_point_type=root.floating_point_type,
+            device=root.device,
+        )
+        convergence = (
+            Convergence(tolerance=-math.inf, maximum_epochs=self.epochs)
+            if self.convergence is None
+            else self.convergence
+        )
+        self.history = convergence.history_until_converged(training=training)
+        self.average_log_likelihoods.extend(
+            -loss for loss in self.history.epoch_losses
+        )
+        circuit.root = root.copy_with_circuit_parameters(training.parameters)
         return circuit
+
+
+# %% training on mini-batches
+
+
+@dataclass(kw_only=True)
+class DropoutTraining(MiniBatchTraining):
+    """
+    Mini-batch gradient descent under dropout, one compiled step per batch.
+    """
+
+    compiled_step: Callable
+    """
+    The step from parameters, optimizer state, batch and key to the new parameters,
+    optimizer state and loss.
+    """
+
+    parameters: list[jax.Array]
+    """
+    The parameters after the last step.
+    """
+
+    optimizer_state: optax.OptState
+    """
+    The optimizer state after the last step.
+    """
+
+    key: jax.Array
+    """
+    The key the dropout masks of the next step are drawn from.
+    """
+
+    floating_point_type: jnp.dtype
+    """
+    The floating point type of the parameters.
+    """
+
+    device: jax.Device
+    """
+    The device of the parameters.
+    """
+
+    def step_on_batch(self, *, batch: tuple[np.ndarray, ...]) -> float:
+        (rows,) = batch
+        self.key, step_key = jax.random.split(self.key)
+        self.parameters, self.optimizer_state, value = self.compiled_step(
+            self.parameters,
+            self.optimizer_state,
+            jnp.asarray(rows, dtype=self.floating_point_type, device=self.device),
+            step_key,
+        )
+        return float(value)

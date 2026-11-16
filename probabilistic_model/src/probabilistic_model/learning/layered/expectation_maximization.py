@@ -10,8 +10,9 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
+import math
+
 import numpy as np
-import tqdm
 
 from probabilistic_model.learning.layered.flows import (
     CircuitParameterLayout,
@@ -19,7 +20,16 @@ from probabilistic_model.learning.layered.flows import (
     NodeAndEdgeValues,
     TopDownProbabilities,
 )
-from probabilistic_model.learning.layered.gradients import LogLikelihoodGradient
+from probabilistic_model.learning.layered.gradients import (
+    GradientOfBatch,
+    LogLikelihoodGradient,
+)
+from probabilistic_model.learning.training_schedule import (
+    Convergence,
+    ConvergenceHistory,
+    MiniBatches,
+    MiniBatchTraining,
+)
 from probabilistic_model.learning.layered.maximization import (
     LayerMaximization,
     LayerMaximizations,
@@ -123,12 +133,23 @@ class ExpectationMaximization(ABC):
 
     epochs: int = 10
     """
-    The number of passes over the data.
+    The number of passes over the data when :attr:`convergence` is ``None``.
+    """
+
+    convergence: Convergence | None = None
+    """
+    When training stops, after exactly :attr:`epochs` if ``None``.
     """
 
     batch_size: int | None = None
     """
     The number of rows per update, all rows if ``None``.
+    """
+
+    evaluation_batch_size: int | None = None
+    """
+    The most rows whose gradient is computed at once within an update, all rows of the
+    update if ``None``.
     """
 
     momentum: float = 0.0
@@ -162,6 +183,11 @@ class ExpectationMaximization(ABC):
     of that epoch.
     """
 
+    history: ConvergenceHistory | None = field(default=None, init=False)
+    """
+    The losses of the epochs of the last :meth:`fit`.
+    """
+
     @abstractmethod
     def mixing_weights(
         self, *, node_rates: np.ndarray, top_down_probabilities: np.ndarray
@@ -186,41 +212,95 @@ class ExpectationMaximization(ABC):
         :return: The circuit.
         """
         encoded = np.asarray(HasParameterArrays.host_copy(circuit.encoded(data)))
-        number_of_rows = len(encoded)
-        batch_size = number_of_rows if self.batch_size is None else self.batch_size
-        gradient = LogLikelihoodGradient.from_root(
-            root=circuit.root, transformation=self.data_softening
+        training = ExpectationMaximizationTraining(
+            arguments=(encoded,),
+            mini_batches=MiniBatches(batch_size=self.batch_size, seed=self.seed),
+            expectation_maximization=self,
+            root=circuit.root,
+            gradient=LogLikelihoodGradient.from_root(
+                root=circuit.root, transformation=self.data_softening
+            ),
+            momentum=Momentum(decay=self.momentum) if self.momentum > 0 else None,
         )
-        momentum = Momentum(decay=self.momentum) if self.momentum > 0 else None
-        random_number_generator = np.random.default_rng(self.seed)
-        root = circuit.root
-        for _ in tqdm.tqdm(range(self.epochs), desc="Expectation maximization"):
-            order = random_number_generator.permutation(number_of_rows)
-            summed_log_likelihood = 0.0
-            for start in range(0, number_of_rows, batch_size):
-                batch = encoded[order[start : start + batch_size]]
-                gradient.root = root
-                result = gradient.compute(
-                    data=root.namespace.asarray(
-                        batch, dtype=root.floating_point_type, device=root.device
-                    )
-                )
-                summed_log_likelihood += result.log_likelihood
-                flows = ExpectedFlows.from_parameter_gradients(
-                    root=root, gradients=result.gradients, number_of_rows=len(batch)
-                ).compute()
-                root = self.updated_root(
-                    root=root,
-                    gradients=result.gradients,
-                    flows=flows,
-                    number_of_rows=len(batch),
-                    momentum=momentum,
-                )
-                if momentum is not None:
-                    momentum.number_of_updates += 1
-            self.average_log_likelihoods.append(summed_log_likelihood / number_of_rows)
-        circuit.root = root
+        convergence = (
+            Convergence(tolerance=-math.inf, maximum_epochs=self.epochs)
+            if self.convergence is None
+            else self.convergence
+        )
+        self.history = convergence.history_until_converged(training=training)
+        self.average_log_likelihoods.extend(
+            -loss for loss in self.history.epoch_losses
+        )
+        circuit.root = training.root
         return circuit
+
+    def batch_gradient(
+        self, *, gradient: LogLikelihoodGradient, root: Layer, batch: np.ndarray
+    ) -> GradientOfBatch:
+        """
+        :param gradient: The gradient computation.
+        :param root: The root layer at the current parameters.
+        :param batch: The encoded rows of one update, on the host.
+        :return: The summed log-likelihood of the rows and its gradient, summed over
+            chunks of at most :attr:`evaluation_batch_size` rows.
+        """
+        chunk_size = (
+            len(batch)
+            if self.evaluation_batch_size is None
+            else self.evaluation_batch_size
+        )
+        gradient.root = root
+        total: GradientOfBatch | None = None
+        for start in range(0, len(batch), chunk_size):
+            result = gradient.compute(
+                data=root.namespace.asarray(
+                    batch[start : start + chunk_size],
+                    dtype=root.floating_point_type,
+                    device=root.device,
+                )
+            )
+            if total is None:
+                total = result
+                continue
+            total = GradientOfBatch(
+                log_likelihood=total.log_likelihood + result.log_likelihood,
+                gradients=[
+                    summed + added
+                    for summed, added in zip(total.gradients, result.gradients)
+                ],
+            )
+        return total
+
+    def update(
+        self,
+        *,
+        root: Layer,
+        gradient: LogLikelihoodGradient,
+        batch: np.ndarray,
+        momentum: Momentum | None,
+    ) -> tuple[Layer, float]:
+        """
+        :param root: The root layer at the current parameters.
+        :param gradient: The gradient computation.
+        :param batch: The encoded rows of the update, on the host.
+        :param momentum: The moving average of the batch statistics, if any.
+        :return: The root layer with the updated parameters and the summed
+            log-likelihood of the batch before the update.
+        """
+        result = self.batch_gradient(gradient=gradient, root=root, batch=batch)
+        flows = ExpectedFlows.from_parameter_gradients(
+            root=root, gradients=result.gradients, number_of_rows=len(batch)
+        ).compute()
+        updated = self.updated_root(
+            root=root,
+            gradients=result.gradients,
+            flows=flows,
+            number_of_rows=len(batch),
+            momentum=momentum,
+        )
+        if momentum is not None:
+            momentum.number_of_updates += 1
+        return updated, result.log_likelihood
 
     def updated_root(
         self,
@@ -429,3 +509,40 @@ class Anemone(ExpectationMaximization):
         return MixingWeights(
             current=top_down_probabilities, batch=self.learning_rate * node_rates
         )
+
+
+# %% training on mini-batches
+
+
+@dataclass(kw_only=True)
+class ExpectationMaximizationTraining(MiniBatchTraining):
+    """
+    Mini-batch training by one :class:`ExpectationMaximization` update per batch.
+    """
+
+    expectation_maximization: ExpectationMaximization
+    """
+    The variant whose updates are made.
+    """
+
+    root: Layer
+    """
+    The root layer at the current parameters.
+    """
+
+    gradient: LogLikelihoodGradient
+    """
+    The gradient computation the expected flows are read off.
+    """
+
+    momentum: Momentum | None
+    """
+    The moving average of the batch statistics, if any.
+    """
+
+    def step_on_batch(self, *, batch: tuple[np.ndarray, ...]) -> float:
+        (rows,) = batch
+        self.root, log_likelihood = self.expectation_maximization.update(
+            root=self.root, gradient=self.gradient, batch=rows, momentum=self.momentum
+        )
+        return -log_likelihood / len(rows)
