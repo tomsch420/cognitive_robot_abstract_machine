@@ -48,7 +48,7 @@ items:
   title: Shared benchmark for circuit learning methods
   track: survey-and-benchmark
   depends_on:
-  - tensorized-array-backends/region-graph-builds-tensorized
+  - minibatch-training-until-convergence
   status: not started
   notes: >
     Harness for the metrics of the first standing rule; every method remeasured, no published
@@ -157,3 +157,26 @@ items:
     circuits from a Chow-Liu based vtree; shares the Chow-Liu tree of hidden-chow-liu-trees.
     Restored after the benchmark gained a capability list: its determinism makes most likely
     assignment queries tractable, which HCLT circuits cannot answer exactly.
+
+- id: minibatch-training-until-convergence
+  title: Mini-batch gradient descent that trains until convergence
+  track: survey-and-benchmark
+  depends_on:
+  - tensorized-array-backends/region-graph-builds-tensorized
+  status: not started
+  notes: >
+    GradientDescent and TorchGradientDescent train on mini-batches and stop once the average
+    train log-likelihood grows by less than a tolerance for a number of epochs, or at an epoch
+    limit, reporting the epochs and whether they converged. Full batches ran out of GPU memory
+    on the large benchmark datasets. Added by the developer at the benchmark kickoff.
+
+- id: structural-queries-any-backend
+  title: Sampling, truncation and conditioning on any array backend
+  track: survey-and-benchmark
+  depends_on:
+  - learning-benchmark
+  status: not started
+  notes: >
+    Sampling, truncation and conditioning raise HostOnlyQueryError unless the parameters are
+    numpy arrays, so the benchmark times them on numpy only. Make them work on jax and torch
+    so those cells of the benchmark fill. Added by the developer at the benchmark kickoff.
