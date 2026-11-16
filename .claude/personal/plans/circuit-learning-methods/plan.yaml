@@ -161,9 +161,12 @@ items:
 - id: minibatch-training-until-convergence
   title: Mini-batch gradient descent that trains until convergence
   track: survey-and-benchmark
+  branch: minibatch-training-until-convergence
+  pull_request_number: 43
+  session: https://claude.ai/code/session_01LzY41JSSpHzvhkbRxbQgFH
   depends_on:
   - tensorized-array-backends/region-graph-builds-tensorized
-  status: not started
+  status: in progress
   notes: >
     GradientDescent and TorchGradientDescent train on mini-batches and stop once the average
     train log-likelihood grows by less than a tolerance for a number of epochs, or at an epoch
