@@ -51,7 +51,7 @@ from krrood.entity_query_language.verbalization.fragments.base import (
 from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
     FunctionVerbalizationTemplates,
 )
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 import krrood.symbolic_math.symbolic_math as sm
 from krrood.symbolic_math.symbolic_math import FloatVariable, trinary_logic_and
 from semantic_digital_twin.adapters.multi_sim import MujocoSynchronizer

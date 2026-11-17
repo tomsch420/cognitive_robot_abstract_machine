@@ -21,7 +21,7 @@ from typing import Any
 import numpy as np
 
 from coraplex.datastructures.dataclasses import Context
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from coraplex.plans.factories import sequential
 from coraplex.plans.plan import Plan
 from coraplex.robot_plans.actions.core.pick_up import PickUpAction

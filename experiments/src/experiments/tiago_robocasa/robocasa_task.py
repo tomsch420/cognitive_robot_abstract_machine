@@ -20,7 +20,7 @@ from typing import Any, Callable
 
 import mujoco
 import numpy as np
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 
 from coraplex.datastructures.dataclasses import Context, MotionToleranceConfig
 from coraplex.execution_environment import PhysicallySimulatedRobot

@@ -25,7 +25,7 @@ from experiments.robocasa_atomic_tasks.stored_runs import (
     SimulatedMomentRecorder,
     StoredTaskRun,
 )
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from semantic_digital_twin.adapters.robocasa_dataset.mujoco_compat import (
     robocasa_version_assertions_relaxed,
 )

@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from giskardpy.motion_statechart.context import MotionStatechartContext
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from segmind.datastructures.events import DetectionEvent
 from segmind.detectors.base import AbstractDetector, SegmindContext
 from semantic_digital_twin.adapters.robocasa_dataset.mujoco_compat import (

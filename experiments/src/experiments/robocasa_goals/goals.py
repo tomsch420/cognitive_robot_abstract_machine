@@ -8,7 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from giskardpy.motion_statechart.context import MotionStatechartContext
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from segmind.detectors.base import AbstractDetector
 from semantic_digital_twin.world_description.world_entity import Body
 

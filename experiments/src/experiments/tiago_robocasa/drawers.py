@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 from typing_extensions import Callable
 
 from coraplex.datastructures.dataclasses import Context
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from coraplex.plans.plan import Plan
 from experiments.hsr_robocasa.robocasa_task import FixtureReference
 from experiments.tiago_robocasa.handles import TiagoHandleTask

@@ -9,7 +9,7 @@ from abc import ABC
 from dataclasses import dataclass, field
 from enum import StrEnum
 
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from segmind.datastructures.events import EventWithTrackedObjects
 
 # %% the conditions

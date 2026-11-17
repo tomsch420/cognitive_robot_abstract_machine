@@ -14,7 +14,7 @@ from typing_extensions import Any, Callable
 
 import numpy as np
 import yaml
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from coraplex.datastructures.dataclasses import Context, MotionToleranceConfig
 from coraplex.execution_environment import PhysicallySimulatedRobot
 from coraplex.plans.plan import Plan

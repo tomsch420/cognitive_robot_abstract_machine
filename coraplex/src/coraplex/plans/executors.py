@@ -40,6 +40,7 @@ from coraplex.robot_plans.robot_specific_plan_transformations import (
     KeepTheTorsoUprightWhileUsingATool,
     MoveStretchToolCenterPointInAStraightLine,
 )
+from coraplex.robotiq_grippers import DriveRobotiqGrippersThroughTheirActionServers
 from cramph.composites import ChildChooserAccess, StatementNode
 from cramph.context import ContextExtension
 from cramph.data_types import LifeCycleValues
@@ -496,11 +497,15 @@ class SimulatedPlanExecutor(PlanExecutor, StatechartExecutor, ABC):
                 self.tick()
                 self.pacer.sleep()
             # The controller stops commanding, so a velocity-servoed base stops too.
-            MotionControl.set_velocity_acceleration_jerk_to_zero(self.context.world)
+            MotionControl.set_velocity_acceleration_jerk_to_zero(
+                world=self.context.world
+            )
             self.context.world.notify_state_change()
             self.pacer.wait_for_standstill()
         finally:
-            MotionControl.set_velocity_acceleration_jerk_to_zero(self.context.world)
+            MotionControl.set_velocity_acceleration_jerk_to_zero(
+                world=self.context.world
+            )
             self.finish_run()
 
     def _is_over(self) -> bool:
@@ -660,7 +665,11 @@ class RealRobotPlanExecutor(PlanExecutor):
     """
 
     plan_adaptations: list[PlanTransformation] = field(
-        default_factory=lambda: [CloseFingersToObjectWidth(), DetectWithRoboKudo()],
+        default_factory=lambda: [
+            DriveRobotiqGrippersThroughTheirActionServers(),
+            CloseFingersToObjectWidth(),
+            DetectWithRoboKudo(),
+        ],
         kw_only=True,
     )
 

@@ -163,8 +163,8 @@ class MovesContainerByItsHandle(
         return [
             self.grasping_of(self.grasp, self.arm),
             self._create_mechanism_goal(),
-            self.gripper_goal_type.moving_gripper_to(
-                end_effector.default_configuration(GripperState.OPEN)
+            self.gripper_goal_type.create_gripper_goal(
+                configuration=end_effector.default_configuration(GripperState.OPEN)
             ),
             self.tool_center_point_goal(
                 self.back_off_pose(self.grasp.grasp_pose, end_effector),
