@@ -15,7 +15,11 @@ from sqlalchemy.orm import Session
 from typing_extensions import Dict, Iterable, List, Set
 
 from experiments.grasp_learning.models import GraspModel, GraspModelLibrary
-from experiments.grasp_learning.records import GraspAttempt, GraspLearningTask
+from experiments.grasp_learning.records import (
+    GraspAttempt,
+    GraspLearningTask,
+    RecordedGraspAttempt,
+)
 from experiments.physical_pick_up.objects import GraspableRoboCasaCategory
 from experiments.orm.ormatic_interface import (
     Base,
@@ -73,9 +77,12 @@ class GraspDatabase:
         Base.metadata.create_all(engine)
         return cls(session=Session(engine))
 
-    def add_attempts(self, attempts: Iterable[GraspAttempt]) -> None:
+    def add_attempts(
+        self, attempts: Iterable[GraspAttempt | RecordedGraspAttempt]
+    ) -> None:
         """
-        Store attempts.
+        Store attempts; the attempt of a :class:`RecordedGraspAttempt` counts among the
+        attempts of its task like one stored alone.
 
         :param attempts: The attempts to store.
         """

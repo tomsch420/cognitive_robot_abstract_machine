@@ -15,6 +15,10 @@ from enum import StrEnum
 from typing_extensions import Type
 
 from experiments.physical_pick_up.robots import ObjectPlacement
+from experiments.robocasa_atomic_tasks.stored_runs import (
+    RecordedPlan,
+    SimulatedMoment,
+)
 from semantic_digital_twin.grasping.surface_grasp import SurfaceGrasp
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, EndEffector
 from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
@@ -120,4 +124,36 @@ class GraspAttempt:
     grasp: SurfaceGrasp
     """
     The grasp, with its result.
+    """
+
+
+# %% attempts with what they left behind
+
+
+@dataclass(kw_only=True)
+class RecordedGraspAttempt:
+    """
+    An attempt performed by a plan in a physical simulation, with the plans it ran and
+    the world's state as it moved.
+    """
+
+    attempt: GraspAttempt
+    """
+    The attempt, with its result.
+    """
+
+    degree_of_freedom_names: list[str]
+    """
+    The names of the world's degrees of freedom, in the order every moment lists their
+    positions.
+    """
+
+    moments: list[SimulatedMoment]
+    """
+    The world's state through the attempt, in the order it passed.
+    """
+
+    plans: list[RecordedPlan]
+    """
+    The plans the robot performed in the attempt, in the order they began.
     """
