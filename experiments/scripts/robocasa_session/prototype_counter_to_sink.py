@@ -96,7 +96,7 @@ with world.modify_world():
         parent=world.root, child=pr2_world.root, world=world
     )
     world.merge_world(pr2_world, drive)
-    drive.has_hardware_interface = True
+    world.set_dofs_has_hardware_interface(drive.active_dofs, True)
 drive.origin = task.robot_base_pose
 pr2 = PR2.from_world(world)
 

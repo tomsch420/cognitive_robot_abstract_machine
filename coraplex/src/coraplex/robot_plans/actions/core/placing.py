@@ -146,8 +146,10 @@ class PlaceAction(
                 in_a_straight_line=self.moves_straight_around_objects,
                 accompanying_goals=(
                     (
-                        self.gripper_goal_type.moving_gripper_to(
-                            arm.end_effector.default_configuration(GripperState.OPEN)
+                        self.gripper_goal_type.create_gripper_goal(
+                            configuration=arm.end_effector.default_configuration(
+                                GripperState.OPEN
+                            )
                         ),
                     )
                     if self.moves_straight_around_objects

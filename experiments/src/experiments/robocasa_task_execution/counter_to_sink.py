@@ -357,7 +357,7 @@ class CounterToSinkEpisode:
                 parent=world.root, child=pr2_world.root, world=world
             )
             world.merge_world(pr2_world, drive)
-            drive.has_hardware_interface = True
+            world.set_dofs_has_hardware_interface(drive.active_dofs, True)
         drive.origin = task.robot_base_pose
         episode = cls(environment=environment, task=task, robot=PR2.from_world(world))
         episode.stand_clear_of_the_kitchen()

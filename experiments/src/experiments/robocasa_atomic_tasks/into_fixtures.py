@@ -144,8 +144,9 @@ class PutIntoAFixtureFromAboveAction(
                     distance=self.lowering_distance,
                 ),
             ),
-            self.gripper_goal_type.moving_gripper_to(
-                gripper.default_configuration(GripperState.CLOSE), tolerate_stall=True
+            self.gripper_goal_type.create_gripper_goal(
+                configuration=gripper.default_configuration(GripperState.CLOSE),
+                tolerate_stall=True,
             ),
             Deferred(
                 name="lift the object",

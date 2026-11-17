@@ -1,5 +1,6 @@
 import os.path
 import shutil
+from copy import deepcopy
 
 import mujoco
 import numpy
@@ -177,6 +178,37 @@ def test_light_is_parsed_and_attached_to_its_parent_body():
     assert light.specular == pytest.approx([0.3, 0.3, 0.3])
     assert light.directional is True
     assert light.cast_shadow is False
+
+
+BODY_WITH_A_LIGHT_MJCF = """
+<mujoco>
+  <worldbody>
+    <body name="lamp">
+      <light pos="0 0 1"/>
+      <geom type="box" size="0.1 0.1 0.1"/>
+    </body>
+  </worldbody>
+</mujoco>
+"""
+
+
+def test_a_copy_of_a_world_keeps_the_light_of_a_body():
+    """
+    A light refers to the body it is attached to; copying the world must not copy that
+    body, and with it the world, once more for the light.
+    """
+    world = MJCFParser.from_xml_string(BODY_WITH_A_LIGHT_MJCF).create_world()
+
+    copied_world = deepcopy(world)
+
+    [light] = [
+        simulator_property
+        for simulator_property in copied_world.get_body_by_name(
+            "lamp"
+        ).simulator_additional_properties
+        if isinstance(simulator_property, MujocoLight)
+    ]
+    assert light.position == pytest.approx([0.0, 0.0, 1.0])
 
 
 VISUAL_ONLY_GEOM_SCENE = os.path.join(DATASET_DIR, "visual_only_geom_scene.xml")

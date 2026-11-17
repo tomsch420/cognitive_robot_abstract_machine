@@ -291,8 +291,17 @@ class PandaOmronGripper(
     """
 
     def setup_hardware_interfaces(self) -> None:
-        for joint_name in (PandaOmronJoint.LEFT_FINGER, PandaOmronJoint.RIGHT_FINGER):
-            self._world.get_connection_by_name(joint_name).has_hardware_interface = True
+        self._world.set_dofs_has_hardware_interface(
+            [
+                dof
+                for joint_name in (
+                    PandaOmronJoint.LEFT_FINGER,
+                    PandaOmronJoint.RIGHT_FINGER,
+                )
+                for dof in self._world.get_connection_by_name(joint_name).active_dofs
+            ],
+            True,
+        )
 
     def setup_joint_states(self) -> list[JointState]:
         """
@@ -386,8 +395,14 @@ class PandaOmronArm(Arm[PandaOmronGripper], ServoedRobotPart):
         return {joint: upper for joint in arm[:5]} | {joint: wrist for joint in arm[5:]}
 
     def setup_hardware_interfaces(self) -> None:
-        for joint_name in PandaOmronJoint.arm():
-            self._world.get_connection_by_name(joint_name).has_hardware_interface = True
+        self._world.set_dofs_has_hardware_interface(
+            [
+                dof
+                for joint_name in PandaOmronJoint.arm()
+                for dof in self._world.get_connection_by_name(joint_name).active_dofs
+            ],
+            True,
+        )
 
     def setup_joint_states(self) -> list[JointState]:
         """
@@ -442,9 +457,9 @@ class PandaOmronLift(Torso, HasOneArm[PandaOmronArm], ServoedRobotPart):
         }
 
     def setup_hardware_interfaces(self) -> None:
-        self._world.get_connection_by_name(
-            PandaOmronJoint.LIFT
-        ).has_hardware_interface = True
+        self._world.set_dofs_has_hardware_interface(
+            self._world.get_connection_by_name(PandaOmronJoint.LIFT).active_dofs, True
+        )
 
     def setup_joint_states(self) -> list[JointState]:
         """

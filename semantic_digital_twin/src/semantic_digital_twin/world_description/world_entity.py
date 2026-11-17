@@ -296,7 +296,7 @@ class WorldEntityWithID(WorldEntity, SubclassJSONSerializer, HasID):
                 if isinstance(item, HomogeneousTransformationMatrix):
                     copied.child_frame = _resolve_frame(item.child_frame, world)
                 return copied
-            return deepcopy(item)
+            return world.rebind_world_entities(item)
 
         result = {}
         introspector = DataclassOnlyIntrospector()

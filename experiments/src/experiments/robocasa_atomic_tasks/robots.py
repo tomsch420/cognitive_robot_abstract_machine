@@ -125,7 +125,7 @@ class PR2Robot(TaskRobot):
                 parent=world.root, child=pr2_world.root, world=world
             )
             world.merge_world(pr2_world, drive)
-            drive.has_hardware_interface = True
+            world.set_dofs_has_hardware_interface(drive.active_dofs, True)
         drive.origin = start_pose
         robot = PR2.from_world(world)
         robot.mobile_base.full_body_controlled = True

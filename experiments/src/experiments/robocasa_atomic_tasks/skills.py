@@ -350,12 +350,14 @@ class MeasuredJointPosition(JointPositionList):
             return artifacts
         measured_errors = [
             sm.abs(
-                self.apply_limits_to_target(target, connection)
+                self.apply_limits_to_target(target=target, connection=connection)
                 - self._measured_positions[connection]
             )
             for connection, target in self.goal_state.items()
         ]
-        artifacts.observation = self.goal_reached_at(sm.max(sm.Vector(measured_errors)))
+        artifacts.observation = self.goal_reached_at(
+            error=sm.max(sm.Vector(measured_errors))
+        )
         return artifacts
 
     def on_tick(self) -> ObservationStateValues | None:
@@ -587,8 +589,8 @@ class OperateMechanismAction(DrivesAJointByAPart, MovesContainerByItsHandle):
             self.grasping_of(self.grasp, self.arm),
             *settling,
             self._create_mechanism_goal(),
-            self.gripper_goal_type.moving_gripper_to(
-                end_effector.default_configuration(GripperState.OPEN)
+            self.gripper_goal_type.create_gripper_goal(
+                configuration=end_effector.default_configuration(GripperState.OPEN)
             ),
             self.tool_center_point_goal(
                 self.back_off_pose(self.grasp.grasp_pose, end_effector), self.arm
@@ -778,8 +780,10 @@ class PressAction(
 
     def create_steps(self) -> list[StatechartNode]:
         return [
-            self.gripper_goal_type.moving_gripper_to(
-                self.arm.end_effector.default_configuration(self.gripper_state)
+            self.gripper_goal_type.create_gripper_goal(
+                configuration=self.arm.end_effector.default_configuration(
+                    self.gripper_state
+                )
             ),
             self.tool_center_point_goal(
                 self.fingertips_goal(self.approach_distance), self.arm
@@ -946,8 +950,10 @@ class StandAndPressAction(MayReachThroughFreeSpace, OperatesGripper, SequentialA
         press = self.press if isinstance(self.press, PressAction) else self.press.press
         return [
             self.navigate,
-            self.gripper_goal_type.moving_gripper_to(
-                press.arm.end_effector.default_configuration(press.gripper_state)
+            self.gripper_goal_type.create_gripper_goal(
+                configuration=press.arm.end_effector.default_configuration(
+                    press.gripper_state
+                )
             ),
             *self.reaching(
                 a(ReachThroughFreeSpaceAction)(
