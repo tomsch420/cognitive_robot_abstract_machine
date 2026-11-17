@@ -17,7 +17,7 @@ from experiments.robocasa_atomic_tasks.robocasa_names import (
     RoboCasaRobotBodyPrefix,
     RoboCasaRobotFrame,
 )
-from experiments.robocasa_goals.simulation_mirror import RoboCasaSimulationMirror
+from experiments.robocasa_atomic_tasks.simulation_mirror import RoboCasaSimulationMirror
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, Arm
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body

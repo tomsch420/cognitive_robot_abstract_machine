@@ -70,7 +70,7 @@ from experiments.robocasa_atomic_tasks.skills import (
 )
 from experiments.robocasa_atomic_tasks.robots import TaskRobot
 from experiments.robocasa_atomic_tasks.stands import RobotClearance, StandFinder
-from experiments.robocasa_task_execution.exceptions import (
+from experiments.robocasa_atomic_tasks.exceptions import (
     NoClearStandingPoseBehindTheStart,
 )
 from krrood.entity_query_language.query.match import Match

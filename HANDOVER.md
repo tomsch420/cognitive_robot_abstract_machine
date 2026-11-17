@@ -164,6 +164,9 @@ To decompose a new object, record its shape before splitting it and keep it afte
 3. `store.add(DecomposedObject.of(whole, fingerprint))`
 
 ### The PR2 task (unchanged since 2026-10-16)
+- **Removed on 2026-11-17:** the module below stopped importing once coraplex dropped
+  `coraplex.datastructures.dataclasses` (2026-10-07) and was deleted with its tests and
+  scripts; the PandaOmron version lives in `robocasa_atomic_tasks`.
 - **What works:** PickPlaceCounterToSink with the PR2 under CRAM plans, full MuJoCo physics,
   friction grasping, an omni base drive, and a graph of convex sets path to place into the
   basin.

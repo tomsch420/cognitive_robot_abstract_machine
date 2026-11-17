@@ -15,7 +15,7 @@ from functools import cached_property
 import numpy as np
 from typing_extensions import TYPE_CHECKING
 
-from experiments.robocasa_goals.exceptions import (
+from experiments.robocasa_atomic_tasks.exceptions import (
     NotARoboCasaFixture,
     NotARoboCasaObject,
 )

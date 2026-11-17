@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 from coraplex.plans.failures import PlanFailure
 from krrood.exceptions import DataclassException
+from krrood_spatial_math.spatial_types import Pose
 from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -417,3 +418,74 @@ class NothingTouched(PlanFailure):
             "Start lower or above the bodies to touch, or let the tool frame go further "
             "down."
         )
+
+
+# %% where the robot starts
+
+
+@dataclass
+class NoClearStandingPoseBehindTheStart(DataclassException):
+    """
+    Raised when the robot collides with the kitchen wherever it stands behind the start
+    pose RoboCasa gives.
+    """
+
+    start_pose: Pose
+    """
+    RoboCasa's start pose, which the robot stepped back from.
+    """
+
+    maximum_distance: float
+    """
+    How far behind the start pose the robot stood at most.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The robot collides with the kitchen everywhere up to "
+            f"{self.maximum_distance} m behind its start pose {self.start_pose}."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Allow the robot to step back further, or compose another episode."
+
+
+# %% finding RoboCasa's counterpart of a body
+
+
+@dataclass
+class NotARoboCasaObject(DataclassException):
+    """
+    Raised when a body is asked for the RoboCasa object it is the root of, but is the
+    root of none.
+    """
+
+    body: Body
+    """
+    The body asked about.
+    """
+
+    def error_message(self) -> str:
+        return f"{self.body.name} is the root body of no object RoboCasa placed."
+
+    def suggest_correction(self) -> str:
+        return "Ask about the root body of one of the task's objects."
+
+
+@dataclass
+class NotARoboCasaFixture(DataclassException):
+    """
+    Raised when a body is asked for the RoboCasa fixture it is the root of, but is the
+    root of none.
+    """
+
+    body: Body
+    """
+    The body asked about.
+    """
+
+    def error_message(self) -> str:
+        return f"{self.body.name} is the root body of no fixture of the kitchen."
+
+    def suggest_correction(self) -> str:
+        return "Ask about the root body of one of the kitchen's fixtures."
