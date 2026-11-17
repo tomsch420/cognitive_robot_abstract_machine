@@ -171,3 +171,10 @@ items:
     torch so those cells of the benchmark fill. Added by the developer at the benchmark kickoff.
 
     '
+
+- id: cirkit-comparison
+  title: "Compare the layered circuits with cirkit"
+  branch: null
+  track: survey-and-benchmark
+  depends_on: []
+  status: not started
