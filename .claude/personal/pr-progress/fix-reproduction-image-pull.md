@@ -1,4 +1,4 @@
-## PR cram2#997 (fix-reproduction-image-pull): Let the bug reproduction job pull the CI image
-- Plan: give the reproduce job of reproduce_bug_reports.yml `packages: read`, so the runner can pull ghcr.io/cram2/cognitive_robot_abstract_machine:jazzy (403 Forbidden in run 44100561697 for cram2#996)
-- Done: draft cram2#997 at 01a18da3d3 with bug-fix; actionlint passes
-- Next: CI fails on every branch until cram2#998 (opencv pin) is merged, then rerun the failed jobs; after merging, edit cram2#996 to rerun the workflow; it should comment with the failing assertion and add `reproduced`
+## PR cram2#997 (fix-reproduction-image-pull): Let the bug reproduction job pull the CI image, and keep opencv-python below 5.1
+- Plan: give the reproduce job `packages: read` so the runner can pull the CI image (403 for cram2#996); robokudo requires opencv-python<5.1, since 5.1.0.95 has only Windows wheels and breaks every CI install
+- Done: both commits on cram2#997 at ad47918677 (pin moved in from the closed cram2#998); a fresh resolution picks opencv-python 5.0.0.93, which has manylinux wheels
+- Next: CI of cram2#997; robokudo code owners review the pin; after merging, edit cram2#996 to rerun the workflow; lift the bound once 5.1 has Linux wheels
