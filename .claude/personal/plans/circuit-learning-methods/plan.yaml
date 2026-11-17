@@ -176,5 +176,15 @@ items:
   title: "Compare the layered circuits with cirkit"
   branch: null
   track: survey-and-benchmark
-  depends_on: []
+  depends_on:
+  - learning-benchmark
   status: not started
+  notes: 'Compare the tensorized layered circuits of probabilistic_model with cirkit
+    (https://github.com/april-tools/cirkit). cirkit runs on the shared benchmark as a method
+    of its own: the same RAT-SPN structure on the same datasets, trained as cirkit trains it
+    with torch on CPU and GPU, measured with every metric of the first standing rule. The
+    pull request also compares the features of both libraries: circuit operations,
+    structures, input distributions and backends. cirkit (libcirkit on PyPI) is a new
+    dependency of experiments, approved by the developer first.
+
+    '
