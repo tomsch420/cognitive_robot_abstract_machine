@@ -1,14 +1,14 @@
 schema_version: 1
 id: circuit-learning-methods
 title: State-of-the-art learning methods for probabilistic circuits
-description: >
-  Survey current parameter and structure learning methods for probabilistic circuits,
-  measure them on one shared benchmark, and implement the ones that pay off in
-  probabilistic_model on the tensorized layered circuits. Starts once region graphs
-  build tensorized RAT-SPNs (cram2#976).
+description: 'Survey current parameter and structure learning methods for probabilistic circuits,
+  measure them on one shared benchmark, and implement the ones that pay off in probabilistic_model
+  on the tensorized layered circuits. Starts once region graphs build tensorized RAT-SPNs
+  (cram2#976).
+
+  '
 default_repository: tomsch420/cognitive_robot_abstract_machine
 tracking_issue: 41
-
 waves:
 - id: foundation
   name: Survey and benchmark
@@ -16,7 +16,6 @@ waves:
 - id: methods
   name: Learning methods
   description: Parameter and structure learning, in parallel tracks.
-
 tracks:
 - id: survey-and-benchmark
   name: Survey and benchmark
@@ -27,7 +26,6 @@ tracks:
 - id: structure-learning
   name: Structure learning
   wave: methods
-
 items:
 - id: learning-methods-survey
   title: Survey state-of-the-art learning methods for probabilistic circuits
@@ -37,27 +35,29 @@ items:
   session: https://claude.ai/code/session_01LzY41J7dEMMTMGn2EDVH97
   depends_on: []
   status: in progress
-  notes: >
-    Parameter and structure learning only (the developer excluded expressive architectures
-    and Bayesian learning). Compare published methods by reported results on standard
-    benchmarks, cost, and fit with the tensorized layered circuits; deliver a short doc page in
-    probabilistic_model/doc. Confirms, reorders or drops the candidate items below and adds
-    missing ones, announced on the tracking PR.
+  notes: 'Parameter and structure learning only (the developer excluded expressive architectures
+    and Bayesian learning). Compare published methods by reported results on standard benchmarks,
+    cost, and fit with the tensorized layered circuits; deliver a short doc page in probabilistic_model/doc.
+    Confirms, reorders or drops the candidate items below and adds missing ones, announced
+    on the tracking PR.
 
+    '
 - id: learning-benchmark
   title: Shared benchmark for circuit learning methods
   track: survey-and-benchmark
-  depends_on:
-  - minibatch-training-until-convergence
-  status: not started
-  notes: >
-    Harness for the metrics of the first standing rule; every method remeasured, no published
-    numbers reused. 14 datasets without preprocessing of our own: binary NLTCS, MSNBC, Plants,
-    Ad; continuous POWER, GAS, HEPMASS, MINIBOONE, BSDS300; mixed OpenML 42225, 42571, 42729,
-    42746, 45045. Full grid of library, device, float type and edges; one seed; train until
-    convergence. Conditioning and truncation at 5 to 100 variables or simple sets. Baselines:
-    RAT-SPN, JPT, EM. Full spec: https://claude.ai/artifact/3eGnQibyJjzzRH1HLAZn3W
+  branch: learning-benchmark
+  pull_request_number: 45
+  session: local session f213800d-5c57-4391-9753-59b88553b370
+  depends_on: []
+  status: in progress
+  notes: 'Harness for the metrics of the first standing rule; every method remeasured, no
+    published numbers reused. 14 datasets without preprocessing of our own: binary NLTCS,
+    MSNBC, Plants, Ad; continuous POWER, GAS, HEPMASS, MINIBOONE, BSDS300; mixed OpenML 42225,
+    42571, 42729, 42746, 45045. Full grid of library, device, float type and edges; one seed;
+    train until convergence. Conditioning and truncation at 5 to 100 variables or simple sets.
+    Baselines: RAT-SPN, JPT, EM. Full spec: https://claude.ai/artifact/3eGnQibyJjzzRH1HLAZn3W
 
+    '
 - id: minibatch-em-tensorized
   title: Mini-batch expectation maximization on layered circuits
   track: parameter-learning
@@ -65,41 +65,42 @@ items:
   - learning-methods-survey
   - learning-benchmark
   status: not started
-  notes: >
-    Stochastic EM for layered circuits on any array backend, with the expected counts taken
-    from the gradient of the log-likelihood (Peharz et al. 2020, Einsum Networks). The
+  notes: 'Stochastic EM for layered circuits on any array backend, with the expected counts
+    taken from the gradient of the log-likelihood (Peharz et al. 2020, Einsum Networks). The
     existing expectation_maximization.py works on rustworkx circuits only.
 
+    '
 - id: tractable-regularization
   title: Data softening and entropy regularization
   track: parameter-learning
   depends_on:
   - minibatch-em-tensorized
   status: not started
-  notes: >
-    Liu and Van den Broeck 2021, Tractable Regularization of Probabilistic Circuits:
+  notes: 'Liu and Van den Broeck 2021, Tractable Regularization of Probabilistic Circuits:
     data softening and entropy regularization, usable with EM and gradient descent.
 
+    '
 - id: probabilistic-dropout
   title: Probabilistic dropout at inputs and sums
   track: parameter-learning
   depends_on:
   - learning-benchmark
   status: not started
-  notes: >
-    Dropout at input distributions and at sum children (Peharz et al. 2019, RAT-SPN section
-    3.3) for gradient training of layered circuits.
+  notes: 'Dropout at input distributions and at sum children (Peharz et al. 2019, RAT-SPN
+    section 3.3) for gradient training of layered circuits.
 
+    '
 - id: latent-variable-distillation
   title: Latent variable distillation
   track: parameter-learning
   depends_on:
   - minibatch-em-tensorized
   status: not started
-  notes: >
-    Liu et al. 2023: guide the latent assignments of a circuit with a deep generative model
-    before EM. Needs a deep generative model, so the developer approves the dependency first.
+  notes: 'Liu et al. 2023: guide the latent assignments of a circuit with a deep generative
+    model before EM. Needs a deep generative model, so the developer approves the dependency
+    first.
 
+    '
 - id: learnspn
   title: LearnSPN structure learning
   track: structure-learning
@@ -107,10 +108,11 @@ items:
   - learning-methods-survey
   - learning-benchmark
   status: not started
-  notes: >
-    Gens and Domingos 2013: recursive clustering of rows into sums and independence splits
-    of variables into products. Check overlap with the existing JPT and Nyga induction first.
+  notes: 'Gens and Domingos 2013: recursive clustering of rows into sums and independence
+    splits of variables into products. Check overlap with the existing JPT and Nyga induction
+    first.
 
+    '
 - id: hidden-chow-liu-trees
   title: Hidden Chow-Liu tree circuits
   track: structure-learning
@@ -118,11 +120,11 @@ items:
   - learning-methods-survey
   - learning-benchmark
   status: not started
-  notes: >
-    Liu and Van den Broeck 2021: a Chow-Liu tree over the variables with a latent variable per
-    node, compiled into a tensorized layered circuit; the standard strong baseline of recent
-    circuit papers.
+  notes: 'Liu and Van den Broeck 2021: a Chow-Liu tree over the variables with a latent variable
+    per node, compiled into a tensorized layered circuit; the standard strong baseline of
+    recent circuit papers.
 
+    '
 - id: prune-and-grow
   title: Sparse circuits by pruning and growing
   track: structure-learning
@@ -130,56 +132,42 @@ items:
   - hidden-chow-liu-trees
   - minibatch-em-tensorized
   status: not started
-  notes: >
-    Dang et al. 2022: alternately prune low-flow edges and grow the circuit by copying and
-    perturbing nodes, starting from a hidden Chow-Liu tree circuit.
+  notes: 'Dang et al. 2022: alternately prune low-flow edges and grow the circuit by copying
+    and perturbing nodes, starting from a hidden Chow-Liu tree circuit.
 
+    '
 - id: anemone
   title: Anemone mini-batch expectation maximization
   track: parameter-learning
   depends_on:
   - minibatch-em-tensorized
   status: not started
-  notes: >
-    Liu, Shao and Van den Broeck 2026, Rethinking Probabilistic Circuit Parameter Learning:
+  notes: 'Liu, Shao and Van den Broeck 2026, Rethinking Probabilistic Circuit Parameter Learning:
     mini-batch EM with a learning rate per parameter scaled by its contribution to the batch
     likelihood; beats full-batch and mini-batch EM in final log-likelihood and epochs. Uses
     the expected counts of minibatch-em-tensorized. Added by the survey.
 
+    '
 - id: strudel
   title: Strudel structure learning
   track: structure-learning
   depends_on:
   - hidden-chow-liu-trees
   status: not started
-  notes: >
-    Dang et al. 2020: greedy structure learning of smooth, deterministic and decomposable
+  notes: 'Dang et al. 2020: greedy structure learning of smooth, deterministic and decomposable
     circuits from a Chow-Liu based vtree; shares the Chow-Liu tree of hidden-chow-liu-trees.
     Restored after the benchmark gained a capability list: its determinism makes most likely
     assignment queries tractable, which HCLT circuits cannot answer exactly.
 
-- id: minibatch-training-until-convergence
-  title: Mini-batch gradient descent that trains until convergence
-  track: survey-and-benchmark
-  branch: minibatch-training-until-convergence
-  pull_request_number: 43
-  session: https://claude.ai/code/session_01LzY41JSSpHzvhkbRxbQgFH
-  depends_on:
-  - tensorized-array-backends/region-graph-builds-tensorized
-  status: in progress
-  notes: >
-    GradientDescent and TorchGradientDescent train on mini-batches and stop once the average
-    train log-likelihood grows by less than a tolerance for a number of epochs, or at an epoch
-    limit, reporting the epochs and whether they converged. Full batches ran out of GPU memory
-    on the large benchmark datasets. Added by the developer at the benchmark kickoff.
-
+    '
 - id: structural-queries-any-backend
   title: Sampling, truncation and conditioning on any array backend
   track: survey-and-benchmark
   depends_on:
   - learning-benchmark
   status: not started
-  notes: >
-    Sampling, truncation and conditioning raise HostOnlyQueryError unless the parameters are
-    numpy arrays, so the benchmark times them on numpy only. Make them work on jax and torch
-    so those cells of the benchmark fill. Added by the developer at the benchmark kickoff.
+  notes: 'Sampling, truncation and conditioning raise HostOnlyQueryError unless the parameters
+    are numpy arrays, so the benchmark times them on numpy only. Make them work on jax and
+    torch so those cells of the benchmark fill. Added by the developer at the benchmark kickoff.
+
+    '
