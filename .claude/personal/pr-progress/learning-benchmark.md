@@ -1,4 +1,4 @@
 ## PR #45 on the fork (learning-benchmark): Benchmark circuit learning methods against RAT-SPN, JPT and EM
-- Plan: harness experiments/circuit_learning from learning-experiments, baselines only (RAT-SPN gradient descent, JPT, rustworkx EM on the RAT-SPN structure); plateau learning rate reduction with the InjectStatefulHyperparamsState fix; develop and test in the neem-4 tom-probabilistic-experiments container (worktree /root/learning-benchmark); then run the baselines on the 14 datasets
-- Done: bootstrap 2026-11-17, draft PR, plan record in progress
-- Next: port the harness and tests; run1 (all methods, learning-experiments worktree) is still running on neem-4, so ask before a run that competes with it
+- Plan: harness experiments/circuit_learning with the three baselines; plateau learning rate; rustworkx EM until convergence; run the EM baseline on the 14 datasets in the neem-4 container (worktree /root/learning-benchmark)
+- Done: harness and library commits 53ff2791a4 (local, not pushed yet); harness and touched library tests pass in the container; krrood check clean; found and fixed rustworkx continuous leaves failing on rows of mixed symbolic and continuous values
+- Next: full probabilistic_model suite (running); push; decide with the developer when the EM baseline runs (neem-4 load 284 on 256 cores, run1 still running); psutil is used by the runner but only declared transitively
