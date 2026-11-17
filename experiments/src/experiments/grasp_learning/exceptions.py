@@ -28,3 +28,25 @@ class ObjectInNoFixture(DataclassException):
 
     def suggest_correction(self) -> str:
         return "Choose a task whose object starts inside a fixture, such as a sink."
+
+
+# %% stored attempts
+
+
+@dataclass(kw_only=True)
+class NoRecordedGraspAttempt(DataclassException):
+    """
+    Raised when an attempt with its run is read by a number no such attempt is stored
+    under.
+    """
+
+    database_id: int
+    """
+    The number asked for.
+    """
+
+    def error_message(self) -> str:
+        return f"No attempt with its run is stored under {self.database_id}."
+
+    def suggest_correction(self) -> str:
+        return "Read the numbers of the stored attempts from the database first."

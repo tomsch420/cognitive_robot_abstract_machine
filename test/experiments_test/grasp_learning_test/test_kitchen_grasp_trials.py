@@ -5,17 +5,38 @@ the fixture the object lies in.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import pytest
 
 pytest.importorskip("robosuite", reason="robosuite is not installed")
 
 from ...pytest_environment import runs_in_continuous_integration
 from experiments.grasp_learning.database import GraspDatabase
+from experiments.grasp_learning.exceptions import NoRecordedGraspAttempt
+from experiments.grasp_learning.records import (
+    GraspAttempt,
+    GraspLearningTask,
+    GraspSource,
+    RecordedGraspAttempt,
+)
+from experiments.physical_pick_up.robots import ObjectPlacement
+from experiments.robocasa_atomic_tasks.judge import Judgement
+from experiments.robocasa_atomic_tasks.stored_runs import (
+    SimulatedMoment,
+    StoredTaskRun,
+)
+from krrood_spatial_math.spatial_types import Twist, Vector3
+from semantic_digital_twin.grasping.grasp_strategies import GraspFromAnySide
+from semantic_digital_twin.grasping.object_relative_grasp import (
+    GraspResult,
+    draw_grasps,
+)
 from experiments.grasp_learning.kitchen_grasp_trials import (
-    EpisodeAroundTheObject,
     KitchenAroundTheObject,
     KitchenGraspTrials,
 )
+from experiments.robocasa_atomic_tasks.episode import RoboCasaEpisode
 from experiments.robocasa_atomic_tasks.pick_place import PickPlaceSinkToCounter
 from experiments.robocasa_atomic_tasks.robots import RobotModel
 from semantic_digital_twin.adapters.robocasa_dataset.mujoco_compat import (
@@ -40,16 +61,11 @@ def kitchen() -> KitchenAroundTheObject:
 
 
 @pytest.fixture(scope="module")
-def around_the_object(kitchen: KitchenAroundTheObject) -> EpisodeAroundTheObject:
+def episode(kitchen: KitchenAroundTheObject) -> RoboCasaEpisode:
     return kitchen.compose()
 
 
-def test_the_object_lies_in_the_sink(around_the_object):
-    assert around_the_object.fixture is around_the_object.episode.environment.sink
-
-
-def test_the_sink_the_robot_and_the_object_stay(kitchen, around_the_object):
-    episode = around_the_object.episode
+def test_the_sink_the_robot_and_the_object_stay(kitchen, episode):
     world_bodies = set(episode.world.kinematic_structure_entities)
 
     assert episode.fixture_body(episode.environment.sink) in world_bodies
@@ -58,8 +74,7 @@ def test_the_sink_the_robot_and_the_object_stay(kitchen, around_the_object):
 
 
 @pytest.mark.parametrize("fixture_type", [Fridge, Stove])
-def test_a_fixture_across_the_kitchen_is_removed(around_the_object, fixture_type):
-    episode = around_the_object.episode
+def test_a_fixture_across_the_kitchen_is_removed(episode, fixture_type):
     [fixture] = [
         fixture
         for fixture in episode.environment.fixtures.values()
@@ -70,37 +85,135 @@ def test_a_fixture_across_the_kitchen_is_removed(around_the_object, fixture_type
     assert fixture.root_body not in names
 
 
-def test_no_semantic_annotation_refers_to_a_removed_body(around_the_object):
-    world = around_the_object.episode.world
+def test_no_semantic_annotation_refers_to_a_removed_body(episode):
+    world = episode.world
     entities = set(world.kinematic_structure_entities)
 
     assert all(annotation.root in entities for annotation in world.semantic_annotations)
 
 
-def test_the_object_is_dropped_inside_the_sink(kitchen, around_the_object):
-    episode = around_the_object.episode
+# %% storing an attempt with its run
+
+
+def recorded_attempt(
+    kitchen: KitchenAroundTheObject, episode: RoboCasaEpisode
+) -> RecordedGraspAttempt:
+    """
+    :return: An attempt at a grasp drawn on the picked object, lifting it, with a run
+        of two moments of one degree of freedom.
+    """
     graspable = episode.graspable(kitchen.task.picked_object)
-    sink_box = episode.bounds.of_branch(episode.fixture_body(around_the_object.fixture))
+    [grasp] = draw_grasps(GraspFromAnySide().statement(graspable), 1)
+    grasp.result = GraspResult(
+        object_raised=True,
+        motion_completed=True,
+        object_displacement=Twist(translation=Vector3(0.0, 0.0, 0.2)),
+        slip=Twist(translation=Vector3(0.0, 0.0, 0.0)),
+    )
+    return RecordedGraspAttempt(
+        attempt=GraspAttempt(
+            task=GraspLearningTask.of_graspable(
+                graspable, type(episode.arm.end_effector)
+            ),
+            robot=type(episode.robot),
+            object_name=graspable.root.name.name,
+            source=GraspSource.STATED_REGIONS,
+            placement=ObjectPlacement(x=1.0, y=-0.3),
+            grasp=grasp,
+        ),
+        run=StoredTaskRun(
+            task=kitchen.task.robocasa_task_name,
+            layout=kitchen.task.layout,
+            style=kitchen.task.style,
+            seed=kitchen.task.seed,
+            robot=kitchen.task.robot,
+            degree_of_freedom_names=["lever"],
+            moments=[
+                SimulatedMoment(simulation_time=0.0, positions=[0.0]),
+                SimulatedMoment(simulation_time=0.5, positions=[0.1]),
+            ],
+            judgement=Judgement(
+                accomplished=False, judged_objects=[], judged_joint_positions=[]
+            ),
+        ),
+    )
 
-    area = around_the_object.inside_of_the_fixture(graspable)
 
-    assert sink_box.lower[0] < area.x.lower < area.x.upper < sink_box.upper[0]
-    assert sink_box.lower[1] < area.y.lower < area.y.upper < sink_box.upper[1]
-    assert sink_box.lower[2] < area.height < graspable.root.global_pose.to_np()[2, 3]
+@pytest.fixture
+def database() -> GraspDatabase:
+    return GraspDatabase.connect("sqlite:///:memory:")
+
+
+def test_a_recorded_attempt_counts_among_the_attempts_of_its_task(
+    kitchen, episode, database
+):
+    recorded = recorded_attempt(kitchen, episode)
+
+    database.add_attempts([recorded])
+
+    [read] = database.attempts(recorded.attempt.task)
+    assert read.grasp.height == recorded.attempt.grasp.height
+    assert read.placement == recorded.attempt.placement
+
+
+def test_a_recorded_attempt_is_read_back_with_its_run(kitchen, episode, database):
+    recorded = recorded_attempt(kitchen, episode)
+    database.add_attempts([recorded])
+
+    read = database.recorded_attempt(1)
+
+    assert read.run.moments == recorded.run.moments
+    assert read.run.task == recorded.run.task
+
+
+def test_reading_an_attempt_that_is_not_stored_raises(database):
+    with pytest.raises(NoRecordedGraspAttempt):
+        database.recorded_attempt(1)
 
 
 # %% an attempt
 
 
-@simulates_physics
-def test_an_attempt_is_stored_with_where_the_object_lay(kitchen):
-    database = GraspDatabase.connect("sqlite:///:memory:")
+@dataclass(kw_only=True)
+class OneAttempt:
+    """
+    The trials of one attempt and what they stored.
+    """
+
+    trials: KitchenGraspTrials
+    """
+    The trials.
+    """
+
+    recorded: RecordedGraspAttempt
+    """
+    The attempt they tried.
+    """
+
+
+@pytest.fixture(scope="module")
+def one_attempt(kitchen: KitchenAroundTheObject) -> OneAttempt:
     trials = KitchenGraspTrials(
-        kitchen=kitchen, database=database, number_of_attempts=1
+        kitchen=kitchen,
+        database=GraspDatabase.connect("sqlite:///:memory:"),
+        number_of_attempts=1,
     )
-
     [recorded] = trials.run()
+    return OneAttempt(trials=trials, recorded=recorded)
 
-    [stored] = database.attempts(recorded.attempt.task)
+
+@simulates_physics
+def test_an_attempt_is_stored_with_where_the_object_lay(one_attempt):
+    recorded = one_attempt.recorded
+
+    [stored] = one_attempt.trials.database.attempts(recorded.attempt.task)
+
     assert stored.placement == recorded.attempt.placement
     assert stored.grasp.result.lifted == recorded.attempt.grasp.result.lifted
+
+
+@simulates_physics
+def test_attempts_grasp_from_above(one_attempt):
+    pitch = one_attempt.recorded.attempt.grasp.pitch
+
+    assert pitch < one_attempt.trials.grasp_strategy.pitch.upper

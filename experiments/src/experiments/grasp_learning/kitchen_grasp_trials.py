@@ -1,9 +1,10 @@
 """
 Trying grasps on an object of a RoboCasa kitchen cut down to the fixture the object lies
-in, in MuJoCo: before every attempt the object is dropped somewhere inside the fixture,
-and the robot walks to a stand it chooses and lifts the object by a grasp drawn from
-where the object's annotation allows. Every attempt is stored with its plans and with
-the world's state as it moved.
+in, in MuJoCo: every attempt starts with the object where RoboCasa put it, and the robot
+walks to a stand it chooses and lifts the object by a grasp drawn from
+:attr:`KitchenGraspTrials.grasp_strategy`. Every attempt is stored with its plans and
+with the world's state as it moved, and can be replayed with
+``experiments/scripts/grasp_learning/replay_kitchen_grasp_attempt.py``.
 
 Run it with ``python -m experiments.grasp_learning.kitchen_grasp_trials``; see
 ``--help``.
@@ -18,10 +19,11 @@ from dataclasses import dataclass, field
 from datetime import timedelta
 
 import numpy as np
-from random_events.interval import closed
 from typing_extensions import TYPE_CHECKING, Iterator
 
 from coraplex.plans.executors import PlanOutcome
+from coraplex.robot_plans.actions.core.pick_up import GraspingAction
+from coraplex.robot_plans.plan_transformations import CloseFingersToObjectWidth
 from experiments.grasp_learning.database import GraspDatabase
 from experiments.grasp_learning.exceptions import ObjectInNoFixture
 from experiments.grasp_learning.records import (
@@ -30,21 +32,27 @@ from experiments.grasp_learning.records import (
     GraspSource,
     RecordedGraspAttempt,
 )
-from experiments.physical_pick_up.robots import ObjectPlacement, PickUpArea
+from experiments.physical_pick_up.robots import ObjectPlacement
 from experiments.robocasa_atomic_tasks.catalogue import TaskModule
 from experiments.robocasa_atomic_tasks.episode import RoboCasaEpisode
-from experiments.robocasa_atomic_tasks.placement import FixtureRegion
 from experiments.robocasa_atomic_tasks.robots import RobotModel
 from experiments.robocasa_atomic_tasks.skills import StandAndPickUpAction
 from experiments.robocasa_atomic_tasks.stored_runs import (
     PlanRecorder,
     SimulatedMomentRecorder,
+    StoredTaskRun,
+    TaskRunReplay,
 )
 from experiments.robocasa_atomic_tasks.tasks import PickAndPlaceTask
+from krrood.bounds import Bounds
 from krrood.parametrization.model_registries import UniformPriorRegistry
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Twist
 from semantic_digital_twin.adapters.multi_sim import MujocoSimulationSnapshot
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
+from semantic_digital_twin.grasping.grasp_strategies import (
+    GraspFromAnySide,
+    GraspStrategy,
+)
 from semantic_digital_twin.grasping.grasp_trials import GraspPerformer, GraspTrials
 from semantic_digital_twin.grasping.object_relative_grasp import GraspResult
 from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
@@ -84,10 +92,9 @@ class KitchenAroundTheObject:
     may lie at most, in metres.
     """
 
-    def compose(self) -> EpisodeAroundTheObject:
+    def compose(self) -> RoboCasaEpisode:
         """
-        :return: A new episode of :attr:`task`, cut down, with the fixture the picked
-            object lies in.
+        :return: A new episode of :attr:`task`, cut down.
         """
         episode = self.task.compose()
         fixture = self.holding_fixture(episode)
@@ -115,14 +122,11 @@ class KitchenAroundTheObject:
             len(world.bodies),
             episode.task.instruction,
         )
-        return EpisodeAroundTheObject(
-            episode=RoboCasaEpisode(
-                environment=episode.environment,
-                task=episode.task,
-                robot=episode.robot,
-                task_robot=episode.task_robot,
-            ),
-            fixture=fixture,
+        return RoboCasaEpisode(
+            environment=episode.environment,
+            task=episode.task,
+            robot=episode.robot,
+            task_robot=episode.task_robot,
         )
 
     def holding_fixture(self, episode: RoboCasaEpisode) -> Fixture:
@@ -185,48 +189,22 @@ class KitchenAroundTheObject:
         )
 
 
-@dataclass(kw_only=True)
-class EpisodeAroundTheObject:
+# %% closing on an object wider than the gripper
+
+
+@dataclass
+class CloseFingersToObjectWidthWhereItFits(CloseFingersToObjectWidth):
     """
-    An episode whose kitchen is cut down around the fixture the picked object lies in.
+    Differs from :class:`CloseFingersToObjectWidth` in leaving a grasp on an object
+    wider than the gripper opens to shut the fingers onto whatever part of the object
+    lies between them.
     """
 
-    episode: RoboCasaEpisode
-    """
-    The cut down episode.
-    """
-
-    fixture: Fixture
-    """
-    The fixture the picked object lies in.
-    """
-
-    def inside_of_the_fixture(
-        self, graspable: HasGraspCandidates, margin: float = 0.03
-    ) -> PickUpArea:
-        """
-        :param graspable: The object picked up.
-        :param margin: How far the object's footprint keeps from the sides of the
-            inside, in metres, beyond half the diagonal of its bounding box.
-        :return: Where in the lowest inside region of :attr:`fixture` the middle of the
-            object's footprint may lie however the object is turned.
-        """
-        regions = self.fixture.get_int_sites(relative=False)
-        region = FixtureRegion.from_corners(
-            min(regions.values(), key=lambda corners: corners[0][2])
-        )
-        corners = np.array([region.corner, region.along_width, region.along_depth])
-        object_box = self.episode.bounds.of_body(graspable.root)
-        reach = (
-            float(np.linalg.norm(object_box.upper[:2] - object_box.lower[:2])) / 2
-            + margin
-        )
-        lower = corners[:, :2].min(axis=0) + reach
-        upper = corners[:, :2].max(axis=0) - reach
-        return PickUpArea(
-            height=float(region.corner[2]),
-            x=closed(lower[0], upper[0]).simple_sets[0],
-            y=closed(lower[1], upper[1]).simple_sets[0],
+    def is_applicable(self, plan_node: GraspingAction) -> bool:
+        return (
+            super().is_applicable(plan_node)
+            and plan_node.grasp.width_along_closing_axis
+            <= plan_node.arm.end_effector.separation_when_open
         )
 
 
@@ -236,13 +214,7 @@ class EpisodeAroundTheObject:
 @dataclass(kw_only=True)
 class AttemptRecording:
     """
-    What one attempt left behind besides its result: where the object lay, the plans and
-    the world's state as it moved.
-    """
-
-    placement: ObjectPlacement
-    """
-    Where the object was dropped.
+    The plans of one attempt and the world's state as it moved through it.
     """
 
     plan_recorder: PlanRecorder
@@ -260,9 +232,9 @@ class AttemptRecording:
 class KitchenGraspPerformer(GraspPerformer):
     """
     Performs every grasp in a physically simulated episode: the simulation is put back
-    to :attr:`start` and the object dropped at a placement drawn inside the fixture; the
-    robot then walks to a stand it chooses facing the object, picks it up by the grasp
-    and parks its arms, and holds still for :attr:`hold_duration`.
+    to :attr:`start`, the robot walks to a stand it chooses facing the object, picks the
+    object up by the grasp and parks its arms, and holds still for
+    :attr:`hold_duration`.
     """
 
     episode: RoboCasaEpisode
@@ -275,34 +247,9 @@ class KitchenGraspPerformer(GraspPerformer):
     The object picked up.
     """
 
-    area: PickUpArea
-    """
-    Where the middle of the object's footprint may come to lie.
-    """
-
-    generator: np.random.Generator
-    """
-    Draws the placements.
-    """
-
     start: MujocoSimulationSnapshot
     """
-    The moment of the simulation every attempt starts from.
-    """
-
-    maximum_yaw: float = math.pi
-    """
-    How far the object may be turned either way about the vertical axis, in radians.
-    """
-
-    drop_height: float = 0.02
-    """
-    How far above the floor of the area the object's lowest point starts, in metres.
-    """
-
-    settling_duration: timedelta = timedelta(seconds=1)
-    """
-    How long the dropped object is given to come to rest before the robot moves.
+    The moment of the simulation every attempt starts from, with the object at rest.
     """
 
     hold_duration: timedelta = timedelta(seconds=2)
@@ -318,18 +265,14 @@ class KitchenGraspPerformer(GraspPerformer):
 
     recordings: list[AttemptRecording] = field(default_factory=list, init=False)
     """
-    What each attempt so far left behind, in order.
+    What each attempt so far recorded, in order.
     """
 
     def perform(self, grasp: GraspCandidate) -> GraspResult:
         episode = self.episode
         simulation = episode.simulation
         simulation.restore_snapshot(snapshot=self.start)
-        placement = self.area.random_placement(self.generator, self.maximum_yaw)
-        self.drop_object(placement)
-        simulation.step_simulation(self.settling_duration)
         recording = AttemptRecording(
-            placement=placement,
             plan_recorder=PlanRecorder(simulation=simulation),
             moment_recorder=SimulatedMomentRecorder(
                 _world=episode.world, simulation=simulation
@@ -365,9 +308,9 @@ class KitchenGraspPerformer(GraspPerformer):
             slip=Twist.from_transformation(HomogeneousTransformationMatrix(slip)),
         )
         logger.info(
-            "Attempt %d at %s: lifted %s, rose %.3f m, slipped %.3f m",
+            "Attempt %d: picked up %s, lifted %s, rose %.3f m, slipped %.3f m",
             len(self.recordings),
-            placement,
+            picked_up.succeeded,
             result.lifted,
             displacement[2, 3],
             float(np.linalg.norm(slip[:3, 3])),
@@ -404,31 +347,6 @@ class KitchenGraspPerformer(GraspPerformer):
                 retries=0,
             )
 
-    def drop_object(self, placement: ObjectPlacement) -> None:
-        """
-        Put the object, at rest, where the middle of its footprint lies at the
-        placement, its lowest point :attr:`drop_height` above the floor of the area.
-
-        :param placement: Where the object is dropped.
-        """
-        body = self.graspable.root
-        lower, upper = body.collision.combined_mesh.bounds
-        world_T_object = (
-            HomogeneousTransformationMatrix.from_xyz_rpy(
-                x=placement.x,
-                y=placement.y,
-                z=self.area.height - lower[2] + self.drop_height,
-                yaw=placement.yaw,
-            ).to_np()
-            @ HomogeneousTransformationMatrix.from_xyz_rpy(
-                x=-(lower[0] + upper[0]) / 2, y=-(lower[1] + upper[1]) / 2
-            ).to_np()
-        )
-        world = self.episode.world
-        body.parent_connection.origin = HomogeneousTransformationMatrix(
-            world_T_object, reference_frame=world.root
-        )
-
     def world_T_object(self) -> np.ndarray:
         """
         :return: The pose of the object, as the simulation last left it.
@@ -454,9 +372,9 @@ class KitchenGraspPerformer(GraspPerformer):
 @dataclass(kw_only=True)
 class KitchenGraspTrials:
     """
-    Tries grasps drawn from where the picked object's annotation allows on the object of
-    a pick and place task, in its kitchen cut down to the fixture the object lies in,
-    and stores every attempt with what it left behind.
+    Tries grasps drawn from :attr:`grasp_strategy` on the object of a pick and place
+    task, in its kitchen cut down to the fixture the object lies in, and stores every
+    attempt with its run.
     """
 
     kitchen: KitchenAroundTheObject
@@ -474,9 +392,21 @@ class KitchenGraspTrials:
     How many grasps are drawn.
     """
 
-    seed: int = 0
+    grasp_strategy: GraspStrategy = field(
+        default_factory=lambda: GraspFromAnySide(
+            pitch=Bounds(lower=0.0, upper=math.pi / 12),
+            height=Bounds(lower=0.4, upper=0.95),
+        )
+    )
     """
-    Seeds the placements of the object.
+    Where the grasps are drawn from: by default from above, the approach at most 15
+    degrees off straight down, on the upper part of the object.
+    """
+
+    settling_duration: timedelta = timedelta(seconds=1)
+    """
+    How long the object is given to come to rest where RoboCasa put it before the first
+    attempt.
     """
 
     def run(self) -> Iterator[RecordedGraspAttempt]:
@@ -485,17 +415,27 @@ class KitchenGraspTrials:
 
         :return: The stored attempts, as they are tried.
         """
-        around_the_object = self.kitchen.compose()
-        episode = around_the_object.episode
+        episode = self.kitchen.compose()
         task = self.kitchen.task
         graspable = episode.graspable(task.picked_object)
+        episode.plan_adaptations.insert(
+            0,
+            CloseFingersToObjectWidthWhereItFits(
+                squeeze=episode.arm.end_effector.squeeze
+            ),
+        )
         with episode.executed(physics=True):
             episode.run([episode.create_parking_step()]).raise_if_failed()
+            episode.let_physics_run(self.settling_duration)
+            world_T_object = graspable.root.global_pose.to_np()
+            placement = ObjectPlacement(
+                x=float(world_T_object[0, 3]),
+                y=float(world_T_object[1, 3]),
+                yaw=math.atan2(world_T_object[1, 0], world_T_object[0, 0]),
+            )
             performer = KitchenGraspPerformer(
                 episode=episode,
                 graspable=graspable,
-                area=around_the_object.inside_of_the_fixture(graspable),
-                generator=np.random.default_rng(self.seed),
                 start=episode.simulation.take_snapshot(),
             )
             trials = GraspTrials(
@@ -503,6 +443,7 @@ class KitchenGraspTrials:
                 performer=performer,
                 number_of_trials=self.number_of_attempts,
                 model_registry=UniformPriorRegistry(),
+                grasp_strategy=self.grasp_strategy,
             )
             learning_task = GraspLearningTask.of_graspable(
                 graspable, type(episode.arm.end_effector)
@@ -515,15 +456,48 @@ class KitchenGraspTrials:
                         robot=type(episode.robot),
                         object_name=graspable.root.name.name,
                         source=GraspSource.STATED_REGIONS,
-                        placement=recording.placement,
+                        placement=placement,
                         grasp=record.grasp,
                     ),
-                    degree_of_freedom_names=recording.moment_recorder.degree_of_freedom_names,
-                    moments=recording.moment_recorder.moments,
-                    plans=recording.plan_recorder.plans,
+                    run=StoredTaskRun(
+                        task=task.robocasa_task_name,
+                        layout=task.layout,
+                        style=task.style,
+                        seed=task.seed,
+                        robot=task.robot,
+                        degree_of_freedom_names=recording.moment_recorder.degree_of_freedom_names,
+                        moments=recording.moment_recorder.moments,
+                        judgement=None,
+                        plans=recording.plan_recorder.plans,
+                    ),
                 )
                 self.database.add_attempts([recorded])
                 yield recorded
+
+
+# %% replaying an attempt
+
+
+def replay_attempt(
+    *, database: GraspDatabase, attempt_id: int, speed: float = 1.0
+) -> None:
+    """
+    Replay a stored attempt, with its plans, in its kitchen cut down anew, as fast as it
+    passed in the simulation times ``speed``.
+
+    :param database: Where the attempt is stored.
+    :param attempt_id: The database id of the attempt.
+    :param speed: How many times faster than it passed the attempt is replayed.
+    """
+    run = database.recorded_attempt(attempt_id).run
+    task = TaskModule.tasks_by_name[run.task](
+        layout=run.layout, style=run.style, seed=run.seed, robot=run.robot
+    )
+    episode = KitchenAroundTheObject(task=task).compose()
+    # a viewer that shows the worlds plans run in, as cramera-live does, starts showing
+    # this one once a plan executor is created for it
+    episode.create_executor()
+    TaskRunReplay(world=episode.world, run=run, robot=episode.robot).play(speed)
 
 
 # %% the command line
@@ -531,10 +505,11 @@ class KitchenGraspTrials:
 
 def main() -> None:
     """
-    Try grasps on the picked object of a pick and place task from the command line and
-    report how many lifted it.
+    Try grasps on the picked object of a pick and place task and report how many lifted
+    it.
     """
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--database", required=True, help="the database URI")
     tasks = {
         name: task
         for name, task in TaskModule.tasks_by_name.items()
@@ -553,26 +528,24 @@ def main() -> None:
         "--seed", type=int, default=0, help="seeds RoboCasa's choice of the objects"
     )
     parser.add_argument(
-        "--placement-seed",
-        type=int,
-        default=KitchenGraspTrials.seed,
-        help="seeds where the object is dropped",
+        "--draw-seed", type=int, default=0, help="seeds the drawing of the grasps"
     )
     parser.add_argument(
         "--attempts", type=int, default=KitchenGraspTrials.number_of_attempts
     )
-    parser.add_argument("--database", required=True, help="the database URI")
     arguments = parser.parse_args()
     logging.basicConfig(level=logging.INFO, force=True)
+    database = GraspDatabase.connect(arguments.database)
+    # the probabilistic models draw from numpy's global random state
+    np.random.seed(arguments.draw_seed)
     trials = KitchenGraspTrials(
         kitchen=KitchenAroundTheObject(
             task=tasks[arguments.task](
                 robot=arguments.robot, seed=arguments.seed, physics=True
             )
         ),
-        database=GraspDatabase.connect(arguments.database),
+        database=database,
         number_of_attempts=arguments.attempts,
-        seed=arguments.placement_seed,
     )
     attempts = list(trials.run())
     lifted = sum(recorded.attempt.grasp.result.lifted for recorded in attempts)

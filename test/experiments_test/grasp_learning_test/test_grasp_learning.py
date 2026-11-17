@@ -25,9 +25,7 @@ from experiments.grasp_learning.records import (
     GraspAttempt,
     GraspLearningTask,
     GraspSource,
-    RecordedGraspAttempt,
 )
-from experiments.robocasa_atomic_tasks.stored_runs import SimulatedMoment
 from experiments.physical_pick_up.objects import PickUpObject
 from experiments.physical_pick_up.pick_up_experiment import PickUpExperiment
 from experiments.physical_pick_up.robots import ObjectPlacement
@@ -148,29 +146,6 @@ def test_stored_attempts_are_read_back_by_task(milk_scene, database):
         result_values(attempts[0].grasp.result)
     )
     assert database.attempts(other_task) == []
-
-
-def test_a_recorded_attempt_counts_among_the_attempts_of_its_task(milk_scene, database):
-    [attempt] = synthetic_attempts(milk_scene, 1)
-    moments = [
-        SimulatedMoment(simulation_time=0.0, positions=[0.0]),
-        SimulatedMoment(simulation_time=0.5, positions=[0.1]),
-    ]
-
-    database.add_attempts(
-        [
-            RecordedGraspAttempt(
-                attempt=attempt,
-                degree_of_freedom_names=["lever"],
-                moments=moments,
-                plans=[],
-            )
-        ]
-    )
-
-    [read] = database.attempts(attempt.task)
-    assert read.grasp.height == attempt.grasp.height
-    assert read.placement == attempt.placement
 
 
 def result_values(result: GraspResult) -> List[float]:

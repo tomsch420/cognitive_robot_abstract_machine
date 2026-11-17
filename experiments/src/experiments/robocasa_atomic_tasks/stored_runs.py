@@ -126,9 +126,10 @@ class StoredTaskRun:
     The moments of the run, in the order they passed.
     """
 
-    judgement: Judgement
+    judgement: Judgement | None
     """
-    RoboCasa's verdict on the world as the run left it.
+    RoboCasa's verdict on the world as the run left it; ``None`` for a run RoboCasa did
+    not judge, such as one in a kitchen cut down to part of it.
     """
 
     plans: list[RecordedPlan] = field(default_factory=list)

@@ -14,6 +14,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from typing_extensions import Dict, Iterable, List, Set
 
+from experiments.grasp_learning.exceptions import NoRecordedGraspAttempt
 from experiments.grasp_learning.models import GraspModel, GraspModelLibrary
 from experiments.grasp_learning.records import (
     GraspAttempt,
@@ -26,6 +27,7 @@ from experiments.orm.ormatic_interface import (
     GraspAttemptDAO,
     GraspLearningTaskDAO,
     GraspModelDAO,
+    RecordedGraspAttemptDAO,
 )
 from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.ormatic.utils import create_engine
@@ -95,6 +97,17 @@ class GraspDatabase:
         :return: Every stored attempt of that task, in the order they were stored.
         """
         return list(self.numbered_attempts(task).values())
+
+    def recorded_attempt(self, database_id: int) -> RecordedGraspAttempt:
+        """
+        :param database_id: The number an attempt with its run was stored under.
+        :return: The attempt with its run.
+        :raises NoRecordedGraspAttempt: If none is stored under that number.
+        """
+        stored = self.session.get(RecordedGraspAttemptDAO, database_id)
+        if stored is None:
+            raise NoRecordedGraspAttempt(database_id=database_id)
+        return stored.from_dao()
 
     def numbered_attempts(self, task: GraspLearningTask) -> Dict[int, GraspAttempt]:
         """

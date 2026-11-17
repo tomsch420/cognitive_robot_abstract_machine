@@ -31,6 +31,7 @@ from coraplex.robot_plans.actions.core.robot_body import (
     MoveTorsoAction,
     ParkArmsAction,
 )
+from coraplex.plans.plan_transformation import PlanTransformation
 from coraplex.robot_plans.plan_transformations import (
     LetContactCarryTheBodies,
     MoveStraightAroundObjects,
@@ -163,6 +164,18 @@ class RoboCasaEpisode:
     Whether the kitchen's joints are left to the physics while a plan runs in a physical
     simulation, the world taking where the physics moved them only once the plan is
     over; otherwise the world follows them as the physics moves them.
+    """
+
+    plan_adaptations: list[PlanTransformation] = field(
+        default_factory=lambda: [
+            LetContactCarryTheBodies(),
+            MoveStraightAroundObjects(),
+        ]
+    )
+    """
+    The plan transformations adapting every plan to being performed in a physical
+    simulation, see
+    :attr:`~coraplex.plans.executors.PhysicallySimulatedPlanExecutor.plan_adaptations`.
     """
 
     simulation: MujocoSim | None = field(default=None, init=False, repr=False)
@@ -366,7 +379,8 @@ class RoboCasaEpisode:
             physics the bodies are carried by the grip of the fingers alone, the hand
             moves in straight lines around what it holds or lets go of, and only what
             the robot does to the kitchen's joints moves them; whether the world follows
-            them during the plan is :attr:`leaves_the_environment_to_the_physics`.
+            them during the plan is :attr:`leaves_the_environment_to_the_physics`; the
+            plans are adapted by :attr:`plan_adaptations`.
         """
         context = StatechartContext.with_extensions(
             world=self.world,
@@ -386,7 +400,7 @@ class RoboCasaEpisode:
             simulation=self.simulation,
             collision_avoidance=self.collision_avoidance,
             extensions=list(self.executor_extensions),
-            plan_adaptations=[LetContactCarryTheBodies(), MoveStraightAroundObjects()],
+            plan_adaptations=list(self.plan_adaptations),
             leaves_the_environment_to_the_physics=self.leaves_the_environment_to_the_physics,
         )
 
