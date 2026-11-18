@@ -131,14 +131,17 @@ class KitchenAroundTheObject:
 
     def holding_fixture(self, episode: RoboCasaEpisode) -> Fixture:
         """
-        :param episode: An episode of :attr:`task` whose kitchen is whole.
-        :return: The smallest fixture whose bounding box holds the middle of the picked
-            object.
+        :param episode: An episode of :attr:`task`, whole or cut down.
+        :return: The smallest fixture still in the episode's world whose bounding box
+            holds the middle of the picked object.
         :raises ObjectInNoFixture: If no fixture's box holds it.
         """
         middle = episode.object_body(self.task.picked_object).global_pose.to_np()[:3, 3]
+        body_names = {body.name.name for body in episode.world.bodies}
         volumes = {}
         for fixture in episode.environment.fixtures.values():
+            if fixture.root_body not in body_names:
+                continue
             body = episode.fixture_body(fixture)
             if not self.collides(episode, body):
                 continue
@@ -212,6 +215,95 @@ class CloseFingersToObjectWidthWhereItFits(CloseFingersToObjectWidth):
 
 
 @dataclass(kw_only=True)
+class GraspOutcomeMeasurement:
+    """
+    Measures how an object moved from where it rested when the measurement was made, and
+    how it slipped in the gripper from when the gripper took hold of it.
+    """
+
+    episode: RoboCasaEpisode
+    """
+    The episode the object is grasped in.
+    """
+
+    graspable: HasGraspCandidates
+    """
+    The object grasped.
+    """
+
+    grasp: GraspCandidate
+    """
+    The grasp the gripper takes the object by.
+    """
+
+    minimum_rise: float = 0.05
+    """
+    How far the object has to have risen to count as raised, in metres.
+    """
+
+    world_T_resting_object: np.ndarray = field(init=False)
+    """
+    The pose of the object when the measurement was made.
+    """
+
+    gripper_T_grasp_when_taken: np.ndarray = field(init=False)
+    """
+    The pose of the grasp frame, fixed to the object, in the tool frame, when the
+    gripper took hold; as when the measurement was made until then.
+    """
+
+    def __post_init__(self) -> None:
+        self.world_T_resting_object = self.world_T_object()
+        self.gripper_T_grasp_when_taken = self.gripper_T_grasp()
+
+    def note_hold_taken(self) -> None:
+        """
+        Remember where the object lies in the gripper now, which slip is measured from.
+        """
+        self.gripper_T_grasp_when_taken = self.gripper_T_grasp()
+
+    def result(self, *, motion_completed: bool) -> GraspResult:
+        """
+        :param motion_completed: Whether the robot went through every step.
+        :return: What happened to the object, as the simulation last left it.
+        """
+        world_T_held_object = self.world_T_object()
+        displacement = np.eye(4)
+        displacement[:3, 3] = (
+            world_T_held_object[:3, 3] - self.world_T_resting_object[:3, 3]
+        )
+        displacement[:3, :3] = (
+            world_T_held_object[:3, :3] @ self.world_T_resting_object[:3, :3].T
+        )
+        slip = np.linalg.inv(self.gripper_T_grasp_when_taken) @ self.gripper_T_grasp()
+        return GraspResult(
+            object_raised=bool(displacement[2, 3] >= self.minimum_rise),
+            motion_completed=motion_completed,
+            object_displacement=Twist.from_transformation(
+                HomogeneousTransformationMatrix(displacement)
+            ),
+            slip=Twist.from_transformation(HomogeneousTransformationMatrix(slip)),
+        )
+
+    def world_T_object(self) -> np.ndarray:
+        """
+        :return: The pose of the object, as the simulation last left it.
+        """
+        return self.graspable.root.global_pose.to_np()
+
+    def gripper_T_grasp(self) -> np.ndarray:
+        """
+        :return: The pose of the grasp frame, fixed to the object, in the tool frame.
+        """
+        world_T_tool = self.episode.arm.end_effector.tool_frame.global_pose.to_np()
+        return (
+            np.linalg.inv(world_T_tool)
+            @ self.world_T_object()
+            @ self.grasp.grasp_pose.to_np()
+        )
+
+
+@dataclass(kw_only=True)
 class AttemptRecording:
     """
     The plans of one attempt and the world's state as it moved through it.
@@ -280,9 +372,14 @@ class KitchenGraspPerformer(GraspPerformer):
         )
         self.recordings.append(recording)
         episode.executor_extensions.append(recording.plan_recorder)
-        world_T_resting_object = self.world_T_object()
+        measurement = GraspOutcomeMeasurement(
+            episode=episode,
+            graspable=self.graspable,
+            grasp=grasp,
+            minimum_rise=self.minimum_rise,
+        )
         picked_up = self.pick_up(grasp)
-        gripper_T_grasp_when_picked_up = self.gripper_T_grasp(grasp)
+        measurement.note_hold_taken()
         parked = (
             picked_up.succeeded
             and episode.run([episode.create_parking_step()]).succeeded
@@ -290,30 +387,14 @@ class KitchenGraspPerformer(GraspPerformer):
         episode.let_physics_run(self.hold_duration)
         episode.executor_extensions.remove(recording.plan_recorder)
         recording.moment_recorder.finish()
-        world_T_held_object = self.world_T_object()
-        displacement = np.eye(4)
-        displacement[:3, 3] = world_T_held_object[:3, 3] - world_T_resting_object[:3, 3]
-        displacement[:3, :3] = (
-            world_T_held_object[:3, :3] @ world_T_resting_object[:3, :3].T
-        )
-        slip = np.linalg.inv(gripper_T_grasp_when_picked_up) @ self.gripper_T_grasp(
-            grasp
-        )
-        result = GraspResult(
-            object_raised=bool(displacement[2, 3] >= self.minimum_rise),
-            motion_completed=parked,
-            object_displacement=Twist.from_transformation(
-                HomogeneousTransformationMatrix(displacement)
-            ),
-            slip=Twist.from_transformation(HomogeneousTransformationMatrix(slip)),
-        )
+        result = measurement.result(motion_completed=parked)
         logger.info(
             "Attempt %d: picked up %s, lifted %s, rose %.3f m, slipped %.3f m",
             len(self.recordings),
             picked_up.succeeded,
             result.lifted,
-            displacement[2, 3],
-            float(np.linalg.norm(slip[:3, 3])),
+            float(result.object_displacement.translation.to_np()[2]),
+            float(np.linalg.norm(result.slip.translation.to_np()[:3])),
         )
         return result
 
@@ -346,24 +427,6 @@ class KitchenGraspPerformer(GraspPerformer):
                 ],
                 retries=0,
             )
-
-    def world_T_object(self) -> np.ndarray:
-        """
-        :return: The pose of the object, as the simulation last left it.
-        """
-        return self.graspable.root.global_pose.to_np()
-
-    def gripper_T_grasp(self, grasp: GraspCandidate) -> np.ndarray:
-        """
-        :param grasp: A grasp on the object.
-        :return: The pose of the grasp frame, fixed to the object, in the tool frame.
-        """
-        world_T_tool = self.episode.arm.end_effector.tool_frame.global_pose.to_np()
-        return (
-            np.linalg.inv(world_T_tool)
-            @ self.world_T_object()
-            @ grasp.grasp_pose.to_np()
-        )
 
 
 # %% the trials
@@ -475,21 +538,17 @@ class KitchenGraspTrials:
                 yield recorded
 
 
-# %% replaying an attempt
+# %% replaying a run in the kitchen cut down
 
 
-def replay_attempt(
-    *, database: GraspDatabase, attempt_id: int, speed: float = 1.0
-) -> None:
+def replay_run(*, run: StoredTaskRun, speed: float = 1.0) -> None:
     """
-    Replay a stored attempt, with its plans, in its kitchen cut down anew, as fast as it
+    Replay a stored run, with its plans, in its kitchen cut down anew, as fast as it
     passed in the simulation times ``speed``.
 
-    :param database: Where the attempt is stored.
-    :param attempt_id: The database id of the attempt.
-    :param speed: How many times faster than it passed the attempt is replayed.
+    :param run: The run, such as the run of a stored attempt or pick-up trial.
+    :param speed: How many times faster than it passed the run is replayed.
     """
-    run = database.recorded_attempt(attempt_id).run
     task = TaskModule.tasks_by_name[run.task](
         layout=run.layout, style=run.style, seed=run.seed, robot=run.robot
     )

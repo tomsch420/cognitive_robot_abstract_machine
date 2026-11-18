@@ -1,3 +1,7 @@
+"""
+Tests of the MuJoCo simulator's callbacks.
+"""
+
 import os
 import threading
 import time
@@ -30,6 +34,10 @@ headless = os.environ.get("CI", "false").lower() == "true"
 
 
 class TestMujocoSimulator:
+    """
+    The callbacks of a MuJoCo simulator on a model of a floor.
+    """
+
     file_path = os.path.join(resources_path, "floor.xml")
     headless = headless
     step_size = 1e-3
@@ -520,6 +528,39 @@ class TestMujocoSimulator:
         )
 
     # %% actuator control
+
+    def test_set_actuator_force_range_limits_the_force_of_the_actuator(
+        self, *, simulator
+    ):
+        """
+        set_actuator_force_range must write the range into the compiled model and turn
+        the limit on, so the actuator's force is clamped to it from the next step on.
+        """
+        force_range = numpy.array([-5.0, 5.0])
+
+        result = simulator.callbacks["set_actuator_force_range"](
+            actuator_name="actuator1", force_range=force_range
+        )
+        assert (
+            result.type
+            is SimulatorCallbackResult.ResultType.SUCCESS_AFTER_EXECUTION_ON_DATA
+        )
+
+        actuator = simulator._mj_model.actuator("actuator1")
+        assert numpy.array_equal(actuator.forcerange, force_range)
+        assert actuator.forcelimited[0] == mujoco.mjtLimited.mjLIMITED_TRUE
+
+    def test_set_actuator_force_range_fails_for_unknown_actuator(self, *, simulator):
+        """
+        set_actuator_force_range must report failure when the actuator does not exist.
+        """
+        result = simulator.callbacks["set_actuator_force_range"](
+            actuator_name="this_actuator_does_not_exist",
+            force_range=numpy.array([-5.0, 5.0]),
+        )
+        assert (
+            result.type is SimulatorCallbackResult.ResultType.FAILURE_WITHOUT_EXECUTION
+        )
 
     def test_set_actuator_control_hands_the_actuator_a_new_set_point(self, simulator):
         """

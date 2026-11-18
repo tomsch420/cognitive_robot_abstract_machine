@@ -1500,6 +1500,43 @@ class RaiseTheToolAction(MovesTheToolVertically, GoalAction):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
+class MoveTheToolInAStraightLineAction(HoldsBase, GoalAction):
+    """
+    Moves the tool frame of an arm in a straight line from where it is to a pose.
+    """
+
+    arm: Arm
+    """
+    The arm whose tool frame moves.
+    """
+
+    target_pose: Pose
+    """
+    Where the tool frame ends up.
+    """
+
+    max_linear_velocity: float | None = None
+    """
+    Cap on the speed of the tool frame, in m/s; uncapped when ``None``.
+    """
+
+    hold_base: bool = True
+    """
+    Whether the base stands still while the tool frame moves, even where the robot
+    otherwise moves its whole body.
+    """
+
+    def create_goal(self) -> StatechartNode:
+        return self.tool_center_point_goal(
+            self.target_pose,
+            self.arm,
+            max_linear_velocity=self.max_linear_velocity,
+            in_a_straight_line=True,
+            accompanying_goals=(self.base_hold(),) if self.hold_base else (),
+        )
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
 class LowerTheToolUntilTouchingAction(MovesTheToolVertically, SequentialAction):
     """
     Lowers the tool frame straight down until a body of one group touches a body of

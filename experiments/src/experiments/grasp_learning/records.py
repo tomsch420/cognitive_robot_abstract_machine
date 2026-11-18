@@ -16,6 +16,7 @@ from typing_extensions import Type
 
 from experiments.physical_pick_up.robots import ObjectPlacement
 from experiments.robocasa_atomic_tasks.stored_runs import StoredTaskRun
+from semantic_digital_twin.grasping.object_relative_grasp import GraspResult
 from semantic_digital_twin.grasping.surface_grasp import SurfaceGrasp
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, EndEffector
 from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
@@ -141,4 +142,142 @@ class RecordedGraspAttempt:
     run: StoredTaskRun
     """
     The plans the robot performed in the attempt and the world's state as it moved.
+    """
+
+
+# %% whole pick-ups from a stored starting world
+
+
+@dataclass(kw_only=True)
+class StandOffset:
+    """
+    How far the base is moved from where it stands in the starting world, in the frame
+    of the base as it stands there.
+    """
+
+    forward: float
+    """
+    How far the base moves along its x-axis, in metres.
+    """
+
+    sideways: float
+    """
+    How far the base moves along its y-axis, to its left, in metres.
+    """
+
+    turn: float
+    """
+    How far the base turns about its z-axis, counterclockwise, in radians.
+    """
+
+
+@dataclass(kw_only=True)
+class PickUpParameters:
+    """
+    Everything a pick-up from the starting world varies by.
+    """
+
+    stand_offset: StandOffset
+    """
+    Where the base stands for the pick-up.
+    """
+
+    torso_height: float
+    """
+    The position of the torso's lift joint during the pick-up, in metres.
+    """
+
+    grasp: SurfaceGrasp
+    """
+    Where on the object the fingers close, and from which direction they come.
+    """
+
+    opening: float
+    """
+    How far the fingers open before they approach, as a fraction of how far they open
+    at most.
+    """
+
+    closing_force: float
+    """
+    The most force each finger presses with, in newtons.
+    """
+
+    approach_clearance: float
+    """
+    How far outside the object's bounding box the gripper stops before it comes onto
+    the grasp, in metres.
+    """
+
+    approach_velocity: float
+    """
+    How fast the tool frame comes down onto the grasp, in m/s.
+    """
+
+    settling_duration: float
+    """
+    How long the closed fingers hold still on the object before lifting, in seconds.
+    """
+
+    lift_velocity: float
+    """
+    How fast the tool frame leaves the grasp, in m/s.
+    """
+
+
+class PickUpStage(StrEnum):
+    """
+    A part of a pick-up, in the order a pick-up goes through them.
+    """
+
+    STANDING = "standing"
+    """
+    Moving the base to where it stands for the pick-up.
+    """
+
+    APPROACHING = "approaching"
+    """
+    Opening the fingers and coming down onto the grasp.
+    """
+
+    CLOSING = "closing"
+    """
+    Closing the fingers on the object.
+    """
+
+    LEAVING = "leaving"
+    """
+    Going back along the way in to where the gripper started.
+    """
+
+
+@dataclass(kw_only=True)
+class PickUpTrial:
+    """
+    One pick-up tried from a stored starting world, with what came of it.
+    """
+
+    starting_world_id: int
+    """
+    The database id of the world the trial started from.
+    """
+
+    parameters: PickUpParameters
+    """
+    What the pick-up was varied by.
+    """
+
+    result: GraspResult
+    """
+    What happened to the object.
+    """
+
+    failed_stage: PickUpStage | None
+    """
+    The part of the pick-up whose plan failed; ``None`` when every part went through.
+    """
+
+    run: StoredTaskRun
+    """
+    The plans the robot performed and the world's state as it moved.
     """

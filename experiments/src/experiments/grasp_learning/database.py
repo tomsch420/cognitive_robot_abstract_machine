@@ -14,11 +14,16 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from typing_extensions import Dict, Iterable, List, Set
 
-from experiments.grasp_learning.exceptions import NoRecordedGraspAttempt
+from experiments.grasp_learning.exceptions import (
+    NoPickUpTrial,
+    NoRecordedGraspAttempt,
+    NoStoredWorld,
+)
 from experiments.grasp_learning.models import GraspModel, GraspModelLibrary
 from experiments.grasp_learning.records import (
     GraspAttempt,
     GraspLearningTask,
+    PickUpTrial,
     RecordedGraspAttempt,
 )
 from experiments.physical_pick_up.objects import GraspableRoboCasaCategory
@@ -27,10 +32,13 @@ from experiments.orm.ormatic_interface import (
     GraspAttemptDAO,
     GraspLearningTaskDAO,
     GraspModelDAO,
+    PickUpTrialDAO,
     RecordedGraspAttemptDAO,
 )
 from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.ormatic.utils import create_engine
+from semantic_digital_twin.orm.ormatic_interface import WorldMappingDAO
+from semantic_digital_twin.world import World
 
 # %% connecting
 
@@ -107,6 +115,37 @@ class GraspDatabase:
         stored = self.session.get(RecordedGraspAttemptDAO, database_id)
         if stored is None:
             raise NoRecordedGraspAttempt(database_id=database_id)
+        return stored.from_dao()
+
+    def starting_world(self, *, database_id: int) -> World:
+        """
+        :param database_id: The number a world was stored under.
+        :return: The world, as it was stored.
+        :raises NoStoredWorld: If none is stored under that number.
+        """
+        stored = self.session.get(WorldMappingDAO, database_id)
+        if stored is None:
+            raise NoStoredWorld(database_id=database_id)
+        return stored.from_dao()
+
+    def add_trial(self, *, trial: PickUpTrial) -> None:
+        """
+        Store a pick-up trial with its run.
+
+        :param trial: The trial to store.
+        """
+        self.session.add(to_dao(trial))
+        self.session.commit()
+
+    def pick_up_trial(self, *, database_id: int) -> PickUpTrial:
+        """
+        :param database_id: The number a pick-up trial was stored under.
+        :return: The trial with its run.
+        :raises NoPickUpTrial: If none is stored under that number.
+        """
+        stored = self.session.get(PickUpTrialDAO, database_id)
+        if stored is None:
+            raise NoPickUpTrial(database_id=database_id)
         return stored.from_dao()
 
     def numbered_attempts(self, task: GraspLearningTask) -> Dict[int, GraspAttempt]:

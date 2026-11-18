@@ -1,3 +1,7 @@
+"""
+A physics simulator built on MuJoCo, driven through simulator callbacks.
+"""
+
 #!/usr/bin/env python3
 
 import os
@@ -499,6 +503,36 @@ class MujocoSimulator(BaseSimulator):
         return SimulatorCallbackResult(
             type=SimulatorCallbackResult.ResultType.SUCCESS_AFTER_EXECUTION_ON_DATA,
             info=f"Set geom {geom_name} friction to {friction}",
+        )
+
+    @BaseSimulator.simulator_callback
+    def set_actuator_force_range(
+        self, *, actuator_name: str, force_range: numpy.ndarray
+    ) -> SimulatorCallbackResult:
+        """
+        Limit the force an actuator exerts to a range, by the actuator's name.
+
+        :param actuator_name: The name of the actuator
+        :param force_range: The lowest and the highest force, in newtons, or torque, in
+            newton metres, the actuator exerts from now on
+        :return: A SimulatorCallbackResult indicating the success or failure of the
+            operation
+        """
+        actuator_id = mujoco.mj_name2id(
+            m=self._mj_model, type=mujoco.mjtObj.mjOBJ_ACTUATOR, name=actuator_name
+        )
+        if actuator_id == -1:
+            return SimulatorCallbackResult(
+                type=SimulatorCallbackResult.ResultType.FAILURE_WITHOUT_EXECUTION,
+                info=f"Actuator {actuator_name} not found",
+            )
+        self._mj_model.actuator_forcerange[actuator_id] = force_range
+        self._mj_model.actuator_forcelimited[actuator_id] = (
+            mujoco.mjtLimited.mjLIMITED_TRUE
+        )
+        return SimulatorCallbackResult(
+            type=SimulatorCallbackResult.ResultType.SUCCESS_AFTER_EXECUTION_ON_DATA,
+            info=f"Limited the force of actuator {actuator_name} to {force_range}",
         )
 
     @BaseSimulator.simulator_callback

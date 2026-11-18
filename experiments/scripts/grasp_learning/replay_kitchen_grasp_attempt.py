@@ -13,7 +13,7 @@ import argparse
 import logging
 
 from experiments.grasp_learning.database import GraspDatabase
-from experiments.grasp_learning.kitchen_grasp_trials import replay_attempt
+from experiments.grasp_learning.kitchen_grasp_trials import replay_run
 
 # %% the command line
 
@@ -26,8 +26,9 @@ arguments = parser.parse_args()
 # %% replaying the attempt
 
 logging.basicConfig(level=logging.INFO, force=True)
-replay_attempt(
-    database=GraspDatabase.connect(arguments.database),
-    attempt_id=arguments.attempt_id,
+replay_run(
+    run=GraspDatabase.connect(arguments.database)
+    .recorded_attempt(arguments.attempt_id)
+    .run,
     speed=arguments.speed,
 )
