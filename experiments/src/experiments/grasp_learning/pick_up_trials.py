@@ -22,7 +22,10 @@ from coraplex.robot_plans.actions.core.robot_body import MoveFingersToWidthActio
 from coraplex.robot_plans.mixins import HasApproachesGraspPoses
 from cramph.node import StatechartNode
 from experiments.grasp_learning.database import GraspDatabase
-from experiments.grasp_learning.exceptions import StartingWorldDoesNotMatch
+from experiments.grasp_learning.exceptions import (
+    ParameterWithoutCentre,
+    StartingWorldDoesNotMatch,
+)
 from experiments.grasp_learning.records import (
     PickUpParameters,
     PickUpStage,
@@ -52,9 +55,18 @@ from krrood.bounds import Bounds
 from krrood.entity_query_language.backends import ProbabilisticBackend
 from krrood.entity_query_language.factories import ConditionType, a
 from krrood.entity_query_language.query.match import Match
+from krrood.parametrization.exceptions import UnboundedParameterError
 from krrood.parametrization.model_registries import (
     ModelRegistry,
     UniformPriorRegistry,
+)
+from krrood.parametrization.parameterizer import ModelQueryParameters
+from probabilistic_model.distributions.gaussian import GaussianDistribution
+from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
+    ProbabilisticCircuit,
+    ProductUnit,
+    SumUnit,
+    leaf,
 )
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Pose
 from semantic_digital_twin.adapters.multi_sim import MujocoSimulationSnapshot
@@ -107,7 +119,7 @@ class PickUpParameterSpace:
     The values of :attr:`PickUpParameters.torso_height`.
     """
 
-    pitch: Bounds[float] = field(default_factory=lambda: Bounds(lower=0.0, upper=0.9))
+    pitch: Bounds[float] = field(default_factory=lambda: Bounds(lower=0.0, upper=1.2))
     """
     How far the approach tilts off straight down, in radians, towards the side the
     gripper comes from.
@@ -243,6 +255,68 @@ class PickUpParameterSpace:
             for parameters in drawn
             if parameters.grasp.reaches_surface_of(part)
         ]
+
+
+# %% drawing pick-ups near successful ones
+
+
+@dataclass(kw_only=True)
+class NearSuccessfulPickUps(ModelRegistry):
+    """
+    Answers a statement of pick-ups with an equal mixture of one Gaussian around each of
+    :attr:`centres`, whose standard deviation along every parameter is :attr:`spread`
+    times the range the statement allows that parameter.
+    """
+
+    centres: list[PickUpParameters]
+    """
+    The pick-ups the draws are biased towards, such as ones that lifted the object.
+    """
+
+    spread: float = 0.1
+    """
+    The standard deviation of each Gaussian along a parameter, as a fraction of the
+    range the statement allows the parameter.
+    """
+
+    def get_model(self, *, parameters: ModelQueryParameters) -> ProbabilisticCircuit:
+        """
+        :raises UnboundedParameterError: If the statement leaves a parameter without a
+            lower or an upper bound.
+        :raises ParameterWithoutCentre: If a parameter of the statement is not one of
+            :meth:`PickUpParameters.values_by_attribute_path`.
+        """
+        allowed = parameters.truncation_assignments_from_where_conditions
+        if allowed is None:
+            raise UnboundedParameterError(
+                parameter_name=", ".join(parameters.variables)
+            )
+        [box] = allowed.simple_sets
+        prefix = f"{parameters.queried_class.__name__}."
+        circuit = ProbabilisticCircuit()
+        mixture = SumUnit(probabilistic_circuit=circuit)
+        for centre in self.centres:
+            values = centre.values_by_attribute_path()
+            component = ProductUnit(probabilistic_circuit=circuit)
+            for name, variable in parameters.variables.items():
+                path = name.removeprefix(prefix)
+                if path not in values:
+                    raise ParameterWithoutCentre(parameter_name=name)
+                if variable not in box.keys():
+                    raise UnboundedParameterError(parameter_name=name)
+                [interval] = box[variable].simple_sets
+                component.add_subcircuit(
+                    leaf(
+                        GaussianDistribution(
+                            variable=variable,
+                            location=values[path],
+                            scale=self.spread * (interval.upper - interval.lower),
+                        ),
+                        circuit,
+                    )
+                )
+            mixture.add_subcircuit(component, -math.log(len(self.centres)))
+        return circuit
 
 
 # %% the starting world
@@ -674,10 +748,36 @@ def main() -> None:
         "--draw-seed", type=int, default=0, help="seeds the drawing of the pick-ups"
     )
     parser.add_argument("--attempts", type=int, default=PickUpTrials.number_of_trials)
+    parser.add_argument(
+        "--near-trials",
+        type=int,
+        nargs="+",
+        help="the database ids of stored trials to draw the pick-ups near; drawn "
+        "uniformly from the whole space when left out",
+    )
+    parser.add_argument(
+        "--spread",
+        type=float,
+        default=NearSuccessfulPickUps.spread,
+        help="how far the pick-ups spread around the trials, as a fraction of the "
+        "range of each parameter",
+    )
     arguments = parser.parse_args()
     logging.basicConfig(level=logging.INFO, force=True)
     # the probabilistic models draw from numpy's global random state
     np.random.seed(arguments.draw_seed)
+    database = GraspDatabase.connect(arguments.database)
+    model_registry = (
+        UniformPriorRegistry()
+        if not arguments.near_trials
+        else NearSuccessfulPickUps(
+            centres=[
+                database.pick_up_trial(database_id=trial_id).parameters
+                for trial_id in arguments.near_trials
+            ],
+            spread=arguments.spread,
+        )
+    )
     trials = PickUpTrials(
         kitchen=KitchenAroundTheObject(
             task=tasks[arguments.task](
@@ -685,10 +785,10 @@ def main() -> None:
             )
         ),
         starting_world=StoredStartingWorld(
-            database=GraspDatabase.connect(arguments.database),
-            world_id=arguments.starting_world,
+            database=database, world_id=arguments.starting_world
         ),
         number_of_trials=arguments.attempts,
+        model_registry=model_registry,
     )
     tried = list(trials.run())
     lifted = sum(trial.result.lifted for trial in tried)

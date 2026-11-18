@@ -21,6 +21,7 @@ from experiments.grasp_learning.exceptions import (
     StartingWorldDoesNotMatch,
 )
 from experiments.grasp_learning.pick_up_trials import (
+    NearSuccessfulPickUps,
     PickUpParameterSpace,
     PickUpPerformer,
     StoredStartingWorld,
@@ -38,6 +39,7 @@ from experiments.robocasa_atomic_tasks.stored_runs import (
 from experiments.orm.ormatic_interface import PickUpTrialDAO
 from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.parametrization.model_registries import UniformPriorRegistry
+from krrood.parametrization.parameterizer import UnderspecifiedParameters
 from krrood_spatial_math.spatial_types import Twist, Vector3
 from semantic_digital_twin.grasping.object_relative_grasp import GraspResult
 from semantic_digital_twin.grasping.surface_grasp import SurfaceGrasp
@@ -135,6 +137,60 @@ def test_every_drawn_grasp_comes_from_the_side_of_the_space(kitchen, episode, dr
     for parameters in drawn:
         side = parameters.grasp.yaw + object_yaw
         assert space.side.lower <= side < space.side.upper
+
+
+# %% drawing pick-ups near successful ones
+
+
+def test_every_parameter_of_the_statement_has_a_centre_value(kitchen, episode, drawn):
+    """
+    Every variable of the statement is named by a path a pick-up gives a value for.
+    """
+    statement = PickUpParameterSpace().statement(
+        graspable=episode.graspable(kitchen.task.picked_object)
+    )
+    paths = {
+        name.removeprefix("PickUpParameters.")
+        for name in UnderspecifiedParameters(statement=statement).variables
+    }
+
+    assert paths == set(drawn[0].values_by_attribute_path())
+
+
+def test_pick_ups_drawn_near_two_centres_lie_near_one_of_them(kitchen, episode, drawn):
+    """
+    Every pick-up drawn near two centres lies within five standard deviations of one of
+    them along every parameter.
+    """
+    space = PickUpParameterSpace()
+    registry = NearSuccessfulPickUps(centres=drawn[:2], spread=0.01)
+    np.random.seed(1)
+    near = space.drawn_parameters(
+        graspable=episode.graspable(kitchen.task.picked_object),
+        number_of_pick_ups=20,
+        model_registry=registry,
+    )
+    statement = space.statement(graspable=episode.graspable(kitchen.task.picked_object))
+    [box] = UnderspecifiedParameters(
+        statement=statement
+    ).truncation_assignments_from_where_conditions.simple_sets
+    ranges = {
+        variable.name.removeprefix("PickUpParameters."): interval.upper - interval.lower
+        for variable, value in box.items()
+        for [interval] in [value.simple_sets]
+    }
+    centres = [centre.values_by_attribute_path() for centre in drawn[:2]]
+
+    assert len(near) > 0
+    for parameters in near:
+        values = parameters.values_by_attribute_path()
+        assert any(
+            all(
+                abs(values[path] - centre[path]) < 5 * registry.spread * ranges[path]
+                for path in values
+            )
+            for centre in centres
+        )
 
 
 # %% the starting world

@@ -224,6 +224,29 @@ class PickUpParameters:
     How fast the tool frame leaves the grasp, in m/s.
     """
 
+    def values_by_attribute_path(self) -> dict[str, float]:
+        """
+        :return: Every parameter, keyed by the path of attributes that leads to it from
+            this object, such as ``stand_offset.forward``.
+        """
+        return {
+            "stand_offset.forward": self.stand_offset.forward,
+            "stand_offset.sideways": self.stand_offset.sideways,
+            "stand_offset.turn": self.stand_offset.turn,
+            "torso_height": self.torso_height,
+            "grasp.yaw": self.grasp.yaw,
+            "grasp.height": self.grasp.height,
+            "grasp.depth": self.grasp.depth,
+            "grasp.pitch": self.grasp.pitch,
+            "grasp.roll": self.grasp.roll,
+            "opening": self.opening,
+            "closing_force": self.closing_force,
+            "approach_clearance": self.approach_clearance,
+            "approach_velocity": self.approach_velocity,
+            "settling_duration": self.settling_duration,
+            "lift_velocity": self.lift_velocity,
+        }
+
 
 class PickUpStage(StrEnum):
     """

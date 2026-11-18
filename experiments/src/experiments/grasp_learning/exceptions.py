@@ -124,3 +124,28 @@ class StartingWorldDoesNotMatch(DataclassException):
             "Compose the episode the stored world was saved from, with the same task, "
             "seed and cut."
         )
+
+
+# %% drawing pick-ups near successful ones
+
+
+@dataclass(kw_only=True)
+class ParameterWithoutCentre(DataclassException):
+    """
+    Raised when pick-ups are drawn near given ones for a statement with a parameter the
+    given pick-ups have no value for.
+    """
+
+    parameter_name: str
+    """
+    The name of the parameter.
+    """
+
+    def error_message(self) -> str:
+        return f"The pick-ups to draw near have no value for {self.parameter_name}."
+
+    def suggest_correction(self) -> str:
+        return (
+            "Add the parameter to PickUpParameters.values_by_attribute_path, or leave "
+            "it out of the statement."
+        )
