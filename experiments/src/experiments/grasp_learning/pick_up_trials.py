@@ -30,6 +30,7 @@ from experiments.grasp_learning.records import (
     StandOffset,
 )
 from experiments.grasp_learning.kitchen_grasp_trials import (
+    AttemptRecording,
     GraspOutcomeMeasurement,
     KitchenAroundTheObject,
 )
@@ -41,6 +42,7 @@ from experiments.robocasa_atomic_tasks.skills import (
     StandAction,
 )
 from experiments.robocasa_atomic_tasks.stored_runs import (
+    PlanRecorder,
     SimulatedMomentRecorder,
     StoredTaskRun,
 )
@@ -349,9 +351,13 @@ class PickUpPerformer:
         simulation = episode.simulation
         simulation.restore_snapshot(snapshot=self.start)
         self.limit_finger_force(force=parameters.closing_force)
-        moment_recorder = SimulatedMomentRecorder(
-            _world=episode.world, simulation=simulation
+        recording = AttemptRecording(
+            plan_recorder=PlanRecorder(simulation=simulation),
+            moment_recorder=SimulatedMomentRecorder(
+                _world=episode.world, simulation=simulation
+            ),
         )
+        episode.executor_extensions.append(recording.plan_recorder)
         grasp = parameters.grasp.grasp_candidate(self.graspable.grasped_part())
         measurement = GraspOutcomeMeasurement(
             episode=episode, graspable=self.graspable, grasp=grasp
@@ -384,7 +390,8 @@ class PickUpPerformer:
                 parameters=parameters, grasp=grasp, measurement=measurement
             )
         episode.let_physics_run(self.hold_duration)
-        moment_recorder.finish()
+        episode.executor_extensions.remove(recording.plan_recorder)
+        recording.moment_recorder.finish()
         result = measurement.result(motion_completed=failed_stage is None)
         logger.info(
             "Pick-up %s: lifted %s, rose %.3f m, slipped %.3f m",
@@ -405,12 +412,10 @@ class PickUpPerformer:
                 style=task.style,
                 seed=task.seed,
                 robot=task.robot,
-                degree_of_freedom_names=moment_recorder.degree_of_freedom_names,
-                moments=moment_recorder.moments,
+                degree_of_freedom_names=recording.moment_recorder.degree_of_freedom_names,
+                moments=recording.moment_recorder.moments,
                 judgement=None,
-                # the ORM cannot store a plan that names a gripper by one of its
-                # mixins yet, see the PandaOmronGripperDAO flush error
-                plans=[],
+                plans=recording.plan_recorder.plans,
             ),
         )
 
