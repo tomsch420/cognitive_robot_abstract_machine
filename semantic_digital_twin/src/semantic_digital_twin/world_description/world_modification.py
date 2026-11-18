@@ -491,8 +491,17 @@ class AddActuatorModification(WorldModificationWithWorldEntityReference):
 
     original_actuator_id: UUID | None = field(default=None)
 
+    degree_of_freedom_ids: list[UUID] = field(default_factory=list)
+    """
+    The ids of the degrees of freedom the actuator drives.
+    """
+
     def __post_init__(self):
         self.original_actuator_id = self.actuator.id
+        if not self.degree_of_freedom_ids:
+            self.degree_of_freedom_ids = [
+                degree_of_freedom.id for degree_of_freedom in self.actuator.dofs
+            ]
 
     @classmethod
     def from_kwargs(cls, kwargs: dict[str, Any]):
@@ -505,7 +514,11 @@ class AddActuatorModification(WorldModificationWithWorldEntityReference):
                 [self.original_actuator_id],
                 [self.actuator.id],
             )
-
+        if not self.actuator.dofs:
+            for degree_of_freedom_id in self.degree_of_freedom_ids:
+                self.actuator.add_dof(
+                    world.get_degree_of_freedom_by_id(degree_of_freedom_id)
+                )
         world.add_actuator(self.actuator)
 
     def revert(self, world: World):

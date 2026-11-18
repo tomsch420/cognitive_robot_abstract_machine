@@ -22,7 +22,12 @@ from semantic_digital_twin.world_description.geometry import Box, Scale, Color
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
-from semantic_digital_twin.world_description.world_entity import Body
+from semantic_digital_twin.world_description.world_entity import Actuator, Body
+from semantic_digital_twin.world_description.inertial_properties import (
+    Inertial,
+    InertiaTensor,
+)
+from semantic_digital_twin.adapters.multi_sim import MujocoCamera
 from krrood_spatial_math.spatial_types import Vector3
 from semantic_digital_twin.specifications.connections import (
     RevoluteConnectionSpecification,
@@ -328,3 +333,82 @@ def test_door_swings_about_its_hinge_after_orm_round_trip(session):
         reconstructed_door.movable_joint.connection_T_child_expression.to_np(),
         hinge_T_door.to_np(),
     )
+
+
+# %% what a simulation needs of a world after a round trip
+
+
+def world_of_one_body(name: str) -> tuple[World, Body]:
+    """
+    :param name: The name of the body.
+    :return: A world holding a box with a full inertia tensor, and the box.
+    """
+    world = World()
+    body = Body(
+        name=PrefixedName(name),
+        collision=ShapeCollection([Box(scale=Scale(0.1, 0.2, 0.3))]),
+        inertial=Inertial(
+            mass=2.0,
+            inertia=InertiaTensor.from_values(
+                ixx=0.3, iyy=0.4, izz=0.5, ixy=0.01, ixz=0.02, iyz=0.03
+            ),
+        ),
+    )
+    with world.modify_world():
+        world.add_kinematic_structure_entity(body)
+    return world, body
+
+
+def round_trip(world: World, session: Session) -> World:
+    """
+    :return: The world as it is read back from the database it was stored in.
+    """
+    session.add(to_dao(world))
+    session.commit()
+    return session.scalar(select(WorldMappingDAO)).from_dao()
+
+
+def test_the_inertia_tensor_of_a_body_survives_a_round_trip(session):
+    world, body = world_of_one_body("box")
+
+    loaded = round_trip(world, session)
+
+    loaded_box = loaded.get_body_by_name("box")
+    assert np.array_equal(loaded_box.inertial.inertia.data, body.inertial.inertia.data)
+
+
+def test_a_camera_keeps_the_body_it_is_attached_to_through_a_round_trip(session):
+    world, body = world_of_one_body("camera_mount")
+    with world.modify_world():
+        body.add_simulator_property(MujocoCamera(name="eye", body=body))
+
+    loaded = round_trip(world, session)
+
+    loaded_mount = loaded.get_body_by_name("camera_mount")
+    [camera] = [
+        simulator_property
+        for simulator_property in loaded_mount.simulator_additional_properties
+        if isinstance(simulator_property, MujocoCamera)
+    ]
+    assert camera.body is loaded_mount
+
+
+def test_an_actuator_keeps_the_degree_of_freedom_it_drives_through_a_round_trip(
+    session,
+):
+    world, base = world_of_one_body("base")
+    arm = Body(name=PrefixedName("arm"))
+    actuator = Actuator(name=PrefixedName("servo"))
+    with world.modify_world():
+        world.add_kinematic_structure_entity(arm)
+        joint = RevoluteConnection.create_with_dofs(
+            world, base, arm, axis=Vector3.Z(reference_frame=base)
+        )
+        world.add_connection(joint)
+        actuator.add_dof(joint.dof)
+        world.add_actuator(actuator)
+
+    loaded = round_trip(world, session)
+
+    [loaded_actuator] = loaded.actuators
+    assert [dof.id for dof in loaded_actuator.dofs] == [joint.dof.id]
