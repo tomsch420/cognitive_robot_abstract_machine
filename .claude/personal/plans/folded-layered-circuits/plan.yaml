@@ -73,8 +73,11 @@ items:
   - id: folding-pass
     title: Fold layers of one type at one depth, and build region graphs folded
     track: node-scopes
+    branch: folding-pass
+    pull_request_number: 54
+    session: local Claude Code session 5986c961-7253-4263-876b-dd0de65d823b
     depends_on: [per-node-scopes, folded-edge-matrix]
-    status: not started
+    status: in progress
     notes: >
       A pass merges every layer of one type at one depth into one layer, building on
       StackedLayer and concatenate, with folded edge matrices for the merged sums and
