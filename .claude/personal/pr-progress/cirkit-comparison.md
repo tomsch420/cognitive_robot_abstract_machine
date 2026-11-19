@@ -1,15 +1,16 @@
 PR tomsch420#47 (draft) - cirkit-comparison, plan circuit-learning-methods. libcirkit 0.3.1 installed --no-deps; queries timed in cirkit. Bug fix #48 (torch table parameter count) merged in.
 
 Plan
-- Fix the float32 cirkit training runs that crash on a NaN Gaussian scale (MINIBOONE, NYC_GREEN_TAXI, KDD_CUP_99, ALLSTATE, read 2026-11-19 at 92c0ba9c43): the baseline keeps every scale at least GaussianLayer.minimum_scale, cirkit's exp of the log scale has no floor. Prove it on NYC in neem-4 worktree cirkit-scale-floor, test first, then floor the scale as the baseline does.
-- Rerun the float32 cirkit runs of those datasets after the main run (cirkit-rerun-failed.sh covers failed runs).
-- Full neem-4 run (tom-probabilistic-experiments-ros, /root/circuit-learning-results/cirkit, note cirkit-NOTES.md); add the compare_cirkit.py summary to the PR and the page.
+- Decide with the developer: restart the neem-4 cirkit run with 36fdf76e53 (scale floor), or rerun only its failed runs. Runs recorded so far are unfloored.
+- Confirm on GPU float32 that NYC/KDD/MINIBOONE no longer end on a NaN scale.
+- Add the compare_cirkit.py summary of the full run to the PR and the page.
 - Check why jax gradient descent converges at -8.80 on NLTCS after 50 epochs while cirkit reaches -6.02.
 
 Done
-- a6170aa9fd method, conversion, cirkit-native likelihood timing; 9fe7901ee9 merges #48; 92c0ba9c43 one-value symbolic columns.
-- Merge probe against main clean at 92c0ba9c43; no checks ran on the fork, no reviews.
-- Comparison page: https://claude.ai/artifact/Xs99hE6QMgxxyHmJHoMRXX
+- a6170aa9fd method, conversion, cirkit timing; 9fe7901ee9 merges #48; 92c0ba9c43 one-value symbolic columns.
+- 36fdf76e53: cirkit's log sigma projected to log(GaussianLayer.minimum_scale) after every step, read-back projected; test fails without it. 15 circuit_learning tests pass on neem-4; krrood check clean.
+- Merge probe clean against main at 92c0ba9c43; no checks run on the fork; no reviews.
+- Test worktree neem-4 .../cram-probabilistic-experiments-home/cirkit-scale-floor (/root/cirkit-scale-floor), env script /root/scale-floor-env.sh.
 
 Next
-- Confirm the scale collapse on NYC (diagnose.py), then the fix.
+- The developer's answer on the running benchmark.
