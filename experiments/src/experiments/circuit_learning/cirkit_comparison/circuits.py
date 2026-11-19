@@ -106,6 +106,13 @@ class ConvertedLayer(ABC):
         """
         return self.layer.parameters
 
+    def project_compiled_tensors(self, *, compiler: TorchCompiler) -> None:
+        """
+        Move the values of :attr:`tensors` in the circuit ``compiler`` compiled into the
+        set of parameters :attr:`layer` allows; a layer without constrained parameters
+        leaves them as they are.
+        """
+
     @staticmethod
     def constant_tensor(*, values: np.ndarray) -> TensorParameter:
         """
@@ -169,7 +176,19 @@ class ConvertedGaussianLayer(ConvertedLayer):
 
     def layer_parameters(self, *, values: list[np.ndarray]) -> list[np.ndarray]:
         mean, log_standard_deviation = values
-        return [mean, np.exp(log_standard_deviation)]
+        return self.layer.projected_parameters([mean, np.exp(log_standard_deviation)])
+
+    def project_compiled_tensors(self, *, compiler: TorchCompiler) -> None:
+        """
+        Raise every standard deviation below :attr:`GaussianLayer.minimum_scale` to it,
+        as gradient descent on the layered circuit projects its scales.
+        """
+        compiled, fold = compiler.state.retrieve_compiled_parameter(
+            self.log_standard_deviation
+        )
+        with torch.no_grad():
+            for parameter in compiled.parameters():
+                parameter[fold].clamp_(min=np.log(self.layer.minimum_scale))
 
 
 @dataclass(kw_only=True)
@@ -480,6 +499,14 @@ class CirkitCircuit:
         compiled, fold = self.compiler.state.retrieve_compiled_parameter(tensor)
         return compiled().detach()[fold].cpu().numpy().astype(np.float64)
 
+    def project_parameters(self) -> None:
+        """
+        Move every parameter of the compiled circuit into the set of parameters its
+        layer of :attr:`layered` allows.
+        """
+        for converted in self.converted_layers.values():
+            converted.project_compiled_tensors(compiler=self.compiler)
+
     def trained_layered(self) -> LayeredProbabilisticCircuit:
         """
         :return: A copy of :attr:`layered` with the current parameters of the compiled
@@ -506,7 +533,9 @@ class CirkitCircuit:
 class CirkitTraining(PlateauScheduledTraining):
     """
     Mini-batch training of a cirkit circuit as cirkit trains its circuits: Adam on the
-    average negative log-likelihood, one step per batch.
+    average negative log-likelihood, one step per batch, each step followed by
+    :meth:`CirkitCircuit.project_parameters` as gradient descent on the layered circuit
+    projects its parameters.
     """
 
     circuit: CirkitCircuit
@@ -538,6 +567,7 @@ class CirkitTraining(PlateauScheduledTraining):
         loss = -self.circuit.log_likelihood(rows=rows).mean()
         loss.backward()
         self.optimizer.step()
+        self.circuit.project_parameters()
         return float(loss.detach())
 
     def scale_learning_rate(self, *, scale: float) -> None:

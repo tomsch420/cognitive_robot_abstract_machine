@@ -19,6 +19,7 @@ from sortedcontainers import SortedSet
 from experiments.circuit_learning.cirkit_comparison.circuits import (
     CirkitCircuit,
     CirkitQueryMeasurement,
+    ConvertedGaussianLayer,
     CirkitTraining,
 )
 from experiments.circuit_learning.cirkit_comparison.exceptions import (
@@ -37,6 +38,9 @@ from experiments.circuit_learning.settings import ComputationSetting
 from experiments.experiment_definitions import ExperimentResult
 from probabilistic_model.learning.region_graph.region_graph import RegionGraph
 from probabilistic_model.learning.training_schedule import Convergence, MiniBatches
+from probabilistic_model.probabilistic_circuit.tensorized.input_layer.gaussian_layer import (
+    GaussianLayer,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.layered_probabilistic_circuit import (
     LayeredProbabilisticCircuit,
     LayerNode,
@@ -171,6 +175,36 @@ def test_trained_layered_circuit_has_the_log_likelihoods_of_the_trained_cirkit_c
         cirkit_log_likelihoods,
         rtol=1e-6,
     )
+
+
+def test_cirkit_training_keeps_every_scale_at_least_the_minimum_scale(
+    random_circuit: LayeredProbabilisticCircuit, encoded_rows: np.ndarray
+):
+    """
+    Training on a continuous column of one value, which a vanishing scale fits ever
+    better, keeps every standard deviation of the compiled cirkit circuit at least the
+    minimum scale of the layered circuit.
+    """
+    rows = encoded_rows.copy()
+    rows[:, 0] = 0.5
+    circuit = CirkitCircuit(
+        layered=random_circuit, device=torch.device("cpu"), dtype=torch.float64
+    )
+    training = CirkitTraining(
+        arguments=(torch.asarray(rows, dtype=torch.float64),),
+        mini_batches=MiniBatches(),
+        circuit=circuit,
+        learning_rate=10.0,
+    )
+    training.train_one_epoch()
+    standard_deviations = np.concatenate(
+        [
+            np.exp(circuit.tensor_values(tensor=converted.log_standard_deviation))
+            for converted in circuit.converted_layers.values()
+            if isinstance(converted, ConvertedGaussianLayer)
+        ]
+    )
+    assert standard_deviations.min() >= GaussianLayer.minimum_scale
 
 
 def test_cirkit_circuit_over_a_variable_with_one_value_has_its_log_likelihoods():
