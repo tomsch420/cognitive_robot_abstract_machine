@@ -7,6 +7,6 @@ Done
 - cd16c41081; 17 folding tests pass on neem-4 (worktree /root/folding-pass, script /root/folding_gain.py).
 
 Next
-- Full probabilistic_model suite on neem-4 at cd16c41081 (running).
+- 1567 probabilistic_model tests pass on neem-4 at cd16c41081.
 - Developer decision: RegionGraph builds folded circuits by default?
 - Torch on GPU: keep index arrays on the device (outside the plan).
