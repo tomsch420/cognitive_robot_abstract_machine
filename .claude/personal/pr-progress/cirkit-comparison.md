@@ -1,16 +1,13 @@
-PR tomsch420#47 (draft) - cirkit-comparison, plan circuit-learning-methods. libcirkit 0.3.1 installed --no-deps; queries timed in cirkit. Bug fix #48 (torch table parameter count) merged in.
+PR tomsch420#47 (draft) - cirkit-comparison, plan circuit-learning-methods. Measurements paused by the developer (2026-11-19); the neem-4 cirkit run was left running.
 
 Plan
-- Decide with the developer: restart the neem-4 cirkit run with 36fdf76e53 (scale floor), or rerun only its failed runs. Runs recorded so far are unfloored.
-- Confirm on GPU float32 that NYC/KDD/MINIBOONE no longer end on a NaN scale.
-- Add the compare_cirkit.py summary of the full run to the PR and the page.
-- Check why jax gradient descent converges at -8.80 on NLTCS after 50 epochs while cirkit reaches -6.02.
+- Developer to decide: fix the dense table parameterization in probabilistic_model (own bug-fix PR off main), and whether folding layers becomes a plan item.
 
 Done
-- a6170aa9fd method, conversion, cirkit timing; 9fe7901ee9 merges #48; 92c0ba9c43 one-value symbolic columns.
-- 36fdf76e53: cirkit's log sigma projected to log(GaussianLayer.minimum_scale) after every step, read-back projected; test fails without it. 15 circuit_learning tests pass on neem-4; krrood check clean.
-- Merge probe clean against main at 92c0ba9c43; no checks run on the fork; no reviews.
-- Test worktree neem-4 .../cram-probabilistic-experiments-home/cirkit-scale-floor (/root/cirkit-scale-floor), env script /root/scale-floor-env.sh.
+- 36fdf76e53: cirkit's log sigma floored at GaussianLayer.minimum_scale like the baseline (float32 NaN on MINIBOONE/NYC/KDD/ALLSTATE); test, 15 tests pass on neem-4.
+- Log-likelihood gap found: DenseProbabilityTable reads raw log-probabilities and gradient descent renormalizes after each Adam step, so the gradient only raises observed states and Adam's per-coordinate steps cancel under renormalization. Normalizing in the forward pass (log-softmax, as cirkit) makes jax gradient descent on NLTCS reach exactly cirkit's -6.101 in 50 epochs (was -8.799).
+- Speed gap found: the layered NLTCS RAT-SPN runs 371 layers and 14653 CUDA kernels per likelihood call (298 ms for 3236 rows); cirkit folds it into 6 layers and 123 kernels (2.6 ms). Encoding and transfer are ~1.5 ms.
+- Scripts: neem-4 /root/{likelihood_profile,parameter_movement}.py, worktree /root/cirkit-scale-floor.
 
 Next
-- The developer's answer on the running benchmark.
+- The developer's call on the two fixes above.
