@@ -26,8 +26,11 @@ items:
   - id: leaf-variables-per-node
     title: Leaf layers hold one variable per node
     track: node-scopes
+    branch: leaf-variables-per-node
+    pull_request_number: 51
+    session: local Claude Code session 5986c961-7253-4263-876b-dd0de65d823b
     depends_on: []
-    status: not started
+    status: in progress
     notes: >
       Every leaf layer stores a variables array, one entry per node, instead of the single
       variable of UnivariateInputLayer, and evaluates each node on its own column. Circuits
