@@ -156,6 +156,11 @@ items:
   track: survey-and-benchmark
   pull_request_number: 47
   session: local Claude Code session 1cc90951-6ec3-44b9-9fb2-b5cec8d83bbd
+  blockers:
+    - >-
+      Measurements paused by the developer (2026-11-19). Next: find why cirkit trains NLTCS to -6.05
+      where jax gradient descent stops at -8.80 from the same circuit, and why its likelihood is
+      faster.
   depends_on: []
   status: in progress
   notes: 'Compare the tensorized layered circuits of probabilistic_model with cirkit (https://github.com/april-tools/cirkit).
