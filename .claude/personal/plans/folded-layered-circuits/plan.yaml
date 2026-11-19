@@ -55,8 +55,11 @@ items:
   - id: folded-edge-matrix
     title: An edge matrix of stacked dense blocks
     track: folded-edges
+    branch: folded-edge-matrix
+    pull_request_number: 52
+    session: local Claude Code session 5986c961-7253-4263-876b-dd0de65d823b
     depends_on: []
-    status: not started
+    status: in progress
     notes: >
       A third EdgeMatrix implementation beside the dense and sparse ones: the edges of a
       layer that are a stack of dense blocks, each node mixing or multiplying only the
