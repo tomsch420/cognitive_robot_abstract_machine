@@ -340,7 +340,7 @@ class DenseProbabilityTable(ProbabilityTable[NodeStateValues]):
 
     @property
     def number_of_stored_entries(self) -> int:
-        return int(self.log_probabilities.size)
+        return self.number_of_nodes * self.number_of_states
 
     def log_probabilities_of_states(self, indices: StateIndices) -> SampleNodeValues:
         # an unknown state reads the appended column of probability zero
