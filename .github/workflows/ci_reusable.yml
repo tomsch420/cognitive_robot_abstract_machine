@@ -90,6 +90,18 @@ jobs:
           # Optional for semantic_digital_twin, so its USD tests only run where it is installed
           uv pip install usd-core
 
+      - name: Install libcirkit
+        if: ${{ contains(fromJSON(inputs.libs), 'experiments') }}
+        env:
+          UV_CACHE_DIR: /opt/ros/.uv_cache
+        run: |
+          cd cognitive_robot_abstract_machine
+          source /opt/ros/cram-env/bin/activate
+          # The circuit learning benchmark compares with cirkit, whose pins (scipy~=1.14.0,
+          # graphviz~=0.20.3) the workspace cannot meet, so it goes in without them
+          uv pip install einops opt_einsum graphviz
+          uv pip install --no-deps libcirkit==0.3.1
+
       - name: Install robokudo optional requirements
         if: ${{ contains(fromJSON(inputs.libs), 'robokudo') }}
         env:

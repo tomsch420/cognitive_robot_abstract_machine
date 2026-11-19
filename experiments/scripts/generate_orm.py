@@ -9,6 +9,7 @@ import coraplex.orm.ormatic_interface
 from krrood.ormatic.ormatic import ORMatic
 from krrood.ormatic.utils import classes_of_module
 import experiments.control_loop_experiments.control_loop_profiler
+import experiments.circuit_learning.cirkit_comparison.circuits
 
 # benchmarking measures a running system instead of describing it
 ignored_classes = set(classes_of_module(experiments.control_loop_experiments.scenarios))
@@ -17,6 +18,11 @@ ignored_classes |= set(
 )
 ignored_classes |= set(
     classes_of_module(experiments.control_loop_experiments.control_loop_profiler)
+)
+# the cirkit circuits of the circuit learning benchmark compute, the benchmark's rows
+# describe what they computed
+ignored_classes |= set(
+    classes_of_module(experiments.circuit_learning.cirkit_comparison.circuits)
 )
 
 # Create an ORMatic object with the classes to be mapped

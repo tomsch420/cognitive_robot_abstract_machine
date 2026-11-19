@@ -11,7 +11,7 @@ from datetime import timedelta
 from enum import StrEnum
 
 from experiments.circuit_learning.datasets import DatasetName
-from experiments.circuit_learning.methods import LearningMethod
+from experiments.circuit_learning.method_names import LearningMethod
 from experiments.circuit_learning.settings import (
     ArrayLibrary,
     ComputationSetting,

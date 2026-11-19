@@ -26,17 +26,13 @@ import jax
 import numpy as np
 import psutil
 import torch
+from krrood.adapters.json_serializer import from_json, to_json
 from krrood_compute_resources.machine import Machine, MachineDivision, MachineShare
 from krrood_compute_resources.torch_memory import TorchDeviceMemory
-from krrood.adapters.json_serializer import from_json, to_json
 
 from experiments.circuit_learning.database import BenchmarkDatabase
 from experiments.circuit_learning.datasets import DatasetName, PreparedDatasets
 from experiments.circuit_learning.exceptions import NoShareForRunError
-from experiments.circuit_learning.measurements import (
-    QueryMeasurement,
-    TrainingMeasurement,
-)
 from experiments.circuit_learning.methods import (
     BenchmarkMethods,
     LearningMethod,
@@ -50,10 +46,8 @@ from experiments.circuit_learning.records import (
     TrainedCircuit,
 )
 from experiments.circuit_learning.rows import BenchmarkConfiguration
-from experiments.circuit_learning.settings import (
-    ArrayLibrary,
-    ComputationSetting,
-    Device,
+from experiments.circuit_learning.training_measurements import (
+    TrainingMeasurement,
 )
 from probabilistic_model.learning.torch_gradient_descent import TorchDeviceType
 from probabilistic_model.learning.training_schedule import Convergence
@@ -170,7 +164,7 @@ class RunExecution:
         method = BenchmarkMethods().find(name=self.run.method)
         if self.run.kind is RunKind.QUERIES:
             self.database.store(
-                records=QueryMeasurement(
+                records=method.query_measurement(
                     dataset=dataset,
                     configuration=BenchmarkConfiguration.from_setting(
                         learning_method=self.run.method,
@@ -316,21 +310,6 @@ class BenchmarkRunner:
         methods = BenchmarkMethods()
         datasets = PreparedDatasets(cache_directory=self.cache_directory)
         first, queries, rest = [], [], []
-        query_settings = [
-            *ComputationSetting.grid(
-                array_libraries=(ArrayLibrary.NUMPY,),
-                devices=(Device.CENTRAL_PROCESSOR,),
-            ),
-            *ComputationSetting.grid(
-                array_libraries=(ArrayLibrary.JAX, ArrayLibrary.TORCH)
-            ),
-        ]
-        query_settings = [
-            setting
-            for setting in query_settings
-            if self.division.shares_device(device=setting.device)
-        ]
-        query_settings.sort(key=lambda setting: setting != ComputationSetting.host())
         for name in self.datasets:
             dataset = datasets.load(name=name)
             for method_name in self.methods:
@@ -357,7 +336,8 @@ class BenchmarkRunner:
                         method=method_name,
                         setting=setting,
                     )
-                    for setting in query_settings
+                    for setting in method.query_settings()
+                    if self.division.shares_device(device=setting.device)
                 )
                 rest.extend(
                     BenchmarkRun(
