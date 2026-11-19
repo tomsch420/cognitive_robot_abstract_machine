@@ -849,13 +849,15 @@ class WrappedTable(TableLike):
         )
         container_name = module_and_class_name(collection_class_type)
 
-        # Association Object pattern
+        # Association Object pattern; the association rows' primary key grows in the
+        # order the elements were stored, and a database returns unsorted rows in any order
         rel_type = f"Mapped[{container_name}[{association_table.name}]]"
         rel_constructor = (
             f"relationship('{association_table.name}', "
             f"collection_class={container_name}, "
             f"cascade='all, delete-orphan', "
             f"foreign_keys='[{association_table.name}.{association_table.left_foreign_key}]', "
+            f"order_by='{association_table.name}.{association_table.primary_key_name}', "
             f"lazy='selectin')"
         )
 

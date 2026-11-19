@@ -6,7 +6,7 @@ import pytest
 import sys
 import types
 
-from sqlalchemy import select
+from sqlalchemy import inspect, select
 
 from krrood.ormatic.data_access_objects.conversion_order import HoldingOrder
 from krrood.ormatic.data_access_objects.from_dao import FromDataAccessObjectState
@@ -503,3 +503,19 @@ def test_an_object_holding_a_query_cannot_be_stored():
         to_dao(pose)
 
     assert failure.value.query is pose.position
+
+
+# %% the order of a stored list
+
+
+def test_a_stored_list_is_read_back_in_the_order_of_its_rows():
+    """
+    The rows of a list of objects are read back sorted by the primary key of the table
+    holding them, which grows in the order the list's elements were stored, since a
+    database returns rows of an unsorted query in any order.
+    """
+    relationship = inspect(KRROODPositionsDAO).relationships["positions"]
+
+    assert [(column.table, column.name) for column in relationship.order_by] == [
+        (column.table, column.name) for column in relationship.mapper.primary_key
+    ]
