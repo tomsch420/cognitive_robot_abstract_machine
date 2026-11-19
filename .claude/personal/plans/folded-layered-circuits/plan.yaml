@@ -42,8 +42,11 @@ items:
   - id: per-node-scopes
     title: Inner layers and structural queries work on per-node scopes
     track: node-scopes
+    branch: per-node-scopes
+    pull_request_number: 53
+    session: local Claude Code session 5986c961-7253-4263-876b-dd0de65d823b
     depends_on: [leaf-variables-per-node]
-    status: not started
+    status: in progress
     notes: >
       A layer's scope becomes per node: sums and products derive each node's variables
       from their edges, and every query that reads a layer's single scope (marginal,
