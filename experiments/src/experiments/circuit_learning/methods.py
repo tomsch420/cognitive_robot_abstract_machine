@@ -10,7 +10,6 @@ from __future__ import annotations
 import dataclasses
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from enum import StrEnum
 
 import jax
 import numpy as np
@@ -20,11 +19,20 @@ from krrood_compute_resources.devices import Device
 from krrood_compute_resources.jax_memory import JaxDeviceMemory
 from krrood_compute_resources.memory import BudgetedMemory, DeviceMemory, HostMemory
 
+from experiments.circuit_learning.cirkit_comparison.circuits import (
+    CirkitCircuit,
+    CirkitQueryMeasurement,
+    CirkitTraining,
+)
 from experiments.circuit_learning.datasets import BenchmarkDataset
+from experiments.circuit_learning.measurements import QueryMeasurement
+from experiments.circuit_learning.method_names import LearningMethod
+from experiments.circuit_learning.rows import BenchmarkConfiguration
 from experiments.circuit_learning.settings import (
     ArrayLibrary,
     ComputationSetting,
     EdgeRepresentation,
+    FloatingPointType,
 )
 from probabilistic_model.adapters.circuit_representations import CircuitRepresentations
 from probabilistic_model.learning.expectation_maximization import (
@@ -50,21 +58,6 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
 from probabilistic_model.probabilistic_circuit.tensorized.layered_probabilistic_circuit import (
     LayeredProbabilisticCircuit,
 )
-
-# %% names
-
-
-class LearningMethod(StrEnum):
-    """
-    A learning method of the benchmark, baselines included.
-    """
-
-    RANDOM_TENSORIZED_SUM_PRODUCT_NETWORK_GRADIENT_DESCENT = "RAT-SPN, gradient descent"
-    RANDOM_TENSORIZED_SUM_PRODUCT_NETWORK_EXPECTATION_MAXIMIZATION = (
-        "RAT-SPN, expectation maximization"
-    )
-    JOINT_PROBABILITY_TREE = "joint probability tree"
-
 
 # %% training context
 
@@ -172,6 +165,46 @@ class BenchmarkMethod(ABC):
             first leading.
         """
 
+    def query_settings(self) -> list[ComputationSetting]:
+        """
+        :return: The settings the queries of the method's circuits are measured in,
+            the one that lists the exact queries first.
+        """
+        settings = [
+            *ComputationSetting.grid(
+                array_libraries=(ArrayLibrary.NUMPY,),
+                devices=(Device.CENTRAL_PROCESSOR,),
+            ),
+            *ComputationSetting.grid(
+                array_libraries=(ArrayLibrary.JAX, ArrayLibrary.TORCH)
+            ),
+        ]
+        return sorted(
+            settings, key=lambda setting: setting != ComputationSetting.host()
+        )
+
+    def query_measurement(
+        self,
+        *,
+        dataset: BenchmarkDataset,
+        configuration: BenchmarkConfiguration,
+        setting: ComputationSetting,
+        circuit: LayeredProbabilisticCircuit,
+    ) -> QueryMeasurement:
+        """
+        :param dataset: The dataset the circuit was learned from.
+        :param configuration: The method and dataset of the circuit, in the setting.
+        :param setting: The setting the queries run in, one of :meth:`query_settings`.
+        :param circuit: The circuit the method learned, with host parameters.
+        :return: The measurement of the circuit's queries in the setting.
+        """
+        return QueryMeasurement(
+            dataset=dataset,
+            configuration=configuration,
+            setting=setting,
+            circuit=circuit,
+        )
+
     def supports(self, *, dataset: BenchmarkDataset) -> bool:
         """
         :param dataset: A dataset.
@@ -276,6 +309,30 @@ class RandomTensorizedSumProductNetworkByGradientDescent(
             array_libraries=(ArrayLibrary.JAX, ArrayLibrary.TORCH)
         )
 
+    def mini_batches(
+        self,
+        *,
+        circuit: LayeredProbabilisticCircuit,
+        setting: ComputationSetting,
+        rows: np.ndarray,
+        context: TrainingContext,
+    ) -> MiniBatches:
+        """
+        :param circuit: The circuit to train, with host parameters.
+        :param setting: The setting that trains.
+        :param rows: The encoded training rows.
+        :param context: The limits of training.
+        :return: Mini-batches of at most :attr:`batch_size` rows, fewer if their steps
+            do not fit in the memory budget.
+        """
+        return MiniBatches(
+            batch_size=min(
+                self.batch_size,
+                context.rows_per_step(circuit=circuit, setting=setting, rows=rows),
+            ),
+            seed=self.seed,
+        )
+
     def learn(
         self,
         *,
@@ -285,12 +342,8 @@ class RandomTensorizedSumProductNetworkByGradientDescent(
     ) -> LearnedCircuit:
         host = self.random_circuit(dataset=dataset)
         rows = dataset.encoded(frame=dataset.train)
-        mini_batches = MiniBatches(
-            batch_size=min(
-                self.batch_size,
-                context.rows_per_step(circuit=host, setting=setting, rows=rows),
-            ),
-            seed=self.seed,
+        mini_batches = self.mini_batches(
+            circuit=host, setting=setting, rows=rows, context=context
         )
         circuit = setting.placed(circuit=host)
         data = setting.asarray(rows=circuit.encoded(rows))
@@ -314,6 +367,97 @@ class RandomTensorizedSumProductNetworkByGradientDescent(
         )
         circuit.root = run.trained_root
         return LearnedCircuit(circuit=circuit, history=run.history)
+
+
+@dataclass(kw_only=True)
+class RandomTensorizedSumProductNetworkByCirkit(
+    RandomTensorizedSumProductNetworkByGradientDescent
+):
+    """
+    A RAT-SPN trained by cirkit :cite:`loconte2024what` with torch, as cirkit trains its
+    circuits, from the structure, initial parameters, mini-batches, learning rate
+    schedule and convergence of the gradient descent baseline.
+    """
+
+    @property
+    def name(self) -> LearningMethod:
+        return LearningMethod.RANDOM_TENSORIZED_SUM_PRODUCT_NETWORK_CIRKIT
+
+    def settings(self) -> list[ComputationSetting]:
+        """
+        :return: The torch settings with dense edges, the edges of cirkit's sums,
+            single precision on the GPU first.
+        """
+        settings = [
+            setting
+            for setting in ComputationSetting.grid(
+                array_libraries=(ArrayLibrary.TORCH,)
+            )
+            if setting.edge_representation is EdgeRepresentation.DENSE
+        ]
+        return sorted(
+            settings,
+            key=lambda setting: (
+                not setting.uses_graphics_processor,
+                setting.floating_point_type is not FloatingPointType.FLOAT32,
+            ),
+        )
+
+    def query_settings(self) -> list[ComputationSetting]:
+        """
+        :return: The settings of :meth:`settings`, single precision on the processor
+            cores first.
+        """
+        return sorted(
+            self.settings(),
+            key=lambda setting: (
+                setting.uses_graphics_processor,
+                setting.floating_point_type is not FloatingPointType.FLOAT32,
+            ),
+        )
+
+    def query_measurement(
+        self,
+        *,
+        dataset: BenchmarkDataset,
+        configuration: BenchmarkConfiguration,
+        setting: ComputationSetting,
+        circuit: LayeredProbabilisticCircuit,
+    ) -> QueryMeasurement:
+        return CirkitQueryMeasurement(
+            dataset=dataset,
+            configuration=configuration,
+            setting=setting,
+            circuit=circuit,
+            reports_exact_queries=setting == self.query_settings()[0],
+        )
+
+    def learn(
+        self,
+        *,
+        dataset: BenchmarkDataset,
+        setting: ComputationSetting,
+        context: TrainingContext,
+    ) -> LearnedCircuit:
+        host = self.random_circuit(dataset=dataset)
+        rows = dataset.encoded(frame=dataset.train)
+        circuit = CirkitCircuit(
+            layered=host, device=setting.device_object, dtype=setting.dtype
+        )
+        history = context.convergence.history_until_converged(
+            training=CirkitTraining(
+                arguments=(setting.asarray(rows=host.encoded(rows)),),
+                mini_batches=self.mini_batches(
+                    circuit=host, setting=setting, rows=rows, context=context
+                ),
+                learning_rate_plateau=dataclasses.replace(self.learning_rate_plateau),
+                circuit=circuit,
+                learning_rate=self.learning_rate,
+            )
+        )
+        return LearnedCircuit(
+            circuit=setting.placed(circuit=circuit.trained_layered()), history=history
+        )
 
 
 @dataclass(kw_only=True)
@@ -420,6 +564,7 @@ class BenchmarkMethods:
         default_factory=lambda: [
             RandomTensorizedSumProductNetworkByGradientDescent(),
             RandomTensorizedSumProductNetworkByExpectationMaximization(),
+            RandomTensorizedSumProductNetworkByCirkit(),
             JointProbabilityTreeBaseline(),
         ]
     )

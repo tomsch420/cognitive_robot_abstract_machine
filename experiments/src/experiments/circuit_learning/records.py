@@ -11,7 +11,8 @@ from datetime import timedelta
 from enum import StrEnum
 
 from experiments.circuit_learning.datasets import DatasetName
-from experiments.circuit_learning.methods import BenchmarkMethods, LearningMethod
+from experiments.circuit_learning.method_names import LearningMethod
+from experiments.circuit_learning.methods import BenchmarkMethods
 from experiments.circuit_learning.settings import ComputationSetting
 from probabilistic_model.probabilistic_circuit.tensorized.layered_probabilistic_circuit import (
     LayeredProbabilisticCircuit,
