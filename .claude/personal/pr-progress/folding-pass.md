@@ -8,5 +8,5 @@ Done
 
 Next
 - 1567 probabilistic_model tests pass on neem-4 at cd16c41081.
-- Developer decision: RegionGraph builds folded circuits by default?
+- aa3b51b824: RegionGraph builds folded circuits (developer decision); 1575 tests pass on neem-4.
 - Torch on GPU: keep index arrays on the device (outside the plan).
