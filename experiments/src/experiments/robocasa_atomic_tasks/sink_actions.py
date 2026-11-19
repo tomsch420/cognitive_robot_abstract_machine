@@ -1,8 +1,8 @@
 """
 Actions at the sink, written from what worked when the robot was driven there step by
-step: lifting the hand out of the basin, turning the faucet on and off by pushing its
-handle with one finger, and turning the water hot or cold by swinging the handle with
-the base.
+step: lifting the hand out of the basin, lifting an object out of it, turning the faucet
+on and off by pushing its handle with one finger, and turning the water hot or cold by
+swinging the handle with the base.
 
 Each parameter is a field defaulting to the value that worked, so that the values can be
 varied and what works learned; the preconditions are EQL conditions checked when the
@@ -19,12 +19,14 @@ import numpy as np
 from coraplex.robot_plans.actions.base import GoalAction, SequentialAction
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.robot_body import (
+    MoveFingersToWidthAction,
     MoveTorsoAction,
     SetGripperAction,
 )
-from coraplex.robot_plans.mixins import MovesToolCenterPoint
+from coraplex.robot_plans.mixins import HasApproachesGraspPoses, MovesToolCenterPoint
 from cramph.composites import Deferred, Parallel
 from cramph.data_types import ObservationStateValues
+from cramph.monitors import CountSimulationTimeSeconds
 from cramph.node import EndedByOwner, StatechartNode
 from cramph.threaded_nodes import FunctionCall
 from experiments.robocasa_atomic_tasks.exceptions import (
@@ -40,6 +42,7 @@ from experiments.robocasa_atomic_tasks.exceptions import (
 from experiments.robocasa_atomic_tasks.geometry import ApproachFrame
 from experiments.robocasa_atomic_tasks.skills import (
     DriveJoint,
+    MoveTheToolInAStraightLineAction,
     ReachThroughFreeSpaceAction,
 )
 from giskardpy.motion_statechart.tasks.cartesian_tasks import (
@@ -78,6 +81,7 @@ from semantic_digital_twin.collision_checking.collision_rules import (
     AvoidCollisionBetweenGroups,
 )
 from semantic_digital_twin.datastructures.definitions import GripperState, TorsoState
+from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.reasoning.predicates import InsideOf, PlaceIsOccupied
 from semantic_digital_twin.robots.robot_parts import Arm
 from semantic_digital_twin.world import World
@@ -531,21 +535,15 @@ class HasPreconditions(SequentialAction, ABC):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class WorksAtTheSink(HasPreconditions, ABC):
+class HasASinkBasin(StatechartNode, ABC):
     """
-    An action with preconditions whose gripper works at a sink's faucet.
-    """
-
-    arm: Arm
-    """
-    The arm whose gripper works at the faucet.
+    A node that works at a sink, known by its basin.
     """
 
     basin: Body
     """
-    The sink's basin, which the hand has to be out of when the action starts; the bodies
-    below it in the world, such as the faucet's spout and handle, are what the gripper
-    may touch.
+    The sink's basin; it and the bodies below it in the world, such as the faucet's
+    spout and handle, make up the sink.
     """
 
     @property
@@ -555,6 +553,19 @@ class WorksAtTheSink(HasPreconditions, ABC):
         """
         branch = set(self.world.get_kinematic_structure_entities_of_branch(self.basin))
         return [body for body in self.world.bodies_with_collision if body in branch]
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class WorksAtTheSink(HasASinkBasin, HasPreconditions, ABC):
+    """
+    An action with preconditions whose gripper works at a sink's faucet, starting with
+    the hand out of the basin; the gripper may touch the sink's bodies.
+    """
+
+    arm: Arm
+    """
+    The arm whose gripper works at the faucet.
+    """
 
     def hand_is_outside_the_basin(self) -> ConditionType:
         """
@@ -721,6 +732,152 @@ class LiftTheHandOutOfTheSinkAction(HasPreconditions, LeaveTheSinkAction):
 
     def create_steps_once_the_preconditions_hold(self) -> list[StatechartNode | Match]:
         return self.create_steps_leaving_the_sink()
+
+
+# %% lifting an object out of the sink
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class LiftAnObjectOutOfTheSinkAction(
+    HasASinkBasin, HasApproachesGraspPoses, HasPreconditions
+):
+    """
+    Takes an object lying in a sink's basin by a grasp and lifts it out: the opened
+    fingers go in a straight line to the grasp, close on the object and let it settle,
+    then the hand goes back out the way it came in and straight up above the basin.
+
+    Starts only with the object inside the basin.
+    """
+
+    arm: Arm
+    """
+    The arm whose gripper takes the object.
+    """
+
+    grasp: GraspCandidate
+    """
+    The grasp the fingers close on, which also names the object.
+    """
+
+    opening: float = 0.911
+    """
+    How far apart the fingers are when they go in, as a fraction of how far apart they
+    are when fully open.
+    """
+
+    approach_clearance: float = 0.087
+    """
+    How far from the grasp, back along the way the hand comes in, the straight approach
+    starts, in metres.
+    """
+
+    approach_velocity: float = 0.096
+    """
+    Cap on the speed of the tool frame on the way in, in m/s.
+    """
+
+    settling_time: float = 0.58
+    """
+    How long the object is left to settle in the closed fingers before it is lifted, in
+    seconds of simulated time.
+    """
+
+    lift_velocity: float = 0.124
+    """
+    Cap on the speed of the tool frame on the way out, in m/s.
+    """
+
+    exit_height_above_the_basin: float = 0.089
+    """
+    How far above the top of the basin's collision the tool frame rises at the end, in
+    metres.
+    """
+
+    arm_margin_to_the_sink: float = 0.005
+    """
+    How far the robot's bodies other than its gripper keep from the sink's bodies, in
+    metres.
+    """
+
+    def preconditions(self) -> ConditionType:
+        taken = variable(Body, [self.grasp.graspable.root])
+        return InsideOf(body=taken, other=self.basin)
+
+    def create_temporary_collision_rules(self) -> list[CollisionRule]:
+        """
+        :return: An allowance for the robot to touch the object and for the gripper to
+            touch the sink, while the rest of the robot keeps
+            :attr:`arm_margin_to_the_sink` from the sink.
+        """
+        robot_bodies = list(self.robot.bodies_with_collision)
+        gripper_bodies = set(self.arm.end_effector.bodies)
+        return [
+            AvoidCollisionBetweenGroups(
+                body_group_a=[
+                    body for body in robot_bodies if body not in gripper_bodies
+                ],
+                body_group_b=self.sink_bodies,
+                buffer_zone_distance=self.arm_margin_to_the_sink,
+                violated_distance=0.0,
+            ),
+            AllowCollisionBetweenGroups(
+                body_group_a=robot_bodies, body_group_b=[self.grasp.graspable.root]
+            ),
+            AllowCollisionBetweenGroups(
+                body_group_a=[body for body in robot_bodies if body in gripper_bodies],
+                body_group_b=self.sink_bodies,
+            ),
+        ]
+
+    def create_steps_once_the_preconditions_hold(self) -> list[StatechartNode | Match]:
+        world = self.world
+        gripper = self.arm.end_effector
+        poses = self.grasp_pose_sequence(self.grasp.grasp_pose, gripper, self.grasp)
+        world_T_pre_grasp = world.transform(poses.pre_grasp, world.root)
+        world_T_exit = world_T_pre_grasp.homogeneous_matrix.to_np().copy()
+        world_T_exit[2, 3] = max(
+            world_T_exit[2, 3],
+            Extent.from_body(self.basin, world.root, np.eye(3)).upper[2]
+            + self.exit_height_above_the_basin,
+        )
+        return [
+            MoveFingersToWidthAction(
+                gripper=gripper, width=self.opening * gripper.separation_when_open
+            ),
+            *self.straight_moves(
+                poses=[world_T_pre_grasp, world.transform(poses.grasp, world.root)],
+                velocity=self.approach_velocity,
+            ),
+            MoveFingersToWidthAction(
+                gripper=gripper, width=0.0, squeeze=gripper.squeeze
+            ),
+            CountSimulationTimeSeconds(seconds=self.settling_time),
+            *self.straight_moves(
+                poses=[
+                    world_T_pre_grasp,
+                    HomogeneousTransformationMatrix(
+                        world_T_exit, reference_frame=world.root
+                    ).pose,
+                ],
+                velocity=self.lift_velocity,
+            ),
+        ]
+
+    def straight_moves(
+        self, *, poses: list[Pose], velocity: float
+    ) -> list[MoveTheToolInAStraightLineAction]:
+        """
+        :param poses: Where the tool frame goes, in turn.
+        :param velocity: Cap on its speed, in m/s.
+        :return: New steps moving the tool frame in a straight line to each pose, the
+            base standing still.
+        """
+        return [
+            MoveTheToolInAStraightLineAction(
+                arm=self.arm, target_pose=pose, max_linear_velocity=velocity
+            )
+            for pose in poses
+        ]
 
 
 # %% watching joints
@@ -2388,7 +2545,8 @@ class TurnTheSpoutWithTheGripperAction(WorksAtTheSink):
     press_depth: float = 0.015
     """
     How far the gripper presses beyond where the bounding box of its collision would
-    touch the bar, in metres; the box reaches wider than the gripper at the bar's height.
+    touch the bar, in metres; the box reaches wider than the gripper at the bar's
+    height.
     """
 
     path_clearance: float = 0.02
