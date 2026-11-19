@@ -175,10 +175,16 @@ class ConvertedGaussianLayer(ConvertedLayer):
 @dataclass(kw_only=True)
 class ConvertedSymbolicLayer(ConvertedLayer):
     """
-    Categorical input units over the positions of a symbolic variable's domain.
+    Categorical input units over the positions of a symbolic variable's domain, with
+    states of probability zero added up to the two categories cirkit requires.
     """
 
     layer: SymbolicLayer
+
+    minimum_number_of_categories: int = 2
+    """
+    The fewest categories a cirkit categorical layer takes.
+    """
 
     logits: TensorParameter = field(init=False)
     """
@@ -204,11 +210,17 @@ class ConvertedSymbolicLayer(ConvertedLayer):
             self.layer.states, np.arange(number_of_states)
         ):
             raise LayerWithoutCirkitCounterpartError(layer=self.layer)
-        self.logits = self.constant_tensor(values=table.log_probabilities)
+        missing = max(self.minimum_number_of_categories - number_of_states, 0)
+        logits = np.pad(
+            np.asarray(table.log_probabilities),
+            ((0, 0), (0, missing)),
+            constant_values=-np.inf,
+        )
+        self.logits = self.constant_tensor(values=logits)
         self.categorical_layer = CategoricalLayer(
             Scope([self.layer.variable]),
             self.layer.number_of_nodes,
-            num_categories=number_of_states,
+            num_categories=number_of_states + missing,
             logits=Parameter.from_unary(
                 LogSoftmaxParameter(self.logits.shape), self.logits
             ),
@@ -224,7 +236,7 @@ class ConvertedSymbolicLayer(ConvertedLayer):
 
     def layer_parameters(self, *, values: list[np.ndarray]) -> list[np.ndarray]:
         (logits,) = values
-        return [log_softmax(logits, axis=-1)]
+        return [log_softmax(logits, axis=-1)[:, : len(self.layer.states)]]
 
 
 @dataclass(kw_only=True)

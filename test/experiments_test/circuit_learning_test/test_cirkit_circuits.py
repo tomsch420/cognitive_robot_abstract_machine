@@ -173,6 +173,48 @@ def test_trained_layered_circuit_has_the_log_likelihoods_of_the_trained_cirkit_c
     )
 
 
+def test_cirkit_circuit_over_a_variable_with_one_value_has_its_log_likelihoods():
+    """
+    A symbolic variable with a single value, which cirkit's categorical layers do not
+    take, keeps the log-likelihoods of the layered circuit.
+    """
+    variables = SortedSet(
+        [
+            Continuous("x"),
+            Symbolic(name="constant", domain=Set.from_iterable(["only"])),
+        ]
+    )
+    layered = (
+        RegionGraph(variables=variables, depth=1, repetitions=2)
+        .create_random_region_graph()
+        .to_probabilistic_circuit(input_units=2, sum_units=2)
+    )
+    rows = np.stack(
+        [
+            (
+                np.zeros(10)
+                if isinstance(variable, Symbolic)
+                else np.random.default_rng(2).normal(size=10)
+            )
+            for variable in variables
+        ],
+        axis=1,
+    )
+    circuit = CirkitCircuit(
+        layered=layered, device=torch.device("cpu"), dtype=torch.float64
+    )
+    np.testing.assert_allclose(
+        log_likelihoods_of(circuit=circuit, rows=rows),
+        layered.root.log_likelihood_of_nodes(rows)[:, 0],
+        rtol=1e-6,
+    )
+    np.testing.assert_allclose(
+        circuit.trained_layered().root.log_likelihood_of_nodes(rows)[:, 0],
+        layered.root.log_likelihood_of_nodes(rows)[:, 0],
+        rtol=1e-6,
+    )
+
+
 def test_a_sum_over_some_units_of_a_layer_has_no_cirkit_counterpart(
     random_circuit: LayeredProbabilisticCircuit,
 ):
