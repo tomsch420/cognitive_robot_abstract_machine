@@ -9,6 +9,7 @@ import dataclasses
 
 import numpy as np
 import pytest
+import torch
 
 from krrood.adapters import json_serializer
 from krrood.adapters.json_field import JSONField
@@ -251,3 +252,13 @@ def test_number_of_stored_entries(probabilities):
         table_of(DenseProbabilityTable, probabilities).number_of_stored_entries
         == probabilities.size
     )
+
+
+def test_number_of_stored_entries_of_a_dense_table_in_torch(probabilities):
+    """
+    A dense table whose log-probabilities are a torch tensor counts its entries as one
+    whose log-probabilities are a numpy array does.
+    """
+    table = table_of(DenseProbabilityTable, probabilities)
+    in_torch = table.copy_with_parameters([torch.asarray(table.log_probabilities)])
+    assert in_torch.number_of_stored_entries == table.number_of_stored_entries
