@@ -20,6 +20,7 @@ parts:
     - file: graphical_models
     - file: circuits
     - file: progressive_circuits
+    - file: learning_methods
     - file: truncated_gaussian
     - file: nyga_distribution
     - file: joint_probability_trees
