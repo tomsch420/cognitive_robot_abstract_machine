@@ -42,28 +42,11 @@ items:
     on the tracking PR.
 
     '
-- id: learning-benchmark
-  title: Shared benchmark for circuit learning methods
-  track: survey-and-benchmark
-  branch: learning-benchmark
-  pull_request_number: 45
-  session: local session f213800d-5c57-4391-9753-59b88553b370
-  depends_on: []
-  status: in progress
-  notes: 'Harness for the metrics of the first standing rule; every method remeasured, no
-    published numbers reused. 14 datasets without preprocessing of our own: binary NLTCS,
-    MSNBC, Plants, Ad; continuous POWER, GAS, HEPMASS, MINIBOONE, BSDS300; mixed OpenML 42225,
-    42571, 42729, 42746, 45045. Full grid of library, device, float type and edges; one seed;
-    train until convergence. Conditioning and truncation at 5 to 100 variables or simple sets.
-    Baselines: RAT-SPN, JPT, EM. Full spec: https://claude.ai/artifact/3eGnQibyJjzzRH1HLAZn3W
-
-    '
 - id: minibatch-em-tensorized
   title: Mini-batch expectation maximization on layered circuits
   track: parameter-learning
   depends_on:
   - learning-methods-survey
-  - learning-benchmark
   status: not started
   notes: 'Stochastic EM for layered circuits on any array backend, with the expected counts
     taken from the gradient of the log-likelihood (Peharz et al. 2020, Einsum Networks). The
@@ -83,8 +66,7 @@ items:
 - id: probabilistic-dropout
   title: Probabilistic dropout at inputs and sums
   track: parameter-learning
-  depends_on:
-  - learning-benchmark
+  depends_on: []
   status: not started
   notes: 'Dropout at input distributions and at sum children (Peharz et al. 2019, RAT-SPN
     section 3.3) for gradient training of layered circuits.
@@ -106,7 +88,6 @@ items:
   track: structure-learning
   depends_on:
   - learning-methods-survey
-  - learning-benchmark
   status: not started
   notes: 'Gens and Domingos 2013: recursive clustering of rows into sums and independence
     splits of variables into products. Check overlap with the existing JPT and Nyga induction
@@ -118,7 +99,6 @@ items:
   track: structure-learning
   depends_on:
   - learning-methods-survey
-  - learning-benchmark
   status: not started
   notes: 'Liu and Van den Broeck 2021: a Chow-Liu tree over the variables with a latent variable
     per node, compiled into a tensorized layered circuit; the standard strong baseline of
@@ -163,28 +143,26 @@ items:
 - id: structural-queries-any-backend
   title: Sampling, truncation and conditioning on any array backend
   track: survey-and-benchmark
-  depends_on:
-  - learning-benchmark
+  depends_on: []
   status: not started
   notes: 'Sampling, truncation and conditioning raise HostOnlyQueryError unless the parameters
     are numpy arrays, so the benchmark times them on numpy only. Make them work on jax and
     torch so those cells of the benchmark fill. Added by the developer at the benchmark kickoff.
 
     '
-
 - id: cirkit-comparison
-  title: "Compare the layered circuits with cirkit"
-  branch: null
+  title: Compare the layered circuits with cirkit
+  branch: cirkit-comparison
   track: survey-and-benchmark
-  depends_on:
-  - learning-benchmark
-  status: not started
-  notes: 'Compare the tensorized layered circuits of probabilistic_model with cirkit
-    (https://github.com/april-tools/cirkit). cirkit runs on the shared benchmark as a method
-    of its own: the same RAT-SPN structure on the same datasets, trained as cirkit trains it
-    with torch on CPU and GPU, measured with every metric of the first standing rule. The
-    pull request also compares the features of both libraries: circuit operations,
-    structures, input distributions and backends. cirkit (libcirkit on PyPI) is a new
-    dependency of experiments, approved by the developer first.
+  pull_request_number: 47
+  session: local Claude Code session 1cc90951-6ec3-44b9-9fb2-b5cec8d83bbd
+  depends_on: []
+  status: in progress
+  notes: 'Compare the tensorized layered circuits of probabilistic_model with cirkit (https://github.com/april-tools/cirkit).
+    cirkit runs on the shared benchmark as a method of its own: the same RAT-SPN structure
+    on the same datasets, trained as cirkit trains it with torch on CPU and GPU, measured
+    with every metric of the first standing rule. The pull request also compares the features
+    of both libraries: circuit operations, structures, input distributions and backends. cirkit
+    (libcirkit on PyPI) is a new dependency of experiments, approved by the developer first.
 
     '
