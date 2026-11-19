@@ -1,0 +1,86 @@
+schema_version: 1
+id: folded-layered-circuits
+title: Folded layered circuits
+description: >
+  Fold the layers of a layered probabilistic circuit inside the model: layers of one type
+  at one depth become one layer whose nodes each carry their own scope, and sums evaluate
+  their stacked dense blocks in one batched operation. A RAT-SPN then computes in a
+  handful of operations, as cirkit's folded circuits do, on numpy, jax and torch, while
+  every query keeps working on the one representation.
+default_repository: tomsch420/cognitive_robot_abstract_machine
+tracking_issue: 50
+
+waves:
+  - id: folding
+    name: Folding inside the model
+
+tracks:
+  - id: node-scopes
+    name: Per-node scopes and the folding pass
+    wave: folding
+  - id: folded-edges
+    name: Folded edge matrix
+    wave: folding
+
+items:
+  - id: leaf-variables-per-node
+    title: Leaf layers hold one variable per node
+    track: node-scopes
+    depends_on: []
+    status: not started
+    notes: >
+      Every leaf layer stores a variables array, one entry per node, instead of the single
+      variable of UnivariateInputLayer, and evaluates each node on its own column. Circuits
+      still build one variable per layer, so behaviour and results are unchanged; every
+      leaf type (Gaussian, truncated Gaussian, uniform, Dirac delta, symbolic, integer,
+      dense and sparse tables) moves at once. Tables of variables with different numbers
+      of states pad with probability-zero states.
+
+  - id: per-node-scopes
+    title: Inner layers and structural queries work on per-node scopes
+    track: node-scopes
+    depends_on: [leaf-variables-per-node]
+    status: not started
+    notes: >
+      A layer's scope becomes per node: sums and products derive each node's variables
+      from their edges, and every query that reads a layer's single scope (marginal,
+      support, conditioning, truncation, prune, simplify, remap, sampling, the circuit's
+      own uses in layered_probabilistic_circuit.py) works per node, a marginalized
+      variable masking nodes instead of dropping layers. Tests build layers mixing scopes
+      and compare every query with the same circuit in one scope per layer.
+
+  - id: folded-edge-matrix
+    title: An edge matrix of stacked dense blocks
+    track: folded-edges
+    depends_on: []
+    status: not started
+    notes: >
+      A third EdgeMatrix implementation beside the dense and sparse ones: the edges of a
+      layer that are a stack of dense blocks, each node mixing or multiplying only the
+      child nodes of its block, evaluated in one batched operation (an einsum or a batched
+      log-sum-exp) on any Array API backend. Blocks of different sizes are allowed, so that
+      irregular circuits (JPTs, converted rustworkx circuits) fold too.
+
+  - id: folding-pass
+    title: Fold layers of one type at one depth, and build region graphs folded
+    track: node-scopes
+    depends_on: [per-node-scopes, folded-edge-matrix]
+    status: not started
+    notes: >
+      A pass merges every layer of one type at one depth into one layer, building on
+      StackedLayer and concatenate, with folded edge matrices for the merged sums and
+      products; structural queries fold their results again. RegionGraph builds its
+      circuits folded directly. Every query of a folded circuit equals that of its unfolded
+      circuit, tested per query and per backend.
+
+  - id: folded-benchmark
+    title: Measure folded circuits against cirkit on the circuit learning benchmark
+    track: node-scopes
+    depends_on: [folding-pass, circuit-learning-methods/cirkit-comparison]
+    status: not started
+    notes: >
+      Rerun the gradient descent baseline with folded circuits on the shared benchmark and
+      compare with cirkit: likelihood speed, training time per epoch, compile time of the
+      jax programs and log-likelihoods, on numpy, jax and torch. Report the layers and
+      kernels per likelihood call of the NLTCS RAT-SPN (371 layers and 14653 CUDA kernels
+      unfolded, 6 layers and 123 kernels in cirkit).
