@@ -91,8 +91,8 @@ items:
     depends_on: [folding-pass, circuit-learning-methods/cirkit-comparison]
     status: not started
     notes: >
-      Rerun the gradient descent baseline with folded circuits on the shared benchmark and
-      compare with cirkit: likelihood speed, training time per epoch, compile time of the
-      jax programs and log-likelihoods, on numpy, jax and torch. Report the layers and
-      kernels per likelihood call of the NLTCS RAT-SPN (371 layers and 14653 CUDA kernels
-      unfolded, 6 layers and 123 kernels in cirkit).
+      Rerun the gradient descent baseline with folded circuits (region graphs build them folded) and
+      compare with cirkit: likelihood speed, training time per epoch and jit compile time on numpy,
+      jax and torch. The settings store inner edges as DENSE or SPARSE, which undoes the block edges
+      of folded sums (dense: 1.6 M entries for 40 k edges on NLTCS); decide their edge
+      representations first.
