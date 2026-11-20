@@ -1,4 +1,4 @@
 ## PR cram2#1032 (fix-orm-world-round-trip): store inertia tensors, camera bodies and actuator degrees of freedom through ormatic (fixes cram2#1008)
 - Plan: NPMatrix3x3/NPVector3 data as a required NDArray; krrood TypeDict looks up parametrized generics by origin so NDArray maps to the numpy array column; MultiSimCamera.body typed Body | None; AddActuatorModification keeps degree_of_freedom_ids
-- Done: last commit ae927846d6 on cram2#1032 (draft, approved by a reviewer): WorldModification apply/revert/from_kwargs keyword only, krrood check --since main clean; review thread resolved
+- Done: last commit ad38c84076 on cram2#1032 (merged cram2/main 38804f6fff, conflict in orm/model.py docstring resolved) (draft, approved by a reviewer): WorldModification apply/revert/from_kwargs keyword only, krrood check --since main clean; review thread resolved
 - Next: CI of cram2#1032, especially test_ros (not runnable locally); discuss the api-break with semantic_digital_twin and krrood code owners; maybe a krrood issue for optionals like list[float] | None not being stored
