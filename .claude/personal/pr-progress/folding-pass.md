@@ -1,12 +1,4 @@
-PR tomsch420#54 (draft) - folding-pass, plan folded-layered-circuits, base per-node-scopes (#53) with folded-edge-matrix (#52) merged. LayerFolding and LayeredProbabilisticCircuit.folded.
-
-Plan
-- Done: folding, tests, gain measured (NLTCS, MINIBOONE): torch GPU 26-39x, jax eager 21-37x, jit compile 15-28x, jit 1.15-1.3x, numpy none.
-
-Done
-- cd16c41081; 17 folding tests pass on neem-4 (worktree /root/folding-pass, script /root/folding_gain.py).
-
-Next
-- 1567 probabilistic_model tests pass on neem-4 at cd16c41081.
-- aa3b51b824: RegionGraph builds folded circuits (developer decision); 1575 tests pass on neem-4.
-- Torch on GPU: keep index arrays on the device (outside the plan).
+## PR cram2#1033 (folding-pass): fold the layers of layered circuits, train Gaussian scales through their logarithm
+- Plan: folding stack (#51-#54) plus Gaussian log scale; benchmark measures folded circuits with block edges
+- Done: head 8cd3eae023 (draft): review threads resolved; main merged; placed folds, EdgeRepresentation.BLOCK, block reference, JPT placed
+- Next: full benchmark against cirkit on neem-4 (/root/circuit-learning-results/bench-full, scratch branch bench-full); cirkit-comparison #47 needs fold=False and log_scale when merged after this
