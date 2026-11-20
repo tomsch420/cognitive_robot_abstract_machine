@@ -1,4 +1,4 @@
 ## PR cram2#1040 (trial-workflow): find out by trials what makes a behaviour succeed
-- Plan: A Trial[P,R] + TrialResult with mediators; B DatabaseTrialStore through ormatic, read back by starting state; C pilot trials refuse an outcome that cannot vary; D repetitions; E memory budget + clean stop; F StartingStateRecipe on a shared worker pool; G circuit analysis, best region, Mann Whitney (scipy declared in krrood-probabilistic), causal query; H next_registry + adopted defaults
-- Done: A 9cddcc6ed8, B 7edccbc308, C 86bf344ee6, D 4b218cc156; trial tests green in tom-cram-parametrized-trials (files synced from the worktree; the neem-4 clone has cram2 as origin, so nothing is committed there)
-- Next: E memory budget and clean stop, then F, G, H; PR description update at the end
+- Plan: requirements 1 to 8 of TRIAL_WORKFLOW_NOTES.md as A to H (records with measurements, database store, pilot, repetitions, worker pool, starting state recipe, causal analysis, closing the loop)
+- Done: all of A to H at c44608a080 on the fork's trial-workflow (draft); every krrood test directory green in tom-cram-parametrized-trials at that commit, krrood check --all-lines clean on the trial files; PR description and notes updated
+- Next: CI of cram2#1040; user to decide on the open points in the notes (pilot refuses rare successes, chi-square instead of Mann Whitney, conservative free memory); follow up PR moving pick_up_trials and release_trials onto these classes; delete TRIAL_WORKFLOW_NOTES.md before ready for review
