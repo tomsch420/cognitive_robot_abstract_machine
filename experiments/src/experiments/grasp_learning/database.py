@@ -25,6 +25,7 @@ from experiments.grasp_learning.records import (
     GraspLearningTask,
     PickUpTrial,
     RecordedGraspAttempt,
+    ReleaseTrial,
 )
 from experiments.physical_pick_up.objects import GraspableRoboCasaCategory
 from experiments.orm.ormatic_interface import (
@@ -128,9 +129,9 @@ class GraspDatabase:
             raise NoStoredWorld(database_id=database_id)
         return stored.from_dao()
 
-    def add_trial(self, *, trial: PickUpTrial) -> None:
+    def add_trial(self, *, trial: PickUpTrial | ReleaseTrial) -> None:
         """
-        Store a pick-up trial with its run.
+        Store a trial with its run.
 
         :param trial: The trial to store.
         """

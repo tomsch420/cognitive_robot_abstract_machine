@@ -13,6 +13,7 @@ import time
 from collections.abc import Callable
 from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass, field
+from enum import StrEnum
 from datetime import timedelta
 
 import mujoco
@@ -415,6 +416,24 @@ class RoboCasaEpisode:
         executor.compile(statechart=statechart)
         return executor.attempt()
 
+    def run_part(self, *, part: StrEnum, steps: Sequence[StatechartNode]) -> bool:
+        """
+        Run the steps of one part of a larger whole as a plan of their own.
+
+        :param part: The part the steps make up, named where it fails.
+        :param steps: The steps, performed one after another.
+        :return: Whether the plan succeeded; a failure is logged.
+        """
+        outcome = self.run(steps)
+        if not outcome.succeeded:
+            logger.info(
+                "Part %s failed with %s: %s",
+                part,
+                type(outcome.failure).__name__,
+                " | ".join(str(outcome.failure).splitlines())[:1500],
+            )
+        return outcome.succeeded
+
     def perform(
         self,
         plan: Callable[[], Sequence[StatechartNode | Match]],
@@ -591,6 +610,32 @@ class RoboCasaEpisode:
         """
         if self.physically_simulated:
             self.simulation.step_simulation(duration)
+
+    def limit_finger_force(self, *, force: float) -> None:
+        """
+        Let each finger of the arm's gripper press with at most a force in the physical
+        simulation.
+
+        :param force: The force, in newtons.
+        """
+        gripper = self.arm.end_effector
+        finger_degrees_of_freedom = {
+            degree_of_freedom.id
+            for connection in self.world.connections
+            if connection.child in gripper.bodies
+            for degree_of_freedom in connection.dofs
+        }
+        synchronizer = self.simulation.synchronizer
+        for actuator in self.world.actuators:
+            if not any(
+                degree_of_freedom.id in finger_degrees_of_freedom
+                for degree_of_freedom in actuator.dofs
+            ):
+                continue
+            self.simulation.simulator.set_actuator_force_range(
+                actuator_name=synchronizer.element_names.of(actuator),
+                force_range=np.array([-force, force]),
+            )
 
     # %% finding what RoboCasa refers to
 

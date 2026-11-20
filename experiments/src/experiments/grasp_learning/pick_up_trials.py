@@ -424,7 +424,7 @@ class PickUpPerformer:
         episode = self.episode
         simulation = episode.simulation
         simulation.restore_snapshot(snapshot=self.start)
-        self.limit_finger_force(force=parameters.closing_force)
+        episode.limit_finger_force(force=parameters.closing_force)
         recording = AttemptRecording(
             plan_recorder=PlanRecorder(simulation=simulation),
             moment_recorder=SimulatedMomentRecorder(
@@ -510,8 +510,8 @@ class PickUpPerformer:
         """
         episode = self.episode
         gripper = episode.arm.end_effector
-        if not self.stage_succeeded(
-            stage=PickUpStage.STANDING,
+        if not self.episode.run_part(
+            part=PickUpStage.STANDING,
             steps=[
                 self.torso_step(height=parameters.torso_height),
                 self.stand_step(offset=parameters.stand_offset),
@@ -533,40 +533,22 @@ class PickUpPerformer:
             ),
             *self.straight_moves(poses=way_in, velocity=parameters.approach_velocity),
         ]
-        if not self.stage_succeeded(stage=PickUpStage.APPROACHING, steps=approaching):
+        if not self.episode.run_part(part=PickUpStage.APPROACHING, steps=approaching):
             return PickUpStage.APPROACHING
         closing = MoveFingersToWidthAction(
             gripper=gripper, width=0.0, squeeze=gripper.squeeze
         )
-        if not self.stage_succeeded(stage=PickUpStage.CLOSING, steps=[closing]):
+        if not self.episode.run_part(part=PickUpStage.CLOSING, steps=[closing]):
             return PickUpStage.CLOSING
         episode.let_physics_run(timedelta(seconds=parameters.settling_duration))
         measurement.note_hold_taken()
         way_out = [way_in[0], world_T_start]
-        if not self.stage_succeeded(
-            stage=PickUpStage.LEAVING,
+        if not self.episode.run_part(
+            part=PickUpStage.LEAVING,
             steps=self.straight_moves(poses=way_out, velocity=parameters.lift_velocity),
         ):
             return PickUpStage.LEAVING
         return None
-
-    def stage_succeeded(
-        self, *, stage: PickUpStage, steps: list[StatechartNode]
-    ) -> bool:
-        """
-        :param stage: The stage the steps make up.
-        :param steps: The steps to run.
-        :return: Whether the plan of the steps succeeded; a failure is logged.
-        """
-        outcome = self.episode.run(steps)
-        if not outcome.succeeded:
-            logger.info(
-                "Stage %s failed with %s: %s",
-                stage,
-                type(outcome.failure).__name__,
-                " | ".join(str(outcome.failure).splitlines())[:1500],
-            )
-        return outcome.succeeded
 
     def torso_step(self, *, height: float) -> JointPositionList:
         """
@@ -620,31 +602,6 @@ class PickUpPerformer:
         """
         world = self.episode.world
         return world.transform(spatial_object=pose, target_frame=world.root)
-
-    def limit_finger_force(self, *, force: float) -> None:
-        """
-        Let each finger of the arm's gripper press with at most a force.
-
-        :param force: The force, in newtons.
-        """
-        gripper = self.episode.arm.end_effector
-        finger_degrees_of_freedom = {
-            degree_of_freedom.id
-            for connection in self.episode.world.connections
-            if connection.child in gripper.bodies
-            for degree_of_freedom in connection.dofs
-        }
-        synchronizer = self.episode.simulation.synchronizer
-        for actuator in self.episode.world.actuators:
-            if not any(
-                degree_of_freedom.id in finger_degrees_of_freedom
-                for degree_of_freedom in actuator.dofs
-            ):
-                continue
-            self.episode.simulation.simulator.set_actuator_force_range(
-                actuator_name=synchronizer.element_names.of(actuator),
-                force_range=np.array([-force, force]),
-            )
 
 
 # %% the trials

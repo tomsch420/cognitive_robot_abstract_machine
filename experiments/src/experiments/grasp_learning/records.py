@@ -9,8 +9,11 @@ each task can later become a column of a progressive probabilistic circuit.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from enum import StrEnum
+
+import numpy as np
 
 from typing_extensions import Type
 
@@ -298,6 +301,165 @@ class PickUpTrial:
     failed_stage: PickUpStage | None
     """
     The part of the pick-up whose plan failed; ``None`` when every part went through.
+    """
+
+    run: StoredTaskRun
+    """
+    The plans the robot performed and the world's state as it moved.
+    """
+
+
+# %% letting go of a held object from a stored starting world
+
+
+@dataclass(kw_only=True)
+class ReleaseParameters:
+    """
+    Everything letting go of a held object that rests on its target varies by.
+    """
+
+    opening: float
+    """
+    How far the fingers open, as a fraction of how far apart they are when fully open.
+    """
+
+    opening_force: float
+    """
+    The most force each finger pushes with while it opens, in newtons.
+    """
+
+    settling_duration: float
+    """
+    How long the opened fingers hold still before the hand moves away, in seconds.
+    """
+
+    retreat_tilt: float
+    """
+    The angle between the direction the hand moves away in and the way back along its
+    approach axis, in radians.
+    """
+
+    retreat_turn: float
+    """
+    Which way the direction the hand moves away in tilts, as an angle about the approach
+    axis counterclockwise from the closing axis, in radians.
+    """
+
+    retreat_distance: float
+    """
+    How far the tool frame moves away, in metres.
+    """
+
+    retreat_velocity: float
+    """
+    How fast the tool frame moves away, in m/s.
+    """
+
+    def values_by_attribute_path(self) -> dict[str, float]:
+        """
+        :return: Every parameter, keyed by its attribute name.
+        """
+        return {
+            "opening": self.opening,
+            "opening_force": self.opening_force,
+            "settling_duration": self.settling_duration,
+            "retreat_tilt": self.retreat_tilt,
+            "retreat_turn": self.retreat_turn,
+            "retreat_distance": self.retreat_distance,
+            "retreat_velocity": self.retreat_velocity,
+        }
+
+    def retreat_direction(
+        self, *, approach_axis: np.ndarray, closing_axis: np.ndarray
+    ) -> np.ndarray:
+        """
+        :param approach_axis: The unit axis the gripper approaches along.
+        :param closing_axis: The unit axis its fingers close along, perpendicular to
+            ``approach_axis`` and in the same frame.
+        :return: The unit direction the hand moves away in, in that frame.
+        """
+        tilted_towards = math.cos(self.retreat_turn) * closing_axis + math.sin(
+            self.retreat_turn
+        ) * np.cross(approach_axis, closing_axis)
+        return (
+            -math.cos(self.retreat_tilt) * approach_axis
+            + math.sin(self.retreat_tilt) * tilted_towards
+        )
+
+
+class ReleaseStage(StrEnum):
+    """
+    A part of letting go, in the order letting go goes through them.
+    """
+
+    OPENING = "opening"
+    """
+    Opening the fingers.
+    """
+
+    RETREATING = "retreating"
+    """
+    Moving the opened hand away from the object.
+    """
+
+
+@dataclass(kw_only=True)
+class ReleaseResult:
+    """
+    What came of letting go of an object.
+    """
+
+    finger_separation_after_opening: float
+    """
+    How far apart the fingers were once they opened, in metres.
+    """
+
+    fingers_touched_the_object_after_opening: bool
+    """
+    Whether a finger still touched the object once the fingers opened.
+    """
+
+    object_carried_along: float
+    """
+    How far the object moved while the hand moved away and the object came to rest, in
+    metres.
+    """
+
+    fingers_touched_the_object_at_the_end: bool
+    """
+    Whether a finger still touched the object once the hand had moved away.
+    """
+
+    accomplished: bool
+    """
+    Whether RoboCasa judged the task accomplished at the end.
+    """
+
+
+@dataclass(kw_only=True)
+class ReleaseTrial:
+    """
+    One way of letting go tried from a stored starting world, with what came of it.
+    """
+
+    starting_world_id: int
+    """
+    The database id of the world the trial started from.
+    """
+
+    parameters: ReleaseParameters
+    """
+    What letting go was varied by.
+    """
+
+    result: ReleaseResult
+    """
+    What happened to the object.
+    """
+
+    failed_stage: ReleaseStage | None
+    """
+    The part of letting go whose plan failed; ``None`` when every part went through.
     """
 
     run: StoredTaskRun

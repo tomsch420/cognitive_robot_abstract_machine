@@ -35,6 +35,8 @@ from experiments.robocasa_atomic_tasks.exceptions import (
     HandleHasNoBar,
     LeverNotSwungFarEnough,
     LeverSwungAside,
+    ObjectStillInTheSink,
+    PostureDoesNotFitTheArm,
     PreconditionsNotMet,
     SpoutHasNoBar,
     SpoutNotTurned,
@@ -42,8 +44,10 @@ from experiments.robocasa_atomic_tasks.exceptions import (
 from experiments.robocasa_atomic_tasks.geometry import ApproachFrame
 from experiments.robocasa_atomic_tasks.skills import (
     DriveJoint,
+    HoldsBase,
     MoveTheToolInAStraightLineAction,
     ReachThroughFreeSpaceAction,
+    StandAction,
 )
 from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianPose,
@@ -82,8 +86,10 @@ from semantic_digital_twin.collision_checking.collision_rules import (
 )
 from semantic_digital_twin.datastructures.definitions import GripperState, TorsoState
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
+from semantic_digital_twin.grasping.surface_grasp import SurfaceGrasp
 from semantic_digital_twin.reasoning.predicates import InsideOf, PlaceIsOccupied
-from semantic_digital_twin.robots.robot_parts import Arm
+from semantic_digital_twin.robots.robot_parts import AbstractRobot, Arm
+from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
 from semantic_digital_twin.world_description.geometry import (
@@ -861,7 +867,21 @@ class LiftAnObjectOutOfTheSinkAction(
                 ],
                 velocity=self.lift_velocity,
             ),
+            FunctionCall(
+                name="check the object is out of the sink",
+                function=self.raise_unless_the_object_is_out,
+                failure_types=(ObjectStillInTheSink,),
+            ),
         ]
+
+    def raise_unless_the_object_is_out(self) -> None:
+        """
+        :raises ObjectStillInTheSink: If the object still lies inside the basin.
+        """
+        taken = variable(Body, [self.grasp.graspable.root])
+        if evaluate_condition(not_(InsideOf(body=taken, other=self.basin))):
+            return
+        raise ObjectStillInTheSink(object_name=self.grasp.graspable.root.name.name)
 
     def straight_moves(
         self, *, poses: list[Pose], velocity: float
@@ -880,7 +900,265 @@ class LiftAnObjectOutOfTheSinkAction(
         ]
 
 
-# %% watching joints
+# %% standing at a spot beside something
+
+
+@dataclass(kw_only=True)
+class StandingSpot:
+    """
+    Where a robot stands beside something: how far its root is from the thing along the
+    world's axes, and which way it faces.
+    """
+
+    x: float
+    """
+    How far the robot's root is from the thing along the world's x-axis, in metres.
+    """
+
+    y: float
+    """
+    How far the robot's root is from the thing along the world's y-axis, in metres.
+    """
+
+    yaw: float
+    """
+    Which way the robot faces, as an angle about the world's z-axis, in radians.
+    """
+
+    def standing_pose(self, *, beside: KinematicStructureEntity, world: World) -> Pose:
+        """
+        :param beside: The thing the robot stands beside.
+        :param world: The world the thing is in.
+        :return: Where the robot's root stands, on the floor.
+        """
+        position = beside.global_pose.to_np()[:3, 3]
+        return HomogeneousTransformationMatrix.from_xyz_rpy(
+            x=position[0] + self.x,
+            y=position[1] + self.y,
+            yaw=self.yaw,
+            reference_frame=world.root,
+        ).pose
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class StandAtASpotAction(StandAction):
+    """
+    Takes the robot to a spot beside something, from where the thing is when the action
+    is expanded.
+    """
+
+    spot: StandingSpot
+    """
+    Where the robot stands beside :attr:`beside`.
+    """
+
+    beside: KinematicStructureEntity
+    """
+    The thing the robot stands beside.
+    """
+
+    target_location: Pose = field(init=False, default=None)
+    """
+    Where the robot stands, set when the action is expanded.
+    """
+
+    def create_goal(self) -> StatechartNode:
+        self.target_location = self.spot.standing_pose(
+            beside=self.beside, world=self.world
+        )
+        return super().create_goal()
+
+
+# %% holding an object above another
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class HoldTheObjectAboveAction(HoldsBase, GoalAction):
+    """
+    Moves the tool frame in a straight line, turned as it is, so that the object the
+    gripper holds comes to hang above another body.
+    """
+
+    arm: Arm
+    """
+    The arm whose gripper holds the object.
+    """
+
+    held: Body
+    """
+    The object the gripper holds.
+    """
+
+    above: Body
+    """
+    The body the object comes to hang above.
+    """
+
+    height: float
+    """
+    How far the held object's origin ends above :attr:`above`'s origin, in metres.
+    """
+
+    max_linear_velocity: float | None = None
+    """
+    Cap on the speed of the tool frame, in m/s; uncapped when ``None``.
+    """
+
+    hold_base: bool = False
+    """
+    Whether the base stands still while the tool frame moves, even where the robot
+    otherwise moves its whole body.
+    """
+
+    def create_goal(self) -> StatechartNode:
+        shift = (
+            self.above.global_pose.to_np()[:3, 3] - self.held.global_pose.to_np()[:3, 3]
+        )
+        shift[2] += self.height
+        world_T_tool = self.arm.end_effector.tool_frame.global_pose.to_np().copy()
+        world_T_tool[:3, 3] += shift
+        return self.tool_center_point_goal(
+            HomogeneousTransformationMatrix(
+                world_T_tool, reference_frame=self.world.root
+            ).pose,
+            self.arm,
+            max_linear_velocity=self.max_linear_velocity,
+            in_a_straight_line=True,
+            accompanying_goals=(self.base_hold(),) if self.hold_base else (),
+        )
+
+
+# %% taking an object out of the sink
+
+
+@dataclass(kw_only=True)
+class TakeOutOfTheSinkParameters:
+    """
+    How the robot takes an object out of a sink's basin: where it stands, how it holds
+    the arm over the basin and how it lifts the object out.
+
+    The defaults are those of the PandaOmron.
+    """
+
+    spot_for_the_arm_posture: StandingSpot = field(
+        default_factory=lambda: StandingSpot(x=0.0755, y=-0.8422, yaw=1.5732)
+    )
+    """
+    Where the robot stands beside the object while it takes :attr:`arm_posture`.
+    """
+
+    arm_posture: tuple[float, ...] = (
+        0.0915,
+        1.263,
+        -0.0014,
+        -0.4651,
+        -0.0002,
+        1.7607,
+        0.8783,
+    )
+    """
+    The positions of the arm's joints, from the shoulder out, that hold the hand over
+    the basin before it goes in, in radians.
+    """
+
+    torso_height: float = 0.2578
+    """
+    The position of the torso's lift joint while the object is taken, in metres.
+    """
+
+    spot_beside_the_object: StandingSpot = field(
+        default_factory=lambda: StandingSpot(x=-0.0562, y=-0.8227, yaw=1.55)
+    )
+    """
+    Where the robot stands beside the object to take it.
+    """
+
+    grasp: SurfaceGrasp = field(
+        default_factory=lambda: SurfaceGrasp(
+            yaw=-1.1207, height=0.7477, depth=0.0162, pitch=1.0801, roll=0.3785
+        )
+    )
+    """
+    The grasp the fingers close on, on the object's grasped part.
+    """
+
+    opening: float = 0.919
+    """
+    How far apart the fingers are when they go in, as a fraction of how far apart they
+    are when fully open.
+    """
+
+    approach_clearance: float = 0.0797
+    """
+    How far from the grasp, back along the way the hand comes in, the straight approach
+    starts, in metres.
+    """
+
+    approach_velocity: float = 0.0966
+    """
+    Cap on the speed of the tool frame on the way in, in m/s.
+    """
+
+    settling_time_in_the_fingers: float = 0.518
+    """
+    How long the object is left to settle in the closed fingers before it is lifted, in
+    seconds of simulated time.
+    """
+
+    lift_velocity: float = 0.1298
+    """
+    Cap on the speed of the tool frame on the way out of the sink, in m/s.
+    """
+
+    def posture_step(self, *, arm: Arm, robot: AbstractRobot) -> JointPositionList:
+        """
+        :param arm: The arm that takes :attr:`arm_posture`.
+        :param robot: The robot whose torso goes to :attr:`torso_height`.
+        :return: A new step taking the arm into :attr:`arm_posture` and the torso to
+            :attr:`torso_height`.
+        :raises PostureDoesNotFitTheArm: If :attr:`arm_posture` has another number of
+            positions than the arm has joints.
+        """
+        joints = [
+            connection
+            for connection in arm.active_connections
+            if isinstance(connection, ActiveConnection1DOF)
+        ]
+        if len(joints) != len(self.arm_posture):
+            raise PostureDoesNotFitTheArm(
+                joint_positions=len(self.arm_posture), joints=len(joints)
+            )
+        [torso_lift] = [
+            connection
+            for connection in robot.get_torso().connections
+            if isinstance(connection, ActiveConnection1DOF)
+        ]
+        return JointPositionList(
+            goal_state=JointState(
+                connections=[*joints, torso_lift],
+                target_values=[*self.arm_posture, self.torso_height],
+            )
+        )
+
+    def lift_step(
+        self, *, arm: Arm, basin: Body, graspable: HasGraspCandidates
+    ) -> LiftAnObjectOutOfTheSinkAction:
+        """
+        :param arm: The arm whose gripper lifts the object.
+        :param basin: The sink's basin.
+        :param graspable: The object lifted out.
+        :return: A new step lifting the object out of the basin by :attr:`grasp`.
+        """
+        return LiftAnObjectOutOfTheSinkAction(
+            arm=arm,
+            basin=basin,
+            grasp=self.grasp.grasp_candidate(graspable.grasped_part()),
+            opening=self.opening,
+            approach_clearance=self.approach_clearance,
+            approach_velocity=self.approach_velocity,
+            settling_time=self.settling_time_in_the_fingers,
+            lift_velocity=self.lift_velocity,
+        )
 
 
 @dataclass(eq=False, repr=False, kw_only=True)

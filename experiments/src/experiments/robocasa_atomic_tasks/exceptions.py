@@ -489,3 +489,48 @@ class NotARoboCasaFixture(DataclassException):
 
     def suggest_correction(self) -> str:
         return "Ask about the root body of one of the kitchen's fixtures."
+
+
+@dataclass(kw_only=True)
+class PostureDoesNotFitTheArm(DataclassException):
+    """
+    Raised when an arm is to take a posture with another number of joint positions than
+    it has joints.
+    """
+
+    joint_positions: int
+    """
+    How many joint positions the posture has.
+    """
+
+    joints: int
+    """
+    How many joints the arm has.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"A posture of {self.joint_positions} joint positions does not fit an arm "
+            f"of {self.joints} joints."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Give one position for each joint of the arm, from the shoulder out."
+
+
+@dataclass(kw_only=True)
+class ObjectStillInTheSink(PlanFailure):
+    """
+    Raised when an object a robot was to lift out of a sink still lies inside its basin.
+    """
+
+    object_name: str
+    """
+    The name of the object's body.
+    """
+
+    def error_message(self) -> str:
+        return f"{self.object_name} still lies inside the sink's basin."
+
+    def suggest_correction(self) -> str:
+        return "Take the object out again, by this grasp or another one."

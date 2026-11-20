@@ -20,7 +20,9 @@ from experiments.robocasa_atomic_tasks.episode import RoboCasaEpisode
 from experiments.robocasa_atomic_tasks.robocasa_names import (
     FixtureRegionPrefix,
     RoboCasaObjectName,
+    SinkJoint,
 )
+from experiments.robocasa_atomic_tasks.sink_to_plate import MoveFromTheSinkOntoAPlate
 from experiments.robocasa_atomic_tasks.tasks import PickAndPlaceTask
 from semantic_digital_twin.adapters.robocasa_dataset.mujoco_compat import (
     robocasa_version_assertions_relaxed,
@@ -155,6 +157,24 @@ class PickPlaceSinkToCounter(OntoReceptacle):
     """
     Take the object out of the sink and put it on the plate on the counter.
     """
+
+    def solve(self, episode: RoboCasaEpisode) -> None:
+        """
+        Differs from :meth:`PickAndPlaceTask.solve` in swinging the sink's spout out of
+        the way first, trying again to take the object out where it stays in the sink,
+        and dropping it onto the plate, see :class:`~experiments.robocasa_atomic_tasks.s
+        ink_to_plate.MoveFromTheSinkOntoAPlate`.
+        """
+        sink = episode.environment.sink
+        spout_name = f"{sink.naming_prefix}{SinkJoint.SPOUT}"
+        MoveFromTheSinkOntoAPlate(
+            episode=episode,
+            graspable=episode.graspable(self.picked_object),
+            plate=episode.object_body(self.receptacle),
+            basin=episode.world.get_body_by_name(sink.root_body),
+            spout=episode.joints.part_moved_by(spout_name).root,
+            spout_joint=episode.joints.connection(spout_name),
+        ).perform()
 
 
 @dataclass
