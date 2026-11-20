@@ -1,4 +1,4 @@
 ## PR cram2#1040 (trial-workflow): find out by trials what makes a behaviour succeed
-- Plan: generic trial workflow in krrood.parametrization.trials (TrialParameters, ParameterSpace, NearCentresRegistry, TrialPerformer/Store/Setup, TrialCampaign, TrialAnalysis), doc page krrood/doc/trials.rst
-- Done: efb44e4722 plus the working notes TRIAL_WORKFLOW_NOTES.md on cram2#1040 (draft, label new-feature; replaces the closed #1039); test_underspecified_knowledge 61 passed and krrood check clean in container tom-cram-parametrized-trials on neem-4 (clone /raid/users/tom_sch/repos/cram-parametrized-trials, env synced with uv sync --extra dev --active --inexact)
-- Next: CI of cram2#1039; follow-up to move experiments' pick_up_trials and release_trials onto these classes (user said not now)
+- Plan: A Trial[P,R] + TrialResult with mediators; B DatabaseTrialStore through ormatic, read back by starting state; C pilot trials refuse an outcome that cannot vary; D repetitions; E memory budget + clean stop; F StartingStateRecipe on a shared worker pool; G circuit analysis, best region, Mann Whitney (scipy declared in krrood-probabilistic), causal query; H next_registry + adopted defaults
+- Done: plan agreed with the user; baseline 16/16 trial tests green in tom-cram-parametrized-trials at efb44e4722
+- Next: A
