@@ -4,7 +4,7 @@
 - All measured training optimizations in one PR: gather-free block reduction, sums as matrix products, products as cross products, gradient stop on log-sum-exp shifts, one loss sync per epoch, torch steps recorded as CUDA graphs.
 
 **Done**
-- 3118ba8097 pushed (on cram2 main incl. #1040): torch GPU step 14.5 -> 3.84 ms (f32) with records_cuda_graphs; jax unchanged (checked before/after on GPU and CPU); probabilistic_model suite 1867 passed, 1 xfailed; experiments circuit_learning tests pass; krrood check clean; PR description updated.
+- 1055c0eb40 pushed: jax CPU batches split across host devices (runner: largest power of two of share cores); 25-core share 33.2 -> 6.54 s/epoch vs cirkit 40.1; torch GPU 14.5 -> 3.84 ms with CUDA graphs (harness 1.22 s/epoch vs cirkit 6.41); jax GPU unchanged; suite 1869 passed, 1 xfailed.
 
 **Next**
 - Developer discusses the api-break with the probabilistic_model code owners.
