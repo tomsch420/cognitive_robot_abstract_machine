@@ -16,5 +16,8 @@
 - To measure once benchmarks finish: full-batch EM jax CPU, batch 16384/65536 with chunks 2048/4096 vs plain 1024/4096; then size chunks by StepMemory + ProcessorCache.
 - Rerun em-jax-gpu-float64-block (overlapped by a test run on cores 230-255).
 
+### Decisions
+- cirkit is left out of the EM comparison (user, 2026-11-22). PR text: cirkit 0.3.1 has an undocumented EM optimizer that requires circuits without parameter activations; not benchmarked, since its configuration would be ours rather than cirkit's. cirkit's GD numbers from #1046 stay for context.
+
 ### Next
 - Collect /root/circuit-learning-results/tensorized-em/hepmass-{gpu,cpu-share}/*.json and update PR #55 description.
