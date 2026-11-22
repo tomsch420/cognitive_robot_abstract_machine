@@ -10,5 +10,11 @@
 - Step profile: EM step kernel-bound (GPU kernel 0.566 ms = wall 0.567 ms); GD unchanged (0.575 jax GPU, 3.84 torch GPU).
 - Batch size: jax CPU float32 full-batch EM 3.0 s/epoch at 4096 vs 4.9 at 1024, cliff at 8192 / float64 4096; not adopted (default 1024).
 
+### In progress (uncommitted)
+- JaxExpectationMaximization.rows_per_chunk: lax.scan over cache-sized chunks per device inside one compiled step (test passes).
+- krrood_compute_resources.processor_cache.ProcessorCache: DeviceMemory of the L3/L2 caches of the share's cores (tests pass locally).
+- To measure once benchmarks finish: full-batch EM jax CPU, batch 16384/65536 with chunks 2048/4096 vs plain 1024/4096; then size chunks by StepMemory + ProcessorCache.
+- Rerun em-jax-gpu-float64-block (overlapped by a test run on cores 230-255).
+
 ### Next
 - Collect /root/circuit-learning-results/tensorized-em/hepmass-{gpu,cpu-share}/*.json and update PR #55 description.
