@@ -1,15 +1,14 @@
 ## PR progress: tensorized-expectation-maximization (fork PR #55, stacked on cram2#1046)
 
 ### Plan
-- Wire tensorized EM into the circuit-learning experiments (full-batch and online, jax/torch, cpu/gpu, float32/float64, block edges).
-- Profile and optimize EM like #1046 did (warm synced steps, jax profiler, CUDA graphs incl. the update, jax CPU device split); check gradient descent does not slow down.
-- Benchmark HEPMASS 100 epochs: our EM vs Einsum Networks' EM vs GD (#1046) vs host EM; CPU runs on 25-core shares.
-- Fill the measurements tables in the PR description.
+- Benchmark HEPMASS 100 epochs / 1 h: our EM (full-batch, online) vs Einsum Networks' EM vs GD rerun vs host EM; GPU sequential, CPU 25-core shares in two waves.
+- Fill the measurements tables in the PR description; name labels (api-break, new-feature) to the user.
 
 ### Done
-- Host EM baseline: 42 s / 10k rows, 677 s / 100k rows, 3759 s / full 315k rows per iteration.
-- Refactor: shared CircuitParameterLearning/Training bases, jax and torch bases; learners keyword-only (25269e1630).
-- Tensorized EM (jax, torch) with tests vs host EM, online EM, CUDA graphs, split batches (bf5bc2cd7a).
+- Host EM baseline: 42 s / 10k, 677 s / 100k, 3759 s / 315k rows per iteration.
+- Shared bases, keyword-only learners (25269e1630); tensorized EM jax/torch with host-agreement tests (bf5bc2cd7a); dense probability tables (db16270593); experiments methods em + online (c08bc0739c); fused update step (7a6aa41560).
+- Step profile: EM step kernel-bound (GPU kernel 0.566 ms = wall 0.567 ms); GD unchanged (0.575 jax GPU, 3.84 torch GPU).
+- Batch size: jax CPU float32 full-batch EM 3.0 s/epoch at 4096 vs 4.9 at 1024, cliff at 8192 / float64 4096; not adopted (default 1024).
 
 ### Next
-- Experiments method for tensorized EM; harness /root/hepmass_epoch_speed.py with EM methods; Einsum Networks EM probe.
+- Collect /root/circuit-learning-results/tensorized-em/hepmass-{gpu,cpu-share}/*.json and update PR #55 description.
