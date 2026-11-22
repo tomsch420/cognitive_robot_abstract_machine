@@ -1,13 +1,12 @@
-## cram2#1046 Train block-edge circuits up to 10x faster (branch block-edges-without-gathers, on top of #1040)
+## cram2#1046 Train block-edge circuits up to 10x faster with jax and 4x with torch (branch block-edges-without-gathers)
 
 **Plan**
-- All measured optimizations in one PR (developer's choice): gather-free block reduction, sums as matrix products, products as cross products, gradient stop on log-sum-exp shifts, one loss sync per epoch.
+- All measured training optimizations in one PR: gather-free block reduction, sums as matrix products, products as cross products, gradient stop on log-sum-exp shifts, one loss sync per epoch, torch steps recorded as CUDA graphs.
 
 **Done**
-- f8d07cc0f3 pushed: HEPMASS jax epoch CPU 240 -> 24 s, GPU 2.0 -> 0.18 s; probabilistic_model suite 1858 passed, 1 xfailed; krrood format/check clean; PR description updated.
-- Tried and dropped: donating the training state to jax.jit (no gain).
+- 3118ba8097 pushed (on cram2 main incl. #1040): torch GPU step 14.5 -> 3.84 ms (f32) with records_cuda_graphs; jax unchanged (checked before/after on GPU and CPU); probabilistic_model suite 1867 passed, 1 xfailed; experiments circuit_learning tests pass; krrood check clean; PR description updated.
 
 **Next**
-- Developer discusses the api-break (keyword-only layer methods, step_on_batch returning arrays) with the probabilistic_model code owners.
-- Rebase once #1040 merges.
-- Open question for the developer: NormalDistributionFunctions and GradientStop each pick their backend class; sharing a base would need the monkeypatch in test_normal_distribution_functions changed.
+- Developer discusses the api-break with the probabilistic_model code owners.
+- Rerun the torch GPU rows of the HEPMASS comparison with CUDA graphs (the running comparison used f8d07cc0f3).
+- Open: GradientStop and NormalDistributionFunctions each pick their backend class (sharing a base needs the monkeypatch test changed); CUDA graphs are opt-in until truncated Gaussian, binomial and probability-table layers stop copying from the host.
