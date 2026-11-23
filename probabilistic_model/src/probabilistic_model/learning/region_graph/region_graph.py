@@ -17,6 +17,7 @@ from typing_extensions import Iterable, Self
 
 from probabilistic_model.graph import DirectedAcyclicGraph
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.base import Layer
+from probabilistic_model.probabilistic_circuit.tensorized.folding import LayerFolding
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.edge_matrix import (
     DenseEdgeMatrix,
     SparseEntries,
@@ -263,10 +264,10 @@ class RegionGraph(DirectedAcyclicGraph[RegionGraphNode]):
         predicted_variable: Symbolic | None = None,
     ) -> LayeredProbabilisticCircuit:
         """
-        Convert the region graph to a randomly initialized RAT-SPN with numpy parameters.
-        With a predicted variable, the root region has one sum unit per category of it
-        and the root mixes them, each multiplied by the indicator of its category, so
-        that the circuit classifies; without one, the root region has a single sum unit.
+        Convert the region graph to a folded, randomly initialized RAT-SPN on the host.
+        With a predicted variable, the root mixes one sum unit per category of it, each
+        multiplied by the indicator of its category, so that the circuit classifies;
+        without one, the root region has a single sum unit.
 
         :param input_units: The number of input distributions of each leaf region.
         :param sum_units: The number of sum units of each inner region.
@@ -321,7 +322,9 @@ class RegionGraph(DirectedAcyclicGraph[RegionGraphNode]):
                 predicted_variable=predicted_variable,
                 variables=variables,
             )
-        return LayeredProbabilisticCircuit(variables, root)
+        return LayeredProbabilisticCircuit(
+            variables, LayerFolding(root=root).folded_root()
+        )
 
     def fully_connected_sum_layer(
         self, *, children: list[RegionGraphNode], number_of_nodes: int
@@ -393,10 +396,12 @@ class RegionGraph(DirectedAcyclicGraph[RegionGraphNode]):
                     self.initial_location_range.upper,
                     input_units,
                 ),
-                self.random_number_generator.uniform(
-                    self.initial_scale_range.lower,
-                    self.initial_scale_range.upper,
-                    input_units,
+                np.log(
+                    self.random_number_generator.uniform(
+                        self.initial_scale_range.lower,
+                        self.initial_scale_range.upper,
+                        input_units,
+                    )
                 ),
             )
         if isinstance(variable, Symbolic):

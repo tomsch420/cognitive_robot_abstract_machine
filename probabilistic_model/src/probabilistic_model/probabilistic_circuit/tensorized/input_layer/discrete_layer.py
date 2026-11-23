@@ -1,3 +1,8 @@
+"""
+Input layers whose nodes are each a distribution over the states of a symbolic or an
+integer variable.
+"""
+
 from __future__ import annotations
 
 import dataclasses
@@ -19,16 +24,19 @@ from probabilistic_model.distributions.distributions import (
     SymbolicDistribution,
 )
 from probabilistic_model.exceptions import ShapeMismatchError
+from probabilistic_model.probabilistic_circuit.tensorized.matrix_shape import (
+    MatrixShape2D,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
+    LeafValues,
     BackendArray,
     NodeIndices,
     NodeMask,
     NodeValues,
     SampleArray,
     SampleColumn,
-    SampleNodeStateIndices,
+    LeafStateIndices,
     SampleNodeValues,
-    StateIndices,
     StateMask,
     States,
 )
@@ -117,6 +125,10 @@ class DiscreteLayer(UnivariateInputLayer, ABC):
         )
 
     def validate_own(self):
+        """
+        :raises ShapeMismatchError: If the table does not have one column per state, in
+            addition to what :meth:`Layer.validate_own` raises.
+        """
         super().validate_own()
         if self.table.number_of_states != self.number_of_states:
             raise ShapeMismatchError(
@@ -135,9 +147,7 @@ class DiscreteLayer(UnivariateInputLayer, ABC):
         """
         raise NotImplementedError
 
-    def state_indices_of(
-        self, values: SampleColumn | SampleNodeValues
-    ) -> StateIndices | SampleNodeStateIndices:
+    def state_indices_of(self, *, values: LeafValues) -> LeafStateIndices:
         """
         Look up the index of every value in :attr:`states`.
 
@@ -170,7 +180,7 @@ class DiscreteLayer(UnivariateInputLayer, ABC):
         self, events: SampleArray, cache: QueryCache | None = None
     ) -> SampleNodeValues:
         return self.table.log_probabilities_of_states(
-            self.state_indices_of(self.column_of(events))
+            indices=self.state_indices_of(values=self.column_of(events=events))
         )
 
     @memoized
@@ -219,7 +229,7 @@ class DiscreteLayer(UnivariateInputLayer, ABC):
     def log_conditional_of_value(self, value: Any) -> LayerWithLogProbabilities:
         # the value is read like the values of events, see state_indices_of
         selected = np.zeros(self.number_of_states, dtype=bool)
-        [index] = self.state_indices_of(np.array([value], dtype=float))
+        [index] = self.state_indices_of(values=np.array([value], dtype=float))
         if index >= 0:
             selected[index] = True
         return self.renormalized_to(selected)
@@ -235,7 +245,7 @@ class DiscreteLayer(UnivariateInputLayer, ABC):
         with np.errstate(divide="ignore"):
             node_log_probabilities = np.log(self.table.probability_of_states(selected))
         return LayerWithLogProbabilities(
-            self.with_table(self.table.restricted_to(selected).normalized()),
+            self.copy_with_table(table=self.table.restricted_to(selected).normalized()),
             node_log_probabilities,
         )
 
@@ -256,7 +266,7 @@ class DiscreteLayer(UnivariateInputLayer, ABC):
             },
         )
 
-    def with_table(self, table: ProbabilityTable) -> Self:
+    def copy_with_table(self, *, table: ProbabilityTable) -> Self:
         """
         :param table: The probability table of the new layer, over the nodes and the
             states of this one.
@@ -271,7 +281,7 @@ class DiscreteLayer(UnivariateInputLayer, ABC):
         :param table_type: The type of table to store the probabilities in.
         :return: This layer with its probabilities stored in a table of that type.
         """
-        return self.with_table(table_type.of(self.table))
+        return self.copy_with_table(table=table_type.from_table(table=self.table))
 
     @classmethod
     def from_distributions(
@@ -340,7 +350,12 @@ class DiscreteLayer(UnivariateInputLayer, ABC):
             dtype=float,
         )
         return states, table_type.from_entries(
-            rows, columns, values, (len(distributions), len(states))
+            rows,
+            columns,
+            values,
+            MatrixShape2D(
+                number_of_rows=len(distributions), number_of_columns=len(states)
+            ),
         )
 
     @classmethod
@@ -375,7 +390,10 @@ class DiscreteLayer(UnivariateInputLayer, ABC):
             node_variables=np.concatenate([layer.node_variables for layer in layers]),
             states=states,
             table=table_type.concatenate(
-                [table_type.of(layer.table_over(states=states)) for layer in layers]
+                [
+                    table_type.from_table(table=layer.table_over(states=states))
+                    for layer in layers
+                ]
             ),
         )
 
@@ -392,7 +410,9 @@ class DiscreteLayer(UnivariateInputLayer, ABC):
             rows,
             np.searchsorted(states, self.states[columns]),
             probabilities,
-            (self.number_of_nodes, len(states)),
+            MatrixShape2D(
+                number_of_rows=self.number_of_nodes, number_of_columns=len(states)
+            ),
         )
 
     def has_equal_parameters(self, other: Self) -> bool:
@@ -494,7 +514,9 @@ class IntegerLayer(DiscreteLayer):
                 ],
                 axis=1,
             )
-        reached = self.float_column(values=self.column_of(events)) >= self.float_states
+        reached = (
+            self.float_column(values=self.column_of(events=events)) >= self.float_states
+        )
         return self.table.dot(
             self.namespace.astype(reached, self.floating_point_type).T
         ).T

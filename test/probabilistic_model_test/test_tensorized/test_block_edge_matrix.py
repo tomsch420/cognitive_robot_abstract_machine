@@ -8,8 +8,12 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+from probabilistic_model.probabilistic_circuit.tensorized.matrix_shape import (
+    MatrixShape2D,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.edge_matrix import (
     BlockEdgeMatrix,
+    EdgeBlockStackShape,
     RowReduction,
     SparseEdgeMatrix,
     SparseEntries,
@@ -36,7 +40,11 @@ def test_rows_with_the_same_columns_form_one_block(
     The rows that mix the same columns are stacked into one block per set of columns.
     """
     entries = rows_of_two_blocks_and_a_row_without_edges
-    matrix = BlockEdgeMatrix.from_edge_positions(entries.rows, entries.columns, (5, 5))
+    matrix = BlockEdgeMatrix.from_edge_positions(
+        rows=entries.rows,
+        columns=entries.columns,
+        shape=MatrixShape2D(number_of_rows=5, number_of_columns=5),
+    )
     shapes = sorted(
         stack.block_rows.shape + stack.block_columns.shape[1:]
         for stack in matrix.stacks
@@ -56,10 +64,17 @@ def test_block_reduction_is_the_sparse_reduction(
     values = np.random.default_rng(0).normal(size=(3, 5))
     results = []
     for matrix_type in (SparseEdgeMatrix, BlockEdgeMatrix):
-        matrix = matrix_type.from_edge_positions(entries.rows, entries.columns, (5, 5))
-        stored = matrix.stored_values(entries, 0.0)
+        matrix = matrix_type.from_edge_positions(
+            rows=entries.rows,
+            columns=entries.columns,
+            shape=MatrixShape2D(number_of_rows=5, number_of_columns=5),
+        )
+        stored = matrix.stored_values(entries=entries, padding=0.0)
         results.append(
-            matrix.reduce_by_row(matrix.values_of_columns(values) + stored, reduction)
+            matrix.reduce_by_row(
+                values=matrix.values_of_columns(values=values) + stored,
+                reduction=reduction,
+            )
         )
     np.testing.assert_allclose(results[1], results[0])
 
@@ -72,8 +87,14 @@ def test_stored_values_follow_their_edges(
     entries were given in.
     """
     entries = rows_of_two_blocks_and_a_row_without_edges
-    matrix = BlockEdgeMatrix.from_edge_positions(entries.rows, entries.columns, (5, 5))
-    edge_values = matrix.edge_values(matrix.stored_values(entries, 0.0))
+    matrix = BlockEdgeMatrix.from_edge_positions(
+        rows=entries.rows,
+        columns=entries.columns,
+        shape=MatrixShape2D(number_of_rows=5, number_of_columns=5),
+    )
+    edge_values = matrix.edge_values(
+        stored=matrix.stored_values(entries=entries, padding=0.0)
+    )
     expected = {
         (int(row), int(column)): value
         for row, column, value in zip(entries.rows, entries.columns, entries.data)
@@ -97,8 +118,37 @@ def test_sums_of_one_shape_are_one_stack():
         np.arange(products_per_region), regions * sums_per_region
     )
     matrix = BlockEdgeMatrix.from_edge_positions(
-        rows, columns, (regions * sums_per_region, regions * products_per_region)
+        rows=rows,
+        columns=columns,
+        shape=MatrixShape2D(
+            number_of_rows=regions * sums_per_region,
+            number_of_columns=regions * products_per_region,
+        ),
     )
     [stack] = matrix.stacks
     assert stack.block_rows.shape == (regions, sums_per_region)
     assert stack.block_columns.shape == (regions, products_per_region)
+
+
+def test_stack_shape_counts_the_blocks_and_their_rows_and_columns(
+    rows_of_two_blocks_and_a_row_without_edges: SparseEntries,
+):
+    """
+    Every stack reports how many blocks it holds and how many rows and columns each
+    block has, and its number of edges is their product.
+    """
+    entries = rows_of_two_blocks_and_a_row_without_edges
+    matrix = BlockEdgeMatrix.from_edge_positions(
+        rows=entries.rows,
+        columns=entries.columns,
+        shape=MatrixShape2D(number_of_rows=5, number_of_columns=5),
+    )
+    shapes = sorted(
+        (stack.stack_shape for stack in matrix.stacks),
+        key=lambda shape: shape.columns_per_block,
+    )
+    assert shapes == [
+        EdgeBlockStackShape(number_of_blocks=1, rows_per_block=2, columns_per_block=2),
+        EdgeBlockStackShape(number_of_blocks=1, rows_per_block=2, columns_per_block=3),
+    ]
+    assert sum(stack.number_of_edges for stack in matrix.stacks) == len(entries.rows)

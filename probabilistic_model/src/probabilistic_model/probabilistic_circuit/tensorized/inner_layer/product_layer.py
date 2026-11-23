@@ -13,6 +13,9 @@ from sortedcontainers import SortedSet
 from typing_extensions import Self
 
 from probabilistic_model.probabilistic_model import PartialPointType
+from probabilistic_model.probabilistic_circuit.tensorized.matrix_shape import (
+    MatrixShape2D,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     BackendArray,
     NodeIndices,
@@ -59,9 +62,9 @@ class ProductLayer(InnerLayer):
     """
     A layer of product units.
 
-    Every node multiplies at most one node of each child layer, so the scope of a node
-    is the union of the scopes of its child layers and its likelihood is the sum of
-    their log-likelihoods. A node of a child layer may be a factor of several nodes.
+    Every node multiplies nodes of its child layers, possibly several of one child
+    layer, so its scope is the union of the scopes of its factors. A node of a child
+    layer may be a factor of several nodes.
     """
 
     @classmethod
@@ -123,7 +126,7 @@ class ProductLayer(InnerLayer):
         """
         :param child_layers: The child layers.
         :param edges: The edges from the nodes of the new layer into the child layers,
-            at most one per node and child layer.
+            at most one per node and child node.
         :param number_of_nodes: The number of nodes of the new layer.
         :param edge_matrix_type: The type of matrix to store the edges in.
         :return: The product layer with these edges.
@@ -134,10 +137,12 @@ class ProductLayer(InnerLayer):
         return cls(
             child_layers,
             edge_matrix_type.from_edge_positions(
-                np.asarray(edges.nodes, dtype=np.int64),
-                offsets[np.asarray(edges.child_layer_indices, dtype=np.int64)]
+                rows=np.asarray(edges.nodes, dtype=np.int64),
+                columns=offsets[np.asarray(edges.child_layer_indices, dtype=np.int64)]
                 + np.asarray(edges.child_nodes, dtype=np.int64),
-                (number_of_nodes, int(offsets[-1])),
+                shape=MatrixShape2D(
+                    number_of_rows=number_of_nodes, number_of_columns=offsets[-1]
+                ),
             ),
         )
 
@@ -221,6 +226,12 @@ class ProductLayer(InnerLayer):
         return occurrences.max(axis=1, initial=0) <= 1
 
     def products_over(self, variables: VariableIndices) -> NodeMask:
+        """
+        Find the products over all of the variables, see :meth:`Layer.products_over`.
+
+        :param variables: Indices of variables.
+        :return: The nodes whose scope contains every one of the variables.
+        """
         variables = np.asarray(variables, dtype=np.int64)
         width = max(self.scope_width, int(variables.max(initial=-1)) + 1)
         return self.node_scopes(width=width)[:, variables].all(axis=1)
@@ -241,8 +252,10 @@ class ProductLayer(InnerLayer):
             backend.
         """
         namespace = array_namespace(*child_results)
-        values = self.edges.values_of_columns(namespace.concat(child_results, axis=-1))
-        return self.edges.reduce_by_row(values, reduction)
+        values = self.edges.values_of_columns(
+            values=namespace.concat(child_results, axis=-1)
+        )
+        return self.edges.reduce_by_row(values=values, reduction=reduction)
 
     @memoized
     def log_likelihood_of_nodes(

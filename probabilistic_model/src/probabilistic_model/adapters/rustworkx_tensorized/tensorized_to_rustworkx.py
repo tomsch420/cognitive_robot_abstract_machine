@@ -1,3 +1,8 @@
+"""
+Conversion of a layered circuit into a rustworkx circuit, one unit per node of every
+layer.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -125,9 +130,12 @@ class UnivariateInputLayerToLeavesConverter(
     def convert(
         cls, data: UnivariateInputLayer, builder: RustworkxCircuitBuilder
     ) -> list[Unit]:
+        """
+        Convert a layer into one leaf per node, see :meth:`Converter.convert`.
+        """
         return [
             leaf(distribution, builder.circuit)
-            for distribution in data.node_distributions(builder.variables)
+            for distribution in data.node_distributions(variables=builder.variables)
         ]
 
 
@@ -147,9 +155,12 @@ class MultivariateGaussianLayerToLeavesConverter(
     def convert(
         cls, data: AbstractMultivariateGaussianLayer, builder: RustworkxCircuitBuilder
     ) -> list[Unit]:
+        """
+        Convert a layer into one leaf per node, see :meth:`Converter.convert`.
+        """
         return [
             leaf(distribution, builder.circuit)
-            for distribution in data.node_distributions(builder.variables)
+            for distribution in data.node_distributions(variables=builder.variables)
         ]
 
 
