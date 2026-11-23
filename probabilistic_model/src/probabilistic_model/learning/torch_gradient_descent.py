@@ -81,10 +81,22 @@ class TorchGradientDescent(
             learning_rate_plateau=learning_rate_plateau,
         )
 
+    def compute_on_batch(
+        self, *, parameters: list[torch.Tensor], batch: tuple[torch.Tensor, ...]
+    ) -> list[torch.Tensor]:
+        """
+        :return: The :attr:`loss` on the batch, then its gradient by every parameter
+            tensor.
+        """
+        loss = self.loss.evaluate(
+            self.layer.copy_with_circuit_parameters(parameters=parameters), *batch
+        )
+        return [loss.detach(), *torch.autograd.grad(loss, parameters)]
+
     def probe_step_bytes(self, *, batch: tuple[torch.Tensor, ...]) -> int:
         """
         :return: The most bytes the loss and its gradient on the batch had in use
-            beyond what was in use before; the gradient is discarded afterwards.
+            beyond what was in use before.
         :raises UnmeasurableHostStepMemoryError: If the parameters are on the CPU.
         """
         device = self.parameters[0].device
@@ -93,13 +105,8 @@ class TorchGradientDescent(
         memory = TorchDeviceMemory(device=device)
         memory.reset_peak()
         before = memory.in_use_bytes()
-        self.loss.evaluate(
-            self.layer.copy_with_circuit_parameters(parameters=self.parameters), *batch
-        ).backward()
-        peak = memory.peak_bytes()
-        for parameter in self.parameters:
-            parameter.grad = None
-        return peak - before
+        self.compute_on_batch(parameters=self.parameters, batch=batch)
+        return memory.peak_bytes() - before
 
     def step(
         self, *, optimizer: torch.optim.Optimizer, arguments: tuple[torch.Tensor, ...]
@@ -113,12 +120,11 @@ class TorchGradientDescent(
         :return: The loss of the parameters before the step, a scalar tensor without a
             gradient on the device of the parameters.
         """
-        optimizer.zero_grad()
-        loss = self.loss.evaluate(
-            self.layer.copy_with_circuit_parameters(parameters=self.parameters),
-            *arguments,
+        loss, *gradients = self.computation_on_batch(
+            parameters=self.parameters, batch=arguments
         )
-        loss.backward()
+        for parameter, gradient in zip(self.parameters, gradients, strict=True):
+            parameter.grad = gradient
         optimizer.step()
         with torch.no_grad():
             for parameter, zero_probability in zip(
@@ -130,7 +136,7 @@ class TorchGradientDescent(
             )
             for parameter, valid in zip(self.parameters, projected):
                 parameter.copy_(valid)
-        return loss.detach()
+        return loss
 
 
 # %% training on mini-batches

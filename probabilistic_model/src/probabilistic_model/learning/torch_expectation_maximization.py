@@ -31,26 +31,6 @@ from probabilistic_model.probabilistic_circuit.tensorized.expectation_maximizati
     SufficientStatistics,
 )
 
-# %% statistics of a batch
-
-
-@dataclass(kw_only=True)
-class BatchStatistics:
-    """
-    What one autograd pass learns about the rows of a batch.
-    """
-
-    total_log_likelihood: torch.Tensor
-    """
-    The sum of the log-likelihoods of the rows, without a gradient.
-    """
-
-    statistics: list[SufficientStatistics]
-    """
-    The sufficient statistics of every learned layer on the rows.
-    """
-
-
 # %% expectation maximization
 
 
@@ -78,25 +58,31 @@ class TorchExpectationMaximization(
             for layer in self.learned_layers(root=self.layer)
         ]
 
-    def batch_statistics(self, *, data: torch.Tensor) -> BatchStatistics:
+    def compute_on_batch(
+        self, *, parameters: list[torch.Tensor], batch: tuple[torch.Tensor, ...]
+    ) -> list[torch.Tensor]:
         """
-        :param data: The rows of a batch.
-        :return: What the circuit with the current parameters learns about the rows.
+        :return: The sum of the log-likelihoods of the rows of the batch, then every
+            array of the sufficient statistics of every learned layer on them, in the
+            order of :attr:`SufficientStatistics.arrays`.
         """
+        [data] = batch
         node_offsets = self.zero_node_counts()
         total = self.total_log_likelihood(
-            parameters=self.parameters, node_offsets=node_offsets, data=data
+            parameters=parameters, node_offsets=node_offsets, data=data
         )
-        gradients = torch.autograd.grad(total, self.parameters + node_offsets)
+        gradients = torch.autograd.grad(total, list(parameters) + node_offsets)
         with torch.no_grad():
-            return BatchStatistics(
-                total_log_likelihood=total.detach(),
-                statistics=self.statistics_from_gradients(
-                    parameters=[parameter.detach() for parameter in self.parameters],
-                    parameter_gradients=list(gradients[: len(self.parameters)]),
-                    node_counts=list(gradients[len(self.parameters) :]),
-                ),
+            statistics = self.statistics_from_gradients(
+                parameters=[parameter.detach() for parameter in parameters],
+                parameter_gradients=list(gradients[: len(parameters)]),
+                node_counts=list(gradients[len(parameters) :]),
             )
+        return [total.detach()] + [
+            array
+            for layer_statistics in statistics
+            for array in layer_statistics.arrays
+        ]
 
     def probe_step_bytes(self, *, batch: tuple[torch.Tensor, ...]) -> int:
         """
@@ -110,8 +96,7 @@ class TorchExpectationMaximization(
         memory = TorchDeviceMemory(device=device)
         memory.reset_peak()
         before = memory.in_use_bytes()
-        [data] = batch
-        self.batch_statistics(data=data)
+        self.compute_on_batch(parameters=self.parameters, batch=batch)
         return memory.peak_bytes() - before
 
     def start_training(
@@ -179,15 +164,21 @@ class TorchExpectationMaximizationTraining(
         :return: The loss of the batch, whose statistics are added to
             :attr:`statistics`.
         """
-        [data] = batch
-        batch_statistics = self.expectation_maximization.batch_statistics(data=data)
+        expectation_maximization = self.expectation_maximization
+        total_log_likelihood, *statistics_arrays = (
+            expectation_maximization.computation_on_batch(
+                parameters=expectation_maximization.parameters, batch=batch
+            )
+        )
+        accumulated_arrays = [
+            array for statistics in self.statistics for array in statistics.arrays
+        ]
         with torch.no_grad():
-            for accumulated, added in zip(self.statistics, batch_statistics.statistics):
-                for accumulated_array, added_array in zip(
-                    accumulated.arrays, added.arrays
-                ):
-                    accumulated_array.add_(added_array)
-        return -batch_statistics.total_log_likelihood / data.shape[0]
+            for accumulated_array, added_array in zip(
+                accumulated_arrays, statistics_arrays, strict=True
+            ):
+                accumulated_array.add_(added_array)
+        return -total_log_likelihood / batch[0].shape[0]
 
     def take_step_and_update(self, *, batch: tuple[torch.Tensor, ...]) -> torch.Tensor:
         """
