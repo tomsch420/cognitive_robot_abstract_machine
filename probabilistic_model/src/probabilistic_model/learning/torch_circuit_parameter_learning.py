@@ -1,7 +1,7 @@
 """
 Learning the parameters of a layered circuit with torch: the parameter arrays are leaf
-tensors that every step updates in place, and a step on a CUDA device may be recorded as
-a CUDA graph and replayed.
+tensors that every step updates in place, what a step computes from a batch may be
+compiled, and a step on a CUDA device may be recorded as a CUDA graph and replayed.
 """
 
 from __future__ import annotations
@@ -11,11 +11,13 @@ import gc
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import StrEnum
+from functools import cached_property
 from types import MethodType, TracebackType
 
 import torch
 from krrood_compute_resources.memory import HostMemory, PeakTrackingMemory
 from krrood_compute_resources.torch_memory import TorchDeviceMemory
+from torch.fx.experimental.proxy_tensor import make_fx
 from typing_extensions import Callable
 
 from probabilistic_model.learning.circuit_parameter_learning import (
@@ -42,6 +44,13 @@ class TorchCircuitParameterLearning(CircuitParameterLearning[LayerType], ABC):
     The numeric queries of the circuit must not copy from the host.
     """
 
+    compiles_steps: bool = False
+    """
+    Whether what a step computes from the parameters and a batch is compiled with
+    :func:`torch.compile`, once for every shape of the batches, which pays off only over
+    many steps.
+    """
+
     parameters: list[torch.Tensor] = field(init=False)
     """
     The leaf tensors that training updates, copies of the parameters of the circuit.
@@ -56,6 +65,29 @@ class TorchCircuitParameterLearning(CircuitParameterLearning[LayerType], ABC):
             parameter.detach().clone().requires_grad_(True)
             for parameter in self.layer.circuit_parameters
         ]
+
+    @abstractmethod
+    def compute_on_batch(
+        self, *, parameters: list[torch.Tensor], batch: tuple[torch.Tensor, ...]
+    ) -> list[torch.Tensor]:
+        """
+        Compute what a step needs from a batch before it changes anything.
+
+        :param parameters: The tensors that training updates, :attr:`parameters`.
+        :param batch: The same rows of every training array.
+        :return: Tensors without gradients, which the subclass defines.
+        """
+        raise NotImplementedError
+
+    @cached_property
+    def computation_on_batch(self) -> Callable[..., list[torch.Tensor]]:
+        """
+        :return: :meth:`compute_on_batch`, compiled for every shape of the batches if
+            :attr:`compiles_steps`.
+        """
+        if not self.compiles_steps:
+            return self.compute_on_batch
+        return CompiledComputation(computation=self.compute_on_batch)
 
     @property
     def replays_recorded_steps(self) -> bool:
@@ -74,6 +106,63 @@ class TorchCircuitParameterLearning(CircuitParameterLearning[LayerType], ABC):
         if device.type == TorchDeviceType.COMPUTE_UNIFIED_DEVICE_ARCHITECTURE:
             return TorchDeviceMemory(device=device)
         return HostMemory()
+
+
+# %% compiled computations
+
+
+@dataclass(kw_only=True)
+class CompiledComputation:
+    """
+    A computation of tensors from the parameters and a batch, compiled on the first call
+    on batches of every shape, which also runs it operation by operation.
+
+    .. warning:: The compiled computation keeps the branches that the values of the
+        parameters and of the batch took on the first call.
+    """
+
+    computation: Callable[..., list[torch.Tensor]]
+    """
+    The computation operation by operation, called with ``parameters=`` and ``batch=``.
+    """
+
+    compiled_graphs: dict[BatchShape, Callable[..., list[torch.Tensor]]] = field(
+        default_factory=dict, init=False
+    )
+    """
+    The tensor operations of the computation on batches of every shape, compiled.
+    """
+
+    def __call__(
+        self, *, parameters: list[torch.Tensor], batch: tuple[torch.Tensor, ...]
+    ) -> list[torch.Tensor]:
+        """
+        :param parameters: The tensors that training updates.
+        :param batch: The same rows of every training array.
+        :return: What :attr:`computation` returns on them.
+        """
+        batch_shape = BatchShape.from_batch(batch=batch)
+        if batch_shape not in self.compiled_graphs:
+            self.compile_graph(parameters=parameters, batch=batch)
+        with torch.no_grad():
+            return self.compiled_graphs[batch_shape](parameters, batch)
+
+    def compile_graph(
+        self, *, parameters: list[torch.Tensor], batch: tuple[torch.Tensor, ...]
+    ) -> None:
+        """
+        Compile the tensor operations of the computation on batches of the shape of
+        ``batch``, after running it once operation by operation.
+        """
+        self.computation(parameters=parameters, batch=batch)
+        graph = make_fx(
+            lambda traced_parameters, traced_batch: self.computation(
+                parameters=traced_parameters, batch=traced_batch
+            )
+        )(parameters, batch)
+        self.compiled_graphs[BatchShape.from_batch(batch=batch)] = torch.compile(
+            graph, dynamic=False
+        )
 
 
 # %% training on mini-batches

@@ -1,6 +1,6 @@
 """
-Tests of the learning methods of the circuit learning benchmark that train RAT-SPNs by
-expectation maximization.
+Tests of the learning methods of the circuit learning benchmark that train RAT-SPNs on
+mini-batches.
 """
 
 from __future__ import annotations
@@ -8,10 +8,13 @@ from __future__ import annotations
 # %% imports
 import jax
 import numpy as np
+import pytest
 from krrood_compute_resources.devices import Device
 
 from experiments.circuit_learning.methods import (
     RandomTensorizedSumProductNetworkByExpectationMaximization,
+    RandomTensorizedSumProductNetworkByGradientDescent,
+    RandomTensorizedSumProductNetworkByMiniBatches,
     RandomTensorizedSumProductNetworkByOnlineExpectationMaximization,
     TrainingContext,
 )
@@ -43,6 +46,31 @@ def test_expectation_maximization_learns_on_the_host_and_in_every_setting_of_the
         RandomTensorizedSumProductNetworkByOnlineExpectationMaximization().settings()
         == grid
     )
+
+
+@pytest.mark.parametrize(
+    "method",
+    [
+        RandomTensorizedSumProductNetworkByExpectationMaximization(),
+        RandomTensorizedSumProductNetworkByGradientDescent(),
+    ],
+    ids=["expectation-maximization", "gradient-descent"],
+)
+def test_the_torch_learners_compile_their_steps(
+    dataset, method: RandomTensorizedSumProductNetworkByMiniBatches
+):
+    """
+    The benchmark trains long enough for compiling the steps of torch to pay off.
+    """
+    setting = ComputationSetting(
+        array_library=ArrayLibrary.TORCH,
+        device=Device.CENTRAL_PROCESSOR,
+        floating_point_type=FloatingPointType.FLOAT32,
+        edge_representation=EdgeRepresentation.BLOCK,
+    )
+    circuit = setting.placed(circuit=method.random_circuit(dataset=dataset))
+
+    assert method.learner(root=circuit.root, setting=setting).compiles_steps
 
 
 # %% learning

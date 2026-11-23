@@ -357,6 +357,7 @@ class RandomTensorizedSumProductNetworkByGradientDescent(
                 loss=AverageNegativeLogLikelihood(),
                 learning_rate=self.learning_rate,
                 records_cuda_graphs=True,
+                compiles_steps=True,
             )
         return JaxGradientDescent(
             layer=root,
@@ -424,6 +425,7 @@ class RandomTensorizedSumProductNetworkByExpectationMaximization(
                 minimum_mixture_proportion=regularization.minimum_mixture_proportion,
                 minimum_gaussian_variance=regularization.minimum_gaussian_variance,
                 records_cuda_graphs=True,
+                compiles_steps=True,
             )
         return JaxExpectationMaximization(
             layer=root,
