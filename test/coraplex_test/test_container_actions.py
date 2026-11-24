@@ -197,9 +197,9 @@ def pr2_at_a_handle_below_an_empty_body(simple_pr2_context):
         )
         world.add_connection(
             PrismaticConnection.create_with_dofs(
-                world,
-                world.root,
-                empty,
+                world=world,
+                parent=world.root,
+                child=empty,
                 axis=Vector3.X(),
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
                     1, 0, 1, reference_frame=world.root
@@ -221,7 +221,7 @@ def test_back_off_pose_clears_a_handle_below_a_body_without_geometry(
     world, robot, handle = pr2_at_a_handle_below_an_empty_body
     end_effector = left_or_only_arm(robot).end_effector
     action = OpenAction(
-        grasp=GraspCandidate.from_body_origin(handle), arm=left_or_only_arm(robot)
+        grasp_candidate=GraspCandidate.from_body_origin(graspable=handle), arm=left_or_only_arm(robot)
     )
     grasp_pose = Pose(reference_frame=handle.root)
 
@@ -250,25 +250,25 @@ def test_the_tuning_the_action_is_given_reaches_taking_hold_of_the_handle(
     """
     world, robot, extensions, handle = pr2_at_drawer
     action = action_type(
-        grasp=GraspCandidate.from_body_origin(handle),
+        grasp_candidate=GraspCandidate.from_body_origin(graspable=handle),
         arm=left_or_only_arm(robot),
-        grasp_closing_velocity=0.05,
-        grasp_stall_minimum_time=0.3,
-        tolerate_grasp_stall=True,
+        max_grasp_closing_velocity=0.05,
+        finger_stall_minimum_time=0.3,
+        tolerate_finger_stall=True,
         position_threshold=0.03,
     )
     statechart_of(simulated_executor(extensions), action)
 
     [taking_hold] = [node for node in action.nodes if isinstance(node, GraspingAction)]
     assert (
-        taking_hold.grasp_closing_velocity,
-        taking_hold.grasp_stall_minimum_time,
-        taking_hold.tolerate_grasp_stall,
+        taking_hold.max_grasp_closing_velocity,
+        taking_hold.finger_stall_minimum_time,
+        taking_hold.tolerate_finger_stall,
         taking_hold.position_threshold,
     ) == (
-        action.grasp_closing_velocity,
-        action.grasp_stall_minimum_time,
-        action.tolerate_grasp_stall,
+        action.max_grasp_closing_velocity,
+        action.finger_stall_minimum_time,
+        action.tolerate_finger_stall,
         action.position_threshold,
     )
 
@@ -283,7 +283,7 @@ def test_a_close_action_shuts_the_container_as_far_as_it_is_asked_to(pr2_at_draw
     """
     world, robot, extensions, handle = pr2_at_drawer
     action = CloseAction(
-        grasp=GraspCandidate.from_body_origin(handle),
+        grasp_candidate=GraspCandidate.from_body_origin(graspable=handle),
         arm=left_or_only_arm(robot),
         closed_joint_position=0.0,
         closing_tolerance=0.002,

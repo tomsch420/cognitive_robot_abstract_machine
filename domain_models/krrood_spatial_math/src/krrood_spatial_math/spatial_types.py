@@ -2627,6 +2627,22 @@ class Displacement(VectorPair):
             reference_frame=reference_frame,
         )
 
+    @classmethod
+    def from_transformation(
+        cls, *, start_T_end: HomogeneousTransformationMatrix
+    ) -> Displacement:
+        """
+        :param start_T_end: Where the body ended up, relative to where it started.
+        :return: The displacement from the start to the end, in the reference frame of
+            ``start_T_end``, turning by an angle in [0, pi].
+        """
+        rotation = start_T_end.axis_angle
+        return cls(
+            translation=Vector3.from_iterable(start_T_end.position),
+            rotation_vector=rotation.axis * rotation.angle,
+            reference_frame=start_T_end.reference_frame,
+        )
+
     @classproperty
     def _rotational_part_name(cls) -> str:
         return "rotation_vector"

@@ -8,7 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from cramph.composites import Deferred, Sequence
-from cramph.data_types import LifeCycleValues, ObservationStateValues
+from cramph.data_types import LifeCycleValue, ObservationStateValue
 from cramph.executor import StatechartExecutor
 from cramph.monitors import CountTicks
 from cramph.node import (
@@ -40,7 +40,7 @@ class NodeNotingWhatRanBeforeItExpanded(SucceedsOnObservingTrue, CompositeNode):
     The node whose life cycle state is noted.
     """
 
-    noted_states: list[LifeCycleValues] = field(default_factory=list, init=False)
+    noted_states: list[LifeCycleValue] = field(default_factory=list, init=False)
     """
     The life cycle state :attr:`ran_before` had each time this node expanded.
     """
@@ -53,7 +53,7 @@ class NodeNotingWhatRanBeforeItExpanded(SucceedsOnObservingTrue, CompositeNode):
     def expand(self) -> None:
         self.noted_states.append(self.ran_before.life_cycle_state)
         self.child = NodeSucceedingOnObservingTrue(
-            name="child", observation=ObservationStateValues.TRUE
+            name="child", observation=ObservationStateValue.TRUE
         )
         self._add_child_to_statechart(node=self.child)
 
@@ -92,7 +92,7 @@ def test_the_task_expands_only_after_the_steps_before_it_ended(
         Sequence(name="steps", nodes=[first, Deferred(name="deferred", task=task)]),
     )
 
-    assert task.noted_states == [LifeCycleValues.SUCCEEDED]
+    assert task.noted_states == [LifeCycleValue.SUCCEEDED]
 
 
 def test_the_node_succeeds_once_its_task_succeeded(
@@ -101,24 +101,24 @@ def test_the_node_succeeds_once_its_task_succeeded(
     deferred = Deferred(
         name="deferred",
         task=NodeSucceedingOnObservingTrue(
-            name="task", observation=ObservationStateValues.TRUE
+            name="task", observation=ObservationStateValue.TRUE
         ),
     )
 
     _run_until_it_ends(statechart_executor, deferred)
 
-    assert deferred.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert deferred.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 def test_the_node_fails_once_its_task_failed_instead_of_running_it_again(
     statechart_executor: StatechartExecutor,
 ) -> None:
     task = NodeFailingOnObservingFalse(
-        name="task", observation=ObservationStateValues.FALSE
+        name="task", observation=ObservationStateValue.FALSE
     )
     deferred = Deferred(name="deferred", task=task)
 
     _run_until_it_ends(statechart_executor, deferred)
 
     assert deferred.children == [task]
-    assert deferred.life_cycle_state == LifeCycleValues.FAILED
+    assert deferred.life_cycle_state == LifeCycleValue.FAILED

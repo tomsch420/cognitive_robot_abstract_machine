@@ -99,6 +99,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Lid,
 )
 from krrood_spatial_math.spatial_types import (
+    Pose2D,
     HomogeneousTransformationMatrix,
 )
 from semantic_digital_twin.world import World
@@ -531,9 +532,11 @@ class RoboCasaEpisode:
             world_T_stand[:2, 3] += base_step * away
             steps.append(
                 StandAction(
-                    target_location=HomogeneousTransformationMatrix(
-                        world_T_stand, reference_frame=self.world.root
-                    ).pose
+                    planar_goal_pose=Pose2D.from_pose(
+                        HomogeneousTransformationMatrix(
+                            world_T_stand, reference_frame=self.world.root
+                        ).pose
+                    )
                 )
             )
         with self.allowances.bodies_may_touch(

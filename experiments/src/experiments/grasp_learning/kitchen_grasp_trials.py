@@ -46,7 +46,7 @@ from experiments.robocasa_atomic_tasks.stored_runs import (
 from experiments.robocasa_atomic_tasks.tasks import PickAndPlaceTask
 from krrood.bounds import Bounds
 from krrood.parametrization.model_registries import UniformPriorRegistry
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Twist
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Displacement
 from semantic_digital_twin.adapters.multi_sim import MujocoSimulationSnapshot
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.grasping.grasp_strategies import (
@@ -206,7 +206,7 @@ class CloseFingersToObjectWidthWhereItFits(CloseFingersToObjectWidth):
     def is_applicable(self, plan_node: GraspingAction) -> bool:
         return (
             super().is_applicable(plan_node)
-            and plan_node.grasp.width_along_closing_axis
+            and plan_node.grasp_candidate.width_along_closing_axis
             <= plan_node.arm.end_effector.separation_when_open
         )
 
@@ -279,10 +279,8 @@ class GraspOutcomeMeasurement:
         return GraspResult(
             object_raised=bool(displacement[2, 3] >= self.minimum_rise),
             motion_completed=motion_completed,
-            object_displacement=Twist.from_transformation(
-                HomogeneousTransformationMatrix(displacement)
-            ),
-            slip=Twist.from_transformation(HomogeneousTransformationMatrix(slip)),
+            object_displacement=Displacement.from_transformation(start_T_end=HomogeneousTransformationMatrix(displacement)),
+            slip=Displacement.from_transformation(start_T_end=HomogeneousTransformationMatrix(slip)),
         )
 
     def world_T_object(self) -> np.ndarray:

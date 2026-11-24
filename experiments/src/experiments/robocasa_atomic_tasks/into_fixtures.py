@@ -124,13 +124,13 @@ class PutIntoAFixtureFromAboveAction(
         )
         return [
             SetGripperAction(
-                configuration=gripper.default_configuration(GripperState.OPEN)
+                gripper_configuration=gripper.default_configuration(GripperState.OPEN)
             ),
             Deferred(
                 name="reach above the object",
                 task=ReachThroughFreeSpaceAction(
                     goal=self.grasp_pose_sequence(
-                        self.grasp.grasp_pose, gripper, self.grasp
+                        reference_T_grasp=self.grasp.grasp_pose, end_effector=gripper, grasp_candidate=self.grasp
                     ).pre_grasp,
                     arm=self.arm,
                 ),
@@ -146,7 +146,7 @@ class PutIntoAFixtureFromAboveAction(
             ),
             self.gripper_goal_type.create_gripper_goal(
                 configuration=gripper.default_configuration(GripperState.CLOSE),
-                tolerate_stall=True,
+                tolerate_finger_stall=True,
             ),
             Deferred(
                 name="lift the object",
@@ -181,7 +181,7 @@ class PutIntoAFixtureFromAboveAction(
                 ),
             ),
             SetGripperAction(
-                configuration=gripper.default_configuration(GripperState.OPEN)
+                gripper_configuration=gripper.default_configuration(GripperState.OPEN)
             ),
             Deferred(
                 name="rise off the object",

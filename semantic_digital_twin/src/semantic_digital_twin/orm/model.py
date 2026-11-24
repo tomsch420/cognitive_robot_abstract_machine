@@ -45,7 +45,6 @@ from semantic_digital_twin.world_description.world_entity import (
 from semantic_digital_twin.world_description.world_modification import (
     WorldModelModificationBlock,
 )
-from semantic_digital_twin.world_description.inertial_properties import InertiaTensor
 from semantic_digital_twin.world_description.world_state import WorldState
 
 
@@ -112,29 +111,6 @@ class WorldStateMapping(AlternativeMapping[WorldState]):
             _data=np.array(self.data, dtype=np.float64).reshape((4, len(self.ids))),
             _ids=self.ids,
             _index={name: idx for idx, name in enumerate(self.ids)},
-        )
-
-
-@dataclass(eq=False)
-class InertiaTensorMapping(AlternativeMapping[InertiaTensor]):
-    """
-    An inertia tensor as the nine numbers of its matrix, row after row.
-    """
-
-    elements: list[float]
-    """
-    The elements of the matrix, row after row; empty for a tensor without one.
-    """
-
-    @classmethod
-    def from_domain_object(cls, *, obj: InertiaTensor):
-        return cls(elements=[] if obj.data is None else obj.data.ravel().tolist())
-
-    def to_domain_object(self) -> InertiaTensor:
-        if not self.elements:
-            return InertiaTensor()
-        return InertiaTensor(
-            data=np.array(self.elements, dtype=np.float64).reshape((3, 3))
         )
 
 

@@ -52,7 +52,7 @@ from experiments.robocasa_atomic_tasks.stored_runs import (
 from experiments.robocasa_atomic_tasks.tasks import PickAndPlaceTask
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList
 from krrood.bounds import Bounds
-from krrood.entity_query_language.backends import ProbabilisticBackend
+from krrood.parametrization.probabilistic_backend import ProbabilisticBackend
 from krrood.entity_query_language.factories import ConditionType, a
 from krrood.entity_query_language.query.match import Match
 from krrood.parametrization.exceptions import UnboundedParameterError
@@ -68,7 +68,7 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     SumUnit,
     leaf,
 )
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Pose
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Pose, Pose2D
 from semantic_digital_twin.adapters.multi_sim import MujocoSimulationSnapshot
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.collision_checking.collision_rules import (
@@ -253,7 +253,7 @@ class PickUpParameterSpace:
         return [
             parameters
             for parameters in drawn
-            if parameters.grasp.reaches_surface_of(part)
+            if parameters.grasp.reaches_surface_of(graspable=part)
         ]
 
 
@@ -432,7 +432,7 @@ class PickUpPerformer:
             ),
         )
         episode.executor_extensions.append(recording.plan_recorder)
-        grasp = parameters.grasp.grasp_candidate(self.graspable.grasped_part())
+        grasp = parameters.grasp.grasp_candidate(graspable=self.graspable.grasped_part())
         measurement = GraspOutcomeMeasurement(
             episode=episode, graspable=self.graspable, grasp=grasp
         )
@@ -519,16 +519,21 @@ class PickUpPerformer:
         ):
             return PickUpStage.STANDING
         world_T_start = self.world_pose(pose=gripper.tool_frame.global_pose)
-        poses = HasGraspApproach(
-            approach_clearance=parameters.approach_clearance
-        ).grasp_pose_sequence(grasp.grasp_pose, gripper, grasp)
+        pre_grasp = HasGraspApproach.pre_grasp_pose(
+            reference_T_grasp=grasp.grasp_pose,
+            end_effector=gripper,
+            distance=HasGraspApproach.distance_to_boundary(
+                body=grasp.graspable.root, reference_T_grasp=grasp.grasp_pose
+            )
+            + parameters.approach_clearance,
+        )
         way_in = [
-            self.world_pose(pose=poses.pre_grasp),
-            self.world_pose(pose=poses.grasp),
+            self.world_pose(pose=pre_grasp),
+            self.world_pose(pose=gripper.tool_frame_goal_for_grasp(grasp.grasp_pose)),
         ]
         approaching = [
             MoveFingersToWidthAction(
-                gripper=gripper,
+                two_finger_gripper=gripper,
                 width=parameters.opening * gripper.separation_when_open,
             ),
             *self.straight_moves(poses=way_in, velocity=parameters.approach_velocity),
@@ -536,7 +541,7 @@ class PickUpPerformer:
         if not self.episode.run_part(part=PickUpStage.APPROACHING, steps=approaching):
             return PickUpStage.APPROACHING
         closing = MoveFingersToWidthAction(
-            gripper=gripper, width=0.0, squeeze=gripper.squeeze
+            two_finger_gripper=gripper, width=0.0, squeeze=gripper.squeeze
         )
         if not self.episode.run_part(part=PickUpStage.CLOSING, steps=[closing]):
             return PickUpStage.CLOSING
@@ -574,9 +579,11 @@ class PickUpPerformer:
             x=offset.forward, y=offset.sideways, yaw=offset.turn
         ).to_np()
         return StandAction(
-            target_location=HomogeneousTransformationMatrix(
-                world_T_base @ base_T_stand, reference_frame=self.episode.world.root
-            ).pose
+            planar_goal_pose=Pose2D.from_pose(
+                HomogeneousTransformationMatrix(
+                    world_T_base @ base_T_stand, reference_frame=self.episode.world.root
+                ).pose
+            )
         )
 
     def straight_moves(
@@ -589,7 +596,7 @@ class PickUpPerformer:
         """
         return [
             MoveTheToolInAStraightLineAction(
-                arm=self.episode.arm, target_pose=pose, max_linear_velocity=velocity
+                arm=self.episode.arm, target_pose=pose, cruise_linear_velocity=velocity
             )
             for pose in poses
         ]

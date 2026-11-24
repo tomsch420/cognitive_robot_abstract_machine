@@ -30,7 +30,6 @@ from cramph.data_types import LifeCycleValue
 from cramph.node import StatechartNode
 from cramph.threaded_nodes import FunctionCall
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList
-from giskardpy.utils.utils_for_tests import compare_axis_angle, compare_orientations
 from krrood.entity_query_language.factories import a, an, entity, variable
 from semantic_digital_twin.adapters.multi_sim import MujocoSim
 from semantic_digital_twin.datastructures.definitions import (

@@ -19,7 +19,7 @@ from cramph.executor import StatechartExecutor
 from cramph.statechart import Statechart
 from cramph.composites import Parallel, Sequence, TryAll, TryInOrder
 from cramph.threaded_nodes import FunctionCall
-from cramph.data_types import LifeCycleValues
+from cramph.data_types import LifeCycleValue
 from coraplex.robot_plans.plan_transformations import (
     MoveStraightAroundObjects,
     OpenDrawerBeforeMoveAndPickUp,
@@ -1731,7 +1731,7 @@ def test_a_reach_moving_straight_around_objects_comes_onto_its_grasp_straight(
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     arm = left_or_only_arm(robot)
     reach = ReachAction(
-        grasp=milk.grasp_candidates()[0], arm=arm, open_gripper_at_pre_pose=True
+        grasp_candidate=milk.grasp_candidates()[0], arm=arm, open_gripper_at_pre_pose=True
     )
 
     executor = simulated_executor(

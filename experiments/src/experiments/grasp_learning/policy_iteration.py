@@ -457,7 +457,7 @@ class IterationWorker:
                 generator, batch.maximum_yaw
             )
             grasp = self.drawn_grasp(batch, part, placement, generator)
-            if grasp is None or not grasp.reaches_surface_of(part):
+            if grasp is None or not grasp.reaches_surface_of(graspable=part):
                 outcomes.append(
                     AttemptOutcome(
                         object_name=batch.iteration_object.name,
@@ -467,7 +467,7 @@ class IterationWorker:
                 )
                 continue
             grasp.result = experiment.run(
-                grasp.grasp_candidate(part), placement=placement
+                grasp.grasp_candidate(graspable=part), placement=placement
             )
             self.database.add_attempts(
                 [

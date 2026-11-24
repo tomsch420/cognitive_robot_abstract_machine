@@ -22,7 +22,7 @@ from experiments.robocasa_atomic_tasks.skills import (
     LowerTheToolUntilTouchingAction,
     StandAction,
 )
-from krrood_spatial_math.spatial_types import Point3
+from krrood_spatial_math.spatial_types import Point3, Pose2D
 from .test_sink_actions import SinkOfAnEpisode
 
 # %% the sink of a composed episode asking for an object put into it
@@ -75,7 +75,7 @@ def stand_facing_the_object(sink: SinkOfAnEpisode) -> StandAction:
     episode = sink.episode
     position = episode.object_body(PickPlaceCounterToSink().picked_object)
     [stand, *_] = episode.stands.stands_facing(position.global_pose.to_np()[:3, 3])
-    return StandAction(target_location=stand)
+    return StandAction(planar_goal_pose=Pose2D.from_pose(stand))
 
 
 # %% putting the object into the sink

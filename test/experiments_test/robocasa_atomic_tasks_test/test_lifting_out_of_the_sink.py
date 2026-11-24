@@ -67,7 +67,7 @@ class BroccoliInTheSink:
         return LiftAnObjectOutOfTheSinkAction(
             arm=self.episode.arm,
             basin=self.basin,
-            grasp=self.grasp.grasp_candidate(self.broccoli.grasped_part()),
+            grasp=self.grasp.grasp_candidate(graspable=self.broccoli.grasped_part()),
         )
 
     @property

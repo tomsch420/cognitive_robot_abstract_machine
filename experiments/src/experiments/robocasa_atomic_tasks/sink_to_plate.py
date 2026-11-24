@@ -129,7 +129,7 @@ class MoveFromTheSinkOntoAPlate:
 
     carry_velocity: float = 0.1
     """
-    Cap on the speed of the tool frame on the way to above the plate, in m/s.
+    Speed of the tool frame on the way to above the plate, in m/s.
     """
 
     settling_time_on_the_plate: timedelta = timedelta(seconds=1.2)
@@ -242,13 +242,13 @@ class MoveFromTheSinkOntoAPlate:
                         held=held,
                         above=self.plate,
                         height=self.carry_height,
-                        max_linear_velocity=self.carry_velocity,
+                        cruise_linear_velocity=self.carry_velocity,
                     ),
                     lambda: LowerTheToolUntilTouchingAction(
                         arm=arm, bodies=[held], others=[self.plate]
                     ),
                     lambda: MoveFingersToWidthAction(
-                        gripper=gripper,
+                        two_finger_gripper=gripper,
                         width=self.release_opening * gripper.separation_when_open,
                     ),
                 ]

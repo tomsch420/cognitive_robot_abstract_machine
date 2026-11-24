@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 
 from cramph.context import StatechartContext
-from cramph.data_types import ObservationStateValues
+from cramph.data_types import ObservationStateValue
 from cramph.executor import StatechartExecutor, SteppedSimulationPacer
 from cramph.statechart import Statechart
 from experiments.robocasa_atomic_tasks.skills import BodiesTouch
@@ -77,7 +77,7 @@ def observation_of_the_block_on_the_base(
     block_above_a_base: BlockAboveABase,
     simulation: MujocoSim | None = None,
     ticks: int = 1,
-) -> ObservationStateValues:
+) -> ObservationStateValue:
     """
     :param block_above_a_base: The world with the block and the base.
     :param simulation: The physics the world is synchronized with, if any.
@@ -111,13 +111,13 @@ def observation_of_the_block_on_the_base(
 def test_a_block_resting_on_a_base_touches_it():
     observation = observation_of_the_block_on_the_base(block_above_a_base(gap=0.0))
 
-    assert observation == ObservationStateValues.TRUE
+    assert observation == ObservationStateValue.TRUE
 
 
 def test_a_block_above_a_base_does_not_touch_it():
     observation = observation_of_the_block_on_the_base(block_above_a_base(gap=0.05))
 
-    assert observation == ObservationStateValues.FALSE
+    assert observation == ObservationStateValue.FALSE
 
 
 # %% touching in the physics
@@ -137,4 +137,4 @@ def test_a_block_the_physics_dropped_onto_a_base_touches_it():
     finally:
         simulation.stop_simulation()
 
-    assert observation == ObservationStateValues.TRUE
+    assert observation == ObservationStateValue.TRUE

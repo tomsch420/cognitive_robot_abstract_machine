@@ -40,7 +40,7 @@ from experiments.orm.ormatic_interface import PickUpTrialDAO
 from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.parametrization.model_registries import UniformPriorRegistry
 from krrood.parametrization.parameterizer import UnderspecifiedParameters
-from krrood_spatial_math.spatial_types import Twist, Vector3
+from krrood_spatial_math.spatial_types import Displacement, Vector3
 from semantic_digital_twin.grasping.object_relative_grasp import GraspResult
 from semantic_digital_twin.grasping.surface_grasp import SurfaceGrasp
 from semantic_digital_twin.world import World
@@ -263,8 +263,8 @@ def pick_up_trial(kitchen) -> PickUpTrial:
         result=GraspResult(
             object_raised=True,
             motion_completed=True,
-            object_displacement=Twist(translation=Vector3(0.0, 0.0, 0.2)),
-            slip=Twist(translation=Vector3(0.0, 0.0, 0.0)),
+            object_displacement=Displacement(translation=Vector3(0.0, 0.0, 0.2)),
+            slip=Displacement(translation=Vector3(0.0, 0.0, 0.0)),
         ),
         failed_stage=PickUpStage.LEAVING,
         run=StoredTaskRun(

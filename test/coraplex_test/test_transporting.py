@@ -665,7 +665,7 @@ def test_a_pick_up_of_a_graspable_tries_the_grasps_a_model_expects_to_lift_it(
         EntityQueryLanguageGenerativeBackend().evaluate(expression=step), 1
     )
 
-    assert [_grasp_signature(pick_up.pick_up.grasp)] == [
+    assert [_grasp_signature(pick_up.pick_up.grasp_candidate)] == [
         _grasp_signature(grasp)
         for grasp in carton.grasp_candidates(
             model_registry, GraspResult.lifting_pattern

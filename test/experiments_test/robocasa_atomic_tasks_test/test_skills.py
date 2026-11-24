@@ -128,7 +128,7 @@ def straight_tool_goal_in_the_root(step: StatechartNode) -> np.ndarray:
         if isinstance(step, CartesianPoseStraight)
         else [node for node in step.nodes if isinstance(node, CartesianPoseStraight)]
     )
-    world = goal.tip_link._world
+    world = goal.kinematic_chain.tip._world
     return world.transform(goal.goal_pose, world.root).homogeneous_matrix.to_np()
 
 
@@ -161,7 +161,7 @@ def base_holds_of(step: StatechartNode, panda_omron: PandaOmron) -> list[HoldPos
     return [
         node
         for node in nodes
-        if isinstance(node, HoldPose) and node.tip_link is panda_omron.root
+        if isinstance(node, HoldPose) and node.kinematic_chain.tip is panda_omron.root
     ]
 
 

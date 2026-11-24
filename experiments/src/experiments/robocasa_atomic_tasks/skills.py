@@ -20,7 +20,6 @@ from scipy.spatial.transform import Rotation, Slerp
 
 from coraplex.datastructures.trajectory import PoseTrajectory
 from coraplex.querying.grasp_closeness import GraspCloseness
-from coraplex.querying.predicates import GripperHolds
 from coraplex.robot_plans.actions.base import GoalAction, SequentialAction
 from coraplex.robot_plans.actions.core.container import MovesContainerByItsHandle
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
@@ -31,7 +30,7 @@ from coraplex.robot_plans.actions.core.robot_body import (
 )
 from coraplex.robot_plans.mixins import MovesToolCenterPoint, OperatesGripper
 from cramph.composites import Parallel
-from cramph.data_types import ObservationStateValues
+from cramph.data_types import ObservationStateValue
 from cramph.monitors import CountSimulationTimeSeconds
 from cramph.node import CompositeNode, EndedByOwner, NodeArtifacts, StatechartNode
 from cramph.threaded_nodes import FunctionCall
@@ -69,8 +68,10 @@ from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Point3,
     Pose,
+    Pose2D,
 )
 from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
 from semantic_digital_twin.world_description.geometry import CoordinateBounds
 from semantic_digital_twin.world_description.world_entity import (
@@ -88,7 +89,7 @@ class StandAction(NavigateAction):
     velocities settles in a physical simulation.
     """
 
-    base_pose_threshold: float = 0.03
+    threshold: float = 0.03
     """
     How far the base may be from where it is to stand, in metres and in radians.
     """
@@ -110,7 +111,7 @@ class GraspsClosestTo(SymbolicFunction):
     The grasps, best first.
     """
 
-    standing_position: Pose
+    standing_position: Pose2D
     """
     Where the robot stands while taking one of the grasps, read when the grasps are
     chosen.
@@ -125,9 +126,9 @@ class GraspsClosestTo(SymbolicFunction):
         if self.number_of_grasps is None:
             return list(self.grasps)
         world = self.standing_position.reference_frame._world
-        world_P_standing = world.transform(self.standing_position, world.root).to_np()[
-            :, 3
-        ]
+        world_P_standing = world.transform(
+            self.standing_position.pose, world.root
+        ).to_np()[:, 3]
         closest = sorted(
             self.grasps,
             key=lambda grasp: GraspCloseness.from_grasp(
@@ -225,7 +226,7 @@ class ReachThroughFreeSpaceAction(MovesToolCenterPoint, SequentialAction):
         path = FreeSpacePathPlanner(
             world=world, robot=self.robot, clearance=self.clearance
         ).path(world_T_start[:3, 3], world_T_goal[:3, 3])
-        onto_the_goal = self.tool_center_point_goal(goal, self.arm)
+        onto_the_goal = self.tool_center_point_goal(target=goal, arm=self.arm)
         if path is None or len(path) <= 2:
             return [onto_the_goal]
         lengths = np.r_[0.0, np.cumsum(np.linalg.norm(np.diff(path, axis=0), axis=1))]
@@ -268,10 +269,7 @@ class ReachAboveThePlacementAction(ReachThroughFreeSpaceAction):
     """
 
     def tool_goal(self) -> Pose:
-        grasp = self.place._grasp_on_the_held_object()
-        return self.place.grasp_pose_sequence(
-            grasp.moved_to(self.place.target_location), self.arm.end_effector, grasp
-        ).retreat
+        return self.place.release_of_the_current_grasp().retreat
 
 
 @dataclass(kw_only=True, eq=False)
@@ -360,7 +358,7 @@ class MeasuredJointPosition(JointPositionList):
         )
         return artifacts
 
-    def on_tick(self) -> ObservationStateValues | None:
+    def on_tick(self) -> ObservationStateValue | None:
         for connection, variable in self._measured_positions.items():
             self.context.float_variable_data.set_value(
                 expression=variable,
@@ -431,8 +429,7 @@ class DriveJoint(EndedByOwner, CompositeNode):
                 ),
                 CartesianPose(
                     name="hold part",
-                    root_link=self.environment_link,
-                    tip_link=self.tip_link,
+                    kinematic_chain=KinematicChain(root=self.environment_link, tip=self.tip_link),
                     goal_pose=Pose(reference_frame=self.tip_link),
                     weight=self.grasp_weight,
                 ),
@@ -463,7 +460,7 @@ class HoldsBase(MovesToolCenterPoint, ABC):
             starts.
         """
         return HoldPose(
-            name="hold base", root_link=self.world.root, tip_link=self.robot.root
+            name="hold base", kinematic_chain=KinematicChain(root=self.world.root, tip=self.robot.root)
         )
 
 
@@ -570,7 +567,7 @@ class OperateMechanismAction(DrivesAJointByAPart, MovesContainerByItsHandle):
 
     def _create_mechanism_goal(self) -> StatechartNode:
         return self.joint_drive(
-            self.grasp.graspable.root,
+            self.grasp_candidate.graspable.root,
             self.arm,
             self.mechanism,
             self.goal_position,
@@ -586,14 +583,16 @@ class OperateMechanismAction(DrivesAJointByAPart, MovesContainerByItsHandle):
             else []
         )
         return [
-            self.grasping_of(self.grasp, self.arm),
+            self.create_grasping_action(
+                grasp_candidate=self.grasp_candidate, arm=self.arm
+            ),
             *settling,
             self._create_mechanism_goal(),
             self.gripper_goal_type.create_gripper_goal(
                 configuration=end_effector.default_configuration(GripperState.OPEN)
             ),
             self.tool_center_point_goal(
-                self.back_off_pose(self.grasp.grasp_pose, end_effector), self.arm
+                target=self.back_off_pose(self.grasp_candidate.grasp_pose, end_effector), arm=self.arm
             ),
         ]
 
@@ -648,11 +647,11 @@ class StandAndOperateMechanismAction(MayReachThroughFreeSpace, SequentialAction)
         :param settling_time: See :attr:`OperateMechanismAction.settling_time`.
         :return: The step, with the stand and the grasp left open.
         """
-        stand = variable(Pose, domain=stands)
+        stand = variable(Pose2D, domain=[Pose2D.from_pose(pose) for pose in stands])
         return a(cls)(
-            navigate=a(StandAction)(target_location=stand),
+            navigate=a(StandAction)(planar_goal_pose=stand),
             operate=a(OperateMechanismAction)(
-                grasp=flat_variable(
+                grasp_candidate=flat_variable(
                     GraspsClosestTo(
                         grasps=grasps,
                         standing_position=stand,
@@ -673,7 +672,9 @@ class StandAndOperateMechanismAction(MayReachThroughFreeSpace, SequentialAction)
     def create_steps(self) -> list[StatechartNode]:
         operate = self.operate
         pre_grasp = operate.grasp_pose_sequence(
-            operate.grasp.grasp_pose, operate.arm.end_effector, operate.grasp
+            reference_T_grasp=operate.grasp_candidate.grasp_pose,
+            end_effector=operate.arm.end_effector,
+            grasp_candidate=operate.grasp_candidate,
         ).pre_grasp
         return [
             self.navigate,
@@ -786,10 +787,10 @@ class PressAction(
                 )
             ),
             self.tool_center_point_goal(
-                self.fingertips_goal(self.approach_distance), self.arm
+                target=self.fingertips_goal(self.approach_distance), arm=self.arm
             ),
             self.tool_center_point_goal(
-                self.fingertips_goal(0.0), self.arm, in_a_straight_line=True
+                target=self.fingertips_goal(0.0), arm=self.arm, in_a_straight_line=True
             ),
         ]
 
@@ -879,8 +880,8 @@ class WithdrawAction(PlacesFingertips, HoldsBase, SequentialAction):
     def create_steps(self) -> list[StatechartNode]:
         return [
             self.tool_center_point_goal(
-                self.fingertips_goal(self.distance),
-                self.arm,
+                target=self.fingertips_goal(self.distance),
+                arm=self.arm,
                 in_a_straight_line=True,
                 accompanying_goals=self.goals_held_while_withdrawing(),
             )
@@ -931,7 +932,11 @@ class StandAndPressAction(MayReachThroughFreeSpace, OperatesGripper, SequentialA
         """
         press = a(PressAction)(point=point, approach=approach, arm=arm)
         return a(cls)(
-            navigate=a(StandAction)(target_location=variable(Pose, domain=stands)),
+            navigate=a(StandAction)(
+                planar_goal_pose=variable(
+                    Pose2D, domain=[Pose2D.from_pose(pose) for pose in stands]
+                )
+            ),
             press=(
                 press
                 if pushed_joint is None
@@ -1103,10 +1108,10 @@ class FingerWithdrawAction(PlacesOneFingertip, WithdrawAction):
         return [
             *super().create_steps(),
             self.tool_center_point_goal(
-                HomogeneousTransformationMatrix(
+                target=HomogeneousTransformationMatrix(
                     world_T_risen, reference_frame=world.root
                 ).pose,
-                self.arm,
+                arm=self.arm,
                 in_a_straight_line=True,
                 accompanying_goals=self.goals_held_while_withdrawing(),
             ),
@@ -1146,7 +1151,11 @@ class StandAndPushWithAFingerAction(StandAndPressAction):
         :return: The step, with the stand left open.
         """
         return a(cls)(
-            navigate=a(StandAction)(target_location=variable(Pose, domain=stands)),
+            navigate=a(StandAction)(
+                planar_goal_pose=variable(
+                    Pose2D, domain=[Pose2D.from_pose(pose) for pose in stands]
+                )
+            ),
             press=a(PushAction)(
                 press=a(FingerPressAction)(
                     point=point,
@@ -1164,57 +1173,6 @@ class StandAndPushWithAFingerAction(StandAndPressAction):
 
 
 # %% picking an object up and putting it down
-
-
-@dataclass(eq=False, repr=False, kw_only=True)
-class PlaceHeldObjectAction(PlaceAction):
-    """
-    Puts down an object an arm is known to hold.
-
-    Differs from :class:`~coraplex.robot_plans.actions.core.placing.PlaceAction` in
-    taking an object that lies in :attr:`holding_arm`'s gripper as held by it, whether
-    or not the rays between the fingers hit it.
-    """
-
-    holding_arm: Arm | None = None
-    """
-    The arm that holds the object.
-    """
-
-    reach: float = 0.12
-    """
-    How far from the holding arm's tool frame the object's bounding box may lie at most
-    for the object to lie in its gripper, in metres.
-    """
-
-    def _holding_arm_and_grasp(self) -> tuple[Arm, GraspCandidate]:
-        """
-        Differs from :meth:`PlaceAction._holding_arm_and_grasp` in reading the grasp off
-        :attr:`holding_arm`'s gripper wherever the object lies in it.
-        """
-        arm = self.holding_arm
-        body = self.object_designator.root
-        if arm is None or not self.lies_in_the_gripper_of(arm):
-            return super()._holding_arm_and_grasp()
-        end_effector = arm.end_effector
-        if GripperHolds(end_effector, body)():
-            return arm, GraspCandidate(
-                self.object_designator, end_effector.held_body_T_grasp
-            )
-        return arm, GraspCandidate(
-            self.object_designator, end_effector.body_T_grasp_when_closed(body=body)
-        )
-
-    def lies_in_the_gripper_of(self, arm: Arm) -> bool:
-        """
-        :param arm: An arm.
-        :return: Whether the object lies within :attr:`reach` of the arm's tool frame.
-        """
-        tool = arm.end_effector.tool_frame.global_pose.to_np()[:3, 3]
-        return (
-            BodyBounds(self.world).distance_to(self.object_designator.root, tool)
-            <= self.reach
-        )
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
@@ -1254,11 +1212,11 @@ class StandAndPickUpAction(MayReachThroughFreeSpace, SequentialAction):
             path through free space.
         :return: The step, with the stand and the grasp left open.
         """
-        stand = variable(Pose, domain=stands)
+        stand = variable(Pose2D, domain=[Pose2D.from_pose(pose) for pose in stands])
         return a(cls)(
-            navigate=a(StandAction)(target_location=stand),
+            navigate=a(StandAction)(planar_goal_pose=stand),
             pick_up=a(PickUpAction)(
-                grasp=flat_variable(
+                grasp_candidate=flat_variable(
                     GraspsClosestTo(
                         grasps=grasps,
                         standing_position=stand,
@@ -1273,7 +1231,9 @@ class StandAndPickUpAction(MayReachThroughFreeSpace, SequentialAction):
     def create_steps(self) -> list[StatechartNode]:
         pick_up = self.pick_up
         pre_grasp = pick_up.grasp_pose_sequence(
-            pick_up.grasp.grasp_pose, pick_up.arm.end_effector, pick_up.grasp
+            reference_T_grasp=pick_up.grasp_candidate.grasp_pose,
+            end_effector=pick_up.arm.end_effector,
+            grasp_candidate=pick_up.grasp_candidate,
         ).pre_grasp
         return [
             self.navigate,
@@ -1327,12 +1287,16 @@ class StandAndPlaceAction(MayReachThroughFreeSpace, SequentialAction):
         :return: The step, with the stand and the pose left open.
         """
         return a(cls)(
-            navigate=a(StandAction)(target_location=variable(Pose, domain=stands)),
-            place=a(PlaceHeldObjectAction)(
-                object_designator=graspable,
-                target_location=variable(Pose, domain=target_poses),
+            navigate=a(StandAction)(
+                planar_goal_pose=variable(
+                    Pose2D, domain=[Pose2D.from_pose(pose) for pose in stands]
+                )
+            ),
+            place=a(PlaceAction)(
+                arm=arm,
+                graspable=graspable,
+                goal_pose=variable(Pose, domain=target_poses),
                 retreat_distance=retreat_distance,
-                holding_arm=arm,
             ),
             arm=arm,
             through_free_space=through_free_space,
@@ -1435,10 +1399,10 @@ class BodiesTouch(EndedByOwner, StatechartNode):
     The bodies of the other group.
     """
 
-    def on_tick(self) -> ObservationStateValues:
+    def on_tick(self) -> ObservationStateValue:
         if BodyContacts(world=self.context.world).touch(self.bodies, self.others):
-            return ObservationStateValues.TRUE
-        return ObservationStateValues.FALSE
+            return ObservationStateValue.TRUE
+        return ObservationStateValue.FALSE
 
 
 # %% moving the tool straight up or down
@@ -1463,22 +1427,23 @@ class MovesTheToolVertically(HoldsBase, ABC):
     """
 
     def vertical_tool_goal(
-        self, height: float, max_linear_velocity: float | None = None
+        self, height: float, cruise_linear_velocity: float | None = None
     ) -> StatechartNode:
         """
         :param height: How far the tool frame rises, in metres; it goes down where this
             is negative.
-        :param max_linear_velocity: Cap on the speed of the tool frame, in m/s.
+        :param cruise_linear_velocity: Speed of the tool frame, in m/s, or ``None`` for
+            the default of :class:`CartesianPose`.
         :return: A new goal moving the tool frame there in a straight line.
         """
         world_T_tool = self.arm.end_effector.tool_frame.global_pose.to_np().copy()
         world_T_tool[2, 3] += height
         return self.tool_center_point_goal(
-            HomogeneousTransformationMatrix(
+            target=HomogeneousTransformationMatrix(
                 world_T_tool, reference_frame=self.world.root
             ).pose,
-            self.arm,
-            max_linear_velocity=max_linear_velocity,
+            arm=self.arm,
+            cruise_linear_velocity=cruise_linear_velocity,
             in_a_straight_line=True,
             accompanying_goals=(self.base_hold(),) if self.hold_base else (),
         )
@@ -1515,9 +1480,9 @@ class MoveTheToolInAStraightLineAction(HoldsBase, GoalAction):
     Where the tool frame ends up.
     """
 
-    max_linear_velocity: float | None = None
+    cruise_linear_velocity: float | None = None
     """
-    Cap on the speed of the tool frame, in m/s; uncapped when ``None``.
+    Speed of the tool frame, in m/s; the default of :class:`CartesianPose` when ``None``.
     """
 
     hold_base: bool = True
@@ -1528,9 +1493,9 @@ class MoveTheToolInAStraightLineAction(HoldsBase, GoalAction):
 
     def create_goal(self) -> StatechartNode:
         return self.tool_center_point_goal(
-            self.target_pose,
-            self.arm,
-            max_linear_velocity=self.max_linear_velocity,
+            target=self.target_pose,
+            arm=self.arm,
+            cruise_linear_velocity=self.cruise_linear_velocity,
             in_a_straight_line=True,
             accompanying_goals=(self.base_hold(),) if self.hold_base else (),
         )
@@ -1673,7 +1638,7 @@ class CarryThroughFreeSpaceAction(HoldsBase, SequentialAction):
             )
         accompanying_goals = (self.base_hold(),) if self.hold_base else ()
         onto_the_goal = self.tool_center_point_goal(
-            tool_poses[-1], self.arm, accompanying_goals=accompanying_goals
+            target=tool_poses[-1], arm=self.arm, accompanying_goals=accompanying_goals
         )
         if len(tool_poses) == 1:
             return [onto_the_goal]

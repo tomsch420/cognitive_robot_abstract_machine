@@ -166,10 +166,19 @@ class PlaceAction(
     def on_start(self) -> None:
         """
         Differs from :meth:`~coraplex.robot_plans.actions.base.Action.on_start` in also
-        setting :attr:`_tool_goals` to the release of the grasp :attr:`arm` has on
-        :attr:`graspable` now.
+        setting :attr:`_tool_goals` to :meth:`release_of_the_current_grasp`.
         """
         super().on_start()
+        for variable_pose, pose in zip(
+            self._tool_goals.poses, self.release_of_the_current_grasp().poses
+        ):
+            self.set_variable_pose(variable_pose=variable_pose, value=pose)
+
+    def release_of_the_current_grasp(self) -> GraspPoseSequence:
+        """
+        :return: The tool frame goals releasing :attr:`graspable` at :attr:`goal_pose`
+            by the grasp :attr:`arm` has on it now.
+        """
         end_effector = self.arm.end_effector
         grasp = GraspCandidate(
             self.graspable,
@@ -178,10 +187,8 @@ class PlaceAction(
                 tool_P_grasp=end_effector.tool_P_grasp_when_closed,
             ),
         )
-        place_sequence = self.grasp_pose_sequence(
+        return self.grasp_pose_sequence(
             reference_T_grasp=grasp.moved_to(self.goal_pose),
             end_effector=end_effector,
             grasp_candidate=grasp,
         )
-        for variable_pose, pose in zip(self._tool_goals.poses, place_sequence.poses):
-            self.set_variable_pose(variable_pose=variable_pose, value=pose)

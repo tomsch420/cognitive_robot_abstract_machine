@@ -11,7 +11,7 @@ import pytest
 from ...pytest_environment import runs_in_continuous_integration
 
 from cramph.context import StatechartContext
-from cramph.data_types import ObservationStateValues
+from cramph.data_types import ObservationStateValue
 from cramph.executor import StatechartExecutor, SteppedSimulationPacer
 from cramph.statechart import Statechart
 from experiments.robocasa_atomic_tasks.skills import MeasuredJointPosition
@@ -103,7 +103,7 @@ def observation_after_driving_the_hinge(
     goal_position: float,
     left_to_the_physics: bool,
     ticks: int = 100,
-) -> ObservationStateValues:
+) -> ObservationStateValue:
     """
     :param door_on_a_hinge: The world with the hinge.
     :param goal_position: The position the hinge is driven to.
@@ -152,7 +152,7 @@ def test_a_joint_goal_is_not_reached_while_the_physics_holds_the_joint_back(
         door_on_a_hinge, goal_position=0.5, left_to_the_physics=True
     )
 
-    assert observation == ObservationStateValues.FALSE
+    assert observation == ObservationStateValue.FALSE
 
 
 def test_a_joint_goal_is_reached_once_the_physics_moved_the_joint_there(
@@ -162,4 +162,4 @@ def test_a_joint_goal_is_reached_once_the_physics_moved_the_joint_there(
         door_on_a_hinge, goal_position=0.5, left_to_the_physics=False
     )
 
-    assert observation == ObservationStateValues.TRUE
+    assert observation == ObservationStateValue.TRUE

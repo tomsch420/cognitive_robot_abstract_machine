@@ -42,7 +42,7 @@ from experiments.robocasa_atomic_tasks.stored_runs import (
 )
 from experiments.robocasa_atomic_tasks.tasks import PickAndPlaceTask
 from krrood.bounds import Bounds
-from krrood.entity_query_language.backends import ProbabilisticBackend
+from krrood.parametrization.probabilistic_backend import ProbabilisticBackend
 from krrood.entity_query_language.factories import ConditionType, a
 from krrood.entity_query_language.query.match import Match
 from krrood.parametrization.model_registries import (
@@ -242,7 +242,7 @@ class ReleasePerformer:
             episode.run(
                 [
                     MoveFingersToWidthAction(
-                        gripper=gripper, width=0.0, squeeze=gripper.squeeze
+                        two_finger_gripper=gripper, width=0.0, squeeze=gripper.squeeze
                     )
                 ]
             )
@@ -292,7 +292,7 @@ class ReleasePerformer:
         contacts = BodyContacts(world=episode.world)
         episode.limit_finger_force(force=parameters.opening_force)
         opening = MoveFingersToWidthAction(
-            gripper=gripper, width=parameters.opening * gripper.separation_when_open
+            two_finger_gripper=gripper, width=parameters.opening * gripper.separation_when_open
         )
         failed_stage = None
         if not episode.run_part(part=ReleaseStage.OPENING, steps=[opening]):
@@ -304,7 +304,7 @@ class ReleasePerformer:
         retreat = MoveTheToolInAStraightLineAction(
             arm=episode.arm,
             target_pose=self.retreat_pose(parameters=parameters),
-            max_linear_velocity=parameters.retreat_velocity,
+            cruise_linear_velocity=parameters.retreat_velocity,
         )
         if failed_stage is None and not episode.run_part(
             part=ReleaseStage.RETREATING, steps=[retreat]

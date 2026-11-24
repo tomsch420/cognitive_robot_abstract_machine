@@ -205,7 +205,7 @@ def test_the_base_stops_from_top_speed_within_a_stands_tolerance():
         base_mass + robot.mass, top_speed, gains.damping, gains.torque_limit
     )
 
-    assert distance < StandAction.base_pose_threshold
+    assert distance < StandAction.threshold
 
 
 # %% placing the robots in a kitchen

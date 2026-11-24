@@ -22,6 +22,7 @@ from experiments.robocasa_atomic_tasks.skills import StandAction
 from experiments.robocasa_atomic_tasks.tasks import RoboCasaAtomicTask
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Floor
 from krrood_spatial_math.spatial_types import (
+    Pose2D,
     HomogeneousTransformationMatrix,
     Point2,
     Pose,
@@ -121,7 +122,7 @@ class NavigateKitchen(RoboCasaAtomicTask):
         path = self.widest_path(episode, base_pose[:2, 3], goal)
         episode.perform(lambda: [episode.create_parking_step()]).raise_if_failed()
         for target in self.stands_along(episode, path, start_yaw, goal, target_yaw):
-            outcome = episode.perform(lambda: [StandAction(target_location=target)])
+            outcome = episode.perform(lambda: [StandAction(planar_goal_pose=Pose2D.from_pose(target))])
             if isinstance(outcome.failure, MotionMadeNoProgress):
                 logger.warning(
                     "Driving on after the base stalled: %s",

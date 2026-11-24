@@ -26,7 +26,7 @@ from experiments.robocasa_atomic_tasks.stored_runs import (
     SimulatedMoment,
     StoredTaskRun,
 )
-from krrood_spatial_math.spatial_types import Twist, Vector3
+from krrood_spatial_math.spatial_types import Displacement, Vector3
 from semantic_digital_twin.grasping.grasp_strategies import GraspFromAnySide
 from semantic_digital_twin.grasping.object_relative_grasp import (
     GraspResult,
@@ -107,8 +107,8 @@ def recorded_attempt(
     grasp.result = GraspResult(
         object_raised=True,
         motion_completed=True,
-        object_displacement=Twist(translation=Vector3(0.0, 0.0, 0.2)),
-        slip=Twist(translation=Vector3(0.0, 0.0, 0.0)),
+        object_displacement=Displacement(translation=Vector3(0.0, 0.0, 0.2)),
+        slip=Displacement(translation=Vector3(0.0, 0.0, 0.0)),
     )
     return RecordedGraspAttempt(
         attempt=GraspAttempt(

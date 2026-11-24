@@ -25,7 +25,7 @@ from coraplex.robot_plans.actions.core.robot_body import (
 )
 from coraplex.robot_plans.mixins import HasGraspApproach, MovesToolCenterPoint
 from cramph.composites import Deferred, Parallel
-from cramph.data_types import ObservationStateValues
+from cramph.data_types import ObservationStateValue
 from cramph.monitors import CountSimulationTimeSeconds
 from cramph.node import EndedByOwner, StatechartNode
 from cramph.threaded_nodes import FunctionCall
@@ -76,7 +76,11 @@ from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech impor
     Noun,
     clause,
 )
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Pose
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix,
+    Pose,
+    Pose2D,
+)
 from semantic_digital_twin.adapters.multi_sim import MujocoSynchronizer
 from semantic_digital_twin.collision_checking.collision_matrix import CollisionRule
 from semantic_digital_twin.collision_checking.collision_rules import (
@@ -91,6 +95,7 @@ from semantic_digital_twin.reasoning.predicates import InsideOf, PlaceIsOccupied
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, Arm
 from semantic_digital_twin.semantic_annotations.mixins import IsGraspable
 from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
 from semantic_digital_twin.world_description.geometry import (
     Cylinder,
@@ -596,7 +601,7 @@ class BackOffAction(NavigateAction):
     How far the base backs off, in metres.
     """
 
-    target_location: Pose = field(init=False, default=None)
+    planar_goal_pose: Pose2D = field(init=False, default=None)
     """
     Where the base backs off to, set when the action is expanded.
     """
@@ -604,9 +609,11 @@ class BackOffAction(NavigateAction):
     def create_goal(self) -> StatechartNode:
         world_T_base = self.robot.root.global_pose.to_np().copy()
         world_T_base[:3, 3] -= self.distance * world_T_base[:3, 0]
-        self.target_location = HomogeneousTransformationMatrix(
-            world_T_base, reference_frame=self.world.root
-        ).pose
+        self.planar_goal_pose = Pose2D.from_pose(
+            HomogeneousTransformationMatrix(
+                world_T_base, reference_frame=self.world.root
+            ).pose
+        )
         return super().create_goal()
 
 
@@ -779,7 +786,7 @@ class LiftAnObjectOutOfTheSinkAction(
 
     approach_velocity: float = 0.096
     """
-    Cap on the speed of the tool frame on the way in, in m/s.
+    Speed of the tool frame on the way in, in m/s.
     """
 
     settling_time: float = 0.58
@@ -790,7 +797,7 @@ class LiftAnObjectOutOfTheSinkAction(
 
     lift_velocity: float = 0.124
     """
-    Cap on the speed of the tool frame on the way out, in m/s.
+    Speed of the tool frame on the way out, in m/s.
     """
 
     exit_height_above_the_basin: float = 0.089
@@ -838,7 +845,7 @@ class LiftAnObjectOutOfTheSinkAction(
     def create_steps_once_the_preconditions_hold(self) -> list[StatechartNode | Match]:
         world = self.world
         gripper = self.arm.end_effector
-        poses = self.grasp_pose_sequence(self.grasp.grasp_pose, gripper, self.grasp)
+        poses = self.grasp_pose_sequence(reference_T_grasp=self.grasp.grasp_pose, end_effector=gripper, grasp_candidate=self.grasp)
         world_T_pre_grasp = world.transform(poses.pre_grasp, world.root)
         world_T_exit = world_T_pre_grasp.homogeneous_matrix.to_np().copy()
         world_T_exit[2, 3] = max(
@@ -848,14 +855,14 @@ class LiftAnObjectOutOfTheSinkAction(
         )
         return [
             MoveFingersToWidthAction(
-                gripper=gripper, width=self.opening * gripper.separation_when_open
+                two_finger_gripper=gripper, width=self.opening * gripper.separation_when_open
             ),
             *self.straight_moves(
                 poses=[world_T_pre_grasp, world.transform(poses.grasp, world.root)],
                 velocity=self.approach_velocity,
             ),
             MoveFingersToWidthAction(
-                gripper=gripper, width=0.0, squeeze=gripper.squeeze
+                two_finger_gripper=gripper, width=0.0, squeeze=gripper.squeeze
             ),
             CountSimulationTimeSeconds(seconds=self.settling_time),
             *self.straight_moves(
@@ -888,13 +895,13 @@ class LiftAnObjectOutOfTheSinkAction(
     ) -> list[MoveTheToolInAStraightLineAction]:
         """
         :param poses: Where the tool frame goes, in turn.
-        :param velocity: Cap on its speed, in m/s.
+        :param velocity: Its speed, in m/s.
         :return: New steps moving the tool frame in a straight line to each pose, the
             base standing still.
         """
         return [
             MoveTheToolInAStraightLineAction(
-                arm=self.arm, target_pose=pose, max_linear_velocity=velocity
+                arm=self.arm, target_pose=pose, cruise_linear_velocity=velocity
             )
             for pose in poses
         ]
@@ -957,14 +964,14 @@ class StandAtASpotAction(StandAction):
     The thing the robot stands beside.
     """
 
-    target_location: Pose = field(init=False, default=None)
+    planar_goal_pose: Pose2D = field(init=False, default=None)
     """
     Where the robot stands, set when the action is expanded.
     """
 
     def create_goal(self) -> StatechartNode:
-        self.target_location = self.spot.standing_pose(
-            beside=self.beside, world=self.world
+        self.planar_goal_pose = Pose2D.from_pose(
+            self.spot.standing_pose(beside=self.beside, world=self.world)
         )
         return super().create_goal()
 
@@ -999,9 +1006,9 @@ class HoldTheObjectAboveAction(HoldsBase, GoalAction):
     How far the held object's origin ends above :attr:`above`'s origin, in metres.
     """
 
-    max_linear_velocity: float | None = None
+    cruise_linear_velocity: float | None = None
     """
-    Cap on the speed of the tool frame, in m/s; uncapped when ``None``.
+    Speed of the tool frame, in m/s; the default of :class:`CartesianPose` when ``None``.
     """
 
     hold_base: bool = False
@@ -1018,11 +1025,11 @@ class HoldTheObjectAboveAction(HoldsBase, GoalAction):
         world_T_tool = self.arm.end_effector.tool_frame.global_pose.to_np().copy()
         world_T_tool[:3, 3] += shift
         return self.tool_center_point_goal(
-            HomogeneousTransformationMatrix(
+            target=HomogeneousTransformationMatrix(
                 world_T_tool, reference_frame=self.world.root
             ).pose,
-            self.arm,
-            max_linear_velocity=self.max_linear_velocity,
+            arm=self.arm,
+            cruise_linear_velocity=self.cruise_linear_velocity,
             in_a_straight_line=True,
             accompanying_goals=(self.base_hold(),) if self.hold_base else (),
         )
@@ -1096,7 +1103,7 @@ class TakeOutOfTheSinkParameters:
 
     approach_velocity: float = 0.0966
     """
-    Cap on the speed of the tool frame on the way in, in m/s.
+    Speed of the tool frame on the way in, in m/s.
     """
 
     settling_time_in_the_fingers: float = 0.518
@@ -1107,7 +1114,7 @@ class TakeOutOfTheSinkParameters:
 
     lift_velocity: float = 0.1298
     """
-    Cap on the speed of the tool frame on the way out of the sink, in m/s.
+    Speed of the tool frame on the way out of the sink, in m/s.
     """
 
     def posture_step(self, *, arm: Arm, robot: AbstractRobot) -> JointPositionList:
@@ -1152,7 +1159,7 @@ class TakeOutOfTheSinkParameters:
         return LiftAnObjectOutOfTheSinkAction(
             arm=arm,
             basin=basin,
-            grasp=self.grasp.grasp_candidate(graspable.grasped_part()),
+            grasp=self.grasp.grasp_candidate(graspable=graspable.grasped_part()),
             opening=self.opening,
             approach_clearance=self.approach_clearance,
             approach_velocity=self.approach_velocity,
@@ -1186,12 +1193,12 @@ class JointPositionBound(EndedByOwner, StatechartNode, ABC):
         :return: Whether that is on the side of :attr:`position` this node observes.
         """
 
-    def on_tick(self) -> ObservationStateValues | None:
+    def on_tick(self) -> ObservationStateValue | None:
         world = self.context.world
         joint = world.get_connection_by_name(self.joint.name)
         if self.is_on_the_side_observed(JointReading(world).position(joint)):
-            return ObservationStateValues.TRUE
-        return ObservationStateValues.FALSE
+            return ObservationStateValue.TRUE
+        return ObservationStateValue.FALSE
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
@@ -1254,16 +1261,15 @@ class TouchesTheFaucetHandle(MovesToolCenterPoint, ABC):
         :return: The goal moving the tool frame there while the base stands still.
         """
         return self.tool_center_point_goal(
-            HomogeneousTransformationMatrix(
+            target=HomogeneousTransformationMatrix(
                 world_T_tool, reference_frame=self.world.root
             ).pose,
-            self.arm,
+            arm=self.arm,
             in_a_straight_line=in_a_straight_line,
             accompanying_goals=(
                 HoldPose(
                     name="hold base",
-                    root_link=self.world.root,
-                    tip_link=self.robot.root,
+                    kinematic_chain=KinematicChain(root=self.world.root, tip=self.robot.root),
                 ),
             ),
         )
@@ -1277,10 +1283,10 @@ class TouchesTheFaucetHandle(MovesToolCenterPoint, ABC):
         :return: The goal moving the tool frame there, the base moving along as needed.
         """
         return self.tool_center_point_goal(
-            HomogeneousTransformationMatrix(
+            target=HomogeneousTransformationMatrix(
                 world_T_tool, reference_frame=self.world.root
             ).pose,
-            self.arm,
+            arm=self.arm,
             in_a_straight_line=in_a_straight_line,
         )
 
@@ -1291,16 +1297,15 @@ class TouchesTheFaucetHandle(MovesToolCenterPoint, ABC):
             carrying it while the arm keeps its posture.
         """
         return self.tool_center_point_goal(
-            HomogeneousTransformationMatrix(
+            target=HomogeneousTransformationMatrix(
                 world_T_tool, reference_frame=self.world.root
             ).pose,
-            self.arm,
+            arm=self.arm,
             in_a_straight_line=True,
             accompanying_goals=(
                 RigidCoupling(
                     name="arm keeps its posture",
-                    root_link=self.robot.root,
-                    tip_link=self.arm.end_effector.tool_frame,
+                    kinematic_chain=KinematicChain(root=self.robot.root, tip=self.arm.end_effector.tool_frame),
                 ),
             ),
         )
@@ -1664,8 +1669,7 @@ class PullTheFaucetLeverWithTheBaseAction(WorksCloseToTheFaucetLever, GoalAction
             nodes=[
                 CartesianPose(
                     name="back off slowly",
-                    root_link=self.world.root,
-                    tip_link=self.robot.root,
+                    kinematic_chain=KinematicChain(root=self.world.root, tip=self.robot.root),
                     goal_pose=HomogeneousTransformationMatrix(
                         world_T_base, reference_frame=self.world.root
                     ).pose,
@@ -1861,8 +1865,7 @@ class PushTheFaucetLeverWithTheBaseAction(WorksCloseToTheFaucetLever, GoalAction
             nodes=[
                 CartesianPose(
                     name="drive forward slowly",
-                    root_link=self.world.root,
-                    tip_link=self.robot.root,
+                    kinematic_chain=KinematicChain(root=self.world.root, tip=self.robot.root),
                     goal_pose=HomogeneousTransformationMatrix(
                         world_T_base, reference_frame=self.world.root
                     ).pose,
@@ -1961,12 +1964,14 @@ class FaucetMovedWithAFingerAction(WorksAtTheSink, ABC):
         """
         handle = FaucetHandle.from_lift_joint(self.lift_joint, self.handle)
         return NavigateAction(
-            target_location=HomogeneousTransformationMatrix(
-                handle.standing_pose_in_front(
-                    self.stand_distance, self.stand_sideways_offset
-                ),
-                reference_frame=self.world.root,
-            ).pose
+            planar_goal_pose=Pose2D.from_pose(
+                HomogeneousTransformationMatrix(
+                    handle.standing_pose_in_front(
+                        self.stand_distance, self.stand_sideways_offset
+                    ),
+                    reference_frame=self.world.root,
+                ).pose
+            )
         )
 
     def create_temporary_collision_rules(self) -> list[CollisionRule]:
@@ -2111,7 +2116,7 @@ class TurnOnTheFaucetWithAFingerAction(FaucetMovedWithAFingerAction):
             self.create_navigation_in_front_of_the_handle(),
             MoveTorsoAction(torso_state=self.torso_state),
             SetGripperAction(
-                configuration=gripper.default_configuration(GripperState.OPEN)
+                gripper_configuration=gripper.default_configuration(GripperState.OPEN)
             ),
             a(PutAFingerBesideTheFaucetHandleAction)(
                 arm=self.arm,
@@ -2211,7 +2216,7 @@ class TurnOffTheFaucetWithAFingerAction(FaucetMovedWithAFingerAction):
         return [
             self.create_navigation_in_front_of_the_handle(),
             SetGripperAction(
-                configuration=gripper.default_configuration(GripperState.OPEN)
+                gripper_configuration=gripper.default_configuration(GripperState.OPEN)
             ),
             a(PutTheLowerFingerBesideTheLeverBarAction)(
                 arm=self.arm,
@@ -2417,7 +2422,7 @@ class TurnTheWaterHotWithAFingerAction(SwingsTheFaucetLeverWithTheBase):
         return [
             self.create_navigation_in_front_of_the_handle(),
             SetGripperAction(
-                configuration=gripper.default_configuration(GripperState.OPEN)
+                gripper_configuration=gripper.default_configuration(GripperState.OPEN)
             ),
             a(PutTheLowerFingerBehindTheLeverBarAction)(
                 arm=self.arm,
@@ -2541,7 +2546,7 @@ class TurnTheWaterColdWithAFingerAction(SwingsTheFaucetLeverWithTheBase):
         return [
             self.create_navigation_in_front_of_the_handle(),
             SetGripperAction(
-                configuration=gripper.default_configuration(GripperState.OPEN)
+                gripper_configuration=gripper.default_configuration(GripperState.OPEN)
             ),
             Deferred(
                 name="point the hand at the lever",
@@ -2706,10 +2711,10 @@ class TouchesTheSpoutBar(MovesToolCenterPoint, ABC):
             world_T_tool[:3, 3] += shift
             goals.append(
                 self.tool_center_point_goal(
-                    HomogeneousTransformationMatrix(
+                    target=HomogeneousTransformationMatrix(
                         world_T_tool, reference_frame=self.world.root
                     ).pose,
-                    self.arm,
+                    arm=self.arm,
                     in_a_straight_line=True,
                 )
             )
@@ -2926,7 +2931,7 @@ class TurnTheSpoutWithTheGripperAction(WorksAtTheSink):
 
     def create_steps_once_the_preconditions_hold(self) -> list[StatechartNode | Match]:
         return [
-            NavigateAction(target_location=self.standing_pose()),
+            NavigateAction(planar_goal_pose=Pose2D.from_pose(self.standing_pose())),
             Deferred(
                 name="beside the spout's bar",
                 task=ReachThroughFreeSpaceAction(

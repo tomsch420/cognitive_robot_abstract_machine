@@ -16,7 +16,7 @@ from typing_extensions import List
 
 from giskardpy.executor import Executor, SteppedSimulationPacer
 from giskardpy.motion_statechart.context import MotionStatechartContext
-from giskardpy.motion_statechart.data_types import LifeCycleValues
+from giskardpy.motion_statechart.data_types import LifeCycleValue
 from giskardpy.motion_statechart.goals.templates import Sequence
 from giskardpy.motion_statechart.graph_node import EndMotion, MotionStatechartNode
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
@@ -332,7 +332,7 @@ class PhysicalPickUp:
             self.pacer.sleep()
             if (
                 not closed
-                and self._lift_step.life_cycle_state != LifeCycleValues.NOT_STARTED
+                and self._lift_step.life_cycle_state != LifeCycleValue.NOT_STARTED
             ):
                 self._gripper_T_grasp_when_closed = self._gripper_T_grasp()
                 closed = True

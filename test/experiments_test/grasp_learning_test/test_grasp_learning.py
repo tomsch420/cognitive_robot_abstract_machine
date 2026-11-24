@@ -33,7 +33,7 @@ from experiments.physical_pick_up.scene import PickUpScene
 from semantic_digital_twin.part_finding.annotation_part_finder import (
     AnnotationPartFinder,
 )
-from krrood_spatial_math.spatial_types import Twist, Vector3
+from krrood_spatial_math.spatial_types import Displacement, Vector3
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Handle,
     Mug,
@@ -93,10 +93,10 @@ def synthetic_attempts(scene: PickUpScene, number: int) -> List[GraspAttempt]:
         grasp.result = GraspResult(
             object_raised=raised,
             motion_completed=True,
-            object_displacement=Twist(
+            object_displacement=Displacement(
                 translation=Vector3(0.0, 0.0, 0.2 if raised else 0.0)
             ),
-            slip=Twist(translation=Vector3(0.0, 0.0, 0.0 if raised else -0.2)),
+            slip=Displacement(translation=Vector3(0.0, 0.0, 0.0 if raised else -0.2)),
         )
     return [
         GraspAttempt(
