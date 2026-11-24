@@ -203,6 +203,33 @@ def test_categorical_probabilities_are_smoothed_counts():
     )
 
 
+def test_impossible_states_stay_impossible_under_smoothing():
+    """
+    A state of probability zero, such as the padding of a layer over variables of
+    different domain sizes, gets no pseudocount and stays impossible.
+    """
+    variable = colour_variable()
+    circuit = categorical_mixture(
+        variable=variable,
+        weights=np.array([1.0]),
+        probabilities=np.array([[0.6, 0.4, 0.0]]),
+    )
+    states = np.array([0, 0, 1])
+    CircuitExpectationMaximization(epochs=1).fit(
+        circuit=circuit, data=hashes_of_states(variable=variable, states=states)
+    )
+    counts = np.bincount(states, minlength=3) + StateCountSmoothing().pseudocount
+    counts[2] = 0.0
+    np.testing.assert_allclose(
+        np.exp(
+            HasParameterArrays.host_copy(
+                circuit.root.child_layers[0].table.log_probabilities
+            )
+        ).ravel(),
+        counts / counts.sum(),
+    )
+
+
 def test_anemone_step_mixes_by_top_down_probability_and_flow(
     x: Continuous, weights, locations, scales, data
 ):

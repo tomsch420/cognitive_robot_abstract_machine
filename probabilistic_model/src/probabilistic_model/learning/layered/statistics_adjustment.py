@@ -196,22 +196,29 @@ class Momentum(StatisticsAdjustment):
 @dataclass(kw_only=True)
 class StateCountSmoothing(StatisticsAdjustment):
     """
-    Adds :attr:`pseudocount` to the count of every state of every discrete node, so that
-    a state the rows never show stays possible.
+    Adds :attr:`pseudocount` to the count of every possible state of every discrete
+    node, so that a state the rows never show stays possible; a state of probability
+    zero, such as the padding of a layer over variables of different domain sizes, stays
+    impossible.
     """
 
     pseudocount: float = 0.1
     """
-    The count added to every state of every discrete node.
+    The count added to every possible state of every discrete node.
     """
 
     def adjusted(self, *, statistics: LearnedLayerStatistics) -> LearnedLayerStatistics:
         return statistics.with_statistics(
             statistics=[
-                StateCounts(counts=layer_statistics.counts + self.pseudocount)
+                StateCounts(
+                    counts=layer_statistics.counts
+                    + self.pseudocount * np.isfinite(layer.table.log_probabilities)
+                )
                 if isinstance(layer_statistics, StateCounts)
                 else layer_statistics
-                for layer_statistics in statistics.statistics
+                for layer, layer_statistics in zip(
+                    statistics.layers, statistics.statistics
+                )
             ]
         )
 
