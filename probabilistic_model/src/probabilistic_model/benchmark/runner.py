@@ -44,6 +44,15 @@ class RunStatus(StrEnum):
     TIMED_OUT = "timed_out"
 
 
+class FloatingPointType(StrEnum):
+    """
+    The floating point type jax computes a run in.
+    """
+
+    FLOAT32 = "float32"
+    FLOAT64 = "float64"
+
+
 @dataclass(kw_only=True)
 class BenchmarkRun:
     """
@@ -75,6 +84,11 @@ class BenchmarkRun:
     The file the process writes its output and errors to.
     """
 
+    floating_point_type: FloatingPointType
+    """
+    The floating point type the circuit is learned and measured in.
+    """
+
     def source(self) -> DatasetSource:
         """
         :return: The source of the dataset.
@@ -95,7 +109,9 @@ class BenchmarkRun:
         log = os.open(self.log_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC)
         os.dup2(log, sys.stdout.fileno())
         os.dup2(log, sys.stderr.fileno())
-        jax.config.update("jax_enable_x64", True)
+        jax.config.update(
+            "jax_enable_x64", self.floating_point_type is FloatingPointType.FLOAT64
+        )
         result = Measurement(
             dataset=self.source().load(),
             method=BenchmarkMethods().find(name=self.method),
@@ -134,6 +150,11 @@ class BenchmarkRunner:
     The time after which a run is stopped.
     """
 
+    floating_point_type: FloatingPointType = FloatingPointType.FLOAT64
+    """
+    The floating point type every run computes in.
+    """
+
     log_tail_characters: int = 2000
     """
     How much of the end of a failed run's output its record keeps.
@@ -156,6 +177,7 @@ class BenchmarkRunner:
                     cache_directory=self.cache_directory,
                     result_path=result_path,
                     log_path=log_path,
+                    floating_point_type=self.floating_point_type,
                 )
                 start = time.perf_counter()
                 process = context.Process(target=run.execute)
@@ -172,6 +194,7 @@ class BenchmarkRunner:
                     "dataset": dataset,
                     "method": str(method),
                     "status": str(status),
+                    "floating_point_type": str(self.floating_point_type),
                     "wall_seconds": time.perf_counter() - start,
                 }
                 if status is RunStatus.FINISHED:
@@ -210,6 +233,12 @@ def main() -> None:
         default=Path.home() / ".cache" / "probabilistic_model" / "benchmark",
     )
     parser.add_argument("--timeout-seconds", type=float, default=3600.0)
+    parser.add_argument(
+        "--floating-point-type",
+        type=FloatingPointType,
+        choices=list(FloatingPointType),
+        default=FloatingPointType.FLOAT64,
+    )
     arguments = parser.parse_args()
     BenchmarkRunner(
         datasets=arguments.datasets,
@@ -217,6 +246,7 @@ def main() -> None:
         output=arguments.output,
         cache_directory=arguments.cache_directory,
         timeout_seconds=arguments.timeout_seconds,
+        floating_point_type=arguments.floating_point_type,
     ).run()
 
 

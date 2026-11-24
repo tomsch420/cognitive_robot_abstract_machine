@@ -32,7 +32,11 @@ from probabilistic_model.benchmark.methods import (
     MethodName,
     StrudelMethod,
 )
-from probabilistic_model.benchmark.runner import BenchmarkRunner, RunStatus
+from probabilistic_model.benchmark.runner import (
+    BenchmarkRunner,
+    FloatingPointType,
+    RunStatus,
+)
 from probabilistic_model.benchmark.summary import BenchmarkSummary, ResultColumn
 
 
@@ -160,6 +164,25 @@ def test_runner_appends_one_record_per_run(cache_directory, tmp_path: Path):
     (record,) = [json.loads(line) for line in output.read_text().splitlines()]
     assert record["status"] == RunStatus.FINISHED
     assert record["method"] == MethodName.LEARN_SPN
+
+
+def test_runner_finishes_and_records_a_single_precision_run(
+    cache_directory, tmp_path: Path
+):
+    """
+    A run in single precision finishes and its record names that floating point type.
+    """
+    output = tmp_path / "results" / "run.jsonl"
+    BenchmarkRunner(
+        datasets=[str(BinaryDatasetName.NLTCS)],
+        methods=[MethodName.RAT_SPN_EXPECTATION_MAXIMIZATION],
+        output=output,
+        cache_directory=cache_directory,
+        floating_point_type=FloatingPointType.FLOAT32,
+    ).run()
+    (record,) = [json.loads(line) for line in output.read_text().splitlines()]
+    assert record["status"] == RunStatus.FINISHED
+    assert record["floating_point_type"] == FloatingPointType.FLOAT32
 
 
 # %% summary
