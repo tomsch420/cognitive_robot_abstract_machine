@@ -28,17 +28,8 @@ from experiments.grasp_learning.records import (
     ReleaseTrial,
 )
 from experiments.physical_pick_up.objects import GraspableRoboCasaCategory
-from experiments.orm.ormatic_interface import (
-    Base,
-    GraspAttemptDAO,
-    GraspLearningTaskDAO,
-    GraspModelDAO,
-    PickUpTrialDAO,
-    RecordedGraspAttemptDAO,
-)
 from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.ormatic.utils import create_engine
-from semantic_digital_twin.orm.ormatic_interface import WorldMappingDAO
 from semantic_digital_twin.world import World
 
 # %% connecting
@@ -84,6 +75,8 @@ class GraspDatabase:
         :param uri: The URI of the database.
         :return: The database, with its tables created if they are missing.
         """
+        from experiments.orm.ormatic_interface import Base
+
         engine = create_engine(uri)
         Base.metadata.create_all(engine)
         return cls(session=Session(engine))
@@ -113,6 +106,8 @@ class GraspDatabase:
         :return: The attempt with its run.
         :raises NoRecordedGraspAttempt: If none is stored under that number.
         """
+        from experiments.orm.ormatic_interface import RecordedGraspAttemptDAO
+
         stored = self.session.get(RecordedGraspAttemptDAO, database_id)
         if stored is None:
             raise NoRecordedGraspAttempt(database_id=database_id)
@@ -124,6 +119,8 @@ class GraspDatabase:
         :return: The world, as it was stored.
         :raises NoStoredWorld: If none is stored under that number.
         """
+        from semantic_digital_twin.orm.ormatic_interface import WorldMappingDAO
+
         stored = self.session.get(WorldMappingDAO, database_id)
         if stored is None:
             raise NoStoredWorld(database_id=database_id)
@@ -144,6 +141,8 @@ class GraspDatabase:
         :return: The trial with its run.
         :raises NoPickUpTrial: If none is stored under that number.
         """
+        from experiments.orm.ormatic_interface import PickUpTrialDAO
+
         stored = self.session.get(PickUpTrialDAO, database_id)
         if stored is None:
             raise NoPickUpTrial(database_id=database_id)
@@ -155,6 +154,11 @@ class GraspDatabase:
         :return: Every stored attempt of that task by the number it was stored under,
             in the order they were stored.
         """
+        from experiments.orm.ormatic_interface import (
+            GraspAttemptDAO,
+            GraspLearningTaskDAO,
+        )
+
         self.session.expire_all()
         query = (
             select(GraspAttemptDAO)
@@ -176,6 +180,8 @@ class GraspDatabase:
         :return: Every stored attempt on the category's objects, in the order they were
             stored.
         """
+        from experiments.orm.ormatic_interface import GraspAttemptDAO
+
         self.session.expire_all()
         object_names = [
             object_name
@@ -207,6 +213,8 @@ class GraspDatabase:
         :return: Attempts of any task drawn without replacement on every other
             object, in the order they were stored.
         """
+        from experiments.orm.ormatic_interface import GraspAttemptDAO
+
         numbers_by_object = defaultdict(list)
         for number, object_name in self.session.execute(
             select(GraspAttemptDAO.database_id, GraspAttemptDAO.object_name)
@@ -239,6 +247,8 @@ class GraspDatabase:
         :return: The number the latest attempt of any task was stored under; 0 if none
             is stored.
         """
+        from experiments.orm.ormatic_interface import GraspAttemptDAO
+
         self.session.expire_all()
         query = select(func.max(GraspAttemptDAO.database_id))
         return self.session.scalar(query) or 0
@@ -256,6 +266,8 @@ class GraspDatabase:
         """
         :return: Every stored model, the latest of each task last.
         """
+        from experiments.orm.ormatic_interface import GraspModelDAO
+
         query = select(GraspModelDAO).order_by(GraspModelDAO.database_id)
         return GraspModelLibrary(
             models=[dao.from_dao() for dao in self.session.scalars(query)]
