@@ -122,7 +122,7 @@ class TopDownProbabilities(TopDownPass):
         self, *, layer: SumLayer, node_values: np.ndarray
     ) -> np.ndarray:
         weights = HasParameterArrays.host_copy(
-            layer.edges.edge_values(layer.normalized_weights)
+            layer.edges.edge_values(stored=layer.normalized_weights)
         )
         return weights * node_values[layer.edges.rows]
 
@@ -157,7 +157,7 @@ class ExpectedFlows(TopDownPass):
         # flow of its edge minus its weight times the flow of its node; rounding can make
         # a vanishing flow slightly negative, which no flow is
         weights = HasParameterArrays.host_copy(
-            layer.edges.edge_values(layer.normalized_weights)
+            layer.edges.edge_values(stored=layer.normalized_weights)
         )
         return np.maximum(
             self.log_weight_gradients[layer] + weights * node_values[layer.edges.rows],
@@ -180,7 +180,7 @@ class ExpectedFlows(TopDownPass):
             number_of_rows=number_of_rows,
             log_weight_gradients={
                 layer: HasParameterArrays.host_copy(
-                    layer.edges.edge_values(layer_gradients[0])
+                    layer.edges.edge_values(stored=layer_gradients[0])
                 )
                 for layer, layer_gradients in CircuitParameterLayout(root=root)
                 .split(arrays=gradients)

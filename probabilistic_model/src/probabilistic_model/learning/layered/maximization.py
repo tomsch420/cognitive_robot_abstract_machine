@@ -150,7 +150,7 @@ class SumLayerMaximization(LayerMaximization):
 
     def current_statistics(self, *, layer: SumLayer) -> np.ndarray:
         return HasParameterArrays.host_copy(
-            layer.edges.edge_values(layer.normalized_weights)
+            layer.edges.edge_values(stored=layer.normalized_weights)
         )
 
     def batch_sums(

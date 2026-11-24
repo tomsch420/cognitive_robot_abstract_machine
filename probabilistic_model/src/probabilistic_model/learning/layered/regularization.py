@@ -120,7 +120,7 @@ class NodeEntropies:
             )[layer.edges.columns]
             if isinstance(layer, SumLayer):
                 weights = HasParameterArrays.host_copy(
-                    layer.edges.edge_values(layer.normalized_weights)
+                    layer.edges.edge_values(stored=layer.normalized_weights)
                 )
                 with np.errstate(divide="ignore", invalid="ignore"):
                     terms = np.where(

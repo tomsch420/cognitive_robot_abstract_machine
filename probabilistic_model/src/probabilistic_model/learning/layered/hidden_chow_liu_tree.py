@@ -159,14 +159,17 @@ class HiddenChowLiuTreeParameters(ABC):
             with np.errstate(divide="ignore"):
                 log_probabilities = np.log(probabilities)
             return SymbolicLayer(
-                variable_index,
-                np.arange(probabilities.shape[1]),
-                DenseProbabilityTable(log_probabilities),
-                SymbolicEncoding(variable).hashes,
+                node_variables=np.full(len(probabilities), variable_index),
+                states=np.arange(probabilities.shape[1]),
+                table=DenseProbabilityTable(log_probabilities=log_probabilities),
             )
         if isinstance(variable, Continuous):
             location, scale = self.gaussian_parameters(variable_index=variable_index)
-            return GaussianLayer(variable_index, location, scale)
+            return GaussianLayer(
+                node_variables=np.full(len(location), variable_index),
+                location=location,
+                log_scale=np.log(scale),
+            )
         raise UnsupportedStructureVariableError(variable=variable)
 
 

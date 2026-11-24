@@ -127,7 +127,7 @@ class LogLikelihoodGradient(ABC):
         )
         log_likelihoods = self.root.copy_with_circuit_parameters(
             transformed
-        ).log_likelihood_of_nodes(data)
+        ).log_likelihood_of_nodes(events=data)
         return log_likelihoods[:, 0].sum()
 
     @abstractmethod

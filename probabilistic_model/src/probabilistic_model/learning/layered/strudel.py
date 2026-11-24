@@ -306,7 +306,7 @@ class Strudel:
                 continue
             validation = float(
                 self.to_layered_circuit(root=root, states=states)
-                .log_likelihood(validation_data)
+                .log_likelihood(events=validation_data)
                 .mean()
             )
             if validation < best_validation:

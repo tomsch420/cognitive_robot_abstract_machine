@@ -54,7 +54,11 @@ def gaussian_mixture(
     :param scales: The scales of the components.
     :return: The mixture of Gaussians as a layered circuit with jax parameters.
     """
-    components = GaussianLayer(0, locations.astype(float), scales.astype(float))
+    components = GaussianLayer(
+        node_variables=np.zeros(len(locations), dtype=np.int64),
+        location=locations.astype(float),
+        log_scale=np.log(scales.astype(float)),
+    )
     root = SumLayer.from_entries(
         [components],
         SparseEntries(
@@ -112,10 +116,11 @@ def categorical_mixture(
     :return: The mixture of categorical distributions with jax parameters.
     """
     components = SymbolicLayer(
-        0,
-        np.arange(probabilities.shape[1]),
-        DenseProbabilityTable(np.log(probabilities.astype(float))),
-        SymbolicEncoding(variable).hashes,
+        node_variables=np.zeros(len(probabilities), dtype=np.int64),
+        states=np.arange(probabilities.shape[1]),
+        table=DenseProbabilityTable(
+            log_probabilities=np.log(probabilities.astype(float))
+        ),
     )
     root = SumLayer.from_entries(
         [components],

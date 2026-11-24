@@ -332,7 +332,7 @@ class PruningAndGrowing:
         best_validation = (
             None
             if validation_data is None
-            else float(circuit.log_likelihood(validation_data).mean())
+            else float(circuit.log_likelihood(events=validation_data).mean())
         )
         for iteration in range(self.iterations):
             edge_flows = DatasetEdgeFlows(
@@ -355,7 +355,7 @@ class PruningAndGrowing:
             if validation_data is None:
                 best_root = circuit.root
                 continue
-            validation = float(circuit.log_likelihood(validation_data).mean())
+            validation = float(circuit.log_likelihood(events=validation_data).mean())
             if validation < best_validation:
                 break
             best_root, best_validation = circuit.root, validation

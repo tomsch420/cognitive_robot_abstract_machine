@@ -74,7 +74,7 @@ def total_probability(circuit: LayeredProbabilisticCircuit) -> float:
     :return: The summed probability of every assignment.
     """
     rows = all_binary_rows(variables=circuit.variables)
-    return float(np.exp(logsumexp(circuit.to_namespace(np).log_likelihood(rows))))
+    return float(np.exp(logsumexp(circuit.to_namespace(np).log_likelihood(events=rows))))
 
 
 # %% mutual information
@@ -211,7 +211,7 @@ def test_growing_without_noise_keeps_the_distribution(bits):
         circuit.variables, Growing(noise_variance=0.0).grown_root(root=circuit.root)
     )
     assert grown.number_of_nodes > circuit.number_of_nodes
-    np.testing.assert_allclose(grown.log_likelihood(rows), circuit.log_likelihood(rows))
+    np.testing.assert_allclose(grown.log_likelihood(events=rows), circuit.log_likelihood(events=rows))
 
 
 # %% LearnSPN
@@ -258,8 +258,8 @@ def test_strudel_splits_raise_the_training_likelihood_and_keep_determinism(bits)
         data=rows
     )
     assert (
-        with_splits.log_likelihood(rows).mean()
-        > without_splits.log_likelihood(rows).mean()
+        with_splits.log_likelihood(events=rows).mean()
+        > without_splits.log_likelihood(events=rows).mean()
     )
     assert with_splits.is_deterministic()
     assert with_splits.is_decomposable()
@@ -292,7 +292,7 @@ def test_dropout_without_probability_is_the_likelihood(bits):
         ProbabilisticDropout().log_likelihood(
             root=circuit.root, data=encoded, key=jax.random.PRNGKey(0)
         ),
-        circuit.log_likelihood(rows),
+        circuit.log_likelihood(events=rows),
     )
 
 

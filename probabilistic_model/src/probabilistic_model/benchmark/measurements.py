@@ -229,7 +229,7 @@ class Measurement:
         """
         return np.concatenate(
             [
-                circuit.log_likelihood(rows[start : start + self.evaluation_batch_size])
+                circuit.log_likelihood(events=rows[start : start + self.evaluation_batch_size])
                 for start in range(0, len(rows), self.evaluation_batch_size)
             ]
         )
@@ -250,7 +250,7 @@ class Measurement:
             for variable in variables[: max(len(variables) // 2, 1)]
         }
         queries: dict[QueryName, Callable[[], Any]] = {
-            QueryName.LIKELIHOOD: lambda: circuit.log_likelihood(rows),
+            QueryName.LIKELIHOOD: lambda: circuit.log_likelihood(events=rows),
             QueryName.CONDITIONING: lambda: circuit.log_conditional(point),
             QueryName.TRUNCATION: lambda: circuit.log_truncated(
                 self.truncation_event(circuit=circuit)

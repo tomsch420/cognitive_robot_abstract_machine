@@ -71,7 +71,7 @@ class ProbabilisticDropout:
         for layer in reversed(layers):
             layer_key = next(keys)
             if not isinstance(layer, InnerLayer):
-                log_likelihoods = layer.log_likelihood_of_nodes(data, cache=cache)
+                log_likelihoods = layer.log_likelihood_of_nodes(events=data, cache=cache)
                 kept = jax.random.bernoulli(
                     layer_key, 1 - self.input_probability, log_likelihoods.shape
                 )
@@ -85,7 +85,7 @@ class ProbabilisticDropout:
                     jax.random.split(layer_key, len(layer.child_layers)),
                 ):
                     child_result = child_layer.log_likelihood_of_nodes(
-                        data, cache=cache
+                        events=data, cache=cache
                     )
                     kept = jax.random.bernoulli(
                         child_key, 1 - self.sum_probability, child_result.shape
@@ -95,8 +95,8 @@ class ProbabilisticDropout:
                     child_results
                 )
             else:
-                layer.log_likelihood_of_nodes(data, cache=cache)
-        return root.log_likelihood_of_nodes(data, cache=cache)[:, 0]
+                layer.log_likelihood_of_nodes(events=data, cache=cache)
+        return root.log_likelihood_of_nodes(events=data, cache=cache)[:, 0]
 
     @staticmethod
     def cache_key(*, layer: Layer) -> QueryCacheKey:
