@@ -16,6 +16,16 @@ from experiments.robocasa_atomic_tasks.close_oven_door_trials import (
     CloseOvenDoorSetup,
     CloseOvenDoorSpace,
     CloseOvenDoorTrialsInADatabase,
+)
+from experiments.robocasa_atomic_tasks.open_oven_door_trials import (
+    OpenOvenDoorPerformer,
+    OpenOvenDoorSetup,
+    OpenOvenDoorSpace,
+    OpenOvenDoorTrialsInADatabase,
+)
+from experiments.robocasa_atomic_tasks.oven_door_trials import (
+    OvenDoorScene,
+    OvenDoorSetup,
     StandOnTheFloor,
 )
 
@@ -36,6 +46,12 @@ ignored_classes |= {
     CloseOvenDoorSetup,
     CloseOvenDoorSpace,
     CloseOvenDoorTrialsInADatabase,
+    OpenOvenDoorPerformer,
+    OpenOvenDoorSetup,
+    OpenOvenDoorSpace,
+    OpenOvenDoorTrialsInADatabase,
+    OvenDoorScene,
+    OvenDoorSetup,
     StandOnTheFloor,
 }
 

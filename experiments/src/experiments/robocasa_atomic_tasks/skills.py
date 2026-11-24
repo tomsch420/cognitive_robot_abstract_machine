@@ -24,6 +24,7 @@ from coraplex.robot_plans.actions.base import GoalAction, SequentialAction
 from coraplex.robot_plans.actions.core.container import (
     CloseAction,
     MovesContainerByItsHandle,
+    OpenAction,
 )
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.pick_up import PickUpAction
@@ -48,6 +49,9 @@ from experiments.robocasa_atomic_tasks.free_space import FreeSpacePathPlanner
 from experiments.robocasa_atomic_tasks.geometry import ApproachFrame, BodyBounds
 from giskardpy.motion_statechart.graph_node import MotionNodeArtifacts
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose, HoldPose
+from giskardpy.motion_statechart.tasks.grasped_mechanism import (
+    ArticulateGraspedMechanism,
+)
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
 from giskardpy.motion_statechart.weights import DefaultWeights
 from krrood.entity_query_language.factories import a, flat_variable, variable
@@ -787,6 +791,57 @@ class CloseByTheHandleAction(CloseAction):
             ),
             self._create_mechanism_goal(),
             LetGoOfTheHandleAction(grasp_candidate=self.grasp_candidate, arm=self.arm),
+        ]
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class OpenByTheHandleAction(OpenAction):
+    """
+    Opens a container like object by its handle, as far as
+    :attr:`opened_joint_position`, and lets go of the handle by
+    :class:`LetGoOfTheHandleAction`.
+    """
+
+    opened_joint_position: float | None = None
+    """
+    The joint position, in meters or radians, the container's mechanism is driven to;
+    its upper limit if not given.
+    """
+
+    release_clearance: float = 0.12
+    """
+    The gap in meters between the handle and the gripper once it has let go, see
+    :attr:`LetGoOfTheHandleAction.release_clearance`.
+    """
+
+    def _create_mechanism_goal(self) -> StatechartNode:
+        """
+        Differs from :meth:`OpenAction._create_mechanism_goal` in driving the mechanism
+        to :attr:`opened_joint_position` where one is given.
+        """
+        if self.opened_joint_position is None:
+            return super()._create_mechanism_goal()
+        return ArticulateGraspedMechanism(
+            tip_link=self.arm.end_effector.tool_frame,
+            environment_link=self.grasp_candidate.graspable.root,
+            goal_position=self.opened_joint_position,
+        )
+
+    def create_steps(self) -> list[StatechartNode]:
+        """
+        Differs from :meth:`OpenAction.create_steps` in letting go of the handle by
+        :class:`LetGoOfTheHandleAction`.
+        """
+        return [
+            self.create_grasping_action(
+                grasp_candidate=self.grasp_candidate, arm=self.arm
+            ),
+            self._create_mechanism_goal(),
+            LetGoOfTheHandleAction(
+                grasp_candidate=self.grasp_candidate,
+                arm=self.arm,
+                release_clearance=self.release_clearance,
+            ),
         ]
 
 

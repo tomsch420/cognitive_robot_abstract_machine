@@ -30,14 +30,18 @@ from experiments.robocasa_atomic_tasks.skills import (
     FingerWithdrawAction,
     CloseByTheHandleAction,
     LetGoOfTheHandleAction,
+    OpenByTheHandleAction,
     PressAction,
 )
-from coraplex.robot_plans.actions.core.container import CloseAction
+from coraplex.robot_plans.actions.core.container import CloseAction, OpenAction
 from krrood_spatial_math.spatial_types import Vector3
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Handle
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import RevoluteConnection
+from semantic_digital_twin.world_description.degree_of_freedom import (
+    DegreeOfFreedomLimits,
+)
 from semantic_digital_twin.world_description.geometry import Box, Scale
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
@@ -318,7 +322,8 @@ def test_letting_go_allows_the_gripper_to_touch_the_handle(
 @pytest.fixture
 def handle_on_a_door() -> Handle:
     """
-    A handle fixed to a door that swings on a horizontal hinge, as an oven's does.
+    A handle fixed to a door that swings on a horizontal hinge through 1.05 radians, as
+    an oven's does.
     """
     world = World()
     with world.modify_world():
@@ -330,7 +335,13 @@ def handle_on_a_door() -> Handle:
         )
         world.add_connection(
             RevoluteConnection.create_with_dofs(
-                world=world, parent=kitchen, child=door, axis=Vector3.Y()
+                world=world,
+                parent=kitchen,
+                child=door,
+                axis=Vector3.Y(),
+                dof_limits=DegreeOfFreedomLimits.from_position_range_and_speed(
+                    lower_position=0.0, upper_position=1.05, maximum_speed=1.0
+                ),
             )
         )
         handle = Handle(
@@ -402,3 +413,95 @@ def test_closing_by_the_handle_lets_go_of_the_handle_it_held(
     assert isinstance(letting_go, LetGoOfTheHandleAction)
     assert letting_go.grasp_candidate is closing.grasp_candidate
     assert letting_go.arm is closing.arm
+
+
+# %% opening by the handle
+
+
+def opening_by_the_handle(
+    panda_omron: PandaOmron, handle: Handle, opening: OpenAction
+) -> OpenAction:
+    """
+    :param opening: The action opening the door by its handle.
+    :return: That action, in a statechart acting with the robot.
+    """
+    Statechart(
+        context=StatechartContext.with_extensions(
+            world=panda_omron._world, extensions=[RobotAccess(robot=panda_omron)]
+        )
+    ).add_node(node=opening)
+    return opening
+
+
+def grasp_at_the_middle(handle: Handle) -> GraspCandidate:
+    """
+    :return: A grasp at the handle's middle.
+    """
+    return GraspCandidate(
+        graspable=handle,
+        grasp_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+            reference_frame=handle.root
+        ).pose,
+    )
+
+
+def test_opening_by_the_handle_to_a_position_drives_the_door_there(
+    panda_omron: PandaOmron, handle_on_a_door: Handle
+):
+    [arm] = panda_omron.all_arms
+    opening = opening_by_the_handle(
+        panda_omron,
+        handle_on_a_door,
+        OpenByTheHandleAction(
+            grasp_candidate=grasp_at_the_middle(handle_on_a_door),
+            arm=arm,
+            opened_joint_position=0.4,
+        ),
+    )
+
+    _, opening_the_door, _ = opening.create_steps()
+
+    assert opening_the_door.goal_position == opening.opened_joint_position
+
+
+def test_opening_by_the_handle_without_a_position_opens_as_opening_does(
+    panda_omron: PandaOmron, handle_on_a_door: Handle
+):
+    [arm] = panda_omron.all_arms
+    grasp = grasp_at_the_middle(handle_on_a_door)
+    opening = opening_by_the_handle(
+        panda_omron,
+        handle_on_a_door,
+        OpenByTheHandleAction(grasp_candidate=grasp, arm=arm),
+    )
+
+    grasping, opening_the_door, _ = opening.create_steps()
+
+    expected_grasping, expected_opening_the_door, *_ = opening_by_the_handle(
+        panda_omron, handle_on_a_door, OpenAction(grasp_candidate=grasp, arm=arm)
+    ).create_steps()
+    assert type(grasping) is type(expected_grasping)
+    assert grasping.grasp_candidate is opening.grasp_candidate
+    assert type(opening_the_door) is type(expected_opening_the_door)
+    assert opening_the_door.goal_position == expected_opening_the_door.goal_position
+
+
+def test_opening_by_the_handle_lets_go_of_the_handle_by_its_clearance(
+    panda_omron: PandaOmron, handle_on_a_door: Handle
+):
+    [arm] = panda_omron.all_arms
+    opening = opening_by_the_handle(
+        panda_omron,
+        handle_on_a_door,
+        OpenByTheHandleAction(
+            grasp_candidate=grasp_at_the_middle(handle_on_a_door),
+            arm=arm,
+            release_clearance=0.2,
+        ),
+    )
+
+    _, _, letting_go = opening.create_steps()
+
+    assert isinstance(letting_go, LetGoOfTheHandleAction)
+    assert letting_go.grasp_candidate is opening.grasp_candidate
+    assert letting_go.release_clearance == opening.release_clearance
