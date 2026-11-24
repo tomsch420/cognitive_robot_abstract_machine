@@ -18,7 +18,7 @@ from cramph.node import StatechartNode
 from cramph.statechart import Statechart
 from experiments.robocasa_atomic_tasks import skills
 from experiments.robocasa_atomic_tasks.panda_omron import PandaOmron
-from .conftest import KitchenOfBoxes
+from .conftest import KitchenOfBoxes, box_body
 from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianPose,
     CartesianPoseStraight,
@@ -28,9 +28,19 @@ from experiments.robocasa_atomic_tasks.skills import (
     FingerApproach,
     FingerPressAction,
     FingerWithdrawAction,
+    CloseByTheHandleAction,
     LetGoOfTheHandleAction,
     PressAction,
 )
+from coraplex.robot_plans.actions.core.container import CloseAction
+from krrood_spatial_math.spatial_types import Vector3
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Handle
+from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.connections import RevoluteConnection
+from semantic_digital_twin.world_description.geometry import Box, Scale
+from semantic_digital_twin.world_description.shape_collection import ShapeCollection
+from semantic_digital_twin.world_description.world_entity import Body
 from giskardpy.motion_statechart.tasks.gripper import MoveGripper
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.collision_checking.collision_rules import (
@@ -300,3 +310,95 @@ def test_letting_go_allows_the_gripper_to_touch_the_handle(
 
     assert isinstance(rule, AllowCollisionForEndEffector)
     assert rule.end_effector is letting_go.arm.end_effector
+
+
+# %% closing by the handle
+
+
+@pytest.fixture
+def handle_on_a_door() -> Handle:
+    """
+    A handle fixed to a door that swings on a horizontal hinge, as an oven's does.
+    """
+    world = World()
+    with world.modify_world():
+        kitchen = Body(name=PrefixedName("kitchen"))
+        world.add_kinematic_structure_entity(kitchen)
+        door = Body(
+            name=PrefixedName("door"),
+            collision=ShapeCollection([Box(scale=Scale(0.02, 0.6, 0.5))]),
+        )
+        world.add_connection(
+            RevoluteConnection.create_with_dofs(
+                world=world, parent=kitchen, child=door, axis=Vector3.Y()
+            )
+        )
+        handle = Handle(
+            root=box_body(
+                world,
+                door,
+                "handle",
+                Scale(0.02, 0.4, 0.02),
+                np.array([-0.05, 0.0, 0.2]),
+            )
+        )
+        world.add_semantic_annotation(handle)
+    return handle
+
+
+def closing_by_the_handle(
+    panda_omron: PandaOmron, handle: Handle, action: type[CloseAction]
+) -> CloseAction:
+    """
+    :return: The action closing the door by its handle, held by a grasp at the handle's
+        middle, in a statechart acting with the robot.
+    """
+    [arm] = panda_omron.all_arms
+    closing = action(
+        grasp_candidate=GraspCandidate(
+            graspable=handle,
+            grasp_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                reference_frame=handle.root
+            ).pose,
+        ),
+        arm=arm,
+        closed_joint_position=0.0,
+    )
+    Statechart(
+        context=StatechartContext.with_extensions(
+            world=arm._world, extensions=[RobotAccess(robot=panda_omron)]
+        )
+    ).add_node(node=closing)
+    return closing
+
+
+def test_closing_by_the_handle_takes_hold_and_closes_as_closing_does(
+    panda_omron: PandaOmron, handle_on_a_door: Handle
+):
+    closing = closing_by_the_handle(
+        panda_omron, handle_on_a_door, CloseByTheHandleAction
+    )
+
+    grasping, closing_the_door, _ = closing.create_steps()
+
+    expected_grasping, expected_closing_the_door, *_ = closing_by_the_handle(
+        panda_omron, handle_on_a_door, CloseAction
+    ).create_steps()
+    assert type(grasping) is type(expected_grasping)
+    assert grasping.grasp_candidate is closing.grasp_candidate
+    assert type(closing_the_door) is type(expected_closing_the_door)
+    assert closing_the_door.goal_position == closing.closed_joint_position
+
+
+def test_closing_by_the_handle_lets_go_of_the_handle_it_held(
+    panda_omron: PandaOmron, handle_on_a_door: Handle
+):
+    closing = closing_by_the_handle(
+        panda_omron, handle_on_a_door, CloseByTheHandleAction
+    )
+
+    _, _, letting_go = closing.create_steps()
+
+    assert isinstance(letting_go, LetGoOfTheHandleAction)
+    assert letting_go.grasp_candidate is closing.grasp_candidate
+    assert letting_go.arm is closing.arm
