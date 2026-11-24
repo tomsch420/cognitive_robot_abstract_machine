@@ -238,14 +238,6 @@ class TableLike(ABC):
 
     @property
     @abstractmethod
-    def lineage(self) -> list[str]:
-        """
-        :return: The names of this table and of every table it descends from, nearest
-            first.
-        """
-
-    @property
-    @abstractmethod
     def domain_class(self) -> type:
         """
         :return: The class whose objects this table holds rows of.
@@ -306,22 +298,6 @@ class ExternalTable(TableLike):
             ones inherited from its own (possibly external) ancestors.
         """
         return {prop.key for prop in sqlalchemy.inspect(self.dao_class).attrs}
-
-    @cached_property
-    def lineage(self) -> list[str]:
-        return self.dao_lineage(dao_class=self.dao_class)
-
-    @staticmethod
-    def dao_lineage(*, dao_class: type) -> list[str]:
-        """
-        :param dao_class: A ``DataAccessObject`` subclass mapped by a dependency.
-        :return: The names of its table and of every table it descends from, nearest
-            first.
-        """
-        return [
-            mapper.class_.__name__
-            for mapper in sqlalchemy.inspect(dao_class).iterate_to_root()
-        ]
 
     @property
     def domain_class(self) -> type:
@@ -526,12 +502,6 @@ class WrappedTable(TableLike):
         result = self.wrapped_clazz.name
         result += "DAO"
         return result
-
-    @cached_property
-    def lineage(self) -> list[str]:
-        if self.parent_table is None:
-            return [self.tablename]
-        return [self.tablename, *self.parent_table.lineage]
 
     @cached_property
     def parent_table(self) -> TableLike | None:
@@ -964,22 +934,17 @@ class WrappedTable(TableLike):
     def get_table_of_wrapped_field(self, *, wrapped_field: WrappedField) -> TableLike:
         """
         :param wrapped_field: The wrapped field to get the table for.
-        :return: The table holding every object the field can refer to, see
-            :meth:`~krrood.ormatic.ormatic.ORMatic.table_holding_every_instance`.
+        :return: The wrapped table for the given wrapped field.
         """
         type_endpoint = wrapped_field.type_endpoint
         try:
-            table = self.ormatic.table_for(
+            return self.ormatic.table_for(
                 wrapped_class=self.ormatic.class_dependency_graph.get_wrapped_class(
                     clazz=type_endpoint
                 )
             )
         except KeyError:
             raise WrappedTableNotFound(type_=type_endpoint, wrapped_field=wrapped_field)
-        return self.ormatic.table_holding_every_instance(
-            table=table,
-            field_name=f"{self.wrapped_clazz.name}.{wrapped_field.field.name}",
-        )
 
     def create_one_to_one_relationship(self, *, wrapped_field: WrappedField):
         """

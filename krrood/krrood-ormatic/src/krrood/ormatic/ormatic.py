@@ -5,10 +5,9 @@ Generate an SQLAlchemy interface, a data access object per class, from a class d
 from __future__ import annotations
 
 import logging
-from abc import ABC
 from dataclasses import dataclass, field, is_dataclass
 from functools import cached_property
-from inspect import isabstract, isclass
+from inspect import isclass
 from types import ModuleType
 
 import rustworkx as rx
@@ -22,7 +21,7 @@ from krrood.ormatic.helper import (
     OrmaticInterfaceInformation,
 )
 from sortedcontainers import SortedSet
-from typing_extensions import Any, Optional, TextIO
+from typing_extensions import Optional, TextIO
 
 from krrood.ormatic.default_type_mappings import DefaultTypeMapping
 from krrood.ormatic.field_storage import FieldClassifier
@@ -507,99 +506,6 @@ class ORMatic:
         if wrapped_class in self.wrapped_tables:
             return self.wrapped_tables[wrapped_class]
         return self.external_tables[wrapped_class]
-
-    def table_holding_every_instance(
-        self, *, table: TableLike, field_name: str
-    ) -> TableLike:
-        """
-        A table holds an object only if the object's table descends from it, and a table
-        descends from the table of its class's primary base alone, so a class that
-        subclasses inherit next to their primary base, a mixin, does not hold them.
-
-        :param table: The table of the class a field is typed with.
-        :param field_name: The qualified name of the field.
-        :return: ``table`` where the tables of every concrete subclass of its class
-            descend from it; otherwise the nearest table that the tables of every
-            concrete subclass descend from, and the table of the class itself where it
-            is :meth:`made itself <is_made_itself>`, or ``table`` if they share none.
-        """
-        field_type = table.wrapped_clazz.clazz
-        if not isinstance(field_type, type):
-            return table
-        tables = {
-            other.tablename: other
-            for other in [*self.wrapped_tables.values(), *self.external_tables.values()]
-        }
-        subclass_lineages = [
-            other.lineage
-            for other in tables.values()
-            if other is not table
-            and self.is_concrete_subclass(
-                clazz=other.wrapped_clazz.clazz, field_type=field_type
-            )
-        ] + [
-            ExternalTable.dao_lineage(dao_class=dao_class)
-            for clazz, dao_class in self.externally_mapped_classes.items()
-            if clazz is not field_type
-            and self.is_concrete_subclass(clazz=clazz, field_type=field_type)
-            and dao_class.__name__ not in tables
-        ]
-        if all(table.tablename in lineage for lineage in subclass_lineages):
-            return table
-        if self.is_made_itself(clazz=field_type):
-            subclass_lineages.append(table.lineage)
-        [first, *others] = subclass_lineages
-        shared = [name for name in first if all(name in other for other in others)]
-        if not shared:
-            logger.warning(
-                "No table holds every %s that %s can refer to; it refers to %s, which "
-                "cannot hold the subclasses that inherit %s next to their primary base.",
-                field_type.__name__,
-                field_name,
-                table.tablename,
-                field_type.__name__,
-            )
-            return table
-        logger.info(
-            "%s refers to %s, the nearest table every %s it can refer to is held by.",
-            field_name,
-            shared[0],
-            field_type.__name__,
-        )
-        if shared[0] in tables:
-            return tables[shared[0]]
-        [dao_class] = [
-            dao_class
-            for dao_class in self.externally_mapped_classes.values()
-            if dao_class.__name__ == shared[0]
-        ]
-        return ExternalTable(
-            wrapped_clazz=WrappedClass(clazz=dao_class.original_class()),
-            dao_class=dao_class,
-        )
-
-    @staticmethod
-    def is_made_itself(*, clazz: type) -> bool:
-        """
-        :param clazz: A class.
-        :return: Whether objects of exactly ``clazz`` can be made: it has no abstract
-            methods and does not declare itself abstract by listing :class:`ABC`
-            among its bases.
-        """
-        return not isabstract(clazz) and ABC not in clazz.__bases__
-
-    @classmethod
-    def is_concrete_subclass(cls, *, clazz: Any, field_type: type) -> bool:
-        """
-        :param clazz: A mapped class, or a specialized generic.
-        :param field_type: The type of a field.
-        :return: Whether objects of ``clazz`` can be made and stored in the field.
-        """
-        return (
-            isinstance(clazz, type)
-            and issubclass(clazz, field_type)
-            and cls.is_made_itself(clazz=clazz)
-        )
 
     def make_all_tables(self):
         for table in self.wrapped_tables.values():
