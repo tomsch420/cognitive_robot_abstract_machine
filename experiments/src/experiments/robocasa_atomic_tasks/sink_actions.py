@@ -23,7 +23,7 @@ from coraplex.robot_plans.actions.core.robot_body import (
     MoveTorsoAction,
     SetGripperAction,
 )
-from coraplex.robot_plans.mixins import HasApproachesGraspPoses, MovesToolCenterPoint
+from coraplex.robot_plans.mixins import HasGraspApproach, MovesToolCenterPoint
 from cramph.composites import Deferred, Parallel
 from cramph.data_types import ObservationStateValues
 from cramph.monitors import CountSimulationTimeSeconds
@@ -89,7 +89,7 @@ from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.grasping.surface_grasp import SurfaceGrasp
 from semantic_digital_twin.reasoning.predicates import InsideOf, PlaceIsOccupied
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, Arm
-from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
+from semantic_digital_twin.semantic_annotations.mixins import IsGraspable
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
 from semantic_digital_twin.world_description.geometry import (
@@ -745,7 +745,7 @@ class LiftTheHandOutOfTheSinkAction(HasPreconditions, LeaveTheSinkAction):
 
 @dataclass(eq=False, repr=False, kw_only=True)
 class LiftAnObjectOutOfTheSinkAction(
-    HasASinkBasin, HasApproachesGraspPoses, HasPreconditions
+    HasASinkBasin, HasGraspApproach, HasPreconditions
 ):
     """
     Takes an object lying in a sink's basin by a grasp and lifts it out: the opened
@@ -1141,7 +1141,7 @@ class TakeOutOfTheSinkParameters:
         )
 
     def lift_step(
-        self, *, arm: Arm, basin: Body, graspable: HasGraspCandidates
+        self, *, arm: Arm, basin: Body, graspable: IsGraspable
     ) -> LiftAnObjectOutOfTheSinkAction:
         """
         :param arm: The arm whose gripper lifts the object.

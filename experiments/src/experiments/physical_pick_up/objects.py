@@ -77,7 +77,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Whisk,
     WineBottle,
 )
-from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
+from semantic_digital_twin.semantic_annotations.mixins import IsGraspable
 from krrood_spatial_math.spatial_types import RotationMatrix
 from semantic_digital_twin.world_description.geometry import Mesh, Shape
 
@@ -335,7 +335,7 @@ class ObjectDescription(ABC):
     The name of the object's body in the world and in the simulation.
     """
 
-    semantic_annotation_type: Type[HasGraspCandidates]
+    semantic_annotation_type: Type[IsGraspable]
     """
     What the object is.
     """
@@ -848,7 +848,7 @@ class GraspableRoboCasaCategory:
     The RoboCasa object category, the name of the directory its models lie in.
     """
 
-    semantic_annotation_type: Type[HasGraspCandidates]
+    semantic_annotation_type: Type[IsGraspable]
     """
     What the objects of the category are; categories without an annotation of their
     own are given the nearest more general one.

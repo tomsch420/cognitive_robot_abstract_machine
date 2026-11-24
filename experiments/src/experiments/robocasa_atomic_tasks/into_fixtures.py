@@ -11,7 +11,7 @@ import numpy as np
 
 from coraplex.robot_plans.actions.base import SequentialAction
 from coraplex.robot_plans.actions.core.robot_body import SetGripperAction
-from coraplex.robot_plans.mixins import HasApproachesGraspPoses, OperatesGripper
+from coraplex.robot_plans.mixins import HasGraspApproach, OperatesGripper
 from cramph.composites import Deferred
 from cramph.node import StatechartNode
 from experiments.robocasa_atomic_tasks.geometry import BodyBounds
@@ -37,7 +37,7 @@ from semantic_digital_twin.world_description.world_entity import Body
 
 @dataclass(eq=False, repr=False, kw_only=True)
 class PutIntoAFixtureFromAboveAction(
-    HasApproachesGraspPoses, OperatesGripper, SequentialAction
+    HasGraspApproach, OperatesGripper, SequentialAction
 ):
     """
     Takes an object from above until the palm touches it, carries it with the whole body
@@ -71,7 +71,7 @@ class PutIntoAFixtureFromAboveAction(
 
     approach_clearance: float = 0.02
     """
-    Differs from :attr:`HasApproachesGraspPoses.approach_clearance` in leaving the
+    Differs from :attr:`HasGraspApproach.approach_clearance` in leaving the
     gripper just above the object, from where the palm is lowered onto it.
     """
 

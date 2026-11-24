@@ -42,7 +42,7 @@ from giskardpy.motion_statechart.monitors.progress_monitors import Stalled
 from semantic_digital_twin.reasoning.robot_predicates import (
     fractions_of_rays_between_fingers_hitting_bodies,
 )
-from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
+from semantic_digital_twin.semantic_annotations.mixins import IsGraspable
 from semantic_digital_twin.world_description.connections import Connection6DoF
 
 if TYPE_CHECKING:
@@ -498,7 +498,7 @@ class ActionTrial:
         world = executor.context.world
         graspable_bodies = {
             annotation.root
-            for annotation in world.get_semantic_annotations_by_type(HasGraspCandidates)
+            for annotation in world.get_semantic_annotations_by_type(IsGraspable)
             if isinstance(annotation.root.parent_connection, Connection6DoF)
         }
         robot = executor.context.require_extension(extension_type=RobotAccess).robot

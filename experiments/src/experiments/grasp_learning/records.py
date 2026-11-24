@@ -22,7 +22,7 @@ from experiments.robocasa_atomic_tasks.stored_runs import StoredTaskRun
 from semantic_digital_twin.grasping.object_relative_grasp import GraspResult
 from semantic_digital_twin.grasping.surface_grasp import SurfaceGrasp
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, EndEffector
-from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
+from semantic_digital_twin.semantic_annotations.mixins import IsGraspable
 
 # %% tasks
 
@@ -34,12 +34,12 @@ class GraspLearningTask:
     of object, by one kind of gripper.
     """
 
-    annotation_type: Type[HasGraspCandidates]
+    annotation_type: Type[IsGraspable]
     """
     The annotation type of the object, such as :class:`Mug`.
     """
 
-    grasped_part: Type[HasGraspCandidates]
+    grasped_part: Type[IsGraspable]
     """
     The annotation type of the part the grasps are placed on, such as :class:`Handle`;
     the object's own type when it is grasped as a whole.
@@ -52,7 +52,7 @@ class GraspLearningTask:
 
     @classmethod
     def of_graspable(
-        cls, graspable: HasGraspCandidates, gripper: Type[EndEffector]
+        cls, graspable: IsGraspable, gripper: Type[EndEffector]
     ) -> GraspLearningTask:
         """
         :param graspable: The object to grasp.

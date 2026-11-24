@@ -27,7 +27,7 @@ from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.grasping.object_relative_grasp import GraspResult
 from semantic_digital_twin.grasping.surface_grasp import SurfaceGrasp
 from semantic_digital_twin.robots.robot_parts import EndEffector
-from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
+from semantic_digital_twin.semantic_annotations.mixins import IsGraspable
 
 # %% the model
 
@@ -128,7 +128,7 @@ class GraspModelLibrary:
     """
 
     def model_for(
-        self, graspable: HasGraspCandidates, gripper: Type[EndEffector]
+        self, graspable: IsGraspable, gripper: Type[EndEffector]
     ) -> Optional[GraspModel]:
         """
         :param graspable: The object to grasp.
@@ -143,7 +143,7 @@ class GraspModelLibrary:
         return matching[-1]
 
     def grasp_candidates(
-        self, graspable: HasGraspCandidates, gripper: Type[EndEffector]
+        self, graspable: IsGraspable, gripper: Type[EndEffector]
     ) -> List[GraspCandidate]:
         """
         :param graspable: The object to grasp.

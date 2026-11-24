@@ -12,7 +12,7 @@ import numpy as np
 
 from experiments.robocasa_atomic_tasks.geometry import ApproachFrame, BodyBounds
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
-from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
+from semantic_digital_twin.semantic_annotations.mixins import IsGraspable
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Handle
 
 # %% the grasps tried
@@ -92,7 +92,7 @@ class KitchenGrasps:
 
     def from_above(
         self,
-        graspable: HasGraspCandidates,
+        graspable: IsGraspable,
         depth: float = 0.03,
         pitches: tuple[float, ...] = (math.pi / 4, math.pi / 2),
         degenerate_closing: float = 1e-6,
@@ -210,7 +210,7 @@ class KitchenGrasps:
 
     @staticmethod
     def grasp_at(
-        graspable: HasGraspCandidates,
+        graspable: IsGraspable,
         position: np.ndarray,
         approach: np.ndarray,
         closing: np.ndarray,

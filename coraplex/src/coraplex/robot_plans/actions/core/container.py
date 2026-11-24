@@ -17,12 +17,11 @@ from krrood.entity_query_language.query.match import Match
 from coraplex.querying.grasp_closeness import GraspsByCloseness
 from coraplex.robot_plans.actions.base import SequentialAction
 from cramph.node import StatechartNode
-from coraplex.robot_plans.actions.core.pick_up import (
-    HasGraspChoice,
-    TakesHoldOfAGrasp,
-)
+from coraplex.robot_plans.actions.core.pick_up import TakesHoldOfAGrasp
 from coraplex.robot_plans.mixins import (
-    HasApproachesGraspPoses,
+    HasGraspApproach,
+    HasArmParameter,
+    HasGraspCandidateParameter,
     OperatesGripper,
 )
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode
@@ -38,7 +37,7 @@ from semantic_digital_twin.robots.robot_parts import Arm, EndEffector
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Handle,
 )
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose, Pose2D
 from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
 from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
 from semantic_digital_twin.world_description.shape_collection import (
@@ -51,11 +50,16 @@ from semantic_digital_twin.world_description.world_entity import Body
 
 @dataclass(eq=False, repr=False, kw_only=True)
 class MovesContainerByItsHandle(
-    TakesHoldOfAGrasp, OperatesGripper, SequentialAction, HasGraspChoice, ABC
+    TakesHoldOfAGrasp,
+    OperatesGripper,
+    SequentialAction,
+    HasGraspCandidateParameter,
+    HasArmParameter,
+    ABC,
 ):
     """
-    An action that takes hold of a container's handle by :attr:`grasp`, moves the
-    container with it, lets go and clears the handle.
+    An action that takes hold of a container's handle by :attr:`grasp_candidate`, moves
+    the container with it, lets go and clears the handle.
     """
 
     release_clearance: float = 0.05
@@ -76,10 +80,10 @@ class MovesContainerByItsHandle(
         # A variable, so the grasps are ranked when the action is grounded, from where
         # the robot stands then.
         where_the_robot_stands = variable(
-            Pose, domain=[Pose(reference_frame=arm._robot.root)]
+            Pose2D, domain=[Pose2D(reference_frame=arm._robot.root)]
         )
         return a(cls)(
-            grasp=variable_from(
+            grasp_candidate=variable_from(
                 GraspsByCloseness(
                     graspable=handle,
                     standing_position=where_the_robot_stands,
@@ -100,7 +104,7 @@ class MovesContainerByItsHandle(
         """
         The connection the container moves along while its handle is held.
         """
-        return self.grasp.graspable.root.get_first_parent_connection_of_type(
+        return self.grasp_candidate.graspable.root.get_first_parent_connection_of_type(
             ActiveConnection1DOF
         )
 
@@ -142,13 +146,13 @@ class MovesContainerByItsHandle(
         :return: The pose the tool frame backs off to, in `grasp_pose`'s frame.
         """
         distance = (
-            HasApproachesGraspPoses.distance_out_of(
-                self.moved_part_bounding_box, grasp_pose
+            HasGraspApproach.distance_out_of(
+                bounding_box=self.moved_part_bounding_box, reference_T_grasp=grasp_pose
             )
             + self.release_clearance
         )
-        return HasApproachesGraspPoses.pre_grasp_pose(
-            grasp_pose, end_effector, distance
+        return HasGraspApproach.pre_grasp_pose(
+            reference_T_grasp=grasp_pose, end_effector=end_effector, distance=distance
         )
 
     def create_temporary_collision_rules(self) -> list[CollisionRule]:
@@ -161,14 +165,18 @@ class MovesContainerByItsHandle(
     def create_steps(self) -> list[StatechartNode]:
         end_effector = self.arm.end_effector
         return [
-            self.grasping_of(self.grasp, self.arm),
+            self.create_grasping_action(
+                grasp_candidate=self.grasp_candidate, arm=self.arm
+            ),
             self._create_mechanism_goal(),
             self.gripper_goal_type.create_gripper_goal(
                 configuration=end_effector.default_configuration(GripperState.OPEN)
             ),
             self.tool_center_point_goal(
-                self.back_off_pose(self.grasp.grasp_pose, end_effector),
-                self.arm,
+                target=self.back_off_pose(
+                    self.grasp_candidate.grasp_pose, end_effector
+                ),
+                arm=self.arm,
             ),
         ]
 
@@ -185,8 +193,8 @@ class OpenAction(MovesContainerByItsHandle):
     def _create_mechanism_goal(self) -> MotionStatechartNode:
         return ArticulateGraspedMechanism(
             tip_link=self.arm.end_effector.tool_frame,
-            environment_link=self.grasp.graspable.root,
-            goal_joint_state=self.mechanism.dof.limits.upper.position,
+            environment_link=self.grasp_candidate.graspable.root,
+            goal_position=self.mechanism.dof.limits.upper.position,
         )
 
 
@@ -211,7 +219,7 @@ class CloseAction(MovesContainerByItsHandle):
     def _create_mechanism_goal(self) -> MotionStatechartNode:
         return ArticulateGraspedMechanism(
             tip_link=self.arm.end_effector.tool_frame,
-            environment_link=self.grasp.graspable.root,
-            goal_joint_state=self.closed_joint_position,
+            environment_link=self.grasp_candidate.graspable.root,
+            goal_position=self.closed_joint_position,
             threshold=self.closing_tolerance,
         )

@@ -72,7 +72,7 @@ from semantic_digital_twin.grasping.surface_grasp import SurfaceGrasp
 from semantic_digital_twin.part_finding.annotation_part_finder import (
     AnnotationPartFinder,
 )
-from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
+from semantic_digital_twin.semantic_annotations.mixins import IsGraspable
 
 # %% the objects grasps are tried on
 
@@ -159,7 +159,7 @@ class PreparedModel:
     The model.
     """
 
-    part: HasGraspCandidates
+    part: IsGraspable
     """
     The grasped part.
     """
@@ -422,7 +422,7 @@ class IterationWorker:
         return self.experiments[name]
 
     def prepared(
-        self, model: GraspModel, part: HasGraspCandidates, name: str
+        self, model: GraspModel, part: IsGraspable, name: str
     ) -> PreparedModel:
         """
         :param model: A model.
@@ -494,7 +494,7 @@ class IterationWorker:
     def drawn_grasp(
         self,
         batch: AttemptBatch,
-        part: HasGraspCandidates,
+        part: IsGraspable,
         placement: ObjectPlacement,
         generator: np.random.Generator,
     ) -> Optional[SurfaceGrasp]:

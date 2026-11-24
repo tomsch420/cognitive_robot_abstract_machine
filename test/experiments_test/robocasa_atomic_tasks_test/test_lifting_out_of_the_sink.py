@@ -26,7 +26,7 @@ from krrood.entity_query_language.factories import evaluate_condition, variable
 from semantic_digital_twin.adapters.multi_sim import MujocoSimulationSnapshot
 from semantic_digital_twin.grasping.surface_grasp import SurfaceGrasp
 from semantic_digital_twin.reasoning.predicates import InsideOf
-from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
+from semantic_digital_twin.semantic_annotations.mixins import IsGraspable
 from semantic_digital_twin.world_description.world_entity import Body
 
 # %% the broccoli in the sink
@@ -71,7 +71,7 @@ class BroccoliInTheSink:
         )
 
     @property
-    def broccoli(self) -> HasGraspCandidates:
+    def broccoli(self) -> IsGraspable:
         """
         :return: The broccoli.
         """

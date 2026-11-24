@@ -36,7 +36,7 @@ from semantic_digital_twin.grasping.object_relative_grasp import (
     draw_grasps,
 )
 from semantic_digital_twin.grasping.surface_grasp import SurfaceGrasp
-from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
+from semantic_digital_twin.semantic_annotations.mixins import IsGraspable
 
 # %% turning grasps between the object's frame and the world's
 
@@ -83,7 +83,7 @@ class LiftProbability:
     The learned model.
     """
 
-    part: HasGraspCandidates
+    part: IsGraspable
     """
     The grasped part whose statement the model answers.
     """
@@ -164,7 +164,7 @@ class GraspSelection:
 
     def choose(
         self,
-        part: HasGraspCandidates,
+        part: IsGraspable,
         model: GraspModel,
         probability: LiftProbability,
         generator: np.random.Generator,

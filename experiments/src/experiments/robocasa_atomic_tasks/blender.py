@@ -14,7 +14,7 @@ from experiments.robocasa_atomic_tasks.episode import RoboCasaEpisode
 from experiments.robocasa_atomic_tasks.pick_place import OntoCounter
 from experiments.robocasa_atomic_tasks.robocasa_names import FixturePartSuffix
 from experiments.robocasa_atomic_tasks.tasks import PressTask, RoboCasaAtomicTask
-from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
+from semantic_digital_twin.semantic_annotations.mixins import IsGraspable
 from semantic_digital_twin.adapters.robocasa_dataset.mujoco_compat import (
     robocasa_version_assertions_relaxed,
 )
@@ -32,7 +32,7 @@ class BlenderLidTask(RoboCasaAtomicTask):
     """
 
     @staticmethod
-    def lid(episode: RoboCasaEpisode) -> HasGraspCandidates:
+    def lid(episode: RoboCasaEpisode) -> IsGraspable:
         """
         :param episode: An episode of a blender task.
         :return: The blender's lid, as it may be grasped.

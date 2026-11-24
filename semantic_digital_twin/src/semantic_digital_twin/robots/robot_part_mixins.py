@@ -547,7 +547,7 @@ class HasTwoFingers(
         """
         return self.held_body_T_grasp_at(self.tool_P_grasp_when_closed)
 
-    def body_T_grasp(self, body: Body) -> Pose:
+    def body_T_grasp_when_closed(self, *, body: Body) -> Pose:
         """
         The grasp this gripper has on a body, read at the point it holds an object, like
         :attr:`held_body_T_grasp`.
@@ -556,7 +556,7 @@ class HasTwoFingers(
             held between the fingers by contact alone.
         :return: The grasp frame, in ``body``'s frame.
         """
-        return self.body_T_grasp_at(body, self.tool_P_grasp_when_closed)
+        return self.body_T_grasp(body=body, tool_P_grasp=self.tool_P_grasp_when_closed)
 
 
 @dataclass(eq=False)

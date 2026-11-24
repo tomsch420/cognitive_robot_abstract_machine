@@ -100,12 +100,12 @@ with world.modify_world():
 drive.origin = task.robot_base_pose
 pr2 = PR2.from_world(world)
 
-from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
+from semantic_digital_twin.semantic_annotations.mixins import IsGraspable
 
 cup = next(
     a
     for a in world.semantic_annotations
-    if a.root == task.manipulated_objects[0] and isinstance(a, HasGraspCandidates)
+    if a.root == task.manipulated_objects[0] and isinstance(a, IsGraspable)
 )
 print("target object", type(cup).__name__, cup.root.name.name)
 sink = world.get_semantic_annotations_by_type(Sink)[0]

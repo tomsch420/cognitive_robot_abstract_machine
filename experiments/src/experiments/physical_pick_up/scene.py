@@ -32,7 +32,7 @@ from semantic_digital_twin.part_finding.annotation_part_finder import (
     AnnotationPartFinder,
 )
 from semantic_digital_twin.semantic_annotations.mixins import (
-    HasGraspCandidates,
+    IsGraspable,
     PartWholeRelationship,
 )
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, Arm
@@ -101,7 +101,7 @@ class PickUpScene:
     Where the object stands for the robot to pick it up.
     """
 
-    graspable: HasGraspCandidates = field(init=False)
+    graspable: IsGraspable = field(init=False)
     """
     The object, as what :attr:`object_description` says it is.
     """
@@ -172,7 +172,7 @@ class PickUpScene:
         body.visual = ShapeCollection([slab], reference_frame=body)
         return body
 
-    def _add_object(self) -> HasGraspCandidates:
+    def _add_object(self) -> IsGraspable:
         """
         :return: The object, a free body, not yet placed.
         """
@@ -202,7 +202,7 @@ class PickUpScene:
         return graspable
 
     def _collide_as_nearest_convex_parts(
-        self, graspable: HasGraspCandidates, geometry: ObjectGeometry
+        self, graspable: IsGraspable, geometry: ObjectGeometry
     ) -> None:
         """
         Let each of the object's bodies collide as the convex parts of the object that

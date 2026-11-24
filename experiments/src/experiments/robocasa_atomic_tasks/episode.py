@@ -92,7 +92,7 @@ from semantic_digital_twin.datastructures.definitions import (
     TorsoState,
 )
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, Arm
-from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
+from semantic_digital_twin.semantic_annotations.mixins import IsGraspable
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Floor,
     Handle,
@@ -646,7 +646,7 @@ class RoboCasaEpisode:
         """
         return self.world.get_body_by_name(self.environment.objects[name].root_body)
 
-    def graspable(self, name: str) -> HasGraspCandidates:
+    def graspable(self, name: str) -> IsGraspable:
         """
         :param name: The name RoboCasa gives one of the task's objects.
         :return: The annotation of the object that says where it may be grasped.
@@ -655,12 +655,12 @@ class RoboCasaEpisode:
         return next(
             annotation
             for annotation in self.world.get_semantic_annotations_by_type(
-                HasGraspCandidates
+                IsGraspable
             )
             if annotation.root is body
         )
 
-    def loose_part(self, body_name: str) -> HasGraspCandidates:
+    def loose_part(self, body_name: str) -> IsGraspable:
         """
         :param body_name: The name RoboCasa gives the body of a loose part of a
             fixture, such as the lid of a blender.
@@ -672,7 +672,7 @@ class RoboCasaEpisode:
             (
                 annotation
                 for annotation in self.world.get_semantic_annotations_by_type(
-                    HasGraspCandidates
+                    IsGraspable
                 )
                 if annotation.root is body
             ),
@@ -715,7 +715,7 @@ class RoboCasaEpisode:
             lambda: [MoveTorsoAction(torso_state=TorsoState.HIGH)]
         ).raise_if_failed()
 
-    def pick_up(self, graspable: HasGraspCandidates, attempts: int = 3) -> None:
+    def pick_up(self, graspable: IsGraspable, attempts: int = 3) -> None:
         """
         Pick an object up, standing wherever it can be reached from, and park the arms
         again with it in the gripper; in a physical simulation, pick it up again from
@@ -740,7 +740,7 @@ class RoboCasaEpisode:
             logger.warning("%s was left behind by the pick-up", graspable.root.name)
         raise ObjectNotPickedUp(body=graspable.root)
 
-    def reach_and_pick_up(self, graspable: HasGraspCandidates) -> None:
+    def reach_and_pick_up(self, graspable: IsGraspable) -> None:
         """
         Pick an object up from a stand facing it, see :meth:`pick_up`.
 
@@ -771,7 +771,7 @@ class RoboCasaEpisode:
             ]
         ).raise_if_failed()
 
-    def holds(self, graspable: HasGraspCandidates, reach: float = 0.12) -> bool:
+    def holds(self, graspable: IsGraspable, reach: float = 0.12) -> bool:
         """
         :param graspable: The annotation of an object.
         :param reach: How far from the tool frame of the acting arm the object's
@@ -787,7 +787,7 @@ class RoboCasaEpisode:
 
     def place(
         self,
-        graspable: HasGraspCandidates,
+        graspable: IsGraspable,
         spots: list[np.ndarray],
         retreat_distance: float = 0.1,
     ) -> None:

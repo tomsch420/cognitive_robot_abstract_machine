@@ -42,6 +42,8 @@ from semantic_digital_twin.exceptions import (
     NotAMixerLever,
 )
 from semantic_digital_twin.reasoning.predicates import InsideOf
+from semantic_digital_twin.robots.exceptions import MissingMobileBaseError
+from semantic_digital_twin.robots.robot_part_mixins import HasMobileBase
 from semantic_digital_twin.semantic_annotations.part_whole import (
     IsPartWholeRelationship,
 )
@@ -67,7 +69,7 @@ from semantic_digital_twin.semantic_annotations.mixins import (
     HasKnobs,
     HasButtons,
     HasLevers,
-    HasGraspCandidates,
+    IsGraspable,
     HasRim,
     HasDrawnGraspsByDefault,
 )
@@ -111,7 +113,11 @@ from semantic_digital_twin.specifications.semantic_annotations import (
 )
 
 if TYPE_CHECKING:
+    from semantic_digital_twin.robots.robot_parts import AbstractRobot
     from semantic_digital_twin.world import World
+    from semantic_digital_twin.world_description.graph_of_convex_sets.boxes import (
+        PlanarGraphOfBoundingBoxes,
+    )
 
 
 @dataclass(eq=False)
@@ -122,7 +128,7 @@ class Furniture(SemanticAnnotation, ABC):
 
 
 @dataclass(eq=False)
-class Handle(HasGraspCandidates):
+class Handle(IsGraspable):
     """
     A handle is a physical entity that can be grasped by a hand or a robotic gripper to
     open or close an object.
@@ -992,6 +998,30 @@ class Wardrobe(Cabinet): ...
 
 @dataclass(eq=False)
 class Floor(HasSupportingSurface):
+    """
+    A floor that robots and furniture stand on.
+    """
+
+    def navigable_space(
+        self, *, robot: AbstractRobot, margin: float
+    ) -> PlanarGraphOfBoundingBoxes:
+        """
+        :param robot: A robot with a mobile base, standing on this floor.
+        :param margin: How far, beyond its radius, the base is to keep from obstacles.
+        :return: The free space above this floor that the robot's base can stand in,
+            kept clear of every obstacle up to the robot's height by the base's radius
+            and ``margin``.
+        :raises MissingMobileBaseError: If the robot has no mobile base.
+        """
+        if not isinstance(robot, HasMobileBase):
+            raise MissingMobileBaseError(robot_part=robot)
+        return self.planar_free_space(
+            max_height=robot.as_bounding_box_collection_in_frame(robot.root)
+            .bounding_box()
+            .scale.z,
+            bloat_obstacles=robot.mobile_base.base_radius + margin,
+        )
+
     @classmethod
     def create_with_new_body_from_polytope_in_world(
         cls,
@@ -1205,21 +1235,21 @@ class Wall(HasApertures):
 
 
 @dataclass(eq=False)
-class Container(HasGraspCandidates):
+class Container(IsGraspable):
     """
     An object that holds contents and has an opening they go in and out through.
     """
 
 
 @dataclass(eq=False)
-class Cookware(HasGraspCandidates):
+class Cookware(IsGraspable):
     """
     An object used to cook with.
     """
 
 
 @dataclass(eq=False)
-class Tableware(HasGraspCandidates):
+class Tableware(IsGraspable):
     """
     An object a table is set with for a meal.
     """
@@ -1233,7 +1263,10 @@ class Bottle(Container):
 
 
 @dataclass(eq=False)
-class Statue(HasGraspCandidates): ...
+class Statue(IsGraspable):
+    """
+    A sculpture small enough to be picked up.
+    """
 
 
 @dataclass(eq=False)
@@ -1339,7 +1372,7 @@ class Bowl(HasRim, HasSupportingSurface, Container, Tableware, IsPerceivable):
 
 # Food Items
 @dataclass(eq=False)
-class Food(HasGraspCandidates):
+class Food(IsGraspable):
     """
     A Group class for Food.
     """
@@ -1433,6 +1466,13 @@ class Milk(Food, IsPerceivable):
 class SaltContainer(Container, IsPerceivable):
     """
     A container of salt.
+    """
+
+
+@dataclass(eq=False, kw_only=True)
+class UnknownObject(HasRootBody, IsPerceivable):
+    """
+    An object perception found that no more specific semantic annotation describes.
     """
 
 
@@ -1623,7 +1663,10 @@ class WallDecor(Decor):
 
 
 @dataclass(eq=False)
-class Cloth(HasGraspCandidates): ...
+class Cloth(IsGraspable):
+    """
+    A piece of fabric, such as a towel or a rag.
+    """
 
 
 @dataclass(eq=False)
@@ -1681,7 +1724,7 @@ class Vase(Container):
 
 
 @dataclass(eq=False)
-class Book(HasGraspCandidates):
+class Book(IsGraspable):
     """
     A book.
     """
@@ -1756,21 +1799,21 @@ class Spoon(Cutlery, IsPerceivable): ...
 
 
 @dataclass(eq=False)
-class Pencil(HasGraspCandidates):
+class Pencil(IsGraspable):
     """
     A pencil.
     """
 
 
 @dataclass(eq=False)
-class Pen(HasGraspCandidates):
+class Pen(IsGraspable):
     """
     A pen.
     """
 
 
 @dataclass(eq=False)
-class ShapeSortingPiece(HasGraspCandidates):
+class ShapeSortingPiece(IsGraspable):
     """
     A loose piece of a shape-sorting toy, which drops through the hole of its
     own outline.
@@ -1819,7 +1862,7 @@ class ShapeSortingPiece(HasGraspCandidates):
 
 
 @dataclass(eq=False)
-class Baseball(HasGraspCandidates):
+class Baseball(IsGraspable):
     """
     A baseball.
     """
@@ -1855,7 +1898,7 @@ class Agent(HasRootBody):
 
 
 @dataclass(eq=False)
-class Human(Agent):
+class Human(Agent, IsPerceivable):
     """
     Represents a human agent in the environment.
 
@@ -1868,7 +1911,7 @@ class Human(Agent):
 
 
 @dataclass(eq=False)
-class Parcel(HasGraspCandidates):
+class Parcel(IsGraspable):
     """
     A parcel, as handled in a warehouse.
     """
@@ -1881,7 +1924,10 @@ class SemanticEnvironmentAnnotation(HasRootBody):
     """
 
     def obstacle_entities(
-        self, search_space: BoundingBoxCollection[VolumetricBoundingBox, Point3]
+        self,
+        *,
+        search_space: BoundingBoxCollection[VolumetricBoundingBox, Point3],
+        excluded_bodies: Iterable[Body] = (),
     ) -> list[Body]:
         """
         Collect the obstacle bodies to consider within ``search_space``.
@@ -1891,22 +1937,23 @@ class SemanticEnvironmentAnnotation(HasRootBody):
 
         :param search_space: The search space; its reference frame is used to look up
             the owning world.
+        :param excluded_bodies: Bodies that are no obstacles either, such as an object
+            to be reached into.
         :return: The obstacle bodies to consider.
         """
         world = search_space.reference_frame._world
-        return [
-            body
-            for body in self.bodies_with_collision
-            if body not in world.robot_bodies_with_collision
-        ]
+        left_out = set(world.robot_bodies_with_collision) | set(excluded_bodies)
+        return [body for body in self.bodies_with_collision if body not in left_out]
 
     def build_bloated_obstacle_collection(
         self,
+        *,
         search_space: BoundingBoxCollection[VolumetricBoundingBox, Point3],
         semantic_wall_annotation: Wall | None = None,
         bloat_obstacles: float = 0.0,
         bloat_walls: float = 0.0,
         obstacle_height_clearance: float = 0.01,
+        excluded_bodies: Iterable[Body] = (),
     ) -> BoundingBoxCollection[VolumetricBoundingBox, Point3]:
         """
         Collect and bloat this annotation's obstacle bounding boxes.
@@ -1923,12 +1970,16 @@ class SemanticEnvironmentAnnotation(HasRootBody):
             dimension.
         :param obstacle_height_clearance: Amount to expand every obstacle bounding box
             in z, regardless of ``bloat_obstacles``/``bloat_walls``.
+        :param excluded_bodies: Bodies that are no obstacles, see
+            :meth:`obstacle_entities`.
         :return: A collection of the bloated obstacle and wall bounding boxes.
         """
         world_root = search_space.reference_frame
         origin = HomogeneousTransformationMatrix(reference_frame=world_root)
 
-        entities_to_consider = self.obstacle_entities(search_space)
+        entities_to_consider = self.obstacle_entities(
+            search_space=search_space, excluded_bodies=excluded_bodies
+        )
 
         collections = (
             entity.collision.as_bounding_box_collection_at_origin(origin)
@@ -2004,7 +2055,7 @@ class Cooktop(HasRootBody, HasKnobs):
 
 
 @dataclass(eq=False)
-class Tool(HasGraspCandidates, ABC):
+class Tool(IsGraspable, ABC):
     """
     A tool that is held by a robot's end effector to act on other bodies.
     """
@@ -2095,7 +2146,7 @@ class Whisk(ToolWithHandle):
         return [
             AlignmentPair(
                 tip_normal=Vector3(-1, 0, 0, reference_frame=self.root),
-                goal_normal=Vector3(0, 0, 1, reference_frame=target),
+                reference_normal=Vector3(0, 0, 1, reference_frame=target),
             )
         ]
 
@@ -2110,11 +2161,11 @@ class CuttingKnife(ToolWithHandle):
         return [
             AlignmentPair(
                 tip_normal=Vector3(1, 0, 0, reference_frame=self.root),
-                goal_normal=Vector3(0, 1, 0, reference_frame=target),
+                reference_normal=Vector3(0, 1, 0, reference_frame=target),
             ),
             AlignmentPair(
                 tip_normal=Vector3(0, 0, 1, reference_frame=self.root),
-                goal_normal=Vector3(0, 0, 1, reference_frame=target),
+                reference_normal=Vector3(0, 0, 1, reference_frame=target),
             ),
         ]
 
@@ -2129,7 +2180,7 @@ class PouringCup(Tool, Container):
         return [
             AlignmentPair(
                 tip_normal=Vector3(0, 0, 1, reference_frame=self.root),
-                goal_normal=Vector3(0, 0, 1, reference_frame=target),
+                reference_normal=Vector3(0, 0, 1, reference_frame=target),
             )
         ]
 
@@ -2148,13 +2199,13 @@ class Sponge(Tool):
             return [
                 AlignmentPair(
                     tip_normal=Vector3(0, 0, 1, reference_frame=self.root),
-                    goal_normal=Vector3(0, 0, -1, reference_frame=target),
+                    reference_normal=Vector3(0, 0, -1, reference_frame=target),
                 )
             ]
         return [
             AlignmentPair(
                 tip_normal=Vector3(0, 0, -1, reference_frame=self.root),
-                goal_normal=self._pose_surface_normal(target),
+                reference_normal=self._pose_surface_normal(target),
             )
         ]
 
@@ -2174,84 +2225,84 @@ class Sponge(Tool):
 
 
 @dataclass(eq=False)
-class AluminumFoil(HasGraspCandidates):
+class AluminumFoil(IsGraspable):
     """
     A roll of aluminum foil in its box.
     """
 
 
 @dataclass(eq=False)
-class BarSoap(HasGraspCandidates):
+class BarSoap(IsGraspable):
     """
     A bar of soap.
     """
 
 
 @dataclass(eq=False)
-class Candle(HasGraspCandidates):
+class Candle(IsGraspable):
     """
     A candle.
     """
 
 
 @dataclass(eq=False)
-class CheeseGrater(HasGraspCandidates):
+class CheeseGrater(IsGraspable):
     """
     A grater for cheese and other food.
     """
 
 
 @dataclass(eq=False)
-class DishBrush(HasGraspCandidates):
+class DishBrush(IsGraspable):
     """
     A brush for washing dishes.
     """
 
 
 @dataclass(eq=False)
-class KebabSkewer(HasGraspCandidates):
+class KebabSkewer(IsGraspable):
     """
     A skewer for kebabs.
     """
 
 
 @dataclass(eq=False)
-class Peeler(HasGraspCandidates):
+class Peeler(IsGraspable):
     """
     A peeler for fruit and vegetables.
     """
 
 
 @dataclass(eq=False)
-class PizzaCutter(HasGraspCandidates):
+class PizzaCutter(IsGraspable):
     """
     A wheel for cutting pizza.
     """
 
 
 @dataclass(eq=False)
-class Reamer(HasGraspCandidates):
+class Reamer(IsGraspable):
     """
     A reamer for juicing citrus fruit.
     """
 
 
 @dataclass(eq=False)
-class RollingPin(HasGraspCandidates):
+class RollingPin(IsGraspable):
     """
     A rolling pin for dough.
     """
 
 
 @dataclass(eq=False)
-class Straw(HasGraspCandidates):
+class Straw(IsGraspable):
     """
     A drinking straw.
     """
 
 
 @dataclass(eq=False)
-class Tongs(HasGraspCandidates):
+class Tongs(IsGraspable):
     """
     Tongs for picking up food.
     """

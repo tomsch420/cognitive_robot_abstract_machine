@@ -40,7 +40,7 @@ from krrood.parametrization.parameterizer import UnderspecifiedParameters
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit,
 )
-from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
+from semantic_digital_twin.semantic_annotations.mixins import IsGraspable
 
 # %% where the attempts came from
 
@@ -122,7 +122,7 @@ class SamplingDensities:
     The densities over grasps of the distributions attempts were drawn from.
     """
 
-    parts: Dict[str, HasGraspCandidates]
+    parts: Dict[str, IsGraspable]
     """
     The grasped part of each object, by the name of the object's body.
     """

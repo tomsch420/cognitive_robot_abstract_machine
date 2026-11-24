@@ -63,7 +63,7 @@ from semantic_digital_twin.collision_checking.collision_rules import (
 from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.robots.robot_parts import Arm, EndEffector
-from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
+from semantic_digital_twin.semantic_annotations.mixins import IsGraspable
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Handle
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
@@ -1202,7 +1202,7 @@ class PlaceHeldObjectAction(PlaceAction):
                 self.object_designator, end_effector.held_body_T_grasp
             )
         return arm, GraspCandidate(
-            self.object_designator, end_effector.body_T_grasp(body)
+            self.object_designator, end_effector.body_T_grasp_when_closed(body=body)
         )
 
     def lies_in_the_gripper_of(self, arm: Arm) -> bool:
@@ -1236,7 +1236,7 @@ class StandAndPickUpAction(MayReachThroughFreeSpace, SequentialAction):
     @classmethod
     def from_stands(
         cls,
-        graspable: HasGraspCandidates,
+        graspable: IsGraspable,
         arm: Arm,
         stands: list[Pose],
         grasps: list[GraspCandidate],
@@ -1308,7 +1308,7 @@ class StandAndPlaceAction(MayReachThroughFreeSpace, SequentialAction):
     @classmethod
     def from_stands(
         cls,
-        graspable: HasGraspCandidates,
+        graspable: IsGraspable,
         arm: Arm,
         target_poses: list[Pose],
         stands: list[Pose],

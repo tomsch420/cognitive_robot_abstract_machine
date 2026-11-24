@@ -55,7 +55,7 @@ from semantic_digital_twin.grasping.grasp_strategies import (
 )
 from semantic_digital_twin.grasping.grasp_trials import GraspPerformer, GraspTrials
 from semantic_digital_twin.grasping.object_relative_grasp import GraspResult
-from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
+from semantic_digital_twin.semantic_annotations.mixins import IsGraspable
 from semantic_digital_twin.world_description.geometry import CoordinateBounds
 from semantic_digital_twin.world_description.world_entity import (
     Body,
@@ -226,7 +226,7 @@ class GraspOutcomeMeasurement:
     The episode the object is grasped in.
     """
 
-    graspable: HasGraspCandidates
+    graspable: IsGraspable
     """
     The object grasped.
     """
@@ -334,7 +334,7 @@ class KitchenGraspPerformer(GraspPerformer):
     The episode, simulated physically.
     """
 
-    graspable: HasGraspCandidates
+    graspable: IsGraspable
     """
     The object picked up.
     """

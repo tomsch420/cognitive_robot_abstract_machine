@@ -19,7 +19,7 @@ import numpy as np
 from typing_extensions import Iterator
 
 from coraplex.robot_plans.actions.core.robot_body import MoveFingersToWidthAction
-from coraplex.robot_plans.mixins import HasApproachesGraspPoses
+from coraplex.robot_plans.mixins import HasGraspApproach
 from cramph.node import StatechartNode
 from experiments.grasp_learning.database import GraspDatabase
 from experiments.grasp_learning.exceptions import (
@@ -79,7 +79,7 @@ from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.grasping.grasp_strategies import GraspFromAnySide
 from semantic_digital_twin.grasping.object_relative_grasp import GraspResult
 from semantic_digital_twin.grasping.surface_grasp import SurfaceGrasp
-from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
+from semantic_digital_twin.semantic_annotations.mixins import IsGraspable
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
 from semantic_digital_twin.world_description.world_entity import Body
@@ -181,7 +181,7 @@ class PickUpParameterSpace:
     The values of :attr:`PickUpParameters.lift_velocity`.
     """
 
-    def statement(self, *, graspable: HasGraspCandidates) -> Match[PickUpParameters]:
+    def statement(self, *, graspable: IsGraspable) -> Match[PickUpParameters]:
         """
         :param graspable: The object picked up.
         :return: The statement of every pick-up this space allows on the object.
@@ -233,7 +233,7 @@ class PickUpParameterSpace:
     def drawn_parameters(
         self,
         *,
-        graspable: HasGraspCandidates,
+        graspable: IsGraspable,
         number_of_pick_ups: int,
         model_registry: ModelRegistry,
     ) -> list[PickUpParameters]:
@@ -388,7 +388,7 @@ class PickUpPerformer:
     The task the episode was composed for.
     """
 
-    graspable: HasGraspCandidates
+    graspable: IsGraspable
     """
     The object picked up.
     """
@@ -519,7 +519,7 @@ class PickUpPerformer:
         ):
             return PickUpStage.STANDING
         world_T_start = self.world_pose(pose=gripper.tool_frame.global_pose)
-        poses = HasApproachesGraspPoses(
+        poses = HasGraspApproach(
             approach_clearance=parameters.approach_clearance
         ).grasp_pose_sequence(grasp.grasp_pose, gripper, grasp)
         way_in = [

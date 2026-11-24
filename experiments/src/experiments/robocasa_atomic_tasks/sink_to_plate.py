@@ -38,7 +38,7 @@ from semantic_digital_twin.collision_checking.collision_rules import (
     AllowCollisionBetweenGroups,
 )
 from semantic_digital_twin.reasoning.predicates import InsideOf
-from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
+from semantic_digital_twin.semantic_annotations.mixins import IsGraspable
 from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -60,7 +60,7 @@ class MoveFromTheSinkOntoAPlate:
     The episode the object is moved in, simulated physically.
     """
 
-    graspable: HasGraspCandidates
+    graspable: IsGraspable
     """
     The object moved.
     """

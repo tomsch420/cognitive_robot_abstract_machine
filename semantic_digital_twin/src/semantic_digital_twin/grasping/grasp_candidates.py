@@ -18,7 +18,7 @@ from krrood_spatial_math.exceptions import (
 from krrood_spatial_math.spatial_types import Pose
 
 if TYPE_CHECKING:
-    from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
+    from semantic_digital_twin.semantic_annotations.mixins import IsGraspable
 
 # %% grasp candidates
 
@@ -36,7 +36,7 @@ class GraspCandidate:
     how a grasp stays independent of the robot performing it.
     """
 
-    graspable: HasGraspCandidates
+    graspable: IsGraspable
     """
     The annotation of the object offering this grasp.
     """
@@ -58,7 +58,7 @@ class GraspCandidate:
             )
 
     @classmethod
-    def from_body_origin(cls, graspable: HasGraspCandidates) -> GraspCandidate:
+    def from_body_origin(cls, *, graspable: IsGraspable) -> GraspCandidate:
         """
         The grasp that takes an object at the origin of its own body.
 
