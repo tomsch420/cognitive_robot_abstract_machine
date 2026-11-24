@@ -16,7 +16,10 @@ from semantic_digital_twin.collision_checking.collision_variable_managers import
 
 if TYPE_CHECKING:
     from giskardpy.motion_statechart.graph_node import ConvergingTask
-    from giskardpy.motion_statechart.monitors.progress_monitors import StillProgressing
+    from giskardpy.motion_statechart.monitors.progress_monitors import (
+        BlockedPositionLimit,
+        StillProgressing,
+    )
     from semantic_digital_twin.datastructures.definitions import GripperState
     from semantic_digital_twin.robots.robot_parts import AbstractRobot, EndEffector
     from semantic_digital_twin.world_description.world_entity import (
@@ -25,7 +28,7 @@ if TYPE_CHECKING:
 from cramph.exceptions import StatechartError, NodeInitializationError
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CollisionViolatedError(DataclassException):
     """
     Raised when bodies came closer to each other than their collision threshold allows.
@@ -218,6 +221,43 @@ class NoProgressError(MotionStatechartError):
 
 
 @dataclass(kw_only=True)
+class PositionLimitBlockedError(NoProgressError):
+    """
+    Raised when the watched tasks stopped approaching their goal while degrees of
+    freedom lie at position limits that the tasks would have them move past.
+    """
+
+    blocked_position_limits: list[BlockedPositionLimit]
+    """
+    Every position limit blocking a stalled task, with the task it blocks.
+    """
+
+    def error_message(self) -> str:
+        """
+        Extends :meth:`NoProgressError.error_message` with the blocking limits.
+        """
+        blocked = "; ".join(
+            f"{blocked_limit.task.unique_name} drives "
+            f"{blocked_limit.degree_of_freedom.name} into its "
+            f"{blocked_limit.side.name.lower()} position limit"
+            for blocked_limit in self.blocked_position_limits
+        )
+        return f"{super().error_message()} Blocked: {blocked}."
+
+    def suggest_correction(self) -> str:
+        """
+        Replaces the guesses of :meth:`NoProgressError.suggest_correction` with a
+        correction for the limits known to block the motion.
+        """
+        return (
+            "The goal lies beyond what these joints can reach from this configuration. "
+            "Move the robot so that the motion does not need to drive them past their "
+            "limits, for example by moving its base, or turn a joint whose range spans "
+            "more than a full turn a full turn away from the limit it lies at."
+        )
+
+
+@dataclass(kw_only=True)
 class InvalidConstraintExpressionShapeError(MotionStatechartError):
     """
     Raised when a constraint expression is not a scalar.
@@ -372,13 +412,21 @@ class RobotWithoutMobileBaseError(MotionStatechartError):
 
 
 @dataclass(kw_only=True)
-class EmptyDebugExpressionTrajectoryError(MotionStatechartError):
+class MarkerPublishingThreadEndedError(DataclassException):
     """
-    Raised when a plot is requested but no debug expression samples were recorded.
+    Raised when markers are submitted for publishing after the thread publishing them
+    ended because publishing raised; the exception it raised is the cause.
     """
 
     def error_message(self) -> str:
-        return "Cannot plot: no debug expression samples were recorded."
+        return (
+            "The thread publishing the debug markers ended, so no submitted marker "
+            "would ever be published."
+        )
 
     def suggest_correction(self) -> str:
-        return "Call tick() at least once before plotting, or configure debug expressions to record."
+        return (
+            "Read the cause of this error, often a ROS node that was destroyed while "
+            "it still published. Publishing starts again with the next compiled "
+            "statechart."
+        )

@@ -5,9 +5,9 @@ The statechart: a graph of nodes that is compiled and ticked to run them.
 from __future__ import annotations
 
 import logging
-from copy import deepcopy
 from dataclasses import dataclass, field
 from enum import StrEnum
+from pathlib import Path
 
 import rustworkx as rx
 from typing_extensions import (
@@ -17,7 +17,6 @@ from typing_extensions import (
     Self,
 )
 
-import krrood.symbolic_math.symbolic_math as sm
 from cramph.plotters.gantt_chart_plotter import HistoryGanttChartPlotter
 from krrood.adapters.json_serializer import SubclassJSONSerializer, from_json, to_json
 from krrood.rustworkx_utils.graph_visualizer_base import (
@@ -28,9 +27,9 @@ from krrood.rustworkx_utils.graph_visualizer_base import (
 from cramph.context import ContextExtension, StatechartContext
 from cramph.compiled_tick import LifeCycleChange
 from cramph.data_types import (
-    LifeCycleValues,
+    LifeCycleValue,
     TransitionKind,
-    ObservationStateValues,
+    ObservationStateValue,
 )
 from cramph.exceptions import (
     EmptyStatechartError,
@@ -40,6 +39,7 @@ from cramph.exceptions import (
     NotHeldByControlStructureNodeError,
     NotInStatechartError,
     RemovedNodeStillReferencedError,
+    StatechartBrokenByFailedModificationError,
 )
 from cramph.node import (
     CancelStatechart,
@@ -57,6 +57,14 @@ from cramph.plotters.graphviz import StatechartGraphviz
 from cramph.plotters.interactive_graph import StatechartGraphVisualizer
 from cramph.state import LastObservationState, LifeCycleState, ObservationState
 from cramph.state_history import StateHistory, StateHistoryItem
+from cramph.statechart_changes import (
+    NodeAddition,
+    NodeRemoval,
+    RebuildRequest,
+    ResetRequest,
+    StatechartChangeBlock,
+    StructureChangeRecorderInStatechart,
+)
 from semantic_digital_twin.world_description.world_entity import (
     WorldEntityReferenceWriter,
 )
@@ -72,76 +80,14 @@ logger = logging.getLogger(__name__)
 # %% modifying a statechart
 
 
-@dataclass(kw_only=True, eq=False)
-class ReplacedNode:
-    """
-    A node another node was put in the place of, with what it had before, so that a
-    modification that fails afterwards can put it back.
-    """
-
-    node: StatechartNode
-    """
-    The node that was replaced.
-    """
-
-    replacement: StatechartNode
-    """
-    The node put in its place.
-    """
-
-    former_parent: CompositeNode | None
-    """
-    The parent the node had, or None for a top-level node.
-    """
-
-    former_conditions: dict[TransitionKind, sm.Scalar]
-    """
-    The transitions the former parent decided for the node, as they were.
-    """
-
-    @classmethod
-    def before_replacing(
-        cls, *, node: StatechartNode, replacement: StatechartNode
-    ) -> ReplacedNode:
-        """
-        :param node: The node about to be replaced.
-        :param replacement: The node about to be put in its place.
-        :return: The node as it is now.
-        """
-        return cls(
-            node=node,
-            replacement=replacement,
-            former_parent=node.parent_node,
-            former_conditions={
-                transition_kind: node.get_condition(transition_kind=transition_kind)
-                for transition_kind in TransitionKind.owner_wired_kinds()
-            },
-        )
-
-    def put_back(self) -> None:
-        """
-        Gives the node its former parent, its place among that parent's nodes, and the
-        transitions that parent decided for it.
-        """
-        self.node.parent_node = self.former_parent
-        for transition_kind, condition in self.former_conditions.items():
-            self.node.set_condition(
-                transition_kind=transition_kind, expression=condition
-            )
-        if self.former_parent is not None:
-            self.former_parent.list_in_place_of(
-                child=self.replacement, substitute=self.node
-            )
-
-
 @dataclass(kw_only=True)
 class StatechartModification:
     """
-    Batches changes to a statechart, so that a compiled statechart compiles again only
-    once, when the outermost of any nested modifications ends.
-
-    If the block raises, the nodes added inside it are dropped again and the statechart
-    stays as it was.
+    Batches changes to a statechart, which the outermost of any nested modifications
+    closes into a :class:`~cramph.statechart_changes.StatechartChangeBlock` and a
+    compiled statechart compiles once. A block that raises after it changed the
+    structure breaks the statechart, which stays as the block left it, see
+    :meth:`Statechart.check_not_broken`; one that raises before leaves it usable.
     """
 
     statechart: Statechart
@@ -149,20 +95,29 @@ class StatechartModification:
     The statechart being changed.
     """
 
-    _node_count_at_start: int = field(init=False, default=0)
+    rewrites_compiled_nodes: bool = False
     """
-    How many nodes the statechart held when this modification started.
+    Whether composite nodes the latest compile covered take new children inside this
+    block.
     """
 
-    _replaced_count_at_start: int = field(init=False, default=0)
+    _recorded_change_count_at_start: int = field(init=False, default=0)
     """
-    How many nodes were replaced in the open modifications when this one started.
+    How often the statechart had recorded a change when this block started.
     """
 
     def __enter__(self) -> Self:
-        self._node_count_at_start = len(self.statechart.nodes)
-        self._replaced_count_at_start = len(self.statechart._replaced_nodes)
+        """
+        :raises StatechartBrokenByFailedModificationError: If a block of the statechart
+            raised before.
+        """
+        self.statechart.check_not_broken()
+        self._recorded_change_count_at_start = (
+            self.statechart.structure_change_recorder.recorded_change_count
+        )
         self.statechart._open_modifications += 1
+        if self.rewrites_compiled_nodes:
+            self.statechart._open_rewriting_modifications += 1
         return self
 
     def __exit__(
@@ -171,19 +126,32 @@ class StatechartModification:
         exception: BaseException | None,
         traceback: TracebackType | None,
     ) -> None:
+        """
+        Breaks the statechart if the block raised after it changed the structure.
+        Otherwise the outermost block closes its changes into a block and compiles a
+        compiled statechart that changed.
+
+        :raises StatechartBrokenByFailedModificationError: If a block nested in this one
+            raised and this one did not.
+        """
         statechart = self.statechart
         statechart._open_modifications -= 1
+        if self.rewrites_compiled_nodes:
+            statechart._open_rewriting_modifications -= 1
         if exception is not None:
-            statechart._put_back_replaced_nodes_from(
-                first_put_back=self._replaced_count_at_start
+            changed_structure = (
+                statechart.structure_change_recorder.recorded_change_count
+                != self._recorded_change_count_at_start
             )
-            statechart._drop_nodes_from(first_dropped_index=self._node_count_at_start)
-        if statechart._open_modifications == 0:
-            statechart._replaced_nodes.clear()
-        compiler = statechart.compiler
-        if statechart._open_modifications > 0 or not compiler.is_compiled:
+            if changed_structure and statechart._modification_error is None:
+                statechart._modification_error = exception
             return
-        if not compiler.changed_since_compile:
+        statechart.check_not_broken()
+        if statechart._open_modifications > 0:
+            return
+        statechart.structure_change_recorder.close_change_block()
+        compiler = statechart.compiler
+        if not compiler.is_compiled or not compiler.changed_since_compile:
             return
         compiler.compile()
 
@@ -293,12 +261,25 @@ class Statechart(SubclassJSONSerializer):
     How many :class:`StatechartModification` blocks are open on this statechart.
     """
 
-    _replaced_nodes: list[ReplacedNode] = field(
+    _open_rewriting_modifications: int = field(default=0, init=False, repr=False)
+    """
+    How many of the open :class:`StatechartModification` blocks rewrite compiled nodes.
+    """
+
+    _requested_resets: list[StatechartNode] = field(
         default_factory=list, init=False, repr=False
     )
     """
-    The nodes replaced in the open modifications that are still in this statechart, in
+    The nodes :meth:`request_reset` was called for since the latest settled tick, in
     order.
+    """
+
+    _modification_error: BaseException | None = field(
+        default=None, init=False, repr=False
+    )
+    """
+    The error with which a :meth:`modify` block broke this statechart, or None while no
+    block raised after it changed the structure.
     """
 
     _nodes: list[StatechartNode] = field(default_factory=list, init=False, repr=False)
@@ -332,21 +313,31 @@ class Statechart(SubclassJSONSerializer):
     Cache of all :class:`EndStatechart` nodes, checked every tick in :meth:`is_ended`.
     """
 
+    structure_change_recorder: StructureChangeRecorderInStatechart = field(
+        init=False, repr=False, compare=False
+    )
+    """
+    Records the changes to the structure of this statechart in blocks.
+    """
+
     def __post_init__(self) -> None:
         """
         Creates the (initially empty) life cycle, observation and last observation
-        states for this statechart, and its compiler.
+        states for this statechart, its compiler and its structure change recorder.
         """
         self.life_cycle_state = LifeCycleState(statechart=self)
         self.observation_state = ObservationState(statechart=self)
         self.last_observation_state = LastObservationState(statechart=self)
         self.compiler = StatechartCompiler(statechart=self)
+        self.structure_change_recorder = StructureChangeRecorderInStatechart(
+            statechart=self
+        )
 
     def create_structure_copy(self) -> Statechart:
         """
         Creates a copy of the statechart, where every node is an instance of the base
-        class of its kind, see
-        :meth:`~cramph.node.StatechartNode.create_structure_copy`.
+        class of its kind with the id of the node it copies, see
+        :meth:`~cramph.node.StatechartNode.create_structure_counterpart`.
 
         This is useful if only the structure of the statechart is needed, for example,
         for visualization.
@@ -354,24 +345,34 @@ class Statechart(SubclassJSONSerializer):
         :return: The structural copy.
         """
         statechart_copy = Statechart(context=self.context)
+        with statechart_copy.modify():
+            self._copy_structure_into(statechart_copy=statechart_copy)
+        return statechart_copy
+
+    def _copy_structure_into(self, *, statechart_copy: Statechart) -> None:
+        """
+        Registers the structure counterpart of every node of this statechart in
+        `statechart_copy`, which is empty, with the children and the conditions of the
+        node it copies.
+        """
         # copy nodes in order to make sure index is correct
         for node in self.nodes:
-            statechart_copy._register_node(node=node.create_structure_copy())
+            statechart_copy._register_node(node=node.create_structure_counterpart())
         # link parent/child
         for node in self.get_nodes_by_type(node_type=CompositeNode):
             goal_copy: CompositeNode = statechart_copy.get_node_by_index(
                 index=node.index
             )
-            for child_node in node.nodes:
-                child_node_copy = statechart_copy.get_node_by_index(
-                    index=child_node.index
-                )
+            children_copies = [
+                statechart_copy.get_node_by_index(index=child_node.index)
+                for child_node in node.nodes
+            ]
+            for child_node_copy in children_copies:
                 child_node_copy.parent_node_index = node.index
-                goal_copy.nodes.append(child_node_copy)
-        # copy conditions and plot specs
+            goal_copy.set_children(children=[*goal_copy.nodes, *children_copies])
+        # copy conditions
         for node in self.nodes:
             node_copy = statechart_copy.get_node_by_index(index=node.index)
-            node_copy.plot_specifications = deepcopy(node.plot_specifications)
             for transition_kind in TransitionKind:
                 node_copy.set_condition(
                     transition_kind=transition_kind,
@@ -382,7 +383,6 @@ class Statechart(SubclassJSONSerializer):
                         ),
                     ),
                 )
-        return statechart_copy
 
     @property
     def nodes(self) -> list[StatechartNode]:
@@ -416,13 +416,66 @@ class Statechart(SubclassJSONSerializer):
         """
         return list(set(self.edges))
 
-    def modify(self) -> StatechartModification:
+    def modify(
+        self, *, rewrites_compiled_nodes: bool = False
+    ) -> StatechartModification:
         """
+        :param rewrites_compiled_nodes: Whether composite nodes the latest compile
+            covered take new children inside the block, however their class decides
+            otherwise.
         :return: A block batching changes to this statechart. A compiled statechart
             compiles again once the outermost block ends, keeping the state and the
             history of the nodes it already held.
         """
-        return StatechartModification(statechart=self)
+        return StatechartModification(
+            statechart=self, rewrites_compiled_nodes=rewrites_compiled_nodes
+        )
+
+    def check_not_broken(self) -> None:
+        """
+        :raises StatechartBrokenByFailedModificationError: If a :meth:`modify` block
+            raised after it changed the structure, so the statechart stays as that
+            block left it, half changed.
+        """
+        if self._modification_error is None:
+            return
+        raise StatechartBrokenByFailedModificationError(
+            modification_error=self._modification_error
+        ) from self._modification_error
+
+    @property
+    def may_rewrite_compiled_nodes(self) -> bool:
+        """
+        :return: Whether a block of :meth:`modify` that rewrites compiled nodes is open.
+        """
+        return self._open_rewriting_modifications > 0
+
+    def request_reset(self, *, node: StatechartNode) -> None:
+        """
+        Puts `node` and everything below it back to not started at the start of the next
+        settled tick, so a callback can run a node again without a reset condition.
+
+        What `node` reached this tick stays recorded in the history. It starts again on
+        the tick after the reset at the earliest, if its start condition holds then.
+
+        :param node: A node of this statechart.
+        :raises NotInStatechartError: If `node` does not belong to this statechart.
+        """
+        if node._statechart is not self:
+            raise NotInStatechartError(name=node.name)
+        if node in self._requested_resets:
+            return
+        self._requested_resets.append(node)
+        self.structure_change_recorder.record_change(change=ResetRequest(node=node))
+
+    def take_requested_resets(self) -> list[StatechartNode]:
+        """
+        :return: The nodes :meth:`request_reset` was called for since this was last
+            called, in order. They count as carried out from then on.
+        """
+        requested_resets = self._requested_resets
+        self._requested_resets = []
+        return requested_resets
 
     def request_rebuild(self, *, node: StatechartNode) -> None:
         """
@@ -437,6 +490,9 @@ class Statechart(SubclassJSONSerializer):
             if node not in self.compiler.nodes_to_rebuild:
                 self.compiler.nodes_to_rebuild.append(node)
             self.compiler.changed_since_compile = True
+            self.structure_change_recorder.record_change(
+                change=RebuildRequest(node=node)
+            )
 
     def add_node(self, *, node: StatechartNode) -> None:
         """
@@ -449,51 +505,32 @@ class Statechart(SubclassJSONSerializer):
         :param node: The node to add.
         :raises PrerequisiteNotExpandedError: If `node` is a composite node that reads a
             composite node which has not joined this statechart yet.
+        :raises NodesMissingContextExtensionsError: If :attr:`context` lacks an
+            extension `node` requires to expand.
         """
+        self._check_can_join(node=node)
         with self.modify():
             self._register_node(node=node)
             if isinstance(node, CompositeNode):
                 self._expand(node=node)
 
-    def _put_back_replaced_nodes_from(self, *, first_put_back: int) -> None:
+    def _check_can_join(
+        self, *, node: StatechartNode, taken_over: StatechartNode | None = None
+    ) -> None:
         """
-        Puts back every node replaced from `first_put_back` on, the latest first.
+        Rejects `node` before it changes this statechart, so that a rejected node leaves
+        it usable; a child created while `node` expands is checked once it joins.
 
-        :param first_put_back: The position of the first record to undo in
-            :attr:`_replaced_nodes`.
-        """
-        for replaced in reversed(self._replaced_nodes[first_put_back:]):
-            replaced.put_back()
-        del self._replaced_nodes[first_put_back:]
-
-    def _drop_nodes_from(self, *, first_dropped_index: int) -> None:
-        """
-        Drops every node from `first_dropped_index` on, which no compile covered yet.
-
-        :param first_dropped_index: The index of the first node to drop.
-        """
-        if first_dropped_index == len(self._nodes):
-            return
-        self.compiler.changed_since_compile = True
-        kept_nodes = self._nodes[:first_dropped_index]
-        for dropped_node in self._nodes[first_dropped_index:]:
-            parent_node = dropped_node.parent_node
-            if parent_node in kept_nodes and dropped_node in parent_node.nodes:
-                parent_node.nodes.remove(dropped_node)
-            dropped_node._statechart = None
-            dropped_node.index = None
-            dropped_node.parent_node_index = None
-        self._renumber(kept_nodes=kept_nodes)
-
-    def _expand(self, *, node: CompositeNode) -> None:
-        """
-        Expands `node` in :attr:`context`, once every composite node it reads while
-        expanding has joined this statechart.
-
-        :param node: The composite node that just joined this statechart.
+        :param node: The node about to join.
+        :param taken_over: A child `node` was handed that it takes over before it
+            adopts its children, see :meth:`~cramph.node.CompositeNode.take_over`.
+        :raises PrerequisiteNotExpandedError: If `node` is a composite node that reads a
+            composite node which has not joined this statechart yet.
         :raises NodesMissingContextExtensionsError: If :attr:`context` lacks an
             extension `node` requires to expand.
         """
+        if not isinstance(node, CompositeNode):
+            return
         for prerequisite in node.prerequisite_nodes:
             if isinstance(prerequisite, CompositeNode) and (
                 prerequisite._statechart is not self
@@ -505,6 +542,15 @@ class Statechart(SubclassJSONSerializer):
                 expanding_node.context_extensions_required_to_expand
             ),
         )
+        node.check_handed_children(taken_over=taken_over)
+
+    def _expand(self, *, node: CompositeNode) -> None:
+        """
+        Expands `node` in :attr:`context`.
+
+        :param node: The composite node that just joined this statechart, checked by
+            :meth:`_check_can_join`.
+        """
         node.adopt_handed_children()
         node.expand()
 
@@ -515,6 +561,7 @@ class Statechart(SubclassJSONSerializer):
 
         :param node: The node to add.
         """
+        self.structure_change_recorder.record_change(change=NodeAddition(node=node))
         node.statechart = self
         node.index = self.rx_graph.add_node(node)
         self.life_cycle_state.append_default_value()
@@ -528,6 +575,29 @@ class Statechart(SubclassJSONSerializer):
             self._end_nodes.append(node)
         if isinstance(node, CompositeNodeChoosingItsChild):
             self._choosing_nodes.append(node)
+        node._record_structure(recorder=self.structure_change_recorder)
+
+    def apply_change_block_from_json(
+        self, *, data: dict[str, Any], **kwargs: Any
+    ) -> None:
+        """
+        Makes the changes of a block a statechart holding the same nodes as this one
+        recorded, see :class:`~cramph.statechart_changes.StatechartChangeBlock`.
+
+        :param data: The JSON dict of the block.
+        :param kwargs: Forwarded to :func:`~krrood.adapters.json_serializer.from_json`
+            for every change.
+        """
+        block = StatechartChangeBlock.from_json(
+            data=data,
+            **{
+                **DeserializedNodeTracker.from_statechart(
+                    statechart=self
+                ).create_kwargs(),
+                **kwargs,
+            },
+        )
+        block.apply(statechart=self)
 
     def remove_node(self, *, node: StatechartNode) -> None:
         """
@@ -549,36 +619,30 @@ class Statechart(SubclassJSONSerializer):
         removed_nodes = [node, *node.descendants]
         kept_nodes = [kept for kept in self._nodes if kept not in removed_nodes]
         self._check_not_referenced(removed_nodes=removed_nodes, kept_nodes=kept_nodes)
-        parent_node = node.parent_node
-        if parent_node is not None and node in parent_node.nodes:
-            parent_node.nodes.remove(node)
-        self._renumber(kept_nodes=kept_nodes)
-        self.compiler.nodes_to_rebuild = [
-            rebuilt
-            for rebuilt in self.compiler.nodes_to_rebuild
-            if rebuilt in kept_nodes
-        ]
-        for removed_node in removed_nodes:
-            removed_node._statechart = None
-            removed_node.index = None
-            removed_node.parent_node_index = None
+        with self.modify():
+            self.structure_change_recorder.record_change(change=NodeRemoval(node=node))
+            parent_node = node.parent_node
+            if parent_node is not None and node in parent_node.nodes:
+                parent_node.remove_child(child=node)
+            self._renumber(kept_nodes=kept_nodes)
+            self.compiler.nodes_to_rebuild = [
+                rebuilt
+                for rebuilt in self.compiler.nodes_to_rebuild
+                if rebuilt in kept_nodes
+            ]
+            for removed_node in removed_nodes:
+                removed_node._statechart = None
+                removed_node.index = None
+                removed_node.parent_node_index = None
 
     def replace(
         self, *, node: StatechartNode, replacement: StatechartNode | Match
     ) -> None:
         """
-        Puts `replacement` where `node` is: at its position among the children of the
-        control structure node holding it, or on the top level.
-
-        If `replacement` is a composite node with `node` among its children, `node`
-        stays in the statechart as that child, at its position there, and forgets the
-        transitions its former parent decided for it, so that `replacement` decides
-        them. Otherwise `node` leaves the statechart together with everything below it.
-        A :meth:`modify` block that raises puts back a `node` that stayed in the
-        statechart.
-
-        .. warning:: A :meth:`modify` block that raises after `node` left the statechart
-            does not bring it back.
+        Puts `replacement` where `node` is among the children of the control structure
+        node holding it, or on the top level. A composite `replacement` holding `node`
+        keeps it as its child and decides its transitions anew; otherwise `node` leaves
+        with everything below it.
 
         :param node: A node of this statechart, on the top level or a child of a control
             structure node.
@@ -603,9 +667,8 @@ class Statechart(SubclassJSONSerializer):
         holds_node = isinstance(replacement, CompositeNode) and any(
             child is node for child in replacement.nodes
         )
-        record = ReplacedNode.before_replacing(node=node, replacement=replacement)
+        self._check_can_join(node=replacement, taken_over=node if holds_node else None)
         with self.modify():
-            self._replaced_nodes.append(record)
             self._register_node(node=replacement)
             replacement.parent_node = holder
             if holder is not None:
@@ -620,7 +683,6 @@ class Statechart(SubclassJSONSerializer):
                     holder.parent_node._succeed_at_its_goal(child=holder)
             if not holds_node:
                 self.remove_node(node=node)
-                self._replaced_nodes.remove(record)
 
     @staticmethod
     def _check_not_referenced(
@@ -661,22 +723,37 @@ class Statechart(SubclassJSONSerializer):
         for kept_node in kept_nodes:
             if kept_node.parent_node_index is not None:
                 kept_node.parent_node_index = new_index_of[kept_node.parent_node_index]
+        self._number_nodes(nodes=kept_nodes)
+        self._requested_resets = [
+            requested_node
+            for requested_node in self._requested_resets
+            if requested_node in kept_nodes
+        ]
+
+    def _number_nodes(self, *, nodes: list[StatechartNode]) -> None:
+        """
+        Holds `nodes` in this order, numbering them from 0, in a graph without edges,
+        which the next compile adds again.
+
+        :param nodes: Every node of this statechart, with the parent indices of the new
+            numbering.
+        """
         self.rx_graph = rx.PyDAG(multigraph=True)
-        for kept_node in kept_nodes:
-            kept_node.index = self.rx_graph.add_node(kept_node)
-        self._nodes = kept_nodes
+        for node in nodes:
+            node.index = self.rx_graph.add_node(node)
+        self._nodes = nodes
         self._cancel_nodes = [
             cancel_node
-            for cancel_node in self._cancel_nodes
-            if cancel_node in kept_nodes
+            for cancel_node in nodes
+            if isinstance(cancel_node, CancelStatechart)
         ]
         self._end_nodes = [
-            end_node for end_node in self._end_nodes if end_node in kept_nodes
+            end_node for end_node in nodes if isinstance(end_node, EndStatechart)
         ]
         self._choosing_nodes = [
             choosing_node
-            for choosing_node in self._choosing_nodes
-            if choosing_node in kept_nodes
+            for choosing_node in nodes
+            if isinstance(choosing_node, CompositeNodeChoosingItsChild)
         ]
 
     def add_nodes(self, *, nodes: list[StatechartNode]) -> None:
@@ -727,7 +804,8 @@ class Statechart(SubclassJSONSerializer):
         """
         Executes a single tick of the statechart in its :attr:`context`.
 
-        Every node is brought to the state it reaches in this tick, see
+        Every node a reset was requested for is reset, see :meth:`request_reset`, and
+        every node is brought to the state it reaches in this tick, see
         :class:`~cramph.compiled_tick.CompiledTick`, then every node waiting for a child
         chooses one, then the life cycle callbacks of every change run and the tick is
         recorded. A :class:`CancelStatechart` that started in this
@@ -742,7 +820,11 @@ class Statechart(SubclassJSONSerializer):
         callback of this tick is picked up by the next one. While a change of the
         statechart waits for that, no node changes its state, so nothing runs on the
         tick compiled before the change.
+
+        :raises StatechartBrokenByFailedModificationError: If a :meth:`modify` block of
+            this statechart raised.
         """
+        self.check_not_broken()
         self.compiler.compile_if_changed()
         if not self.compiler.changed_since_compile:
             changes = self.compiler.compiled_tick.settle()
@@ -847,7 +929,7 @@ class Statechart(SubclassJSONSerializer):
             :class:`EndStatechart` observes True, False otherwise.
         """
         return any(
-            self.observation_state[node] == ObservationStateValues.TRUE
+            self.observation_state[node] == ObservationStateValue.TRUE
             for node in self._end_nodes
         )
 
@@ -891,12 +973,11 @@ class Statechart(SubclassJSONSerializer):
             LifeCycleChange(
                 node=node,
                 previous_state=node.life_cycle_state,
-                new_state=LifeCycleValues.INTERRUPTED,
+                new_state=LifeCycleValue.INTERRUPTED,
             )
             for node in self.nodes
             if node is not cancelling_node
-            and node.life_cycle_state
-            in (LifeCycleValues.RUNNING, LifeCycleValues.PAUSED)
+            and node.life_cycle_state in (LifeCycleValue.RUNNING, LifeCycleValue.PAUSED)
         ]
         for change in changes:
             self.life_cycle_state[change.node] = change.new_state
@@ -909,7 +990,7 @@ class Statechart(SubclassJSONSerializer):
         for node in self.nodes:
             node.cleanup()
 
-    def draw(self, *, file_name: str) -> None:
+    def draw(self, *, file_name: Path) -> None:
         """
         Uses graphviz to draw the statechart and safe it at `file_name`.
 
@@ -953,8 +1034,8 @@ class Statechart(SubclassJSONSerializer):
     def plot_gantt_chart(
         self,
         *,
-        path: str = "./ganttchart.pdf",
-        context: StatechartContext = None,
+        path: Path = Path("ganttchart.pdf"),
+        context: StatechartContext | None = None,
         second_length_in_cm: float = 2.0,
     ) -> None:
         """
@@ -1044,7 +1125,8 @@ class Statechart(SubclassJSONSerializer):
         :return: The deserialized statechart.
         """
         statechart = cls(context=context)
-        statechart._register_nodes_from_json(data=data, **kwargs)
+        with statechart.modify():
+            statechart._register_nodes_from_json(data=data, **kwargs)
         return statechart
 
     def add_nodes_from_json(self, *, data: dict[str, Any], **kwargs: Any) -> None:
@@ -1084,10 +1166,12 @@ class Statechart(SubclassJSONSerializer):
             transition.owner._set_transition(transition=transition)
         for parent_index, child_indices in data[StatechartJSONKey.CHILDREN].items():
             # JSON writes the integer keys as strings
-            self.get_node_by_index(index=int(parent_index)).nodes = [
-                self.get_node_by_index(index=child_index)
-                for child_index in child_indices
-            ]
+            self.get_node_by_index(index=int(parent_index)).set_children(
+                children=[
+                    self.get_node_by_index(index=child_index)
+                    for child_index in child_indices
+                ]
+            )
         for node_index, child_indices in data[
             StatechartJSONKey.CHOSEN_CHILDREN
         ].items():

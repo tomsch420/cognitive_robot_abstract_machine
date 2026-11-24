@@ -282,7 +282,9 @@ def test_a_region_graph_without_splits_is_a_mixture_of_fully_factorized_inputs()
     )
     assert number_of_sum_weights(circuit) == 4
     data = np.random.default_rng(0).normal(size=(10, 3))
-    assert np.all(np.isfinite(np.asarray(circuit.log_likelihood(jnp.asarray(data)))))
+    assert np.all(
+        np.isfinite(np.asarray(circuit.log_likelihood(events=jnp.asarray(data))))
+    )
 
 
 def test_every_partition_of_a_deep_region_graph_over_few_variables_has_children():
@@ -308,7 +310,7 @@ def test_deep_region_graph_over_few_variables_becomes_a_circuit():
     ).create_random_region_graph()
     model = region_graph.to_probabilistic_circuit(input_units=3, sum_units=5)
     data = jnp.array(np.random.normal(size=(20, 5)))
-    assert jnp.all(jnp.isfinite(model.log_likelihood(data)))
+    assert jnp.all(jnp.isfinite(model.log_likelihood(events=data)))
 
 
 # %% learning
@@ -323,7 +325,9 @@ def test_learned_circuit_has_normalized_parameters(target):
     region_graph = RegionGraph(
         variables=variables, partitions=2, depth=2, repetitions=2
     ).create_random_region_graph()
-    model = region_graph.to_probabilistic_circuit(input_units=5, sum_units=5)
+    model = region_graph.to_probabilistic_circuit(
+        input_units=5, sum_units=5
+    ).to_namespace(jnp, floating_point_type=jnp.result_type(float))
     data = np.random.uniform(0, 1, (100, len(variables)))
     # the symbolic column holds the hashes of domain elements, which the circuit encodes
     target_column = model.variables.index(target)
@@ -355,7 +359,7 @@ def test_classification_circuit_predicts_a_distribution_over_the_target(target):
     ).create_random_region_graph()
     model = region_graph.to_probabilistic_circuit(
         input_units=5, sum_units=5, predicted_variable=target
-    )
+    ).to_namespace(jnp, floating_point_type=jnp.result_type(float))
     assert isinstance(model, LayeredProbabilisticCircuit)
     assert model.variables == features | SortedSet([target])
 
