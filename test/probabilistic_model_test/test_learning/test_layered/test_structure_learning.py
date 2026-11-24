@@ -74,7 +74,9 @@ def total_probability(circuit: LayeredProbabilisticCircuit) -> float:
     :return: The summed probability of every assignment.
     """
     rows = all_binary_rows(variables=circuit.variables)
-    return float(np.exp(logsumexp(circuit.to_namespace(np).log_likelihood(events=rows))))
+    return float(
+        np.exp(logsumexp(circuit.to_namespace(np).log_likelihood(events=rows)))
+    )
 
 
 # %% mutual information
@@ -211,7 +213,9 @@ def test_growing_without_noise_keeps_the_distribution(bits):
         circuit.variables, Growing(noise_variance=0.0).grown_root(root=circuit.root)
     )
     assert grown.number_of_nodes > circuit.number_of_nodes
-    np.testing.assert_allclose(grown.log_likelihood(events=rows), circuit.log_likelihood(events=rows))
+    np.testing.assert_allclose(
+        grown.log_likelihood(events=rows), circuit.log_likelihood(events=rows)
+    )
 
 
 # %% LearnSPN

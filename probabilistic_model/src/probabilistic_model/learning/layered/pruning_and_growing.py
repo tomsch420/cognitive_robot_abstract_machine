@@ -181,7 +181,7 @@ class Growing:
         for layer in reversed(root.all_layers()):
             copies = 1 if layer is root else 2
             if not isinstance(layer, InnerLayer):
-                grown[layer] = type(layer).concatenate([layer, layer])
+                grown[layer] = type(layer).concatenate(layers=[layer, layer])
             elif isinstance(layer, SumLayer):
                 grown[layer] = self.grown_sum_layer(
                     layer=layer,

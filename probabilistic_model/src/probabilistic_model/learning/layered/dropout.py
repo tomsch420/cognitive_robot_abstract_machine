@@ -71,7 +71,9 @@ class ProbabilisticDropout:
         for layer in reversed(layers):
             layer_key = next(keys)
             if not isinstance(layer, InnerLayer):
-                log_likelihoods = layer.log_likelihood_of_nodes(events=data, cache=cache)
+                log_likelihoods = layer.log_likelihood_of_nodes(
+                    events=data, cache=cache
+                )
                 kept = jax.random.bernoulli(
                     layer_key, 1 - self.input_probability, log_likelihoods.shape
                 )
@@ -92,7 +94,7 @@ class ProbabilisticDropout:
                     )
                     child_results.append(jnp.where(kept, child_result, -jnp.inf))
                 cache.results[self.cache_key(layer=layer)] = layer.log_weighted_sum(
-                    child_results
+                    child_results=child_results
                 )
             else:
                 layer.log_likelihood_of_nodes(events=data, cache=cache)

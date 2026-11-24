@@ -179,8 +179,10 @@ class SumLayerMaximization(LayerMaximization):
         return [
             HasParameterArrays.host_copy(
                 layer.edges.stored_values(
-                    SparseEntries(log_weights, layer.edges.rows, layer.edges.columns),
-                    -np.inf,
+                    entries=SparseEntries(
+                        log_weights, layer.edges.rows, layer.edges.columns
+                    ),
+                    padding=-np.inf,
                 )
             )
         ]
@@ -220,10 +222,14 @@ class CategoricalLayerMaximization(LayerMaximization):
         node_flows: np.ndarray,
         edge_flows: np.ndarray | None,
     ) -> np.ndarray:
-        # the log-probabilities are normalized outside of the forward pass, so their
-        # gradient is the expected count of every state
-        (counts,) = gradients
-        return counts.ravel()
+        # the forward pass normalizes the log-probabilities per node, so the gradient
+        # of a state is its expected count minus the flow of its node times its
+        # probability
+        (gradient,) = gradients
+        probabilities = np.exp(
+            HasParameterArrays.host_copy(layer.table.log_probabilities)
+        )
+        return (gradient + node_flows[:, np.newaxis] * probabilities).ravel()
 
     def normalized_statistics(
         self,
@@ -276,13 +282,13 @@ class GaussianLayerMaximization(LayerMaximization):
         node_flows: np.ndarray,
         edge_flows: np.ndarray | None,
     ) -> np.ndarray:
-        # the gradient of the log-density by location and scale is linear in the flow-
-        # weighted sums of x and (x - location)^2, which are solved for here
-        location_gradient, scale_gradient = gradients
+        # the gradient of the log-density by location and log-scale is linear in the
+        # flow-weighted sums of x and (x - location)^2, which are solved for here
+        location_gradient, log_scale_gradient = gradients
         location = HasParameterArrays.host_copy(layer.location)
         scale = HasParameterArrays.host_copy(layer.scale)
         first = scale**2 * location_gradient + node_flows * location
-        squared_deviation = scale**3 * scale_gradient + scale**2 * node_flows
+        squared_deviation = scale**2 * (log_scale_gradient + node_flows)
         second = squared_deviation + 2 * location * first - location**2 * node_flows
         return np.stack([first, second], axis=1).ravel()
 
@@ -291,7 +297,7 @@ class GaussianLayerMaximization(LayerMaximization):
     ) -> list[np.ndarray]:
         first, second = statistics.reshape(-1, 2).T
         variance = np.maximum(second - first**2, layer.minimum_scale**2)
-        return [first, np.sqrt(variance)]
+        return [first, np.log(variance) / 2]
 
 
 # %% all maximizations

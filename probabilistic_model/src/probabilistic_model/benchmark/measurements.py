@@ -229,7 +229,9 @@ class Measurement:
         """
         return np.concatenate(
             [
-                circuit.log_likelihood(events=rows[start : start + self.evaluation_batch_size])
+                circuit.log_likelihood(
+                    events=rows[start : start + self.evaluation_batch_size]
+                )
                 for start in range(0, len(rows), self.evaluation_batch_size)
             ]
         )
