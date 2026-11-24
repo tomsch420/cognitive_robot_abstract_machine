@@ -1,24 +1,23 @@
 schema_version: 1
 id: circuit-learning-methods
 title: State-of-the-art learning methods for probabilistic circuits
-description: 'Survey current parameter and structure learning methods for probabilistic circuits,
-  measure them on one shared benchmark, and implement the ones that pay off in probabilistic_model
-  on the tensorized layered circuits. Starts once region graphs build tensorized RAT-SPNs
-  (cram2#976).
+description: 'Implement current parameter and structure learning methods for probabilistic
+  circuits in probabilistic_model on the tensorized layered circuits, and measure each on the
+  shared circuit-learning benchmark.
 
   '
 default_repository: tomsch420/cognitive_robot_abstract_machine
 tracking_issue: 41
 waves:
 - id: foundation
-  name: Survey and benchmark
-  description: Decide what to build and how every method is measured.
+  name: Benchmark
+  description: How every method is measured.
 - id: methods
   name: Learning methods
   description: Parameter and structure learning, in parallel tracks.
 tracks:
 - id: survey-and-benchmark
-  name: Survey and benchmark
+  name: Benchmark
   wave: foundation
 - id: parameter-learning
   name: Parameter learning
@@ -27,27 +26,14 @@ tracks:
   name: Structure learning
   wave: methods
 items:
-- id: learning-methods-survey
-  title: Survey state-of-the-art learning methods for probabilistic circuits
-  track: survey-and-benchmark
-  branch: learning-methods-survey
-  pull_request_number: 42
-  session: https://claude.ai/code/session_01LzY41J7dEMMTMGn2EDVH97
-  depends_on: []
-  status: in progress
-  notes: 'Parameter and structure learning only (the developer excluded expressive architectures
-    and Bayesian learning). Compare published methods by reported results on standard benchmarks,
-    cost, and fit with the tensorized layered circuits; deliver a short doc page in probabilistic_model/doc.
-    Confirms, reorders or drops the candidate items below and adds missing ones, announced
-    on the tracking PR.
-
-    '
 - id: minibatch-em-tensorized
   title: Mini-batch expectation maximization on layered circuits
   track: parameter-learning
-  depends_on:
-  - learning-methods-survey
-  status: not started
+  repository: cram2/cognitive_robot_abstract_machine
+  branch: tensorized-expectation-maximization
+  pull_request_number: 1050
+  depends_on: []
+  status: in progress
   notes: 'Stochastic EM for layered circuits on any array backend, with the expected counts
     taken from the gradient of the log-likelihood (Peharz et al. 2020, Einsum Networks). The
     existing expectation_maximization.py works on rustworkx circuits only.
@@ -86,8 +72,7 @@ items:
 - id: learnspn
   title: LearnSPN structure learning
   track: structure-learning
-  depends_on:
-  - learning-methods-survey
+  depends_on: []
   status: not started
   notes: 'Gens and Domingos 2013: recursive clustering of rows into sums and independence
     splits of variables into products. Check overlap with the existing JPT and Nyga induction
@@ -97,8 +82,7 @@ items:
 - id: hidden-chow-liu-trees
   title: Hidden Chow-Liu tree circuits
   track: structure-learning
-  depends_on:
-  - learning-methods-survey
+  depends_on: []
   status: not started
   notes: 'Liu and Van den Broeck 2021: a Chow-Liu tree over the variables with a latent variable
     per node, compiled into a tensorized layered circuit; the standard strong baseline of
@@ -125,7 +109,7 @@ items:
   notes: 'Liu, Shao and Van den Broeck 2026, Rethinking Probabilistic Circuit Parameter Learning:
     mini-batch EM with a learning rate per parameter scaled by its contribution to the batch
     likelihood; beats full-batch and mini-batch EM in final log-likelihood and epochs. Uses
-    the expected counts of minibatch-em-tensorized. Added by the survey.
+    the expected counts of minibatch-em-tensorized. 
 
     '
 - id: strudel
@@ -148,26 +132,5 @@ items:
   notes: 'Sampling, truncation and conditioning raise HostOnlyQueryError unless the parameters
     are numpy arrays, so the benchmark times them on numpy only. Make them work on jax and
     torch so those cells of the benchmark fill. Added by the developer at the benchmark kickoff.
-
-    '
-- id: cirkit-comparison
-  title: Compare the layered circuits with cirkit
-  branch: cirkit-comparison
-  track: survey-and-benchmark
-  pull_request_number: 47
-  session: local Claude Code session 1cc90951-6ec3-44b9-9fb2-b5cec8d83bbd
-  blockers:
-    - >-
-      cirkit 0.3.1 clamps log values at -708.3964 (LOG_CLAMP_MIN), so on AD, about -1136 per row
-      at the start, it gives every row one value, gets no gradient and never trains. Benchmark
-      stopped 2026-11-20 until AD runs with and without the clamp.
-  depends_on: []
-  status: in progress
-  notes: 'Run cirkit on the shared benchmark as a method of its own: the same RAT-SPN on the
-    same datasets, trained as cirkit trains it with torch on CPU and GPU, with every metric
-    of the first standing rule, seconds per epoch included; the pull request also compares
-    the features of both libraries. On AD cirkit runs twice, unchanged and with LOG_CLAMP_MIN
-    at the lowest float32. After cram2#1033, cirkit takes the unfolded RAT-SPN (fold=False)
-    and Gaussian log scales.
 
     '

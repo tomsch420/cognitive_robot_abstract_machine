@@ -1,5 +1,4 @@
-learning-methods-survey	circuit-learning-methods
-cirkit-comparison	circuit-learning-methods
+tensorized-expectation-maximization	circuit-learning-methods
 leaf-variables-per-node	folded-layered-circuits
 per-node-scopes	folded-layered-circuits
 folded-edge-matrix	folded-layered-circuits
