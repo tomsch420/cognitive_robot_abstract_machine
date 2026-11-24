@@ -18,14 +18,25 @@ from cramph.node import StatechartNode
 from cramph.statechart import Statechart
 from experiments.robocasa_atomic_tasks import skills
 from experiments.robocasa_atomic_tasks.panda_omron import PandaOmron
-from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPoseStraight
+from .conftest import KitchenOfBoxes
+from giskardpy.motion_statechart.tasks.cartesian_tasks import (
+    CartesianPose,
+    CartesianPoseStraight,
+)
 from giskardpy.motion_statechart.tasks.cartesian_tasks import HoldPose
 from experiments.robocasa_atomic_tasks.skills import (
     FingerApproach,
     FingerPressAction,
     FingerWithdrawAction,
+    LetGoOfTheHandleAction,
     PressAction,
 )
+from giskardpy.motion_statechart.tasks.gripper import MoveGripper
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.collision_checking.collision_rules import (
+    AllowCollisionForEndEffector,
+)
+from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.datastructures.definitions import GripperState
 
 # %% every action
@@ -197,3 +208,95 @@ def test_a_withdrawal_of_a_robot_moving_its_whole_body_leaves_the_base_free(
     steps = withdrawal.create_steps()
 
     assert [len(base_holds_of(step, panda_omron)) for step in steps] == [0, 0]
+
+
+# %% letting go of a handle
+
+
+def tool_goal_in_the_handle_frame(
+    step: StatechartNode, kitchen_of_boxes: KitchenOfBoxes
+) -> np.ndarray:
+    """
+    :param step: A step moving the tool frame to a pose relative to the handle.
+    :return: That pose, in the handle's frame.
+    """
+    assert isinstance(step, CartesianPose)
+    assert step.goal_pose.reference_frame is kitchen_of_boxes.handle.root
+    return step.goal_pose.to_np()
+
+
+@pytest.fixture
+def letting_go(
+    panda_omron: PandaOmron, kitchen_of_boxes: KitchenOfBoxes
+) -> LetGoOfTheHandleAction:
+    """
+    Letting go of the handle of the kitchen of boxes, held by a grasp at its middle that
+    approaches it along its depth, in a statechart acting with the robot.
+    """
+    [arm] = panda_omron.all_arms
+    handle = kitchen_of_boxes.handle
+    letting_go = LetGoOfTheHandleAction(
+        grasp_candidate=GraspCandidate(
+            graspable=handle,
+            grasp_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                reference_frame=handle.root
+            ).pose,
+        ),
+        arm=arm,
+    )
+    Statechart(
+        context=StatechartContext.with_extensions(
+            world=arm._world, extensions=[RobotAccess(robot=panda_omron)]
+        )
+    ).add_node(node=letting_go)
+    return letting_go
+
+
+def test_letting_go_opens_the_gripper_first(letting_go: LetGoOfTheHandleAction):
+    opening, _, _ = letting_go.create_steps()
+
+    end_effector = letting_go.arm.end_effector
+    assert isinstance(opening, MoveGripper)
+    assert opening.width == end_effector.separation_at(
+        end_effector.default_configuration(GripperState.OPEN).joint_state
+    )
+
+
+def test_letting_go_centres_the_tool_frame_on_the_grasp(
+    letting_go: LetGoOfTheHandleAction, kitchen_of_boxes: KitchenOfBoxes
+):
+    _, centring, _ = letting_go.create_steps()
+
+    end_effector = letting_go.arm.end_effector
+    np.testing.assert_allclose(
+        tool_goal_in_the_handle_frame(centring, kitchen_of_boxes),
+        end_effector.tool_frame_goal_for_grasp(
+            letting_go.grasp_candidate.grasp_pose
+        ).to_np(),
+        atol=1e-12,
+    )
+
+
+def test_letting_go_backs_straight_off_out_of_the_handle_by_the_clearance(
+    letting_go: LetGoOfTheHandleAction, kitchen_of_boxes: KitchenOfBoxes
+):
+    _, _, backing_off = letting_go.create_steps()
+
+    assert isinstance(backing_off, CartesianPoseStraight)
+    handle_T_tool = tool_goal_in_the_handle_frame(backing_off, kitchen_of_boxes)
+    tool_P_grasp = letting_go.arm.end_effector.tool_P_grasp_when_closed.to_np()
+    half_depth = kitchen_of_boxes.handle_scale.x / 2
+    np.testing.assert_allclose(
+        (handle_T_tool @ tool_P_grasp)[:3],
+        [-(half_depth + letting_go.release_clearance), 0.0, 0.0],
+        atol=1e-9,
+    )
+
+
+def test_letting_go_allows_the_gripper_to_touch_the_handle(
+    letting_go: LetGoOfTheHandleAction,
+):
+    [rule] = letting_go.create_temporary_collision_rules()
+
+    assert isinstance(rule, AllowCollisionForEndEffector)
+    assert rule.end_effector is letting_go.arm.end_effector

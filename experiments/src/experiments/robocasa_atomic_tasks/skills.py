@@ -21,14 +21,23 @@ from scipy.spatial.transform import Rotation, Slerp
 from coraplex.datastructures.trajectory import PoseTrajectory
 from coraplex.querying.grasp_closeness import GraspCloseness
 from coraplex.robot_plans.actions.base import GoalAction, SequentialAction
-from coraplex.robot_plans.actions.core.container import MovesContainerByItsHandle
+from coraplex.robot_plans.actions.core.container import (
+    CloseAction,
+    MovesContainerByItsHandle,
+)
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.pick_up import PickUpAction
 from coraplex.robot_plans.actions.core.placing import PlaceAction
 from coraplex.robot_plans.actions.core.robot_body import (
     FollowToolCenterPointPathAction,
 )
-from coraplex.robot_plans.mixins import MovesToolCenterPoint, OperatesGripper
+from coraplex.robot_plans.mixins import (
+    HasArmParameter,
+    HasGraspApproach,
+    HasGraspCandidateParameter,
+    MovesToolCenterPoint,
+    OperatesGripper,
+)
 from cramph.composites import Parallel
 from cramph.data_types import ObservationStateValue
 from cramph.monitors import CountSimulationTimeSeconds
@@ -429,7 +438,9 @@ class DriveJoint(EndedByOwner, CompositeNode):
                 ),
                 CartesianPose(
                     name="hold part",
-                    kinematic_chain=KinematicChain(root=self.environment_link, tip=self.tip_link),
+                    kinematic_chain=KinematicChain(
+                        root=self.environment_link, tip=self.tip_link
+                    ),
                     goal_pose=Pose(reference_frame=self.tip_link),
                     weight=self.grasp_weight,
                 ),
@@ -460,7 +471,8 @@ class HoldsBase(MovesToolCenterPoint, ABC):
             starts.
         """
         return HoldPose(
-            name="hold base", kinematic_chain=KinematicChain(root=self.world.root, tip=self.robot.root)
+            name="hold base",
+            kinematic_chain=KinematicChain(root=self.world.root, tip=self.robot.root),
         )
 
 
@@ -592,7 +604,10 @@ class OperateMechanismAction(DrivesAJointByAPart, MovesContainerByItsHandle):
                 configuration=end_effector.default_configuration(GripperState.OPEN)
             ),
             self.tool_center_point_goal(
-                target=self.back_off_pose(self.grasp_candidate.grasp_pose, end_effector), arm=self.arm
+                target=self.back_off_pose(
+                    self.grasp_candidate.grasp_pose, end_effector
+                ),
+                arm=self.arm,
             ),
         ]
 
@@ -682,6 +697,96 @@ class StandAndOperateMechanismAction(MayReachThroughFreeSpace, SequentialAction)
                 a(ReachThroughFreeSpaceAction)(goal=pre_grasp, arm=operate.arm)
             ),
             operate,
+        ]
+
+
+# %% letting go of a handle
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class LetGoOfTheHandleAction(
+    OperatesGripper,
+    MovesToolCenterPoint,
+    SequentialAction,
+    HasGraspCandidateParameter,
+    HasArmParameter,
+):
+    """
+    Opens the gripper on the handle it holds by :attr:`grasp_candidate`, centres the
+    tool frame on that grasp again, so that no finger stays hooked behind the handle,
+    and backs off in a straight line along the way the gripper came in until the
+    gripper clears the handle.
+    """
+
+    release_clearance: float = 0.12
+    """
+    The gap in metres between the handle and the gripper once it has backed off.
+    """
+
+    def create_temporary_collision_rules(self) -> list[CollisionRule]:
+        """
+        :return: An allowance for the gripper to touch the handle while it opens on it,
+            centres on it and backs off it.
+        """
+        return [AllowCollisionForEndEffector(end_effector=self.arm.end_effector)]
+
+    def create_steps(self) -> list[StatechartNode]:
+        end_effector = self.arm.end_effector
+        grasp_pose = self.grasp_candidate.grasp_pose
+        return [
+            self.gripper_goal_type.create_gripper_goal(
+                configuration=end_effector.default_configuration(GripperState.OPEN)
+            ),
+            self.tool_center_point_goal(
+                target=end_effector.tool_frame_goal_for_grasp(grasp_pose), arm=self.arm
+            ),
+            self.tool_center_point_goal(
+                target=HasGraspApproach.pre_grasp_pose(
+                    reference_T_grasp=grasp_pose,
+                    end_effector=end_effector,
+                    distance=self.back_off_distance,
+                ),
+                arm=self.arm,
+                in_a_straight_line=True,
+            ),
+        ]
+
+    @property
+    def back_off_distance(self) -> float:
+        """
+        How far in metres the gripper backs off from the grasp along the way it came in:
+        out of the handle's bounding box and :attr:`release_clearance` beyond.
+        """
+        handle = self.grasp_candidate.graspable.root
+        return (
+            HasGraspApproach.distance_out_of(
+                bounding_box=handle.collision.as_bounding_box_collection_in_frame(
+                    handle
+                ).bounding_box(),
+                reference_T_grasp=self.grasp_candidate.grasp_pose,
+            )
+            + self.release_clearance
+        )
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class CloseByTheHandleAction(CloseAction):
+    """
+    Closes a container like object by its handle and lets go of the handle by
+    :class:`LetGoOfTheHandleAction`.
+    """
+
+    def create_steps(self) -> list[StatechartNode]:
+        """
+        Differs from :meth:`CloseAction.create_steps` in letting go of the handle by
+        :class:`LetGoOfTheHandleAction`.
+        """
+        return [
+            self.create_grasping_action(
+                grasp_candidate=self.grasp_candidate, arm=self.arm
+            ),
+            self._create_mechanism_goal(),
+            LetGoOfTheHandleAction(grasp_candidate=self.grasp_candidate, arm=self.arm),
         ]
 
 
