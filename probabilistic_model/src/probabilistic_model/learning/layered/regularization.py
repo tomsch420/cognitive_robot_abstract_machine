@@ -1,12 +1,12 @@
 """
 Data softening and entropy regularization of :cite:`liu2021tractable`, which regularize
-expectation maximization on layered circuits.
+tensorized expectation maximization of layered circuits.
 """
 
 from __future__ import annotations
 
 # %% imports
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 from array_api_compat import array_namespace
@@ -14,8 +14,14 @@ from array_api_compat import array_namespace
 from probabilistic_model.learning.layered.exceptions import (
     UnsupportedEntropyLayerError,
 )
-from probabilistic_model.learning.layered.flows import CircuitParameterLayout
-from probabilistic_model.learning.layered.gradients import ParameterTransformation
+from probabilistic_model.learning.layered.flows import TopDownPass
+from probabilistic_model.learning.layered.statistics_adjustment import (
+    LearnedLayerStatistics,
+    StatisticsAdjustment,
+)
+from probabilistic_model.learning.parameters.expectation_maximization.layer_maximization import (
+    EdgeCounts,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     BackendArray,
 )
@@ -25,6 +31,9 @@ from probabilistic_model.probabilistic_circuit.tensorized.has_parameter_arrays i
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.base import (
     InnerLayer,
     Layer,
+)
+from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.edge_matrix import (
+    SparseEntries,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.sum_layer import (
     SumLayer,
@@ -44,7 +53,7 @@ from probabilistic_model.probabilistic_circuit.tensorized.input_layer.probabilit
 
 
 @dataclass(kw_only=True)
-class DataSoftening(ParameterTransformation):
+class DataSoftening:
     """
     Trains on the softened data of :cite:`liu2021tractable`, section 4.2: every observed
     discrete value keeps its state with probability :attr:`keep_probability` and moves
@@ -63,29 +72,47 @@ class DataSoftening(ParameterTransformation):
     def transformed(
         self, *, root: Layer, parameters: list[BackendArray]
     ) -> list[BackendArray]:
-        layout = CircuitParameterLayout(root=root)
-        arrays_of_layers = layout.split(arrays=parameters)
-        for layer, arrays in arrays_of_layers.items():
-            if not (
-                isinstance(layer, DiscreteLayer)
-                and isinstance(layer.table, DenseProbabilityTable)
-                and layer.number_of_states > 1
-            ):
-                continue
-            (log_probabilities,) = arrays
-            namespace = array_namespace(log_probabilities)
-            probabilities = namespace.exp(log_probabilities)
-            # the mass of the other states is summed rather than taken as one minus the
-            # state's own, so that the gradient reaches every state a value may come from
-            totals = namespace.sum(probabilities, axis=1, keepdims=True)
-            other = (totals - probabilities) / (layer.number_of_states - 1)
-            arrays_of_layers[layer] = [
-                namespace.log(
-                    self.keep_probability * probabilities
-                    + (1 - self.keep_probability) * other
-                )
-            ]
-        return layout.join(arrays_of_layers=arrays_of_layers)
+        """
+        :param root: The root layer of the circuit.
+        :param parameters: Arrays in the order of :attr:`Layer.circuit_parameters`.
+        :return: The arrays whose likelihood is the likelihood of the softened data.
+        """
+        return [
+            array
+            for layer, arrays in zip(
+                root.all_layers(), root.parameters_by_layer(parameters=parameters)
+            )
+            for array in self.softened_arrays(layer=layer, arrays=arrays)
+        ]
+
+    def softened_arrays(
+        self, *, layer: Layer, arrays: list[BackendArray]
+    ) -> list[BackendArray]:
+        """
+        :param layer: A layer of the circuit.
+        :param arrays: Parameter arrays of the layer.
+        :return: The arrays of a discrete layer with a dense table and several states
+            softened, every other layer's arrays unchanged.
+        """
+        if not (
+            isinstance(layer, DiscreteLayer)
+            and isinstance(layer.table, DenseProbabilityTable)
+            and layer.number_of_states > 1
+        ):
+            return arrays
+        (log_probabilities,) = arrays
+        namespace = array_namespace(log_probabilities)
+        probabilities = namespace.exp(log_probabilities)
+        # the mass of the other states is summed rather than taken as one minus the
+        # state's own, so that the gradient reaches every state a value may come from
+        totals = namespace.sum(probabilities, axis=1, keepdims=True)
+        other = (totals - probabilities) / (layer.number_of_states - 1)
+        return [
+            namespace.log(
+                self.keep_probability * probabilities
+                + (1 - self.keep_probability) * other
+            )
+        ]
 
 
 # %% entropies
@@ -157,7 +184,7 @@ class NodeEntropies:
 
 
 @dataclass(kw_only=True)
-class EntropyRegularization:
+class EntropyRegularization(StatisticsAdjustment):
     """
     The entropy regularization of :cite:`liu2021tractable`, algorithm 3: the weights of
     every mixture maximize the average log-likelihood plus :attr:`strength` times the
@@ -184,6 +211,34 @@ class EntropyRegularization:
     The largest change of a log-weight in one Newton step, which keeps the exponential
     of the negated log-weight finite.
     """
+
+    def adjusted(self, *, statistics: LearnedLayerStatistics) -> LearnedLayerStatistics:
+        """
+        Replace the counts of every sum layer by those whose maximization is the
+        regularized weights, see :meth:`StatisticsAdjustment.adjusted`.
+        """
+        regularized = EntropyRegularizedTopDownProbabilities(
+            root=statistics.root,
+            regularization=self,
+            edge_counts={
+                layer: layer_statistics
+                for layer, layer_statistics in zip(
+                    statistics.layers, statistics.statistics
+                )
+                if isinstance(layer_statistics, EdgeCounts)
+            },
+            entropies=NodeEntropies(root=statistics.root).compute(),
+            number_of_rows=statistics.number_of_rows,
+        )
+        regularized.compute()
+        return statistics.with_statistics(
+            statistics=[
+                regularized.regularized_counts.get(layer, layer_statistics)
+                for layer, layer_statistics in zip(
+                    statistics.layers, statistics.statistics
+                )
+            ]
+        )
 
     def regularized_weights(
         self,
@@ -273,3 +328,72 @@ class EntropyRegularization:
                 step, -self.maximum_newton_step, self.maximum_newton_step
             )
         return log_weights
+
+
+@dataclass(kw_only=True)
+class EntropyRegularizedTopDownProbabilities(TopDownPass):
+    """
+    The top-down probabilities of the circuit with the entropy-regularized weights,
+    which every mixture is regularized with once the regularized weights above it are
+    known, :cite:`liu2021tractable`, algorithm 3.
+    """
+
+    regularization: EntropyRegularization
+    """
+    The regularization whose weights are solved for.
+    """
+
+    edge_counts: dict[SumLayer, EdgeCounts]
+    """
+    The counts of every sum layer since the last update.
+    """
+
+    entropies: dict[Layer, np.ndarray]
+    """
+    The entropy of every node at the current parameters.
+    """
+
+    number_of_rows: int
+    """
+    The number of rows the counts were counted on.
+    """
+
+    regularized_counts: dict[SumLayer, EdgeCounts] = field(
+        default_factory=dict, init=False
+    )
+    """
+    The counts of every sum layer whose maximization is its regularized weights, filled
+    by :meth:`compute`.
+    """
+
+    @property
+    def root_value(self) -> float:
+        return 1.0
+
+    def sum_edge_values(
+        self, *, layer: SumLayer, node_values: np.ndarray
+    ) -> np.ndarray:
+        rows, columns = layer.edges.rows, layer.edges.columns
+        # rounding can make a vanishing count slightly negative, which no count is
+        counts = np.maximum(
+            layer.edges.edge_values(stored=self.edge_counts[layer].counts), 0.0
+        )
+        child_entropies = np.concatenate(
+            [self.entropies[child_layer] for child_layer in layer.child_layers]
+        )[columns]
+        weights = np.nan_to_num(
+            self.regularization.regularized_weights(
+                average_counts=counts / self.number_of_rows,
+                owners=rows,
+                top_down_probabilities=node_values,
+                child_entropies=child_entropies,
+            )
+        )
+        node_counts = np.bincount(rows, weights=counts, minlength=layer.number_of_nodes)
+        self.regularized_counts[layer] = EdgeCounts(
+            counts=layer.edges.stored_values(
+                entries=SparseEntries(weights * node_counts[rows], rows, columns),
+                padding=0.0,
+            )
+        )
+        return weights * node_values[rows]

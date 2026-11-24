@@ -19,7 +19,7 @@ from probabilistic_model.learning.layered.exceptions import (
     UnsupportedStructureVariableError,
 )
 from probabilistic_model.learning.layered.expectation_maximization import (
-    FullBatchExpectationMaximization,
+    CircuitExpectationMaximization,
 )
 from probabilistic_model.learning.layered.hidden_chow_liu_tree import (
     ChowLiuTree,
@@ -164,7 +164,7 @@ def test_distilled_circuit_is_normalized(bits):
         heads=2,
         layers=1,
         epochs=1,
-        fine_tuning=FullBatchExpectationMaximization(epochs=1),
+        fine_tuning=CircuitExpectationMaximization(epochs=1),
     ).build_circuit(data=rows)
     assert total_probability(circuit) == pytest.approx(1.0)
 
@@ -180,10 +180,8 @@ def test_pruning_removes_the_fraction_and_keeps_an_edge_per_unit(bits):
     circuit = HiddenChowLiuTree(variables=variables, hidden_states=4).build_circuit(
         data=rows
     )
-    FullBatchExpectationMaximization(epochs=3).fit(circuit=circuit, data=rows)
-    flows = DatasetEdgeFlows(root=circuit.root).compute(
-        data=np.asarray(circuit.encoded(rows))
-    )
+    CircuitExpectationMaximization(epochs=3).fit(circuit=circuit, data=rows)
+    flows = DatasetEdgeFlows(circuit=circuit).compute(data=rows)
     host = circuit.to_namespace(np)
     pruned = Pruning(pruned_fraction=0.75).pruned_root(root=host.root, edge_flows=flows)
     original = [layer for layer in host.layers if isinstance(layer, SumLayer)]

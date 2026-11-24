@@ -17,8 +17,7 @@ from sklearn.cluster import MiniBatchKMeans
 from sortedcontainers import SortedSet
 
 from probabilistic_model.learning.layered.expectation_maximization import (
-    ExpectationMaximization,
-    MiniBatchExpectationMaximization,
+    CircuitExpectationMaximization,
 )
 from probabilistic_model.learning.layered.hidden_chow_liu_tree import (
     HiddenChowLiuTree,
@@ -172,8 +171,8 @@ class LatentVariableDistillation:
     The learning rate of the autoencoder's Adam optimizer.
     """
 
-    fine_tuning: ExpectationMaximization = field(
-        default_factory=lambda: MiniBatchExpectationMaximization(epochs=10)
+    fine_tuning: CircuitExpectationMaximization = field(
+        default_factory=lambda: CircuitExpectationMaximization.mini_batch(epochs=10)
     )
     """
     The training of the circuit on the observed rows after it was counted.

@@ -12,11 +12,11 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from probabilistic_model.learning.layered.expectation_maximization import (
-    ExpectationMaximization,
-    MiniBatchExpectationMaximization,
+    CircuitExpectationMaximization,
 )
-from probabilistic_model.learning.layered.flows import ExpectedFlows
-from probabilistic_model.learning.layered.gradients import LogLikelihoodGradient
+from probabilistic_model.learning.layered.statistics_adjustment import (
+    StatisticsRecorder,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     SampleArray,
 )
@@ -50,45 +50,48 @@ from probabilistic_model.probabilistic_circuit.tensorized.layered_probabilistic_
 @dataclass(kw_only=True)
 class DatasetEdgeFlows:
     """
-    The expected flow of every sum edge of a circuit summed over a whole dataset, taken
-    in batches.
+    The expected flow of every sum edge of a circuit summed over a whole dataset, the
+    edge counts of tensorized expectation maximization taken in batches.
     """
 
-    root: Layer
+    circuit: LayeredProbabilisticCircuit
     """
-    The root layer of the circuit, whose parameters are jax or torch arrays.
+    The circuit, whose parameters are jax or torch arrays.
     """
 
     batch_size: int = 1024
     """
-    The number of rows per gradient evaluation.
+    The number of rows per batch.
     """
 
-    def compute(self, *, data: np.ndarray) -> dict[int, np.ndarray]:
+    def compute(self, *, data: SampleArray) -> dict[int, np.ndarray]:
         """
-        :param data: The encoded rows.
+        :param data: The rows, whose symbolic values are hashes of domain elements.
         :return: The flow of every edge of every sum layer, by the position of the layer
             in :meth:`Layer.all_layers`.
         """
+        expectation_maximization = CircuitExpectationMaximization(
+            epochs=1,
+            batch_size=self.batch_size,
+            statistics_adjustments=[StatisticsRecorder()],
+        )
+        learning = expectation_maximization.learner(root=self.circuit.root)
+        expectation_maximization.trained_root(
+            learning=learning, circuit=self.circuit, data=data
+        )
+        [recorder] = learning.statistics_adjustments
+        recorded = recorder.recorded
         positions = {
-            layer: position for position, layer in enumerate(self.root.all_layers())
+            layer: position for position, layer in enumerate(recorded.root.all_layers())
         }
-        gradient = LogLikelihoodGradient.from_root(root=self.root)
-        totals: dict[int, np.ndarray] = {}
-        for start in range(0, len(data), self.batch_size):
-            batch = data[start : start + self.batch_size]
-            result = gradient.compute(
-                data=self.root.namespace.asarray(
-                    batch, dtype=self.root.floating_point_type, device=self.root.device
-                )
+        # rounding can make a vanishing flow slightly negative, which no flow is
+        return {
+            positions[layer]: np.maximum(
+                layer.edges.edge_values(stored=layer_statistics.counts), 0.0
             )
-            flows = ExpectedFlows.from_parameter_gradients(
-                root=self.root, gradients=result.gradients, number_of_rows=len(batch)
-            ).compute()
-            for layer, edge_flows in flows.edge_values.items():
-                position = positions[layer]
-                totals[position] = totals.get(position, 0.0) + edge_flows
-        return totals
+            for layer, layer_statistics in zip(recorded.layers, recorded.statistics)
+            if isinstance(layer, SumLayer)
+        }
 
 
 # %% pruning
@@ -279,8 +282,8 @@ class PruningAndGrowing:
     log-likelihood and keeps the circuit before it.
     """
 
-    parameter_learning: ExpectationMaximization = field(
-        default_factory=lambda: MiniBatchExpectationMaximization(epochs=50)
+    parameter_learning: CircuitExpectationMaximization = field(
+        default_factory=lambda: CircuitExpectationMaximization.mini_batch(epochs=50)
     )
     """
     The parameter learning after every growing step, mini-batch expectation maximization
@@ -304,7 +307,7 @@ class PruningAndGrowing:
 
     batch_size: int = 1024
     """
-    The number of rows per gradient evaluation of the edge flows.
+    The number of rows per batch of the edge flows.
     """
 
     seed: int = 0
@@ -327,7 +330,6 @@ class PruningAndGrowing:
         :param validation_data: The rows that decide when to stop, if any.
         :return: The circuit.
         """
-        encoded = np.asarray(HasParameterArrays.host_copy(circuit.encoded(data)))
         best_root = circuit.root
         best_validation = (
             None
@@ -336,8 +338,8 @@ class PruningAndGrowing:
         )
         for iteration in range(self.iterations):
             edge_flows = DatasetEdgeFlows(
-                root=circuit.root, batch_size=self.batch_size
-            ).compute(data=encoded)
+                circuit=circuit, batch_size=self.batch_size
+            ).compute(data=data)
             # the structure is rebuilt on the host and moved back to the backend after
             pruned = Pruning(pruned_fraction=self.pruned_fraction).pruned_root(
                 root=circuit.to_namespace(np).root, edge_flows=edge_flows

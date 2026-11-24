@@ -6,26 +6,27 @@ produce a layered circuit from the training rows of a dataset.
 from __future__ import annotations
 
 # %% imports
+import dataclasses
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import StrEnum
 
+import jax.numpy as jnp
 import numpy as np
 import pandas as pd
 
 from probabilistic_model.adapters.circuit_representations import CircuitRepresentations
 from probabilistic_model.benchmark.datasets import BenchmarkDataset
-from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
-from probabilistic_model.learning.jpt.variables import infer_variables_from_dataframe
+from probabilistic_model.learning.structure.jpt.jpt import JointProbabilityTree
+from probabilistic_model.learning.structure.jpt.variables import (
+    infer_variables_from_dataframe,
+)
 from probabilistic_model.learning.layered.dropout import (
     MiniBatchGradientDescent,
     ProbabilisticDropout,
 )
 from probabilistic_model.learning.layered.expectation_maximization import (
-    Anemone,
-    ExpectationMaximization,
-    FullBatchExpectationMaximization,
-    MiniBatchExpectationMaximization,
+    CircuitExpectationMaximization,
 )
 from probabilistic_model.learning.layered.hidden_chow_liu_tree import (
     HiddenChowLiuTree,
@@ -38,11 +39,14 @@ from probabilistic_model.learning.layered.strudel import Strudel
 from probabilistic_model.learning.layered.pruning_and_growing import (
     PruningAndGrowing,
 )
+from probabilistic_model.learning.layered.statistics_adjustment import (
+    StateCountSmoothing,
+)
 from probabilistic_model.learning.layered.regularization import (
     DataSoftening,
     EntropyRegularization,
 )
-from probabilistic_model.learning.region_graph.region_graph import RegionGraph
+from probabilistic_model.learning.structure.region_graph.region_graph import RegionGraph
 from probabilistic_model.probabilistic_circuit.tensorized.layered_probabilistic_circuit import (
     LayeredProbabilisticCircuit,
 )
@@ -130,7 +134,8 @@ class RandomTensorizedSumProductNetwork(BenchmarkMethod, ABC):
     ) -> LayeredProbabilisticCircuit:
         """
         :param dataset: The dataset.
-        :return: The randomly initialized RAT-SPN over the variables of the dataset.
+        :return: The randomly initialized RAT-SPN over the variables of the dataset,
+            with jax parameters.
         """
         depth = min(self.depth, max(int(np.log2(len(dataset.variables))), 1))
         return (
@@ -143,6 +148,7 @@ class RandomTensorizedSumProductNetwork(BenchmarkMethod, ABC):
             )
             .create_random_region_graph()
             .to_probabilistic_circuit(input_units=self.units, sum_units=self.units)
+            .to_namespace(jnp)
         )
 
 
@@ -191,7 +197,7 @@ class RandomTensorizedSumProductNetworkByExpectationMaximization(
     The name the variant is reported under.
     """
 
-    expectation_maximization: ExpectationMaximization
+    expectation_maximization: CircuitExpectationMaximization
     """
     The variant.
     """
@@ -249,15 +255,15 @@ class HiddenChowLiuTreeMethod(BenchmarkMethod):
     The number of states of every latent variable.
     """
 
-    mini_batch: ExpectationMaximization = field(
-        default_factory=lambda: MiniBatchExpectationMaximization(epochs=20)
+    mini_batch: CircuitExpectationMaximization = field(
+        default_factory=lambda: CircuitExpectationMaximization.mini_batch(epochs=20)
     )
     """
     The first phase of training.
     """
 
-    full_batch: ExpectationMaximization = field(
-        default_factory=lambda: FullBatchExpectationMaximization(epochs=20)
+    full_batch: CircuitExpectationMaximization = field(
+        default_factory=lambda: CircuitExpectationMaximization(epochs=20)
     )
     """
     The second phase of training.
@@ -292,7 +298,7 @@ class PruningAndGrowingMethod(BenchmarkMethod):
 
     pruning_and_growing: PruningAndGrowing = field(
         default_factory=lambda: PruningAndGrowing(
-            parameter_learning=MiniBatchExpectationMaximization(epochs=10)
+            parameter_learning=CircuitExpectationMaximization.mini_batch(epochs=10)
         )
     )
     """
@@ -387,35 +393,45 @@ class BenchmarkMethods:
             ),
             RandomTensorizedSumProductNetworkByExpectationMaximization(
                 method_name=MethodName.RAT_SPN_EXPECTATION_MAXIMIZATION,
-                expectation_maximization=FullBatchExpectationMaximization(epochs=30),
+                expectation_maximization=CircuitExpectationMaximization(epochs=30),
             ),
             RandomTensorizedSumProductNetworkByExpectationMaximization(
                 method_name=MethodName.RAT_SPN_MINI_BATCH_EXPECTATION_MAXIMIZATION,
-                expectation_maximization=MiniBatchExpectationMaximization(epochs=30),
+                expectation_maximization=CircuitExpectationMaximization.mini_batch(
+                    epochs=30
+                ),
             ),
             RandomTensorizedSumProductNetworkByExpectationMaximization(
                 method_name=MethodName.RAT_SPN_ANEMONE,
-                expectation_maximization=Anemone(epochs=30),
+                expectation_maximization=CircuitExpectationMaximization.anemone(
+                    epochs=30
+                ),
             ),
             JointProbabilityTreeBaseline(),
             HiddenChowLiuTreeMethod(),
             HiddenChowLiuTreeMethod(
                 method_name=MethodName.REGULARIZED_HIDDEN_CHOW_LIU_TREE,
-                mini_batch=MiniBatchExpectationMaximization(
-                    epochs=20,
+                mini_batch=dataclasses.replace(
+                    CircuitExpectationMaximization.mini_batch(epochs=20),
                     data_softening=DataSoftening(keep_probability=0.998),
-                    entropy_regularization=EntropyRegularization(strength=0.001),
+                    statistics_adjustments=[
+                        StateCountSmoothing(),
+                        EntropyRegularization(strength=0.001),
+                    ],
                 ),
-                full_batch=FullBatchExpectationMaximization(
+                full_batch=CircuitExpectationMaximization(
                     epochs=20,
                     data_softening=DataSoftening(keep_probability=0.998),
-                    entropy_regularization=EntropyRegularization(strength=0.001),
+                    statistics_adjustments=[
+                        StateCountSmoothing(),
+                        EntropyRegularization(strength=0.001),
+                    ],
                 ),
             ),
             HiddenChowLiuTreeMethod(
                 method_name=MethodName.HIDDEN_CHOW_LIU_TREE_ANEMONE,
-                mini_batch=Anemone(epochs=40),
-                full_batch=FullBatchExpectationMaximization(epochs=0),
+                mini_batch=CircuitExpectationMaximization.anemone(epochs=40),
+                full_batch=CircuitExpectationMaximization(epochs=0),
             ),
             PruningAndGrowingMethod(),
             LearnSPNMethod(),

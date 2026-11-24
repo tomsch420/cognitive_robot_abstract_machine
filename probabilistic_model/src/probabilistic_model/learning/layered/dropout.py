@@ -77,9 +77,11 @@ class ProbabilisticDropout:
                 kept = jax.random.bernoulli(
                     layer_key, 1 - self.input_probability, log_likelihoods.shape
                 )
-                cache.results[self.cache_key(layer=layer)] = jnp.where(
-                    kept, log_likelihoods, 0.0
-                )
+                cache.results[
+                    QueryCacheKey.from_query(
+                        query=type(layer).log_likelihood_of_nodes, layer=layer
+                    )
+                ] = jnp.where(kept, log_likelihoods, 0.0)
             elif isinstance(layer, SumLayer) and layer is not root:
                 child_results = []
                 for child_layer, child_key in zip(
@@ -93,20 +95,14 @@ class ProbabilisticDropout:
                         child_key, 1 - self.sum_probability, child_result.shape
                     )
                     child_results.append(jnp.where(kept, child_result, -jnp.inf))
-                cache.results[self.cache_key(layer=layer)] = layer.log_weighted_sum(
-                    child_results=child_results
-                )
+                cache.results[
+                    QueryCacheKey.from_query(
+                        query=type(layer).log_likelihood_of_nodes, layer=layer
+                    )
+                ] = layer.log_weighted_sum(child_results=child_results)
             else:
                 layer.log_likelihood_of_nodes(events=data, cache=cache)
         return root.log_likelihood_of_nodes(events=data, cache=cache)[:, 0]
-
-    @staticmethod
-    def cache_key(*, layer: Layer) -> QueryCacheKey:
-        """
-        :param layer: A layer.
-        :return: The key of the layer's log-likelihood in a :class:`QueryCache`.
-        """
-        return QueryCacheKey(type(layer).log_likelihood_of_nodes.__wrapped__, id(layer))
 
 
 # %% mini-batch gradient descent
@@ -165,19 +161,42 @@ class MiniBatchGradientDescent:
         root = circuit.root
         impossible = [jnp.isneginf(parameter) for parameter in root.circuit_parameters]
 
-        def loss(parameters: list[jax.Array], batch: jax.Array, key: jax.Array):
+        def loss(
+            parameters: list[jax.Array], batch: jax.Array, key: jax.Array
+        ) -> jax.Array:
+            """
+            :param parameters: Arrays in the order of the circuit's parameters.
+            :param batch: The encoded rows of the batch.
+            :param key: The random key of the dropout.
+            :return: The negative average log-likelihood of the rows under dropout.
+            """
             log_likelihoods = self.dropout.log_likelihood(
-                root=root.copy_with_circuit_parameters(parameters), data=batch, key=key
+                root=root.copy_with_circuit_parameters(parameters=parameters),
+                data=batch,
+                key=key,
             )
             return -log_likelihoods.mean()
 
-        def step(parameters, optimizer_state, batch, key):
+        def step(
+            parameters: list[jax.Array],
+            optimizer_state: optax.OptState,
+            batch: jax.Array,
+            key: jax.Array,
+        ) -> tuple[list[jax.Array], optax.OptState, jax.Array]:
+            """
+            :param parameters: Arrays in the order of the circuit's parameters.
+            :param optimizer_state: The state of the optimizer before the step.
+            :param batch: The encoded rows of the batch.
+            :param key: The random key of the dropout.
+            :return: The projected parameters and the optimizer state after the step,
+                and the loss before it; parameters of probability zero stay zero.
+            """
             value, gradients = jax.value_and_grad(loss)(parameters, batch, key)
             updates, optimizer_state = self.optimizer.update(
                 gradients, optimizer_state, parameters
             )
             parameters = root.projected_circuit_parameters(
-                optax.apply_updates(parameters, updates)
+                parameters=optax.apply_updates(parameters, updates)
             )
             parameters = [
                 jnp.where(mask, -jnp.inf, parameter)
@@ -204,5 +223,5 @@ class MiniBatchGradientDescent:
                 )
                 summed -= float(value) * len(batch)
             self.average_log_likelihoods.append(summed / len(encoded))
-        circuit.root = root.copy_with_circuit_parameters(parameters)
+        circuit.root = root.copy_with_circuit_parameters(parameters=parameters)
         return circuit

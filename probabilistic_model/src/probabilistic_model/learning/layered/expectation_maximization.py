@@ -1,124 +1,356 @@
 """
-Expectation maximization of the parameters of layered circuits on the array backends
-that differentiate: full batch, mini-batch :cite:`peharz2020einsum` and anemone
-:cite:`liu2026rethinking`.
+Expectation maximization of the parameters of layered circuits by
+:class:`TensorizedExpectationMaximization`, with data softening and adjustments of the
+sufficient statistics such as anemone :cite:`liu2026rethinking`.
 """
 
 from __future__ import annotations
 
 # %% imports
-from abc import ABC, abstractmethod
+import copy
+from abc import ABC
 from dataclasses import dataclass, field
 
+import array_api_compat
+import jax
+import jax.numpy as jnp
 import numpy as np
-import tqdm
+import torch
+from array_api_compat import array_namespace, is_jax_array, is_torch_array
+from typing_extensions import Self
 
-from probabilistic_model.learning.layered.flows import (
-    CircuitParameterLayout,
-    ExpectedFlows,
-    NodeAndEdgeValues,
-    TopDownProbabilities,
+from probabilistic_model.learning.layered.exceptions import (
+    UndifferentiableBackendError,
 )
-from probabilistic_model.learning.layered.gradients import LogLikelihoodGradient
-from probabilistic_model.learning.layered.maximization import (
-    LayerMaximization,
-    LayerMaximizations,
+from probabilistic_model.learning.layered.regularization import DataSoftening
+from probabilistic_model.learning.layered.statistics_adjustment import (
+    AnemoneMixing,
+    LearnedLayerStatistics,
+    Momentum,
+    StateCountSmoothing,
+    StatisticsAdjustment,
 )
-from probabilistic_model.learning.layered.regularization import (
-    DataSoftening,
-    EntropyRegularization,
-    NodeEntropies,
+from probabilistic_model.learning.parameters.circuit_parameter_learning import (
+    LayerType,
+)
+from probabilistic_model.learning.parameters.expectation_maximization.expectation_maximization import (
+    MaximizationRegularization,
+)
+from probabilistic_model.learning.parameters.expectation_maximization.jax_expectation_maximization import (
+    ExpectationMaximizationState,
+    JaxExpectationMaximization,
+    JaxExpectationMaximizationTraining,
+)
+from probabilistic_model.learning.parameters.expectation_maximization.layer_maximization import (
+    SufficientStatistics,
+)
+from probabilistic_model.learning.parameters.expectation_maximization.tensorized_expectation_maximization import (
+    TensorizedExpectationMaximization,
+)
+from probabilistic_model.learning.parameters.expectation_maximization.torch_expectation_maximization import (
+    TorchExpectationMaximization,
+    TorchExpectationMaximizationTraining,
+)
+from probabilistic_model.learning.parameters.training_schedule import (
+    Convergence,
+    MiniBatches,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
+    BackendArray,
     SampleArray,
+    SampleRows,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.has_parameter_arrays import (
     HasParameterArrays,
 )
-from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.base import (
-    InnerLayer,
-    Layer,
-)
-from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.sum_layer import (
-    SumLayer,
-)
+from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.base import Layer
 from probabilistic_model.probabilistic_circuit.tensorized.layered_probabilistic_circuit import (
     LayeredProbabilisticCircuit,
 )
 
-
-# %% mixing of old and new statistics
-
-
-@dataclass(kw_only=True)
-class MixingWeights:
-    """
-    How much the current statistics and the statistics of a batch count in the update of
-    every node of a layer.
-    """
-
-    current: np.ndarray
-    """
-    The weight of the current statistics of every node.
-    """
-
-    batch: np.ndarray
-    """
-    The weight of the statistics of the batch of every node.
-    """
+# %% adjusted expectation maximization
 
 
 @dataclass(kw_only=True)
-class Momentum:
+class AdjustedExpectationMaximization(
+    TensorizedExpectationMaximization[LayerType], ABC
+):
     """
-    The bias-corrected exponential moving average of the batch statistics of every
-    layer, the momentum update of :cite:`liu2026rethinking`, section 5.1.
-    """
-
-    decay: float
-    """
-    The weight of the previous average, called beta in the paper.
+    :class:`TensorizedExpectationMaximization` that counts the statistics on softened
+    data and adjusts them on the host before every update.
     """
 
-    averages: dict[int, list[np.ndarray]] = field(default_factory=dict)
+    statistics_adjustments: list[StatisticsAdjustment] = field(default_factory=list)
     """
-    The current averages of the statistics, by the position of their layer.
-    """
-
-    number_of_updates: int = 0
-    """
-    How many batches the averages have seen.
+    The adjustments applied to the statistics before every update, in order.
     """
 
-    def averaged(self, *, position: int, values: list[np.ndarray]) -> list[np.ndarray]:
+    data_softening: DataSoftening | None = None
+    """
+    The softening of the data the statistics are counted on, none if ``None``.
+    """
+
+    def total_log_likelihood(
+        self,
+        *,
+        parameters: list[BackendArray],
+        node_offsets: list[BackendArray],
+        data: SampleArray,
+    ) -> BackendArray:
         """
-        :param position: The position of the layer in the order of its circuit.
-        :param values: The statistics of the current batch.
-        :return: The bias-corrected averages including the current batch.
+        :meth:`TensorizedExpectationMaximization.total_log_likelihood` of the softened
+        data if :attr:`data_softening` is set.
         """
-        previous = self.averages.get(
-            position, [np.zeros_like(value) for value in values]
+        evaluated_parameters = (
+            parameters
+            if self.data_softening is None
+            else self.data_softening.transformed(root=self.layer, parameters=parameters)
         )
-        current = [
-            self.decay * average + (1 - self.decay) * value
-            for average, value in zip(previous, values)
+        return super().total_log_likelihood(
+            parameters=evaluated_parameters, node_offsets=node_offsets, data=data
+        )
+
+    def adjusted_maximized_parameters(
+        self,
+        *,
+        parameters: list[BackendArray],
+        statistics: list[SufficientStatistics],
+        number_of_rows: int,
+    ) -> list[BackendArray]:
+        """
+        :param parameters: Arrays in the order of the circuit's parameters, those the
+            statistics were counted with.
+        :param statistics: The sufficient statistics of every learned layer since the
+            last update.
+        :param number_of_rows: The number of rows the statistics were counted on.
+        :return: The parameters that maximize the adjusted statistics, on the backend
+            and the device of ``parameters``.
+        """
+        host_parameters = [HasParameterArrays.host_copy(array) for array in parameters]
+        host_root = self.layer.copy_with_circuit_parameters(parameters=host_parameters)
+        adjusted = LearnedLayerStatistics(
+            root=host_root,
+            layers=self.learned_layers(root=host_root),
+            statistics=[
+                type(layer_statistics).from_arrays(
+                    arrays=[
+                        HasParameterArrays.host_copy(array)
+                        for array in layer_statistics.arrays
+                    ]
+                )
+                for layer_statistics in statistics
+            ],
+            number_of_rows=number_of_rows,
+        )
+        for adjustment in self.statistics_adjustments:
+            adjusted = adjustment.adjusted(statistics=adjusted)
+        namespace = array_namespace(*parameters)
+        return [
+            namespace.asarray(
+                maximized, dtype=array.dtype, device=array_api_compat.device(array)
+            )
+            for maximized, array in zip(
+                self.maximized_circuit_parameters(
+                    parameters=host_parameters, statistics=adjusted.statistics
+                ),
+                parameters,
+            )
         ]
-        self.averages[position] = current
-        correction = 1 - self.decay ** (self.number_of_updates + 1)
-        return [average / correction for average in current]
 
 
-# %% expectation maximization
+# %% jax
 
 
 @dataclass(kw_only=True)
-class ExpectationMaximization(ABC):
+class JaxAdjustedExpectationMaximization(
+    AdjustedExpectationMaximization[LayerType], JaxExpectationMaximization[LayerType]
+):
     """
-    Learns the parameters of a layered circuit by expectation maximization, reading the
-    expected flows off the gradient of the log-likelihood.
+    :class:`AdjustedExpectationMaximization` with jax: compiled steps and an update on
+    the host.
+    """
 
-    Sum layers, categorical layers with dense tables and Gaussian layers are learned;
-    every other layer keeps its parameters.
+    def start_training(
+        self,
+        *,
+        arguments: tuple[jax.Array, ...],
+        mini_batches: MiniBatches,
+    ) -> JaxAdjustedExpectationMaximizationTraining[LayerType]:
+        """
+        :meth:`JaxExpectationMaximization.start_training` with updates on the host.
+        """
+        return JaxAdjustedExpectationMaximizationTraining(
+            arguments=arguments,
+            mini_batches=mini_batches,
+            batches_per_update=self.batches_per_update,
+            learning=self,
+        )
+
+
+@dataclass(kw_only=True)
+class JaxAdjustedExpectationMaximizationTraining(
+    JaxExpectationMaximizationTraining[LayerType]
+):
+    """
+    Mini-batch training by :class:`JaxAdjustedExpectationMaximization`, whose steps are
+    compiled and whose updates run on the host.
+    """
+
+    learning: JaxAdjustedExpectationMaximization[LayerType]
+    """
+    The expectation maximization whose steps are taken.
+    """
+
+    rows_since_update: int = field(default=0, init=False)
+    """
+    The number of rows whose statistics were accumulated since the last update.
+    """
+
+    def accumulate_statistics(self, *, batch: tuple[jax.Array, ...]) -> jax.Array:
+        """
+        :meth:`JaxExpectationMaximizationTraining.accumulate_statistics`, counting the
+        rows of the batch.
+        """
+        self.rows_since_update += batch[0].shape[0]
+        return super().accumulate_statistics(batch=batch)
+
+    def accumulate_statistics_and_update(
+        self, *, batch: tuple[jax.Array, ...]
+    ) -> jax.Array:
+        """
+        :meth:`JaxExpectationMaximizationTraining.accumulate_statistics_and_update`,
+        updating on the host.
+        """
+        loss = self.accumulate_statistics(batch=batch)
+        self.update_parameters()
+        return loss
+
+    def step_on_rows(self, *, rows: SampleRows) -> jax.Array:
+        """
+        :meth:`JaxExpectationMaximizationTraining.step_on_rows`, updating on the host.
+        """
+        self.rows_since_update += len(rows)
+        loss = self.take_compiled_step_on_rows(step=self.compiled_step, rows=rows)
+        if self.count_batch_toward_update():
+            self.update_parameters()
+        return loss
+
+    def update_parameters(self) -> None:
+        """
+        :meth:`JaxExpectationMaximizationTraining.update_parameters` from the adjusted
+        statistics, on the host.
+        """
+        state = ExpectationMaximizationState(
+            parameters=self.learning.adjusted_maximized_parameters(
+                parameters=self.state.parameters,
+                statistics=self.state.statistics,
+                number_of_rows=self.rows_since_update,
+            ),
+            statistics=jax.tree.map(jnp.zeros_like, self.state.statistics),
+            loss=self.state.loss,
+        )
+        self.state = (
+            state
+            if self.batch_split_devices is None
+            else self.batch_split_devices.replicated(state=state)
+        )
+        self.rows_since_update = 0
+
+
+# %% torch
+
+
+@dataclass(kw_only=True)
+class TorchAdjustedExpectationMaximization(
+    AdjustedExpectationMaximization[LayerType], TorchExpectationMaximization[LayerType]
+):
+    """
+    :class:`AdjustedExpectationMaximization` with torch, updating on the host.
+    """
+
+    def start_training(
+        self,
+        *,
+        arguments: tuple[torch.Tensor, ...],
+        mini_batches: MiniBatches,
+    ) -> TorchAdjustedExpectationMaximizationTraining[LayerType]:
+        """
+        :meth:`TorchExpectationMaximization.start_training` with updates on the host.
+        """
+        return TorchAdjustedExpectationMaximizationTraining(
+            arguments=arguments,
+            mini_batches=mini_batches,
+            batches_per_update=self.batches_per_update,
+            learning=self,
+        )
+
+
+@dataclass(kw_only=True)
+class TorchAdjustedExpectationMaximizationTraining(
+    TorchExpectationMaximizationTraining[LayerType]
+):
+    """
+    Mini-batch training by :class:`TorchAdjustedExpectationMaximization`, whose updates
+    run on the host.
+    """
+
+    learning: TorchAdjustedExpectationMaximization[LayerType]
+    """
+    The expectation maximization whose parameters are updated.
+    """
+
+    rows_since_update: int = field(default=0, init=False)
+    """
+    The number of rows whose statistics were accumulated since the last update.
+    """
+
+    def accumulate_statistics(self, *, batch: tuple[torch.Tensor, ...]) -> torch.Tensor:
+        """
+        :meth:`TorchExpectationMaximizationTraining.accumulate_statistics`, counting the
+        rows of the batch.
+        """
+        self.rows_since_update += batch[0].shape[0]
+        return super().accumulate_statistics(batch=batch)
+
+    def accumulate_statistics_and_update(
+        self, *, batch: tuple[torch.Tensor, ...]
+    ) -> torch.Tensor:
+        """
+        :meth:`TorchExpectationMaximizationTraining.accumulate_statistics_and_update`,
+        updating on the host.
+        """
+        loss = self.accumulate_statistics(batch=batch)
+        self.update_parameters()
+        return loss
+
+    def update_parameters(self) -> None:
+        """
+        :meth:`TorchExpectationMaximizationTraining.update_parameters` from the adjusted
+        statistics, on the host.
+        """
+        parameters = self.learning.parameters
+        with torch.no_grad():
+            maximized = self.learning.adjusted_maximized_parameters(
+                parameters=[parameter.detach() for parameter in parameters],
+                statistics=self.statistics,
+                number_of_rows=self.rows_since_update,
+            )
+            for parameter, updated in zip(parameters, maximized):
+                parameter.copy_(updated)
+            for statistics in self.statistics:
+                for array in statistics.arrays:
+                    array.zero_()
+        self.rows_since_update = 0
+
+
+# %% learning the parameters of a circuit
+
+
+@dataclass(kw_only=True)
+class CircuitExpectationMaximization:
+    """
+    Learns the parameters of a layered circuit with jax or torch parameters in place, by
+    tensorized expectation maximization for a fixed number of epochs.
     """
 
     epochs: int = 10
@@ -128,27 +360,37 @@ class ExpectationMaximization(ABC):
 
     batch_size: int | None = None
     """
-    The number of rows per update, all rows if ``None``.
+    The number of rows per batch, all rows if ``None``.
     """
 
-    momentum: float = 0.0
+    batches_per_update: int | None = None
     """
-    The decay of the moving average of the batch statistics, none if zero.
+    The batches after which the parameters are updated, once per epoch if ``None``.
     """
 
-    maximizations: LayerMaximizations = field(default_factory=LayerMaximizations)
+    step_size: float = 1.0
     """
-    The maximization step of every kind of layer.
+    The share of the way to the maximizing parameters that an update moves.
+    """
+
+    statistics_adjustments: list[StatisticsAdjustment] = field(
+        default_factory=lambda: [StateCountSmoothing()]
+    )
+    """
+    The adjustments of the statistics before every update, in order; every fit starts
+    from copies of them.
     """
 
     data_softening: DataSoftening | None = None
     """
-    The softening of the data, none if ``None``.
+    The softening of the data the statistics are counted on, none if ``None``.
     """
 
-    entropy_regularization: EntropyRegularization | None = None
+    regularization: MaximizationRegularization = field(
+        default_factory=MaximizationRegularization
+    )
     """
-    The entropy regularization of the weights, none if ``None``.
+    How the maximization step keeps the learned weights and variances away from zero.
     """
 
     seed: int = 0
@@ -156,24 +398,65 @@ class ExpectationMaximization(ABC):
     The seed of the order in which the rows are visited.
     """
 
-    average_log_likelihoods: list[float] = field(default_factory=list, init=False)
-    """
-    The average log-likelihood of the training rows in every epoch, before the updates
-    of that epoch.
-    """
+    @classmethod
+    def mini_batch(cls, *, epochs: int) -> Self:
+        """
+        :param epochs: The number of passes over the data.
+        :return: The mini-batch expectation maximization of :cite:`peharz2020einsum`,
+            equation 6 of :cite:`liu2026rethinking`: a step of a tenth of the way after
+            every batch of 512 rows.
+        """
+        return cls(epochs=epochs, batch_size=512, batches_per_update=1, step_size=0.1)
 
-    @abstractmethod
-    def mixing_weights(
-        self, *, node_rates: np.ndarray, top_down_probabilities: np.ndarray
-    ) -> MixingWeights:
+    @classmethod
+    def anemone(cls, *, epochs: int) -> Self:
         """
-        :param node_rates: The expected flow of every node of a layer per row of the
-            batch.
-        :param top_down_probabilities: The top-down probability of every node at the
-            current parameters.
-        :return: How the current and the batch statistics of every node are mixed.
+        :param epochs: The number of passes over the data.
+        :return: Anemone :cite:`liu2026rethinking` with the momentum and the learning
+            rate of the paper, after every batch of 512 rows.
         """
-        raise NotImplementedError
+        return cls(
+            epochs=epochs,
+            batch_size=512,
+            batches_per_update=1,
+            statistics_adjustments=[
+                Momentum(decay=0.9),
+                StateCountSmoothing(),
+                AnemoneMixing(),
+            ],
+        )
+
+    def learner(self, *, root: Layer) -> TensorizedExpectationMaximization:
+        """
+        :param root: The root layer of the circuit.
+        :return: The expectation maximization of the circuit with the array library of
+            its parameters.
+        :raises UndifferentiableBackendError: If that library does not differentiate.
+        """
+        settings = dict(
+            layer=root,
+            batches_per_update=self.batches_per_update,
+            step_size=self.step_size,
+            regularization=self.regularization,
+        )
+        adjusted_settings = dict(
+            settings,
+            statistics_adjustments=copy.deepcopy(self.statistics_adjustments),
+            data_softening=self.data_softening,
+        )
+        is_adjusted = (
+            bool(self.statistics_adjustments) or self.data_softening is not None
+        )
+        parameter = root.circuit_parameters[0]
+        if is_jax_array(parameter):
+            if is_adjusted:
+                return JaxAdjustedExpectationMaximization(**adjusted_settings)
+            return JaxExpectationMaximization(**settings)
+        if is_torch_array(parameter):
+            if is_adjusted:
+                return TorchAdjustedExpectationMaximization(**adjusted_settings)
+            return TorchExpectationMaximization(**settings)
+        raise UndifferentiableBackendError(parameter_type=type(parameter))
 
     def fit(
         self, *, circuit: LayeredProbabilisticCircuit, data: SampleArray
@@ -185,247 +468,34 @@ class ExpectationMaximization(ABC):
         :param data: The rows, whose symbolic values are hashes of domain elements.
         :return: The circuit.
         """
-        encoded = np.asarray(HasParameterArrays.host_copy(circuit.encoded(data)))
-        number_of_rows = len(encoded)
-        batch_size = number_of_rows if self.batch_size is None else self.batch_size
-        gradient = LogLikelihoodGradient.from_root(
-            root=circuit.root, transformation=self.data_softening
+        if self.epochs == 0:
+            return circuit
+        circuit.root = self.trained_root(
+            learning=self.learner(root=circuit.root), circuit=circuit, data=data
         )
-        momentum = Momentum(decay=self.momentum) if self.momentum > 0 else None
-        random_number_generator = np.random.default_rng(self.seed)
-        root = circuit.root
-        for _ in tqdm.tqdm(range(self.epochs), desc="Expectation maximization"):
-            order = random_number_generator.permutation(number_of_rows)
-            summed_log_likelihood = 0.0
-            for start in range(0, number_of_rows, batch_size):
-                batch = encoded[order[start : start + batch_size]]
-                gradient.root = root
-                result = gradient.compute(
-                    data=root.namespace.asarray(
-                        batch, dtype=root.floating_point_type, device=root.device
-                    )
-                )
-                summed_log_likelihood += result.log_likelihood
-                flows = ExpectedFlows.from_parameter_gradients(
-                    root=root, gradients=result.gradients, number_of_rows=len(batch)
-                ).compute()
-                root = self.updated_root(
-                    root=root,
-                    gradients=result.gradients,
-                    flows=flows,
-                    number_of_rows=len(batch),
-                    momentum=momentum,
-                )
-                if momentum is not None:
-                    momentum.number_of_updates += 1
-            self.average_log_likelihoods.append(summed_log_likelihood / number_of_rows)
-        circuit.root = root
         return circuit
 
-    def updated_root(
+    def trained_root(
         self,
         *,
-        root: Layer,
-        gradients: list[np.ndarray],
-        flows: NodeAndEdgeValues,
-        number_of_rows: int,
-        momentum: Momentum | None,
+        learning: TensorizedExpectationMaximization,
+        circuit: LayeredProbabilisticCircuit,
+        data: SampleArray,
     ) -> Layer:
         """
-        :param root: The root layer at the current parameters.
-        :param gradients: The gradient of the summed log-likelihood of the batch.
-        :param flows: The expected flows of the batch.
-        :param number_of_rows: The number of rows of the batch.
-        :param momentum: The moving average of the batch statistics, if any.
-        :return: The root layer of the circuit with the updated parameters.
+        :param learning: The expectation maximization of the circuit's root.
+        :param circuit: The circuit, which is left unchanged.
+        :param data: The rows, whose symbolic values are hashes of domain elements.
+        :return: The root of the circuit trained for :attr:`epochs` epochs.
         """
-        layout = CircuitParameterLayout(root=root)
-        gradients_of_layers = layout.split(arrays=gradients)
-        top_down = TopDownProbabilities(root=root).compute().node_values
-        entropies = (
-            NodeEntropies(root=root).compute()
-            if self.entropy_regularization is not None
-            else {}
+        root = circuit.root
+        encoded = root.namespace.asarray(
+            np.asarray(HasParameterArrays.host_copy(circuit.encoded(data))),
+            dtype=root.floating_point_type,
+            device=root.device,
         )
-        # the regularization passes the top-down probability on with the new weights
-        regularized_top_down = {
-            layer: np.zeros(layer.number_of_nodes) for layer in root.all_layers()
-        }
-        regularized_top_down[root][:] = 1.0
-        new_arrays = {}
-        for position, layer in enumerate(root.all_layers()):
-            maximization = self.maximizations.find(layer=layer)
-            weights = None
-            if maximization is not None:
-                statistics = self.updated_statistics(
-                    layer=layer,
-                    position=position,
-                    maximization=maximization,
-                    gradients=gradients_of_layers.get(layer, []),
-                    flows=flows,
-                    number_of_rows=number_of_rows,
-                    momentum=momentum,
-                    top_down_probabilities=top_down[layer],
-                    regularized_top_down_probabilities=regularized_top_down[layer],
-                    entropies=entropies,
-                )
-                new_arrays[layer] = [
-                    layer.namespace.asarray(
-                        array, dtype=layer.floating_point_type, device=layer.device
-                    )
-                    for array in maximization.maximizing_parameters(
-                        layer=layer, statistics=statistics
-                    )
-                ]
-                weights = statistics
-            self.pass_top_down_probabilities(
-                layer=layer, weights=weights, values=regularized_top_down
-            )
-        return root.copy_with_circuit_parameters(
-            layout.join(arrays_of_layers=new_arrays)
-        )
-
-    def updated_statistics(
-        self,
-        *,
-        layer: Layer,
-        position: int,
-        maximization: LayerMaximization,
-        gradients: list[np.ndarray],
-        flows: NodeAndEdgeValues,
-        number_of_rows: int,
-        momentum: Momentum | None,
-        top_down_probabilities: np.ndarray,
-        regularized_top_down_probabilities: np.ndarray,
-        entropies: dict[Layer, np.ndarray],
-    ) -> np.ndarray:
-        """
-        :return: The statistics of every node of the layer after the update.
-        """
-        node_rates = flows.node_values[layer] / number_of_rows
-        sums = (
-            maximization.batch_sums(
-                layer=layer,
-                gradients=gradients,
-                node_flows=flows.node_values[layer],
-                edge_flows=flows.edge_values.get(layer),
-            )
-            / number_of_rows
-        )
-        if momentum is not None:
-            sums, node_rates = momentum.averaged(
-                position=position, values=[sums, node_rates]
-            )
-        batch_statistics = maximization.normalized_statistics(
-            layer=layer, sums=sums, node_flows=node_rates, number_of_rows=number_of_rows
-        )
-        child_entropies = (
-            None
-            if self.entropy_regularization is None
-            else maximization.child_entropies(layer=layer, entropies=entropies)
-        )
-        if child_entropies is not None:
-            batch_statistics = self.entropy_regularization.regularized_weights(
-                average_counts=sums,
-                owners=maximization.owners(layer=layer),
-                top_down_probabilities=regularized_top_down_probabilities,
-                child_entropies=child_entropies,
-            )
-        mixing = self.mixing_weights(
-            node_rates=node_rates, top_down_probabilities=top_down_probabilities
-        )
-        owners = maximization.owners(layer=layer)
-        usable = np.isfinite(batch_statistics) & (node_rates[owners] > 0)
-        batch_weight = np.where(usable, mixing.batch[owners], 0.0)
-        current_weight = mixing.current[owners]
-        total = current_weight + batch_weight
-        current = maximization.current_statistics(layer=layer)
-        mixed = current_weight * current + batch_weight * np.where(
-            usable, batch_statistics, 0.0
-        )
-        with np.errstate(divide="ignore", invalid="ignore"):
-            return np.where(total > 0, mixed / total, current)
-
-    @staticmethod
-    def pass_top_down_probabilities(
-        *, layer: Layer, weights: np.ndarray | None, values: dict[Layer, np.ndarray]
-    ) -> None:
-        """
-        Add what the nodes of a layer pass on to the top-down probabilities of their
-        children.
-
-        :param layer: The layer, whose own top-down probabilities are complete.
-        :param weights: The updated weights of every edge if the layer is a sum layer.
-        :param values: The top-down probabilities of every layer, updated in place.
-        """
-        if not isinstance(layer, InnerLayer):
-            return
-        passed = values[layer][layer.edges.rows]
-        if isinstance(layer, SumLayer):
-            passed = passed * weights
-        received = np.zeros(int(layer.column_offsets[-1]))
-        np.add.at(received, layer.edges.columns, passed)
-        for child_layer, start, end in zip(
-            layer.child_layers, layer.column_offsets[:-1], layer.column_offsets[1:]
-        ):
-            values[child_layer] += received[start:end]
-
-
-@dataclass(kw_only=True)
-class FullBatchExpectationMaximization(ExpectationMaximization):
-    """
-    Replaces the statistics of every node by those of the batch, which is the whole data
-    unless :attr:`batch_size` says otherwise.
-    """
-
-    def mixing_weights(
-        self, *, node_rates: np.ndarray, top_down_probabilities: np.ndarray
-    ) -> MixingWeights:
-        return MixingWeights(
-            current=np.zeros_like(node_rates), batch=np.ones_like(node_rates)
-        )
-
-
-@dataclass(kw_only=True)
-class MiniBatchExpectationMaximization(ExpectationMaximization):
-    """
-    Moves the statistics of every node a fixed step towards those of the batch,
-    :cite:`peharz2020einsum`, equation 6 of :cite:`liu2026rethinking`.
-    """
-
-    batch_size: int | None = 512
-    step_size: float = 0.1
-    """
-    The fraction of the way to the batch statistics, called alpha in the papers.
-    """
-
-    def mixing_weights(
-        self, *, node_rates: np.ndarray, top_down_probabilities: np.ndarray
-    ) -> MixingWeights:
-        return MixingWeights(
-            current=np.full_like(node_rates, 1 - self.step_size),
-            batch=np.full_like(node_rates, self.step_size),
-        )
-
-
-@dataclass(kw_only=True)
-class Anemone(ExpectationMaximization):
-    """
-    Mini-batch expectation maximization with a learning rate per node that grows with
-    the node's flow on the batch relative to its top-down probability,
-    :cite:`liu2026rethinking`, equation 7.
-    """
-
-    batch_size: int | None = 512
-    momentum: float = 0.9
-    learning_rate: float = 0.1
-    """
-    The learning rate, called eta in the paper.
-    """
-
-    def mixing_weights(
-        self, *, node_rates: np.ndarray, top_down_probabilities: np.ndarray
-    ) -> MixingWeights:
-        return MixingWeights(
-            current=top_down_probabilities, batch=self.learning_rate * node_rates
-        )
+        return learning.minimize_until_converged(
+            encoded,
+            convergence=Convergence(maximum_epochs=self.epochs, patience=self.epochs),
+            mini_batches=MiniBatches(batch_size=self.batch_size, seed=self.seed),
+        ).trained_root

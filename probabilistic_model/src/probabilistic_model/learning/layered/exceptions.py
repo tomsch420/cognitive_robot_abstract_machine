@@ -17,7 +17,7 @@ from probabilistic_model.exceptions import ProbabilisticModelException
 class UndifferentiableBackendError(ProbabilisticModelException, TypeError):
     """
     Exception raised when the parameters of a circuit are arrays of a backend that
-    cannot differentiate, so no expected flows can be taken from a gradient.
+    cannot differentiate, so expectation maximization cannot count its statistics.
     """
 
     parameter_type: type
