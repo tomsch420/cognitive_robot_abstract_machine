@@ -1,11 +1,11 @@
 PR: https://github.com/cram2/cognitive_robot_abstract_machine/pull/1067 (draft, upstream, label new-feature); fork PR https://github.com/tomsch420/cognitive_robot_abstract_machine/pull/57
 
 Plan:
-- Opt in scaling of external collision buffer zones by the translational distance from a tip link to a goal point
+- Opt in scaling of each external contact's buffer zone by the translational distance from its closest point on the robot to a goal point
 
 Done:
-- BufferZoneScaling (abstract) and LinearBufferZoneScaling, field buffer_zone_scaling on ExternalCollisionAvoidance
-- Tests for factor bounds, constraint lower error, violated distance floor, full motion (also via JSON); 324 tests pass
+- BufferZoneScaling (abstract, per contact point) and LinearBufferZoneScaling, field buffer_zone_scaling on ExternalCollisionAvoidance; tip_link removed
+- Tests for factor bounds, per contact factors, violated distance floor, full motion (also via JSON); 324 tests pass; PR descriptions updated
 
 Next:
 - Await review on cram2 PR 1067
