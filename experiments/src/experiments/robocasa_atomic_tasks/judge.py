@@ -278,7 +278,6 @@ class RoboCasaJudge:
                 position=float(data.qpos[model.jnt_qposadr[joint]]),
             )
             for joint in range(model.njnt)
-            # MuJoCo 4's enums are not found by `in`, which compares from their side
             if any(
                 model.jnt_type[joint] == joint_type
                 for joint_type in one_coordinate_joints
