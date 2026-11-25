@@ -15,7 +15,6 @@ from datetime import timedelta
 
 from typing_extensions import Callable
 
-from coraplex.plans.executors import PlanOutcome
 from coraplex.robot_plans.actions.core.robot_body import MoveFingersToWidthAction
 from cramph.node import StatechartNode
 from experiments.robocasa_atomic_tasks.episode import RoboCasaEpisode
@@ -157,7 +156,7 @@ class MoveFromTheSinkOntoAPlate:
         """
         arm = self.episode.arm
         self.episode.limit_finger_force(force=self.closing_force)
-        self.run_steps(
+        self.episode.run_steps_in_turn(
             [
                 *self.lifting_the_hand_out(),
                 lambda: TurnTheSpoutWithTheGripperAction(
@@ -189,7 +188,7 @@ class MoveFromTheSinkOntoAPlate:
                 back_to_the_start = [
                     lambda: LeaveTheSinkAction(arm=arm, basin=self.basin)
                 ]
-            outcome = self.run_steps(
+            outcome = self.episode.run_steps_in_turn(
                 [
                     *back_to_the_start,
                     lambda: StandAtASpotAction(
@@ -232,7 +231,7 @@ class MoveFromTheSinkOntoAPlate:
                 )
             ]
         ):
-            self.run_steps(
+            self.episode.run_steps_in_turn(
                 [
                     lambda: StandAtASpotAction(
                         spot=self.spot_beside_the_plate, beside=self.plate
@@ -254,7 +253,7 @@ class MoveFromTheSinkOntoAPlate:
                 ]
             ).raise_if_failed()
             self.episode.let_physics_run(self.settling_time_on_the_plate)
-            self.run_steps(
+            self.episode.run_steps_in_turn(
                 [
                     lambda: RaiseTheToolAction(arm=arm, height=self.lift_off_height),
                     lambda: BackOffAction(distance=self.back_off_distance),
@@ -274,16 +273,3 @@ class MoveFromTheSinkOntoAPlate:
                 arm=self.episode.arm, basin=self.basin
             )
         ]
-
-    def run_steps(self, steps: list[Callable[[], StatechartNode]]) -> PlanOutcome:
-        """
-        :param steps: Make the steps, each when its turn comes, so it is planned from
-            the world as the step before left it.
-        :return: How the last step run ended; the steps after a failed one are not run.
-        """
-        outcome = None
-        for make_step in steps:
-            outcome = self.episode.run([make_step()])
-            if not outcome.succeeded:
-                return outcome
-        return outcome

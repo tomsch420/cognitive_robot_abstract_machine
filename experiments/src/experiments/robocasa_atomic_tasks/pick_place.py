@@ -16,6 +16,9 @@ from dataclasses import dataclass
 import numpy as np
 from typing_extensions import TYPE_CHECKING, Sequence
 
+from experiments.robocasa_atomic_tasks.counter_to_oven import (
+    MoveFromTheCounterOntoTheOvenTray,
+)
 from experiments.robocasa_atomic_tasks.episode import RoboCasaEpisode
 from experiments.robocasa_atomic_tasks.robocasa_names import (
     FixtureRegionPrefix,
@@ -201,6 +204,23 @@ class PickPlaceCounterToOven(OntoReceptacle):
 
     layout: LayoutType = LayoutType.LAYOUT002
     receptacle: RoboCasaObjectName = RoboCasaObjectName.OVEN_TRAY
+
+    def solve(self, episode: RoboCasaEpisode) -> None:
+        """
+        Differs from :meth:`PickAndPlaceTask.solve` in moving the object from its plate
+        onto the tray by :class:`~experiments.robocasa_atomic_tasks.counter_to_oven.Move
+        FromTheCounterOntoTheOvenTray` when the episode is simulated physically.
+        """
+        if not episode.physically_simulated:
+            super().solve(episode)
+            return
+        MoveFromTheCounterOntoTheOvenTray(
+            episode=episode,
+            graspable=episode.graspable(self.picked_object),
+            plate=episode.object_body(RoboCasaObjectName.OBJECT_CONTAINER),
+            tray=episode.object_body(self.receptacle),
+            oven=episode.fixture_body(episode.environment.oven),
+        ).perform()
 
 
 @dataclass

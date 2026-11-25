@@ -80,3 +80,16 @@ def test_a_segment_that_misses_the_bounds_is_not_clipped():
     start = np.array([-1.0, 2.0])
     direction = np.array([4.0, 0.0])
     assert bounds.clip_segment(start, direction) is None
+
+
+# %% extent along a direction
+
+
+def test_the_bounds_reach_along_a_direction_from_their_lowest_to_their_highest_corner():
+    bounds = CoordinateBounds(
+        lower=np.array([0.0, 0.0, 0.0]), upper=np.array([2.0, 1.0, 1.0])
+    )
+    direction = np.array([0.6, -0.8, 0.0])
+    assert bounds.extent_along(direction=direction) == SimpleInterval.from_data(
+        -0.8, 1.2, Bound.CLOSED, Bound.CLOSED
+    )

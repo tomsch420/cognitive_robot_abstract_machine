@@ -417,6 +417,23 @@ class RoboCasaEpisode:
         executor.compile(statechart=statechart)
         return executor.attempt()
 
+    def run_steps_in_turn(
+        self, steps: Sequence[Callable[[], StatechartNode]]
+    ) -> PlanOutcome:
+        """
+        Run steps as plans of their own, one after another, each made when its turn
+        comes so that it is planned from the world as the step before left it.
+
+        :param steps: Make the steps.
+        :return: How the last step run ended; the steps after a failed one are not run.
+        """
+        outcome = PlanOutcome()
+        for make_step in steps:
+            outcome = self.run([make_step()])
+            if not outcome.succeeded:
+                return outcome
+        return outcome
+
     def run_part(self, *, part: StrEnum, steps: Sequence[StatechartNode]) -> bool:
         """
         Run the steps of one part of a larger whole as a plan of their own.
@@ -657,9 +674,7 @@ class RoboCasaEpisode:
         body = self.object_body(name)
         return next(
             annotation
-            for annotation in self.world.get_semantic_annotations_by_type(
-                IsGraspable
-            )
+            for annotation in self.world.get_semantic_annotations_by_type(IsGraspable)
             if annotation.root is body
         )
 

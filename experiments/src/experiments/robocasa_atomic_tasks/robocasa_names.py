@@ -286,6 +286,11 @@ class RoboCasaObjectName(StrEnum):
     The object another one is put on or in.
     """
 
+    OBJECT_CONTAINER = "obj_container"
+    """
+    The object the task's object lies on or in when the task begins, such as a plate.
+    """
+
     PLATE = "plate"
     """
     A plate.

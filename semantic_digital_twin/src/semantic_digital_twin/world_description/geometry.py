@@ -1466,6 +1466,20 @@ class CoordinateBounds(Bounds[npt.NDArray[np.float64]]):
                 return None
         return SimpleInterval.from_data(t_min, t_max, Bound.CLOSED, Bound.CLOSED)
 
+    def extent_along(self, *, direction: npt.NDArray[np.float64]) -> SimpleInterval:
+        """
+        :param direction: A direction, one coordinate per axis.
+        :return: The interval the points of these bounds cover when projected onto the
+            direction, in multiples of its length.
+        """
+        middle = (np.asarray(self.lower) + np.asarray(self.upper)) / 2
+        half_extents = (np.asarray(self.upper) - np.asarray(self.lower)) / 2
+        reach = float(half_extents @ np.abs(direction))
+        along = float(middle @ direction)
+        return SimpleInterval.from_data(
+            along - reach, along + reach, Bound.CLOSED, Bound.CLOSED
+        )
+
 
 PointT = TypeVar("PointT", bound=Point)
 """

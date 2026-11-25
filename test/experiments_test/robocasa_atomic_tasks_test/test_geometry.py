@@ -5,8 +5,14 @@ Frames, rays and bounding boxes in the world's root frame.
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
-from experiments.robocasa_atomic_tasks.geometry import ApproachFrame, BodyBounds, Ray
+from experiments.robocasa_atomic_tasks.geometry import (
+    ApproachFrame,
+    BodyBounds,
+    HorizontalFootprint,
+    Ray,
+)
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
@@ -18,6 +24,7 @@ from semantic_digital_twin.world_description.geometry import (
     Scale,
 )
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
+from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.world_entity import Body
 
 # %% frames
@@ -37,6 +44,51 @@ def test_an_approach_frame_points_its_x_axis_along_the_approach(kitchen_of_boxes
     np.testing.assert_allclose(matrix[:3, 1], [0.0, 1.0, 0.0])
     np.testing.assert_allclose(matrix[:3, 2], np.cross([0, 0, -1.0], [0, 1.0, 0]))
     np.testing.assert_allclose(matrix[:3, 3], frame.position)
+
+
+# %% footprints
+
+
+def turned_box(*, scale: Scale, middle: np.ndarray, yaw: float) -> Body:
+    """
+    :param scale: The box's extents.
+    :param middle: Where its middle lies.
+    :param yaw: How far it is turned about the vertical, in radians.
+    :return: The body of the box, fixed to the root of a world of its own.
+    """
+    world = World()
+    with world.modify_world():
+        root = Body(name=PrefixedName("kitchen"))
+        world.add_kinematic_structure_entity(root)
+        box = Body(
+            name=PrefixedName("box"), collision=ShapeCollection([Box(scale=scale)])
+        )
+        world.add_connection(
+            FixedConnection(
+                parent=root,
+                child=box,
+                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    *middle, yaw=yaw, reference_frame=root
+                ),
+            )
+        )
+    return box
+
+
+def test_a_turned_box_lies_along_its_long_side_and_across_its_narrow_side():
+    yaw = 3 * np.pi / 4
+    box = turned_box(
+        scale=Scale(0.17, 0.04, 0.05), middle=np.array([1.0, 2.0, 0.9]), yaw=yaw
+    )
+
+    footprint = HorizontalFootprint.from_body(box)
+
+    long_side = np.array([np.cos(yaw), np.sin(yaw), 0.0])
+    assert abs(footprint.long_axis @ long_side) == pytest.approx(1.0)
+    assert footprint.narrow_axis @ long_side == pytest.approx(0.0, abs=1e-12)
+    assert footprint.narrow_axis[2] == 0.0
+    assert (footprint.length, footprint.width) == pytest.approx((0.17, 0.04))
+    np.testing.assert_allclose(footprint.middle, [1.0, 2.0, 0.9], atol=1e-12)
 
 
 # %% rays

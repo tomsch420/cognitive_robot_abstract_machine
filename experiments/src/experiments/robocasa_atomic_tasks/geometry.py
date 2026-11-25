@@ -8,6 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import numpy as np
+import trimesh
 
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
@@ -113,6 +114,71 @@ class Ray:
         direction = self.direction / np.linalg.norm(self.direction)
         offset = point - self.point
         return float(np.linalg.norm(offset - (offset @ direction) * direction))
+
+
+# %% footprints
+
+
+@dataclass(kw_only=True)
+class HorizontalFootprint:
+    """
+    The shape of a body's collision geometry seen from straight above: its middle and
+    the horizontal directions it is longest and narrowest along, in the world's root
+    frame.
+    """
+
+    middle: np.ndarray
+    """
+    The middle of the box bounding the geometry along :attr:`long_axis`,
+    :attr:`narrow_axis` and the vertical.
+    """
+
+    long_axis: np.ndarray
+    """
+    The horizontal unit vector along which the geometry spreads the most.
+    """
+
+    narrow_axis: np.ndarray
+    """
+    The horizontal unit vector square to :attr:`long_axis`.
+    """
+
+    length: float
+    """
+    How far the geometry reaches along :attr:`long_axis`, in metres.
+    """
+
+    width: float
+    """
+    How far the geometry reaches along :attr:`narrow_axis`, in metres.
+    """
+
+    @classmethod
+    def from_body(cls, body: Body) -> HorizontalFootprint:
+        """
+        :param body: A body with collision geometry, where it is now.
+        :return: Its footprint, with the axes found by the principal components of its
+            vertices' horizontal positions.
+        """
+        vertices = trimesh.transformations.transform_points(
+            body.collision.combined_mesh.vertices, body.global_pose.to_np()
+        )
+        horizontal = vertices[:, :2] - vertices[:, :2].mean(axis=0)
+        _, axes = np.linalg.eigh(np.cov(horizontal.T))
+        long_axis = np.append(axes[:, 1], 0.0)
+        narrow_axis = np.append(axes[:, 0], 0.0)
+        along_long, along_narrow = vertices @ long_axis, vertices @ narrow_axis
+        middle = (along_long.max() + along_long.min()) / 2 * long_axis + (
+            along_narrow.max() + along_narrow.min()
+        ) / 2 * narrow_axis
+        middle[2] = (vertices[:, 2].max() + vertices[:, 2].min()) / 2
+        return cls(
+            middle=middle,
+            long_axis=long_axis,
+            narrow_axis=narrow_axis,
+            length=float(np.ptp(along_long)),
+            width=float(np.ptp(along_narrow)),
+        )
 
 
 # %% bodies
