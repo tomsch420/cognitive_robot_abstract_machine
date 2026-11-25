@@ -268,17 +268,21 @@ class RoboCasaJudge:
         """
         model, data = self.environment.sim.model, self.environment.sim.data
         robocasa_robot_bodies = self.robocasa_robot_body_ids
-        one_coordinate_joints = {
+        one_coordinate_joints = (
             mujoco.mjtJoint.mjJNT_HINGE,
             mujoco.mjtJoint.mjJNT_SLIDE,
-        }
+        )
         return [
             JudgedJointPosition(
                 joint_name=model.joint_id2name(joint),
                 position=float(data.qpos[model.jnt_qposadr[joint]]),
             )
             for joint in range(model.njnt)
-            if model.jnt_type[joint] in one_coordinate_joints
+            # MuJoCo 4's enums are not found by `in`, which compares from their side
+            if any(
+                model.jnt_type[joint] == joint_type
+                for joint_type in one_coordinate_joints
+            )
             and model.jnt_bodyid[joint] not in robocasa_robot_bodies
         ]
 
