@@ -23,10 +23,11 @@ from experiments.robocasa_atomic_tasks.open_oven_door_trials import (
     OpenOvenDoorSpace,
     OpenOvenDoorTrialsInADatabase,
 )
+from experiments.robocasa_atomic_tasks.let_down_doors import StandOnTheFloor
 from experiments.robocasa_atomic_tasks.oven_door_trials import (
+    DriveToTheStand,
     OvenDoorScene,
     OvenDoorSetup,
-    StandOnTheFloor,
 )
 
 # benchmarking measures a running system instead of describing it
@@ -50,6 +51,7 @@ ignored_classes |= {
     OpenOvenDoorSetup,
     OpenOvenDoorSpace,
     OpenOvenDoorTrialsInADatabase,
+    DriveToTheStand,
     OvenDoorScene,
     OvenDoorSetup,
     StandOnTheFloor,

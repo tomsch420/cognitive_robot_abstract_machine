@@ -14,12 +14,15 @@ import numpy as np
 from numpy.typing import NDArray
 
 from experiments.robocasa_atomic_tasks.doors import OpenOven
+from experiments.robocasa_atomic_tasks.let_down_doors import (
+    HandleApproach,
+    LetTheDoorDownByItsHandleAction,
+    StandBeforeTheHandle,
+)
 from experiments.robocasa_atomic_tasks.oven_door_trials import (
     BaseMotion,
-    HandleApproach,
     OvenDoorScene,
     OvenDoorSetup,
-    StandBeforeTheHandle,
 )
 from experiments.robocasa_atomic_tasks.robots import RobotModel
 from experiments.robocasa_atomic_tasks.skills import (
@@ -308,25 +311,25 @@ class OpenOvenDoorPerformer(TrialPerformer[OpenOvenDoorParameters, OpenOvenDoorT
 
     def perform(self, *, parameters: OpenOvenDoorParameters) -> OpenOvenDoorTrial:
         episode = self.scene.episode
-        stand = parameters.stand.stand_on_the_floor(
-            handle_middle=self.scene.handle_middle,
-            heading_facing_the_oven=self.scene.start.heading,
-        )
-        driving = self.scene.drive_to(stand=stand)
+        driving = self.scene.drive_to(stand=parameters.stand)
         reached = self.scene.where_the_base_stands()
         measurements = OpenOvenDoorMeasurements(
-            stand_position_error=stand.position_error(reached=reached),
-            stand_turn_error=stand.turn_error(reached=reached),
+            stand_position_error=driving.stand.position_error(reached=reached),
+            stand_turn_error=driving.stand.turn_error(reached=reached),
             door_angle=self.door_angle,
         )
-        if driving.failure is not None:
-            measurements.driving_failure = type(driving.failure).__name__
+        if driving.outcome.failure is not None:
+            measurements.driving_failure = type(driving.outcome.failure).__name__
             return self.ended_trial(parameters=parameters, measurements=measurements)
         episode.robot.mobile_base.full_body_controlled = (
             parameters.base_motion is BaseMotion.MOVING_WITH_THE_ARM
         )
-        with episode.allowances.bodies_may_touch(
-            self.wrist, [self.scene.door, self.scene.handle.root]
+        with episode.allowances.rules_applied(
+            ignore_rules=[
+                LetTheDoorDownByItsHandleAction.wrist_allowance(
+                    arm=episode.arm, handle_body=self.scene.handle.root
+                )
+            ]
         ):
             self.pull(parameters=parameters, measurements=measurements)
             if (
@@ -348,16 +351,6 @@ class OpenOvenDoorPerformer(TrialPerformer[OpenOvenDoorParameters, OpenOvenDoorT
         """
         return float(self.scene.door.parent_connection.position)
 
-    @property
-    def wrist(self) -> list[Body]:
-        """
-        The two links of the arm the hand hangs from, which come close to the handle as
-        the door swings down.
-        """
-        hand = self.scene.episode.arm.end_effector.root
-        forearm_end = hand.parent_connection.parent
-        return [forearm_end, forearm_end.parent_connection.parent]
-
     def pull(
         self,
         *,
@@ -374,8 +367,8 @@ class OpenOvenDoorPerformer(TrialPerformer[OpenOvenDoorParameters, OpenOvenDoorT
         pulling = episode.run(
             [
                 OpenByTheHandleAction(
-                    grasp_candidate=self.scene.grasp(
-                        approach=HandleApproach.FROM_THE_FRONT
+                    grasp_candidate=HandleApproach.FROM_THE_FRONT.closest_grasp(
+                        handle=self.scene.handle
                     ),
                     arm=episode.arm,
                     opened_joint_position=(

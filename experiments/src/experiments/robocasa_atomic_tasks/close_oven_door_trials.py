@@ -11,13 +11,15 @@ from dataclasses import dataclass, field
 from enum import Enum
 
 from experiments.robocasa_atomic_tasks.doors import CloseOven
-from experiments.robocasa_atomic_tasks.oven_door_trials import (
-    BaseMotion,
+from experiments.robocasa_atomic_tasks.let_down_doors import (
     HandleApproach,
-    OvenDoorScene,
-    OvenDoorSetup,
     StandBeforeTheHandle,
     StandOnTheFloor,
+)
+from experiments.robocasa_atomic_tasks.oven_door_trials import (
+    BaseMotion,
+    OvenDoorScene,
+    OvenDoorSetup,
 )
 from experiments.robocasa_atomic_tasks.robots import RobotModel
 from experiments.robocasa_atomic_tasks.skills import CloseByTheHandleAction
@@ -179,19 +181,15 @@ class CloseOvenDoorPerformer(
 
     def perform(self, *, parameters: CloseOvenDoorParameters) -> CloseOvenDoorTrial:
         episode = self.scene.episode
-        stand = parameters.stand.stand_on_the_floor(
-            handle_middle=self.scene.handle_middle,
-            heading_facing_the_oven=self.scene.start.heading,
-        )
-        driving = self.scene.drive_to(stand=stand)
+        driving = self.scene.drive_to(stand=parameters.stand)
         reached = self.scene.where_the_base_stands()
-        if driving.failure is not None:
+        if driving.outcome.failure is not None:
             return self.ended_trial(
                 parameters=parameters,
-                stand=stand,
+                stand=driving.stand,
                 reached=reached,
                 failed_stage=CloseOvenDoorStage.DRIVING_TO_THE_STAND,
-                failure=driving.failure,
+                failure=driving.outcome.failure,
             )
         episode.robot.mobile_base.full_body_controlled = (
             parameters.base_motion is BaseMotion.MOVING_WITH_THE_ARM
@@ -199,7 +197,9 @@ class CloseOvenDoorPerformer(
         closing = episode.run(
             [
                 CloseByTheHandleAction(
-                    grasp_candidate=self.scene.grasp(approach=parameters.approach),
+                    grasp_candidate=parameters.approach.closest_grasp(
+                        handle=self.scene.handle
+                    ),
                     arm=episode.arm,
                     closed_joint_position=0.0,
                 )
@@ -208,7 +208,7 @@ class CloseOvenDoorPerformer(
         episode.let_physics_run()
         return self.ended_trial(
             parameters=parameters,
-            stand=stand,
+            stand=driving.stand,
             reached=reached,
             failed_stage=(
                 None if closing.failure is None else CloseOvenDoorStage.CLOSING_THE_DOOR

@@ -8,12 +8,17 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from experiments.robocasa_atomic_tasks.door_handles import RoboCasaDoorHandleSplitter
 from experiments.robocasa_atomic_tasks.episode import RoboCasaEpisode
+from experiments.robocasa_atomic_tasks.let_down_doors import (
+    LetTheDoorDownByItsHandleAction,
+)
 from experiments.robocasa_atomic_tasks.robocasa_names import FixtureJointRole
 from experiments.robocasa_atomic_tasks.tasks import DoorShareTask
 from semantic_digital_twin.adapters.robocasa_dataset.mujoco_compat import (
     robocasa_version_assertions_relaxed,
 )
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Door
 
 with robocasa_version_assertions_relaxed():
     from robocasa.models.scenes.scene_registry import LayoutType
@@ -30,6 +35,18 @@ class ManipulateFixtureDoors(DoorShareTask):
 
     def joint_names(self, episode: RoboCasaEpisode) -> list[str]:
         return list(episode.environment.fxtr.door_joint_names)
+
+    def doors(self, episode: RoboCasaEpisode) -> list[Door]:
+        """
+        :param episode: The episode the task is performed in.
+        :return: The doors hanging from the joints of :meth:`joint_names`.
+        """
+        joint_names = self.joint_names(episode)
+        return [
+            door
+            for door in episode.world.get_semantic_annotations_by_type(Door)
+            if door.root.parent_connection.name.name in joint_names
+        ]
 
 
 @dataclass
@@ -91,6 +108,36 @@ class OpenOven(ManipulateFixtureDoors):
     """
 
     layout: LayoutType = LayoutType.LAYOUT002
+
+    def compose(self) -> RoboCasaEpisode:
+        """
+        Differs from :meth:`RoboCasaAtomicTask.compose` in splitting the handle off the
+        oven's door into a body of its own when the episode is simulated physically.
+        """
+        episode = super().compose()
+        if not self.physics:
+            return episode
+        for door in self.doors(episode):
+            RoboCasaDoorHandleSplitter().split_handle_off(door=door)
+        return episode
+
+    def solve(self, episode: RoboCasaEpisode) -> None:
+        """
+        Differs from :meth:`DoorShareTask.solve` in letting the door down by
+        :class:`LetTheDoorDownByItsHandleAction` when the episode is simulated
+        physically.
+        """
+        if not episode.physically_simulated:
+            super().solve(episode)
+            return
+        for door in self.doors(episode):
+            episode.run(
+                [
+                    LetTheDoorDownByItsHandleAction.from_handle(
+                        handle=door.handle, arm=episode.arm
+                    )
+                ]
+            ).raise_if_failed()
 
 
 @dataclass

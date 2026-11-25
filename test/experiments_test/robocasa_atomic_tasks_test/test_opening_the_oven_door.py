@@ -17,10 +17,8 @@ from experiments.robocasa_atomic_tasks.open_oven_door_trials import (
     OpeningStrategy,
     PressOnTheInnerFace,
 )
-from experiments.robocasa_atomic_tasks.oven_door_trials import (
-    BaseMotion,
-    StandBeforeTheHandle,
-)
+from experiments.robocasa_atomic_tasks.let_down_doors import StandBeforeTheHandle
+from experiments.robocasa_atomic_tasks.oven_door_trials import BaseMotion
 
 # %% the oven of a composed episode
 
