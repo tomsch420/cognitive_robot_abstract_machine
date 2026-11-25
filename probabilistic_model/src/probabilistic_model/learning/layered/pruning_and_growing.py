@@ -71,12 +71,12 @@ class DatasetEdgeFlows:
             in :meth:`Layer.all_layers`.
         """
         expectation_maximization = CircuitExpectationMaximization(
-            epochs=1,
+            convergence=CircuitExpectationMaximization.convergence_after(epochs=1),
             batch_size=self.batch_size,
             statistics_adjustments=[StatisticsRecorder()],
         )
         learning = expectation_maximization.learner(root=self.circuit.root)
-        expectation_maximization.trained_root(
+        expectation_maximization.training_run(
             learning=learning, circuit=self.circuit, data=data
         )
         [recorder] = learning.statistics_adjustments

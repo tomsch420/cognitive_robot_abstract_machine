@@ -161,7 +161,9 @@ def test_full_batch_epoch_is_the_closed_form_mixture_update(
     circuit = gaussian_mixture(
         variable=x, weights=weights, locations=locations, scales=scales
     )
-    CircuitExpectationMaximization(epochs=1).fit(circuit=circuit, data=data[:, None])
+    CircuitExpectationMaximization.full_batch(epochs=1).fit(
+        circuit=circuit, data=data[:, None]
+    )
     responsibilities = gaussian_mixture_responsibilities(
         data=data, weights=weights, locations=locations, scales=scales
     )
@@ -189,7 +191,7 @@ def test_categorical_probabilities_are_smoothed_counts():
         probabilities=np.array([[0.2, 0.3, 0.5]]),
     )
     states = np.array([0, 0, 0, 1, 1])
-    CircuitExpectationMaximization(epochs=1).fit(
+    CircuitExpectationMaximization.full_batch(epochs=1).fit(
         circuit=circuit, data=hashes_of_states(variable=variable, states=states)
     )
     counts = np.bincount(states, minlength=3) + StateCountSmoothing().pseudocount
@@ -215,7 +217,7 @@ def test_impossible_states_stay_impossible_under_smoothing():
         probabilities=np.array([[0.6, 0.4, 0.0]]),
     )
     states = np.array([0, 0, 1])
-    CircuitExpectationMaximization(epochs=1).fit(
+    CircuitExpectationMaximization.full_batch(epochs=1).fit(
         circuit=circuit, data=hashes_of_states(variable=variable, states=states)
     )
     counts = np.bincount(states, minlength=3) + StateCountSmoothing().pseudocount
@@ -242,7 +244,7 @@ def test_anemone_step_mixes_by_top_down_probability_and_flow(
     )
     mixing = AnemoneMixing()
     CircuitExpectationMaximization(
-        epochs=1,
+        convergence=CircuitExpectationMaximization.convergence_after(epochs=1),
         batch_size=len(data),
         batches_per_update=1,
         statistics_adjustments=[mixing],
@@ -359,7 +361,7 @@ def test_softened_counts_move_mass_to_the_other_states():
         probabilities=np.array([[1 / 3, 1 / 3, 1 / 3]]),
     )
     CircuitExpectationMaximization(
-        epochs=1,
+        convergence=CircuitExpectationMaximization.convergence_after(epochs=1),
         data_softening=DataSoftening(keep_probability=keep_probability),
         statistics_adjustments=[],
     ).fit(circuit=circuit, data=hashes_of_states(variable=variable, states=states))
@@ -391,9 +393,11 @@ def test_entropy_regularization_without_strength_is_the_plain_update(
     regularized = gaussian_mixture(
         variable=x, weights=weights, locations=locations, scales=scales
     )
-    CircuitExpectationMaximization(epochs=1).fit(circuit=plain, data=data[:, None])
+    CircuitExpectationMaximization.full_batch(epochs=1).fit(
+        circuit=plain, data=data[:, None]
+    )
     CircuitExpectationMaximization(
-        epochs=1,
+        convergence=CircuitExpectationMaximization.convergence_after(epochs=1),
         statistics_adjustments=[
             StateCountSmoothing(),
             EntropyRegularization(strength=0.0),

@@ -154,7 +154,7 @@ def test_counted_parameters_are_the_conditional_frequencies(bits):
 
 def test_distilled_circuit_is_normalized(bits):
     """
-    A distilled and fine-tuned circuit sums to one over all assignments.
+    A distilled circuit sums to one over all assignments.
     """
     variables, rows = bits
     circuit = LatentVariableDistillation(
@@ -164,7 +164,6 @@ def test_distilled_circuit_is_normalized(bits):
         heads=2,
         layers=1,
         epochs=1,
-        fine_tuning=CircuitExpectationMaximization(epochs=1),
     ).build_circuit(data=rows)
     assert total_probability(circuit) == pytest.approx(1.0)
 
@@ -180,7 +179,7 @@ def test_pruning_removes_the_fraction_and_keeps_an_edge_per_unit(bits):
     circuit = HiddenChowLiuTree(variables=variables, hidden_states=4).build_circuit(
         data=rows
     )
-    CircuitExpectationMaximization(epochs=3).fit(circuit=circuit, data=rows)
+    CircuitExpectationMaximization.full_batch(epochs=3).fit(circuit=circuit, data=rows)
     flows = DatasetEdgeFlows(circuit=circuit).compute(data=rows)
     host = circuit.to_namespace(np)
     pruned = Pruning(pruned_fraction=0.75).pruned_root(root=host.root, edge_flows=flows)

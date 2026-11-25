@@ -1,14 +1,14 @@
 """
 Latent variable distillation of :cite:`liu2023scaling` for hidden Chow-Liu tree
 circuits: a masked autoencoder trained on the data assigns every latent variable by
-clustering the embedding of its variable, the circuit is counted from the completed rows
-and then fine-tuned on the observed rows.
+clustering the embedding of its variable, and the circuit is counted from the completed
+rows.
 """
 
 from __future__ import annotations
 
 # %% imports
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import numpy as np
 import torch
@@ -16,9 +16,6 @@ from random_events.variable import Symbolic
 from sklearn.cluster import MiniBatchKMeans
 from sortedcontainers import SortedSet
 
-from probabilistic_model.learning.layered.expectation_maximization import (
-    CircuitExpectationMaximization,
-)
 from probabilistic_model.learning.layered.hidden_chow_liu_tree import (
     HiddenChowLiuTree,
 )
@@ -171,13 +168,6 @@ class LatentVariableDistillation:
     The learning rate of the autoencoder's Adam optimizer.
     """
 
-    fine_tuning: CircuitExpectationMaximization = field(
-        default_factory=lambda: CircuitExpectationMaximization.mini_batch(epochs=10)
-    )
-    """
-    The training of the circuit on the observed rows after it was counted.
-    """
-
     seed: int = 0
     """
     The seed of the autoencoder and the clustering.
@@ -186,8 +176,8 @@ class LatentVariableDistillation:
     def build_circuit(self, *, data: np.ndarray) -> LayeredProbabilisticCircuit:
         """
         :param data: The rows, whose symbolic values are hashes of domain elements.
-        :return: The distilled and fine-tuned hidden Chow-Liu tree circuit with jax
-            parameters.
+        :return: The hidden Chow-Liu tree circuit whose parameters are counted with the
+            latent states the autoencoder assigns, with jax parameters.
         """
         torch.manual_seed(self.seed)
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -206,10 +196,9 @@ class LatentVariableDistillation:
         ).to(device)
         self.train_autoencoder(model=model, values=values)
         latent_states = self.latent_states(model=model, values=values)
-        circuit = HiddenChowLiuTree(
+        return HiddenChowLiuTree(
             variables=self.variables, hidden_states=self.hidden_states, seed=self.seed
         ).build_circuit(data=data, latent_states=latent_states)
-        return self.fine_tuning.fit(circuit=circuit, data=data)
 
     def autoencoder_values(self, *, data: np.ndarray) -> np.ndarray:
         """

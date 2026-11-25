@@ -12,8 +12,14 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import optax
-import tqdm
+from typing_extensions import Callable
 
+from probabilistic_model.learning.parameters.training_schedule import (
+    Convergence,
+    ConvergenceHistory,
+    MiniBatches,
+    MiniBatchTraining,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     SampleArray,
 )
@@ -112,12 +118,13 @@ class ProbabilisticDropout:
 class MiniBatchGradientDescent:
     """
     Minimizes the average negative log-likelihood of a circuit with jax parameters by
-    mini-batch gradient descent, under probabilistic dropout.
+    mini-batch gradient descent under probabilistic dropout, until :attr:`convergence`
+    stops it.
     """
 
-    epochs: int = 10
+    convergence: Convergence = field(default_factory=Convergence)
     """
-    The number of passes over the data.
+    When training stops.
     """
 
     batch_size: int = 512
@@ -142,86 +149,150 @@ class MiniBatchGradientDescent:
     The seed of the order of the rows and of the dropout masks.
     """
 
-    average_log_likelihoods: list[float] = field(default_factory=list, init=False)
-    """
-    The average log-likelihood of the training rows under dropout in every epoch.
-    """
-
     def fit(
         self, *, circuit: LayeredProbabilisticCircuit, data: SampleArray
-    ) -> LayeredProbabilisticCircuit:
+    ) -> ConvergenceHistory:
         """
         Learn the parameters of the circuit, in place.
 
         :param circuit: A circuit whose parameters are jax arrays.
         :param data: The rows, whose symbolic values are hashes of domain elements.
-        :return: The circuit.
+        :return: The average loss under dropout of every epoch trained.
         """
-        encoded = np.asarray(HasParameterArrays.host_copy(circuit.encoded(data)))
         root = circuit.root
-        impossible = [jnp.isneginf(parameter) for parameter in root.circuit_parameters]
+        encoded = root.namespace.asarray(
+            np.asarray(HasParameterArrays.host_copy(circuit.encoded(data))),
+            dtype=root.floating_point_type,
+            device=root.device,
+        )
+        training = DropoutGradientDescentTraining(
+            arguments=(encoded,),
+            mini_batches=MiniBatches(batch_size=self.batch_size, seed=self.seed),
+            learning=self,
+            root=root,
+        )
+        history = self.convergence.history_until_converged(training=training)
+        circuit.root = root.copy_with_circuit_parameters(parameters=training.parameters)
+        return history
 
-        def loss(
-            parameters: list[jax.Array], batch: jax.Array, key: jax.Array
-        ) -> jax.Array:
-            """
-            :param parameters: Arrays in the order of the circuit's parameters.
-            :param batch: The encoded rows of the batch.
-            :param key: The random key of the dropout.
-            :return: The negative average log-likelihood of the rows under dropout.
-            """
-            log_likelihoods = self.dropout.log_likelihood(
-                root=root.copy_with_circuit_parameters(parameters=parameters),
-                data=batch,
+
+@dataclass(kw_only=True)
+class DropoutGradientDescentTraining(MiniBatchTraining):
+    """
+    The steps of a :class:`MiniBatchGradientDescent`, one compiled step per batch with a
+    fresh dropout key.
+    """
+
+    learning: MiniBatchGradientDescent
+    """
+    The gradient descent whose steps are taken.
+    """
+
+    root: Layer
+    """
+    The root of the circuit at the parameters before training.
+    """
+
+    parameters: list[jax.Array] = field(init=False)
+    """
+    The parameters after the last step.
+    """
+
+    optimizer_state: optax.OptState = field(init=False)
+    """
+    The state of the optimizer after the last step.
+    """
+
+    key: jax.Array = field(init=False)
+    """
+    The random key the dropout key of the next step is split from.
+    """
+
+    impossible: list[jax.Array] = field(init=False)
+    """
+    Where every parameter array is ``-inf``, a probability of zero kept by every step.
+    """
+
+    compiled_step: Callable[..., tuple[list[jax.Array], optax.OptState, jax.Array]] = (
+        field(init=False)
+    )
+    """
+    :meth:`step`, compiled.
+    """
+
+    def __post_init__(self) -> None:
+        """
+        Start from the parameters of :attr:`root` and compile the step.
+        """
+        self.parameters = list(self.root.circuit_parameters)
+        self.optimizer_state = self.learning.optimizer.init(self.parameters)
+        self.key = jax.random.PRNGKey(self.learning.seed)
+        self.impossible = [jnp.isneginf(parameter) for parameter in self.parameters]
+        self.compiled_step = jax.jit(
+            lambda parameters, optimizer_state, batch, key: self.step(
+                parameters=parameters,
+                optimizer_state=optimizer_state,
+                batch=batch,
                 key=key,
             )
-            return -log_likelihoods.mean()
+        )
 
-        def step(
-            parameters: list[jax.Array],
-            optimizer_state: optax.OptState,
-            batch: jax.Array,
-            key: jax.Array,
-        ) -> tuple[list[jax.Array], optax.OptState, jax.Array]:
-            """
-            :param parameters: Arrays in the order of the circuit's parameters.
-            :param optimizer_state: The state of the optimizer before the step.
-            :param batch: The encoded rows of the batch.
-            :param key: The random key of the dropout.
-            :return: The projected parameters and the optimizer state after the step,
-                and the loss before it; parameters of probability zero stay zero.
-            """
-            value, gradients = jax.value_and_grad(loss)(parameters, batch, key)
-            updates, optimizer_state = self.optimizer.update(
-                gradients, optimizer_state, parameters
+    def loss(
+        self, *, parameters: list[jax.Array], batch: jax.Array, key: jax.Array
+    ) -> jax.Array:
+        """
+        :param parameters: Arrays in the order of the circuit's parameters.
+        :param batch: The encoded rows of the batch.
+        :param key: The random key of the dropout.
+        :return: The negative average log-likelihood of the rows under dropout.
+        """
+        log_likelihoods = self.learning.dropout.log_likelihood(
+            root=self.root.copy_with_circuit_parameters(parameters=parameters),
+            data=batch,
+            key=key,
+        )
+        return -log_likelihoods.mean()
+
+    def step(
+        self,
+        *,
+        parameters: list[jax.Array],
+        optimizer_state: optax.OptState,
+        batch: jax.Array,
+        key: jax.Array,
+    ) -> tuple[list[jax.Array], optax.OptState, jax.Array]:
+        """
+        :param parameters: Arrays in the order of the circuit's parameters.
+        :param optimizer_state: The state of the optimizer before the step.
+        :param batch: The encoded rows of the batch.
+        :param key: The random key of the dropout.
+        :return: The projected parameters and the optimizer state after the step,
+            and the loss before it; parameters of probability zero stay zero.
+        """
+        value, gradients = jax.value_and_grad(
+            lambda differentiated: self.loss(
+                parameters=differentiated, batch=batch, key=key
             )
-            parameters = root.projected_circuit_parameters(
-                parameters=optax.apply_updates(parameters, updates)
-            )
-            parameters = [
+        )(parameters)
+        updates, updated_optimizer_state = self.learning.optimizer.update(
+            gradients, optimizer_state, parameters
+        )
+        projected = self.root.projected_circuit_parameters(
+            parameters=optax.apply_updates(parameters, updates)
+        )
+        return (
+            [
                 jnp.where(mask, -jnp.inf, parameter)
-                for mask, parameter in zip(impossible, parameters)
-            ]
-            return parameters, optimizer_state, value
+                for mask, parameter in zip(self.impossible, projected)
+            ],
+            updated_optimizer_state,
+            value,
+        )
 
-        compiled_step = jax.jit(step)
-        parameters = list(root.circuit_parameters)
-        optimizer_state = self.optimizer.init(parameters)
-        random_number_generator = np.random.default_rng(self.seed)
-        key = jax.random.PRNGKey(self.seed)
-        for _ in tqdm.tqdm(range(self.epochs), desc="Gradient descent"):
-            order = random_number_generator.permutation(len(encoded))
-            summed = 0.0
-            for start in range(0, len(encoded), self.batch_size):
-                batch = encoded[order[start : start + self.batch_size]]
-                key, step_key = jax.random.split(key)
-                parameters, optimizer_state, value = compiled_step(
-                    parameters,
-                    optimizer_state,
-                    jnp.asarray(batch, dtype=root.floating_point_type),
-                    step_key,
-                )
-                summed -= float(value) * len(batch)
-            self.average_log_likelihoods.append(summed / len(encoded))
-        circuit.root = root.copy_with_circuit_parameters(parameters=parameters)
-        return circuit
+    def step_on_batch(self, *, batch: tuple[jax.Array, ...]) -> jax.Array:
+        [data] = batch
+        self.key, step_key = jax.random.split(self.key)
+        self.parameters, self.optimizer_state, value = self.compiled_step(
+            self.parameters, self.optimizer_state, data, step_key
+        )
+        return value

@@ -10,6 +10,7 @@ from __future__ import annotations
 import dataclasses
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from datetime import timedelta
 from enum import StrEnum
 
 import jax
@@ -27,6 +28,29 @@ from experiments.circuit_learning.settings import (
     EdgeRepresentation,
 )
 from probabilistic_model.adapters.circuit_representations import CircuitRepresentations
+from probabilistic_model.learning.layered.dropout import (
+    MiniBatchGradientDescent,
+    ProbabilisticDropout,
+)
+from probabilistic_model.learning.layered.expectation_maximization import (
+    CircuitExpectationMaximization,
+)
+from probabilistic_model.learning.layered.hidden_chow_liu_tree import (
+    HiddenChowLiuTree,
+)
+from probabilistic_model.learning.layered.latent_variable_distillation import (
+    LatentVariableDistillation,
+)
+from probabilistic_model.learning.layered.learn_spn import LearnSPN
+from probabilistic_model.learning.layered.pruning_and_growing import PruningAndGrowing
+from probabilistic_model.learning.layered.regularization import (
+    DataSoftening,
+    EntropyRegularization,
+)
+from probabilistic_model.learning.layered.statistics_adjustment import (
+    StateCountSmoothing,
+)
+from probabilistic_model.learning.layered.strudel import Strudel
 from probabilistic_model.learning.parameters.expectation_maximization.expectation_maximization import (
     ExpectationMaximization,
     ExpectationMaximizationTraining,
@@ -87,6 +111,17 @@ class LearningMethod(StrEnum):
         "RAT-SPN, online expectation maximization"
     )
     JOINT_PROBABILITY_TREE = "joint probability tree"
+    RANDOM_TENSORIZED_SUM_PRODUCT_NETWORK_DROPOUT = (
+        "RAT-SPN, gradient descent with probabilistic dropout"
+    )
+    RANDOM_TENSORIZED_SUM_PRODUCT_NETWORK_ANEMONE = "RAT-SPN, anemone"
+    HIDDEN_CHOW_LIU_TREE = "hidden Chow-Liu tree"
+    REGULARIZED_HIDDEN_CHOW_LIU_TREE = "regularized hidden Chow-Liu tree"
+    HIDDEN_CHOW_LIU_TREE_ANEMONE = "hidden Chow-Liu tree, anemone"
+    PRUNING_AND_GROWING = "pruning and growing"
+    LEARN_SPN = "LearnSPN"
+    STRUDEL = "Strudel"
+    LATENT_VARIABLE_DISTILLATION = "latent variable distillation"
 
 
 # %% training context
@@ -539,6 +574,346 @@ class JointProbabilityTreeBaseline(BenchmarkMethod):
         )
 
 
+@dataclass(kw_only=True)
+class CircuitExpectationMaximizationMethod(BenchmarkMethod, ABC):
+    """
+    A circuit whose structure is built on the host and whose parameters phases of
+    tensorized expectation maximization then train, each phase until the training loss
+    converges as the training context says, whatever its own convergence.
+    """
+
+    phases: list[CircuitExpectationMaximization] = field(default_factory=list)
+    """
+    The phases of training, in order.
+    """
+
+    def settings(self) -> list[ComputationSetting]:
+        return ComputationSetting.grid(
+            array_libraries=(ArrayLibrary.JAX, ArrayLibrary.TORCH)
+        )
+
+    @abstractmethod
+    def starting_circuit(
+        self, *, dataset: BenchmarkDataset
+    ) -> LayeredProbabilisticCircuit:
+        """
+        :param dataset: The dataset.
+        :return: The circuit the phases start from.
+        """
+        raise NotImplementedError
+
+    def learn(
+        self,
+        *,
+        dataset: BenchmarkDataset,
+        setting: ComputationSetting,
+        context: TrainingContext,
+    ) -> LearnedCircuit:
+        host = self.starting_circuit(dataset=dataset).to_namespace(np)
+        rows = dataset.encoded(frame=dataset.train)
+        circuit = setting.placed(circuit=host)
+        rows_per_step = context.rows_per_step(circuit=host, setting=setting, rows=rows)
+        histories = []
+        for phase in self.phases:
+            configured = dataclasses.replace(
+                phase, convergence=context.convergence, seed=self.seed
+            )
+            learner = configured.learner(root=circuit.root)
+            run = dataclasses.replace(
+                configured,
+                batch_size=learner.largest_even_batch_size(
+                    rows=min(phase.batch_size or len(rows), rows_per_step)
+                ),
+            ).training_run(learning=learner, circuit=circuit, data=rows)
+            circuit.root = run.trained_root
+            histories.append(run.history)
+        return LearnedCircuit(
+            circuit=circuit, history=self.joined_history(histories=histories)
+        )
+
+    @staticmethod
+    def joined_history(*, histories: list[ConvergenceHistory]) -> ConvergenceHistory:
+        """
+        :param histories: The histories of consecutive phases of training.
+        :return: The history of all their epochs, converged if every phase converged.
+        """
+        return ConvergenceHistory(
+            epoch_losses=[
+                loss for history in histories for loss in history.epoch_losses
+            ],
+            converged=all(history.converged for history in histories),
+            duration=sum((history.duration for history in histories), timedelta()),
+            epoch_durations=[
+                duration
+                for history in histories
+                for duration in history.epoch_durations
+            ],
+        )
+
+
+@dataclass(kw_only=True)
+class RandomTensorizedSumProductNetworkByAnemone(
+    RandomTensorizedSumProductNetworkLearning, CircuitExpectationMaximizationMethod
+):
+    """
+    A RAT-SPN trained by anemone :cite:`liu2026rethinking`, mini-batch expectation
+    maximization with a learning rate per node.
+    """
+
+    phases: list[CircuitExpectationMaximization] = field(
+        default_factory=lambda: [CircuitExpectationMaximization.anemone(epochs=30)]
+    )
+    """
+    One phase of anemone with the momentum and learning rate of the paper.
+    """
+
+    @property
+    def name(self) -> LearningMethod:
+        return LearningMethod.RANDOM_TENSORIZED_SUM_PRODUCT_NETWORK_ANEMONE
+
+    def starting_circuit(
+        self, *, dataset: BenchmarkDataset
+    ) -> LayeredProbabilisticCircuit:
+        return self.random_circuit(dataset=dataset)
+
+
+@dataclass(kw_only=True)
+class RandomTensorizedSumProductNetworkByDropout(
+    RandomTensorizedSumProductNetworkLearning
+):
+    """
+    A RAT-SPN trained by mini-batch gradient descent with Adam under the probabilistic
+    dropout of :cite:`peharz2020random`, section 3.3, until the training loss converges.
+    """
+
+    dropout: ProbabilisticDropout = field(
+        default_factory=lambda: ProbabilisticDropout(
+            input_probability=0.1, sum_probability=0.1
+        )
+    )
+    """
+    The dropout during training.
+    """
+
+    batch_size: int = 512
+    """
+    The most rows per step, fewer if they do not fit in memory.
+    """
+
+    @property
+    def name(self) -> LearningMethod:
+        return LearningMethod.RANDOM_TENSORIZED_SUM_PRODUCT_NETWORK_DROPOUT
+
+    def settings(self) -> list[ComputationSetting]:
+        return ComputationSetting.grid(array_libraries=(ArrayLibrary.JAX,))
+
+    def learn(
+        self,
+        *,
+        dataset: BenchmarkDataset,
+        setting: ComputationSetting,
+        context: TrainingContext,
+    ) -> LearnedCircuit:
+        host = self.random_circuit(dataset=dataset)
+        rows = dataset.encoded(frame=dataset.train)
+        circuit = setting.placed(circuit=host)
+        history = MiniBatchGradientDescent(
+            convergence=context.convergence,
+            batch_size=min(
+                self.batch_size,
+                context.rows_per_step(circuit=host, setting=setting, rows=rows),
+            ),
+            dropout=self.dropout,
+            seed=self.seed,
+        ).fit(circuit=circuit, data=rows)
+        return LearnedCircuit(circuit=circuit, history=history)
+
+
+@dataclass(kw_only=True)
+class HiddenChowLiuTreeMethod(CircuitExpectationMaximizationMethod):
+    """
+    A hidden Chow-Liu tree circuit :cite:`liu2021tractable` trained by mini-batch and
+    then full-batch expectation maximization, the schedule of its section 4.3.
+    """
+
+    method_name: LearningMethod = LearningMethod.HIDDEN_CHOW_LIU_TREE
+    """
+    The name the configuration is reported under.
+    """
+
+    hidden_states: int = 12
+    """
+    The number of states of every latent variable.
+    """
+
+    phases: list[CircuitExpectationMaximization] = field(
+        default_factory=lambda: [
+            CircuitExpectationMaximization.mini_batch(epochs=20),
+            CircuitExpectationMaximization.full_batch(epochs=20),
+        ]
+    )
+    """
+    Mini-batch and then full-batch expectation maximization.
+    """
+
+    @property
+    def name(self) -> LearningMethod:
+        return self.method_name
+
+    def starting_circuit(
+        self, *, dataset: BenchmarkDataset
+    ) -> LayeredProbabilisticCircuit:
+        return HiddenChowLiuTree(
+            variables=dataset.variables,
+            hidden_states=self.hidden_states,
+            seed=self.seed,
+        ).build_circuit(data=dataset.encoded(frame=dataset.train))
+
+
+@dataclass(kw_only=True)
+class LatentVariableDistillationMethod(CircuitExpectationMaximizationMethod):
+    """
+    Latent variable distillation :cite:`liu2023scaling` of a hidden Chow-Liu tree
+    circuit with a masked autoencoder trained on the training rows, fine-tuned by mini-
+    batch expectation maximization.
+    """
+
+    phases: list[CircuitExpectationMaximization] = field(
+        default_factory=lambda: [CircuitExpectationMaximization.mini_batch(epochs=10)]
+    )
+    """
+    The fine-tuning of the distilled circuit on the observed rows.
+    """
+
+    @property
+    def name(self) -> LearningMethod:
+        return LearningMethod.LATENT_VARIABLE_DISTILLATION
+
+    def starting_circuit(
+        self, *, dataset: BenchmarkDataset
+    ) -> LayeredProbabilisticCircuit:
+        return LatentVariableDistillation(
+            variables=dataset.variables, seed=self.seed
+        ).build_circuit(data=dataset.encoded(frame=dataset.train))
+
+
+@dataclass(kw_only=True)
+class PruningAndGrowingMethod(BenchmarkMethod):
+    """
+    Pruning and growing :cite:`dang2022sparse` from a trained hidden Chow-Liu tree
+    circuit, stopped by the validation rows.
+    """
+
+    start: HiddenChowLiuTreeMethod = field(default_factory=HiddenChowLiuTreeMethod)
+    """
+    How the initial circuit is learned.
+    """
+
+    pruning_and_growing: PruningAndGrowing = field(
+        default_factory=lambda: PruningAndGrowing(
+            parameter_learning=CircuitExpectationMaximization.mini_batch(epochs=10)
+        )
+    )
+    """
+    The structure learning.
+    """
+
+    @property
+    def name(self) -> LearningMethod:
+        return LearningMethod.PRUNING_AND_GROWING
+
+    def settings(self) -> list[ComputationSetting]:
+        return self.start.settings()
+
+    def learn(
+        self,
+        *,
+        dataset: BenchmarkDataset,
+        setting: ComputationSetting,
+        context: TrainingContext,
+    ) -> LearnedCircuit:
+        """
+        Like :meth:`BenchmarkMethod.learn`, with the history of the initial circuit's
+        training.
+        """
+        start = self.start.learn(dataset=dataset, setting=setting, context=context)
+        circuit = self.pruning_and_growing.fit(
+            circuit=start.circuit,
+            data=dataset.encoded(frame=dataset.train),
+            validation_data=dataset.encoded(frame=dataset.validation),
+        )
+        return LearnedCircuit(
+            circuit=setting.placed(circuit=circuit), history=start.history
+        )
+
+
+@dataclass(kw_only=True)
+class LearnSPNMethod(BenchmarkMethod):
+    """
+    LearnSPN :cite:`gens2013learning`.
+    """
+
+    @property
+    def name(self) -> LearningMethod:
+        return LearningMethod.LEARN_SPN
+
+    def settings(self) -> list[ComputationSetting]:
+        return [ComputationSetting.host()]
+
+    def learn(
+        self,
+        *,
+        dataset: BenchmarkDataset,
+        setting: ComputationSetting,
+        context: TrainingContext,
+    ) -> LearnedCircuit:
+        circuit = LearnSPN(variables=dataset.variables, seed=self.seed).build_circuit(
+            data=dataset.encoded(frame=dataset.train)
+        )
+        return LearnedCircuit(circuit=setting.placed(circuit=circuit), history=None)
+
+
+@dataclass(kw_only=True)
+class StrudelMethod(BenchmarkMethod):
+    """
+    Strudel :cite:`dang2020strudel`, stopped by the validation rows.
+    """
+
+    maximum_splits: int = 1000
+    """
+    The largest number of splits.
+    """
+
+    @property
+    def name(self) -> LearningMethod:
+        return LearningMethod.STRUDEL
+
+    def settings(self) -> list[ComputationSetting]:
+        return [ComputationSetting.host()]
+
+    def supports(self, *, dataset: BenchmarkDataset) -> bool:
+        """
+        Whether every variable of the dataset is symbolic, see
+        :meth:`BenchmarkMethod.supports`.
+        """
+        return dataset.is_symbolic
+
+    def learn(
+        self,
+        *,
+        dataset: BenchmarkDataset,
+        setting: ComputationSetting,
+        context: TrainingContext,
+    ) -> LearnedCircuit:
+        circuit = Strudel(
+            variables=dataset.variables, maximum_splits=self.maximum_splits
+        ).build_circuit(
+            data=dataset.encoded(frame=dataset.train),
+            validation_data=dataset.encoded(frame=dataset.validation),
+        )
+        return LearnedCircuit(circuit=setting.placed(circuit=circuit), history=None)
+
+
 # %% all methods
 
 
@@ -554,6 +929,34 @@ class BenchmarkMethods:
             RandomTensorizedSumProductNetworkByExpectationMaximization(),
             RandomTensorizedSumProductNetworkByOnlineExpectationMaximization(),
             JointProbabilityTreeBaseline(),
+            RandomTensorizedSumProductNetworkByDropout(),
+            RandomTensorizedSumProductNetworkByAnemone(),
+            HiddenChowLiuTreeMethod(),
+            HiddenChowLiuTreeMethod(
+                method_name=LearningMethod.REGULARIZED_HIDDEN_CHOW_LIU_TREE,
+                phases=[
+                    dataclasses.replace(
+                        phase,
+                        data_softening=DataSoftening(keep_probability=0.998),
+                        statistics_adjustments=[
+                            StateCountSmoothing(),
+                            EntropyRegularization(strength=0.001),
+                        ],
+                    )
+                    for phase in (
+                        CircuitExpectationMaximization.mini_batch(epochs=20),
+                        CircuitExpectationMaximization.full_batch(epochs=20),
+                    )
+                ],
+            ),
+            HiddenChowLiuTreeMethod(
+                method_name=LearningMethod.HIDDEN_CHOW_LIU_TREE_ANEMONE,
+                phases=[CircuitExpectationMaximization.anemone(epochs=40)],
+            ),
+            PruningAndGrowingMethod(),
+            LearnSPNMethod(),
+            StrudelMethod(),
+            LatentVariableDistillationMethod(),
         ]
     )
     """

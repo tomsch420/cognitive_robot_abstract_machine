@@ -32,6 +32,7 @@ from probabilistic_model.learning.layered.statistics_adjustment import (
 )
 from probabilistic_model.learning.parameters.circuit_parameter_learning import (
     LayerType,
+    TrainingRun,
 )
 from probabilistic_model.learning.parameters.expectation_maximization.expectation_maximization import (
     MaximizationRegularization,
@@ -53,6 +54,7 @@ from probabilistic_model.learning.parameters.expectation_maximization.torch_expe
 )
 from probabilistic_model.learning.parameters.training_schedule import (
     Convergence,
+    ConvergenceHistory,
     MiniBatches,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
@@ -350,12 +352,14 @@ class TorchAdjustedExpectationMaximizationTraining(
 class CircuitExpectationMaximization:
     """
     Learns the parameters of a layered circuit with jax or torch parameters in place, by
-    tensorized expectation maximization for a fixed number of epochs.
+    tensorized expectation maximization until :attr:`convergence` stops it.
     """
 
-    epochs: int = 10
+    convergence: Convergence = field(
+        default_factory=lambda: Convergence(maximum_epochs=10, patience=10)
+    )
     """
-    The number of passes over the data.
+    When training stops, after ten epochs by default.
     """
 
     batch_size: int | None = None
@@ -398,6 +402,23 @@ class CircuitExpectationMaximization:
     The seed of the order in which the rows are visited.
     """
 
+    @staticmethod
+    def convergence_after(*, epochs: int) -> Convergence:
+        """
+        :param epochs: The number of passes over the data.
+        :return: The convergence that stops training after exactly that many epochs.
+        """
+        return Convergence(maximum_epochs=epochs, patience=epochs)
+
+    @classmethod
+    def full_batch(cls, *, epochs: int) -> Self:
+        """
+        :param epochs: The number of passes over the data.
+        :return: Expectation maximization with one update of all rows per epoch, for
+            that many epochs.
+        """
+        return cls(convergence=cls.convergence_after(epochs=epochs))
+
     @classmethod
     def mini_batch(cls, *, epochs: int) -> Self:
         """
@@ -406,7 +427,12 @@ class CircuitExpectationMaximization:
             equation 6 of :cite:`liu2026rethinking`: a step of a tenth of the way after
             every batch of 512 rows.
         """
-        return cls(epochs=epochs, batch_size=512, batches_per_update=1, step_size=0.1)
+        return cls(
+            convergence=cls.convergence_after(epochs=epochs),
+            batch_size=512,
+            batches_per_update=1,
+            step_size=0.1,
+        )
 
     @classmethod
     def anemone(cls, *, epochs: int) -> Self:
@@ -416,7 +442,7 @@ class CircuitExpectationMaximization:
             rate of the paper, after every batch of 512 rows.
         """
         return cls(
-            epochs=epochs,
+            convergence=cls.convergence_after(epochs=epochs),
             batch_size=512,
             batches_per_update=1,
             statistics_adjustments=[
@@ -460,33 +486,35 @@ class CircuitExpectationMaximization:
 
     def fit(
         self, *, circuit: LayeredProbabilisticCircuit, data: SampleArray
-    ) -> LayeredProbabilisticCircuit:
+    ) -> ConvergenceHistory:
         """
         Learn the parameters of the circuit, in place.
 
         :param circuit: A circuit whose parameters are jax or torch arrays.
         :param data: The rows, whose symbolic values are hashes of domain elements.
-        :return: The circuit.
+        :return: The losses of the epochs trained.
         """
-        if self.epochs == 0:
-            return circuit
-        circuit.root = self.trained_root(
+        if self.convergence.maximum_epochs == 0:
+            return ConvergenceHistory(epoch_losses=[], converged=False)
+        run = self.training_run(
             learning=self.learner(root=circuit.root), circuit=circuit, data=data
         )
-        return circuit
+        circuit.root = run.trained_root
+        return run.history
 
-    def trained_root(
+    def training_run(
         self,
         *,
         learning: TensorizedExpectationMaximization,
         circuit: LayeredProbabilisticCircuit,
         data: SampleArray,
-    ) -> Layer:
+    ) -> TrainingRun:
         """
         :param learning: The expectation maximization of the circuit's root.
         :param circuit: The circuit, which is left unchanged.
         :param data: The rows, whose symbolic values are hashes of domain elements.
-        :return: The root of the circuit trained for :attr:`epochs` epochs.
+        :return: The circuit's root trained until :attr:`convergence` stops, and the
+            losses of its epochs.
         """
         root = circuit.root
         encoded = root.namespace.asarray(
@@ -496,6 +524,6 @@ class CircuitExpectationMaximization:
         )
         return learning.minimize_until_converged(
             encoded,
-            convergence=Convergence(maximum_epochs=self.epochs, patience=self.epochs),
+            convergence=self.convergence,
             mini_batches=MiniBatches(batch_size=self.batch_size, seed=self.seed),
-        ).trained_root
+        )
