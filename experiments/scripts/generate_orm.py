@@ -23,6 +23,15 @@ from experiments.robocasa_atomic_tasks.open_oven_door_trials import (
     OpenOvenDoorSpace,
     OpenOvenDoorTrialsInADatabase,
 )
+from experiments.robocasa_atomic_tasks.counter_to_oven import (
+    MoveFromTheCounterOntoTheOvenTray,
+)
+from experiments.robocasa_atomic_tasks.counter_to_oven_trials import (
+    CounterToOvenPerformer,
+    CounterToOvenSetup,
+    CounterToOvenSpace,
+    CounterToOvenTrialsInADatabase,
+)
 from experiments.robocasa_atomic_tasks.let_down_doors import StandOnTheFloor
 from experiments.robocasa_atomic_tasks.oven_door_trials import (
     DriveToTheStand,
@@ -47,6 +56,11 @@ ignored_classes |= {
     CloseOvenDoorSetup,
     CloseOvenDoorSpace,
     CloseOvenDoorTrialsInADatabase,
+    CounterToOvenPerformer,
+    CounterToOvenSetup,
+    CounterToOvenSpace,
+    CounterToOvenTrialsInADatabase,
+    MoveFromTheCounterOntoTheOvenTray,
     OpenOvenDoorPerformer,
     OpenOvenDoorSetup,
     OpenOvenDoorSpace,

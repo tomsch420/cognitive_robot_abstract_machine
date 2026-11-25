@@ -13,6 +13,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from coraplex.plans.executors import PlanOutcome
 from coraplex.robot_plans.actions.core.robot_body import (
     MoveFingersToWidthAction,
     SetGripperAction,
@@ -76,7 +77,7 @@ class MoveFromTheCounterOntoTheOvenTray:
     The body of the oven the tray belongs to.
     """
 
-    hand_clearance_from_the_oven: float = 0.1
+    hand_clearance_from_the_oven: float = 0.135
     """
     How far in front of the oven the object is carried to at least, so that the hand
     above it clears the oven, in metres.
@@ -98,10 +99,10 @@ class MoveFromTheCounterOntoTheOvenTray:
     How far past the object's width each finger is sent as it closes, in metres.
     """
 
-    counter_buffer_zone_distance: float = 0.001
+    counter_buffer_zone_distance: float = 0.002
     """
-    How close to the fixtures around the object the robot may come while it takes hold
-    of it, in metres.
+    How close to the object and the fixtures around it the robot may come while it takes
+    hold of it, in metres.
     """
 
     lift_height: float = 0.1
@@ -109,7 +110,7 @@ class MoveFromTheCounterOntoTheOvenTray:
     How far the object is lifted straight up off the plate, in metres.
     """
 
-    surroundings_buffer_zone_distance: float = 0.01
+    surroundings_buffer_zone_distance: float = 0.016
     """
     How close to everything else the robot may come while it reaches above the object,
     carries it and puts it down, in metres.
@@ -127,14 +128,32 @@ class MoveFromTheCounterOntoTheOvenTray:
     metres.
     """
 
-    carry_height: float = 0.1
+    carry_height: float = 0.06
     """
     How far above the tray's top the underside of the object is carried to, in metres.
     """
 
-    withdrawal_height: float = 0.25
+    margin_inside_the_tray: float = 0.005
     """
-    How far the open hand rises off the object once it lies on the tray, in metres.
+    How far inside the tray's front edge the box of the object is carried to at least,
+    in metres.
+    """
+
+    lowering_overshoot: float = 0.1
+    """
+    How far beyond :attr:`carry_height` the object is lowered at most before it touches
+    the tray, for the tray's floor lying below its rim, in metres.
+    """
+
+    lift_off_height: float = 0.05
+    """
+    How far the open hand rises off the object once it lies on the tray, before the base
+    backs off, in metres.
+    """
+
+    withdrawal_height: float = 0.2
+    """
+    How far the open hand rises once the base backed off, in metres.
     """
 
     back_off_distance: float = 0.2
@@ -148,31 +167,45 @@ class MoveFromTheCounterOntoTheOvenTray:
 
         :raises PlanFailure: Why a step failed.
         """
-        self.take_hold_of_the_object()
-        self.put_the_object_onto_the_tray()
+        self.attempt().raise_if_failed()
 
-    def take_hold_of_the_object(self) -> None:
+    def attempt(self) -> PlanOutcome:
         """
-        Reach above the middle of the object, open the hand, lower it until the fingers
-        touch the plate or a fixture around it, which the hand may touch meanwhile,
-        raise it by :attr:`finger_gap_above_the_plate`, close the fingers across the
-        narrow side of the object and lift it.
+        Take hold of the object on the plate, carry it onto the tray and withdraw, as
+        far as the steps succeed.
 
-        :raises PlanFailure: Why a step failed.
+        :return: How the last step run ended.
+        """
+        holding = self.take_hold_of_the_object()
+        if not holding.succeeded:
+            return holding
+        return self.put_the_object_onto_the_tray()
+
+    def take_hold_of_the_object(self) -> PlanOutcome:
+        """
+        Reach above the middle of the object, open the hand, lower it until it touches
+        the object, the plate or a fixture around it, which the hand may touch
+        meanwhile, raise it by :attr:`finger_gap_above_the_plate`, close the fingers
+        across the narrow side of the object and lift it.
+
+        :return: How the last step run ended; the steps after a failed one are not run.
         """
         arm = self.episode.arm
         gripper = arm.end_effector
         held = self.graspable.root
         footprint = HorizontalFootprint.from_body(held)
-        self.episode.run_steps_in_turn(
+        hand = set(gripper.bodies_with_collision)
+        reaching = self.episode.run(
             [
-                lambda: ReachThroughFreeSpaceAction(
+                ReachThroughFreeSpaceAction(
                     goal=self.pose_above_the_object(footprint),
                     arm=arm,
                     surroundings_buffer=self.surroundings_buffer_zone_distance,
                 )
             ]
-        ).raise_if_failed()
+        )
+        if not reaching.succeeded:
+            return reaching
         around_the_object = self.episode.fixtures.bodies_near(
             self.episode.bounds.of_branch(held), margin=self.episode.handling_margin
         )
@@ -189,10 +222,20 @@ class MoveFromTheCounterOntoTheOvenTray:
                     body_group_b=around_the_object,
                     buffer_zone_distance=self.counter_buffer_zone_distance,
                     violated_distance=0.0,
-                )
+                ),
+                AvoidCollisionBetweenGroups(
+                    body_group_a=[
+                        body
+                        for body in self.episode.robot.bodies_with_collision
+                        if body not in hand
+                    ],
+                    body_group_b=[held],
+                    buffer_zone_distance=self.counter_buffer_zone_distance,
+                    violated_distance=0.0,
+                ),
             ],
         ):
-            self.episode.run_steps_in_turn(
+            return self.episode.run_steps_in_turn(
                 [
                     lambda: SetGripperAction(
                         gripper_configuration=gripper.default_configuration(
@@ -201,8 +244,8 @@ class MoveFromTheCounterOntoTheOvenTray:
                     ),
                     lambda: LowerTheToolUntilTouchingAction(
                         arm=arm,
-                        bodies=self.finger_bodies(),
-                        others=[self.plate, *around_the_object],
+                        bodies=list(hand),
+                        others=[held, self.plate, *around_the_object],
                         distance=2 * self.reach_height,
                         hold_base=True,
                     ),
@@ -218,17 +261,17 @@ class MoveFromTheCounterOntoTheOvenTray:
                         arm=arm, height=self.lift_height, hold_base=True
                     ),
                 ]
-            ).raise_if_failed()
+            )
 
-    def put_the_object_onto_the_tray(self) -> None:
+    def put_the_object_onto_the_tray(self) -> PlanOutcome:
         """
         Turn the hand so that the object lies across the way out of the oven, carry it
         through the free space to above the tray, lower it until it touches the tray,
-        let go, raise the hand and back the base off; the robot keeps
-        :attr:`surroundings_buffer_zone_distance` from everything else but the object
-        and the tray, which the hand may touch.
+        let go, raise the hand off it, back the base off and raise the hand; the robot
+        keeps :attr:`surroundings_buffer_zone_distance` from everything else but the
+        object and the tray, which the hand may touch.
 
-        :raises PlanFailure: Why a step failed.
+        :return: How the last step run ended; the steps after a failed one are not run.
         """
         arm = self.episode.arm
         gripper = arm.end_effector
@@ -254,9 +297,9 @@ class MoveFromTheCounterOntoTheOvenTray:
                 )
             ],
         ):
-            self.episode.run_steps_in_turn(
+            return self.episode.run_steps_in_turn(
                 [
-                    self.turn_turning_the_object_across,
+                    self.turn_laying_the_object_across,
                     lambda: CarryThroughFreeSpaceAction(
                         arm=arm,
                         carried=held,
@@ -268,7 +311,7 @@ class MoveFromTheCounterOntoTheOvenTray:
                         arm=arm,
                         bodies=[held, *self.finger_bodies()],
                         others=[self.tray],
-                        distance=2 * self.carry_height,
+                        distance=self.carry_height + self.lowering_overshoot,
                         hold_base=True,
                     ),
                     lambda: SetGripperAction(
@@ -277,11 +320,14 @@ class MoveFromTheCounterOntoTheOvenTray:
                         )
                     ),
                     lambda: RaiseTheToolAction(
-                        arm=arm, height=self.withdrawal_height, hold_base=True
+                        arm=arm, height=self.lift_off_height, hold_base=True
                     ),
                     lambda: BackOffAction(distance=self.back_off_distance),
+                    lambda: RaiseTheToolAction(
+                        arm=arm, height=self.withdrawal_height, hold_base=True
+                    ),
                 ]
-            ).raise_if_failed()
+            )
 
     def pose_above_the_object(self, footprint: HorizontalFootprint) -> Pose:
         """
@@ -308,7 +354,8 @@ class MoveFromTheCounterOntoTheOvenTray:
         :return: Where the middle of the object is carried to: above the middle of the
             tray, moved horizontally out of the oven until it lies at least
             :attr:`hand_clearance_from_the_oven` in front of the box bounding the oven,
-            but no further than keeps the object's box over the tray, its underside
+            but no further than keeps the object's box :attr:`margin_inside_the_tray`
+            inside the tray's front edge, its underside
             :attr:`carry_height` above the tray's top.
         """
         bounds = self.episode.bounds
@@ -324,7 +371,7 @@ class MoveFromTheCounterOntoTheOvenTray:
         along = out_of_the_oven @ middle
         target = min(
             max(along, oven_front + self.hand_clearance_from_the_oven),
-            tray_front - held_reach,
+            tray_front - held_reach - self.margin_inside_the_tray,
         )
         point = middle + max(target - along, 0.0) * out_of_the_oven
         point[2] = (
@@ -344,7 +391,7 @@ class MoveFromTheCounterOntoTheOvenTray:
         out_of_the_oven[2] = 0.0
         return out_of_the_oven / np.linalg.norm(out_of_the_oven)
 
-    def turn_turning_the_object_across(self) -> JointPositionList:
+    def turn_laying_the_object_across(self) -> JointPositionList:
         """
         :return: A new goal turning the wrist's last joint, the hand pointing straight
             down, so that the long axis of the held object's footprint lies square to
