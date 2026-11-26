@@ -64,25 +64,10 @@ items:
     first.
 
     '
-- id: hidden-chow-liu-trees
-  title: Hidden Chow-Liu tree circuits
-  track: structure-learning
-  repository: cram2/cognitive_robot_abstract_machine
-  branch: hidden-chow-liu-trees
-  pull_request_number: 1069
-  session: local Claude Code session f5205c24-8775-46ae-bd12-63c23b68d9a7
-  depends_on: []
-  status: in progress
-  notes: 'Liu and Van den Broeck 2021: a Chow-Liu tree over the variables with a latent variable
-    per node, compiled into a tensorized layered circuit; the standard strong baseline of
-    recent circuit papers.
-
-    '
 - id: prune-and-grow
   title: Sparse circuits by pruning and growing
   track: structure-learning
-  depends_on:
-  - hidden-chow-liu-trees
+  depends_on: []
   status: not started
   notes: 'Dang et al. 2022: alternately prune low-flow edges and grow the circuit by copying
     and perturbing nodes, starting from a hidden Chow-Liu tree circuit.
@@ -102,8 +87,7 @@ items:
 - id: strudel
   title: Strudel structure learning
   track: structure-learning
-  depends_on:
-  - hidden-chow-liu-trees
+  depends_on: []
   status: not started
   notes: 'Dang et al. 2020: greedy structure learning of smooth, deterministic and decomposable
     circuits from a Chow-Liu based vtree; shares the Chow-Liu tree of hidden-chow-liu-trees.
