@@ -2,8 +2,8 @@ schema_version: 1
 id: circuit-learning-methods
 title: State-of-the-art learning methods for probabilistic circuits
 description: 'Implement current parameter and structure learning methods for probabilistic
-  circuits in probabilistic_model on the tensorized layered circuits, and measure each on the
-  shared circuit-learning benchmark.
+  circuits in probabilistic_model on the tensorized layered circuits, and measure each on
+  the shared circuit-learning benchmark.
 
   '
 default_repository: tomsch420/cognitive_robot_abstract_machine
@@ -26,24 +26,10 @@ tracks:
   name: Structure learning
   wave: methods
 items:
-- id: minibatch-em-tensorized
-  title: Mini-batch expectation maximization on layered circuits
-  track: parameter-learning
-  repository: cram2/cognitive_robot_abstract_machine
-  branch: tensorized-expectation-maximization
-  pull_request_number: 1050
-  depends_on: []
-  status: in progress
-  notes: 'Stochastic EM for layered circuits on any array backend, with the expected counts
-    taken from the gradient of the log-likelihood (Peharz et al. 2020, Einsum Networks). The
-    existing expectation_maximization.py works on rustworkx circuits only.
-
-    '
 - id: tractable-regularization
   title: Data softening and entropy regularization
   track: parameter-learning
-  depends_on:
-  - minibatch-em-tensorized
+  depends_on: []
   status: not started
   notes: 'Liu and Van den Broeck 2021, Tractable Regularization of Probabilistic Circuits:
     data softening and entropy regularization, usable with EM and gradient descent.
@@ -61,8 +47,7 @@ items:
 - id: latent-variable-distillation
   title: Latent variable distillation
   track: parameter-learning
-  depends_on:
-  - minibatch-em-tensorized
+  depends_on: []
   status: not started
   notes: 'Liu et al. 2023: guide the latent assignments of a circuit with a deep generative
     model before EM. Needs a deep generative model, so the developer approves the dependency
@@ -82,8 +67,11 @@ items:
 - id: hidden-chow-liu-trees
   title: Hidden Chow-Liu tree circuits
   track: structure-learning
+  branch: hidden-chow-liu-trees
+  pull_request_number: 1069
+  session: local Claude Code session f5205c24-8775-46ae-bd12-63c23b68d9a7
   depends_on: []
-  status: not started
+  status: in progress
   notes: 'Liu and Van den Broeck 2021: a Chow-Liu tree over the variables with a latent variable
     per node, compiled into a tensorized layered circuit; the standard strong baseline of
     recent circuit papers.
@@ -94,7 +82,6 @@ items:
   track: structure-learning
   depends_on:
   - hidden-chow-liu-trees
-  - minibatch-em-tensorized
   status: not started
   notes: 'Dang et al. 2022: alternately prune low-flow edges and grow the circuit by copying
     and perturbing nodes, starting from a hidden Chow-Liu tree circuit.
@@ -103,13 +90,12 @@ items:
 - id: anemone
   title: Anemone mini-batch expectation maximization
   track: parameter-learning
-  depends_on:
-  - minibatch-em-tensorized
+  depends_on: []
   status: not started
   notes: 'Liu, Shao and Van den Broeck 2026, Rethinking Probabilistic Circuit Parameter Learning:
     mini-batch EM with a learning rate per parameter scaled by its contribution to the batch
     likelihood; beats full-batch and mini-batch EM in final log-likelihood and epochs. Uses
-    the expected counts of minibatch-em-tensorized. 
+    the expected counts of minibatch-em-tensorized.
 
     '
 - id: strudel
