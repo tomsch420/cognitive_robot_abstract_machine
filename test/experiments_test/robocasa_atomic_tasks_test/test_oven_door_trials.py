@@ -17,7 +17,7 @@ from experiments.robocasa_atomic_tasks.oven_door_trials import BaseMotion
 from krrood.parametrization.model_registries import UniformPriorRegistry
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connections import RevoluteConnection
+from semantic_digital_twin.world_description.connections import ScrewAxisConnection
 from semantic_digital_twin.world_description.geometry import Box, Scale
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
@@ -41,9 +41,9 @@ def door() -> Body:
             collision=ShapeCollection([Box(scale=Scale(0.6, 0.04, 0.5))]),
         )
         world.add_connection(
-            RevoluteConnection.create_with_dofs(
-                world=world, parent=oven, child=door, axis=Vector3.X()
-            )
+            ScrewAxisConnection.create_with_dofs(
+                world=world, parent=oven, child=door, screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.X()
+            ))
         )
     return door
 

@@ -14,7 +14,7 @@ from krrood_spatial_math.spatial_types import (
     Vector3,
 )
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connections import RevoluteConnection
+from semantic_digital_twin.world_description.connections import ScrewAxisConnection
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
 )
@@ -52,7 +52,7 @@ def test_a_range_ending_at_zero_is_held_mirrored():
 
 
 @pytest.fixture
-def lever() -> RevoluteConnection:
+def lever() -> ScrewAxisConnection:
     """
     A lever turning between -1 and 1 rad about an axis along the world's x-axis through
     (1, 2, 3), standing at 0.2 rad.
@@ -62,11 +62,11 @@ def lever() -> RevoluteConnection:
         root = Body(name=PrefixedName("kitchen"))
         world.add_kinematic_structure_entity(root)
         lever = Body(name=PrefixedName("lever"))
-        joint = RevoluteConnection.create_with_dofs(
+        joint = ScrewAxisConnection.create_with_dofs(
             world=world,
             parent=root,
             child=lever,
-            axis=Vector3.X(),
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.X()),
             parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
                 1.0, 2.0, 3.0, yaw=np.pi / 2, reference_frame=root
             ),

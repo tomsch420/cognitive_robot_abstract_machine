@@ -20,8 +20,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection1DOF,
-    PrismaticConnection,
-    RevoluteConnection,
+    ScrewAxisConnection,
 )
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -245,7 +244,7 @@ class FixtureJoints:
         return limits.lower.position
 
     @staticmethod
-    def axis_of(joint: RevoluteConnection) -> Ray:
+    def axis_of(joint: ScrewAxisConnection) -> Ray:
         """
         :param joint: A joint of the world that turns its part.
         :return: The line the joint turns its part about, in the world's root frame.
@@ -256,7 +255,7 @@ class FixtureJoints:
         )
         return Ray(
             point=world_T_connection[:3, 3],
-            direction=world_T_connection[:3, :3] @ joint.axis.to_np()[:3],
+            direction=world_T_connection[:3, :3] @ joint.screw_axis.unit_direction.to_np()[:3],
         )
 
     @staticmethod
@@ -275,7 +274,7 @@ class FixtureJoints:
         :return: The direction the joint moves ``point`` in on the way there, or its
             part if it slides it; ``None`` if it turns the part and no point is given.
         """
-        if point is None and not isinstance(joint, PrismaticConnection):
+        if point is None and not (isinstance(joint, ScrewAxisConnection) and joint.behaves_like_a_prismatic_connection):
             return None
         world_T_part = joint.child.global_pose.to_np()
         before = (
@@ -290,7 +289,7 @@ class FixtureJoints:
 
     @classmethod
     def point_for_a_fingertip(
-        cls, joint: RevoluteConnection, part: Body, end: float
+        cls, joint: ScrewAxisConnection, part: Body, end: float
     ) -> np.ndarray:
         """
         :param joint: A joint of the world that turns its part.

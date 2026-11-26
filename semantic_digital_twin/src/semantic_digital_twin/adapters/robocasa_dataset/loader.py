@@ -49,7 +49,7 @@ from semantic_digital_twin.utils import camel_case_split
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection1DOF,
-    RevoluteConnection,
+    ScrewAxisConnection,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import LimitSide
 from semantic_digital_twin.world_description.world_entity import (
@@ -574,10 +574,8 @@ class RoboCasaDatasetLoader:
                 body
                 for body in handle_bodies
                 if isinstance(body, Body)
-                and isinstance(body.parent_connection, RevoluteConnection)
-                and isinstance(
-                    body.parent_connection.parent.parent_connection, RevoluteConnection
-                )
+                and (isinstance(body.parent_connection, ScrewAxisConnection) and body.parent_connection.behaves_like_a_revolute_connection)
+                and (isinstance(body.parent_connection.parent.parent_connection, ScrewAxisConnection) and body.parent_connection.parent.parent_connection.behaves_like_a_revolute_connection)
             ]
             if not levers:
                 continue

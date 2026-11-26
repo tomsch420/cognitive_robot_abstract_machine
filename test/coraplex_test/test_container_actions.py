@@ -29,7 +29,7 @@ from krrood_spatial_math.spatial_types import (
 )
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
-    PrismaticConnection,
+    ScrewAxisConnection,
 )
 from semantic_digital_twin.world_description.geometry import Box, Scale
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
@@ -196,11 +196,11 @@ def pr2_at_a_handle_below_an_empty_body(simple_pr2_context):
             collision=ShapeCollection([Box(scale=Scale(0.04, 0.2, 0.04))]),
         )
         world.add_connection(
-            PrismaticConnection.create_with_dofs(
+            ScrewAxisConnection.create_with_dofs(
                 world=world,
                 parent=world.root,
                 child=empty,
-                axis=Vector3.X(),
+                screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(axis=Vector3.X()),
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
                     1, 0, 1, reference_frame=world.root
                 ),

@@ -38,7 +38,7 @@ from krrood_spatial_math.spatial_types import Vector3
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Handle
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connections import RevoluteConnection
+from semantic_digital_twin.world_description.connections import ScrewAxisConnection
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
 )
@@ -334,11 +334,11 @@ def handle_on_a_door() -> Handle:
             collision=ShapeCollection([Box(scale=Scale(0.02, 0.6, 0.5))]),
         )
         world.add_connection(
-            RevoluteConnection.create_with_dofs(
+            ScrewAxisConnection.create_with_dofs(
                 world=world,
                 parent=kitchen,
                 child=door,
-                axis=Vector3.Y(),
+                screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Y()),
                 dof_limits=DegreeOfFreedomLimits.from_position_range_and_speed(
                     lower_position=0.0, upper_position=1.05, maximum_speed=1.0
                 ),

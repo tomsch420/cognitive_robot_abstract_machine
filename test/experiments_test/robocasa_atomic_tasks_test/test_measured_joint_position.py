@@ -24,7 +24,7 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
-    RevoluteConnection,
+    ScrewAxisConnection,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedom,
@@ -53,7 +53,7 @@ class DoorOnAHinge:
     The world itself.
     """
 
-    hinge: RevoluteConnection
+    hinge: ScrewAxisConnection
     """
     The hinge the door turns about.
     """
@@ -84,11 +84,11 @@ def door_on_a_hinge() -> DoorOnAHinge:
             ),
         )
         world.add_degree_of_freedom(degree_of_freedom)
-        hinge = RevoluteConnection(
+        hinge = ScrewAxisConnection(
             name=PrefixedName("hinge"),
             parent=root,
             child=door,
-            axis=Vector3.Z(reference_frame=door),
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z(reference_frame=door)),
             raw_dof=degree_of_freedom,
         )
         world.add_connection(hinge)

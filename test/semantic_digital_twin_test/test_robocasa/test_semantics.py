@@ -40,8 +40,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Toaster,
 )
 from semantic_digital_twin.world_description.connections import (
-    PrismaticConnection,
-    RevoluteConnection,
+    ScrewAxisConnection,
 )
 
 ROBOCASA_RESOURCES_DIR = (
@@ -484,7 +483,7 @@ def test_attaching_appliance_controls_keeps_their_joints():
 
     knob_body = world.get_body_by_name("toaster_main_group_knob_doneness")
     lever_body = world.get_body_by_name("toaster_main_group_lever")
-    assert isinstance(knob_body.parent_connection, RevoluteConnection)
-    assert isinstance(lever_body.parent_connection, PrismaticConnection)
+    assert (isinstance(knob_body.parent_connection, ScrewAxisConnection) and knob_body.parent_connection.behaves_like_a_revolute_connection)
+    assert (isinstance(lever_body.parent_connection, ScrewAxisConnection) and lever_body.parent_connection.behaves_like_a_prismatic_connection)
     assert knob_body.parent_kinematic_structure_entity == toaster_body
     assert lever_body.parent_kinematic_structure_entity == toaster_body

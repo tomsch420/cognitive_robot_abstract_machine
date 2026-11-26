@@ -40,7 +40,7 @@ from semantic_digital_twin.adapters.robocasa_dataset.mujoco_compat import (
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connections import RevoluteConnection
+from semantic_digital_twin.world_description.connections import ScrewAxisConnection
 from semantic_digital_twin.world_description.world_entity import Body
 
 with robocasa_version_assertions_relaxed():
@@ -79,7 +79,7 @@ class WorldWithALever:
     The world.
     """
 
-    lever_joint: RevoluteConnection
+    lever_joint: ScrewAxisConnection
     """
     The joint the lever turns on.
     """
@@ -105,11 +105,11 @@ def world_with_a_lever() -> WorldWithALever:
     with world.modify_world():
         root = Body(name=PrefixedName("kitchen"))
         world.add_kinematic_structure_entity(root)
-        joint = RevoluteConnection.create_with_dofs(
+        joint = ScrewAxisConnection.create_with_dofs(
             world=world,
             parent=root,
             child=Body(name=PrefixedName("lever")),
-            axis=Vector3.X(),
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.X()),
         )
         world.add_connection(joint)
     return WorldWithALever(world=world, lever_joint=joint)

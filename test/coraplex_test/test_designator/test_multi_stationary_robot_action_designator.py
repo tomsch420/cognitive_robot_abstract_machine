@@ -51,7 +51,7 @@ from krrood_spatial_math.spatial_types import (
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
-    PrismaticConnection,
+    ScrewAxisConnection,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedom,
@@ -574,14 +574,14 @@ def physically_simulated_slider_context(stationary_block_context):
             ),
         )
         world.add_degree_of_freedom(degree_of_freedom)
-        slider = PrismaticConnection(
+        slider = ScrewAxisConnection(
             name=PrefixedName("slider"),
             parent=world.root,
             child=slider_box,
             parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
                 2.0, 2.0, 1.0
             ),
-            axis=Vector3.X(reference_frame=slider_box),
+            screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(axis=Vector3.X(reference_frame=slider_box)),
             raw_dof=degree_of_freedom,
         )
         world.add_connection(slider)

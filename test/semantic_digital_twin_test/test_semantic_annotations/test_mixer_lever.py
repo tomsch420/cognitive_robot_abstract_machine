@@ -16,7 +16,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import Mixe
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
-    RevoluteConnection,
+    ScrewAxisConnection,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
@@ -39,12 +39,12 @@ class MixerTap:
     The lever, the hot water at the upper end of the swivel's range.
     """
 
-    hinge: RevoluteConnection
+    hinge: ScrewAxisConnection
     """
     The hinge the lever tilts on.
     """
 
-    swivel: RevoluteConnection
+    swivel: ScrewAxisConnection
     """
     The swivel the hinge sits on.
     """
@@ -58,21 +58,21 @@ def mixer_tap() -> MixerTap:
         world.add_kinematic_structure_entity(tap)
         swivel_body = Body(name=PrefixedName("swivel"))
         lever_body = Body(name=PrefixedName("lever"))
-        swivel = RevoluteConnection.create_with_dofs(
+        swivel = ScrewAxisConnection.create_with_dofs(
             world=world,
             parent=tap,
             child=swivel_body,
-            axis=Vector3.X(),
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.X()),
             dof_limits=DegreeOfFreedomLimits.from_position_range_and_speed(
                 lower_position=-0.785, upper_position=0.785, maximum_speed=1.0
             ),
         )
         world.add_connection(swivel)
-        hinge = RevoluteConnection.create_with_dofs(
+        hinge = ScrewAxisConnection.create_with_dofs(
             world=world,
             parent=swivel_body,
             child=lever_body,
-            axis=Vector3.Y(),
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Y()),
             dof_limits=DegreeOfFreedomLimits.from_position_range_and_speed(
                 lower_position=0.0, upper_position=0.5, maximum_speed=1.0
             ),

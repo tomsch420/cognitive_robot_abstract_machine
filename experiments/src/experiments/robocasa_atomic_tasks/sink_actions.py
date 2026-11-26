@@ -376,7 +376,7 @@ class FaucetHandle:
             @ lift_joint.parent_T_connection_expression.to_np()
         )
         anchor = world_T_joint[:3, 3]
-        axis = world_T_joint[:3, :3] @ lift_joint.axis.to_np()[:3]
+        axis = world_T_joint[:3, :3] @ lift_joint.screw_axis.unit_direction.to_np()[:3]
         up = np.array([0.0, 0.0, 1.0])
         facing = axis - (axis @ up) * up
         facing = facing / np.linalg.norm(facing)
@@ -2641,7 +2641,7 @@ class SpoutBar:
         joint_axis = (
             world_T_joint_parent[:3, :3]
             @ spout_joint.parent_T_connection_expression.to_np()[:3, :3]
-            @ spout_joint.axis.to_np()[:3]
+            @ spout_joint.screw_axis.unit_direction.to_np()[:3]
         )
         world_P_joint = (
             world_T_joint_parent @ spout_joint.parent_T_connection_expression.to_np()

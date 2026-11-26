@@ -68,7 +68,7 @@ from krrood_spatial_math.spatial_types import (
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
-    RevoluteConnection,
+    ScrewAxisConnection,
 )
 from semantic_digital_twin.world_description.world_entity import Body
 from ...plan_running import run_plan, simulated_executor, statechart_of, with_grounding
@@ -1123,12 +1123,12 @@ def test_a_trial_leaves_what_turns_on_a_joint_on_that_joint(
     parent_T_milk = free_connection.origin
     with world.modify_world():
         world.remove_connection(free_connection)
-        hinge = RevoluteConnection.create_with_dofs(
+        hinge = ScrewAxisConnection.create_with_dofs(
             world=world,
             parent=free_connection.parent,
             child=milk.root,
             parent_T_connection_expression=parent_T_milk,
-            axis=Vector3.Z(),
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
         )
         world.add_connection(hinge)
     executor = simulated_executor(extensions)

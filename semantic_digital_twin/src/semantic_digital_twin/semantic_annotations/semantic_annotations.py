@@ -16,7 +16,7 @@ from typing_extensions import ClassVar, Sequence
 
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection1DOF,
-    RevoluteConnection,
+    ScrewAxisConnection,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import LimitSide
 from semantic_digital_twin.world_description.geometry import Shape
@@ -453,14 +453,14 @@ class MixerLever(Lever):
     """
 
     @property
-    def flow_joint(self) -> RevoluteConnection:
+    def flow_joint(self) -> ScrewAxisConnection:
         """
         The hinge the lever tilts on to let the water flow.
         """
         return self._revolute_connection_above(self.root)
 
     @property
-    def temperature_joint(self) -> RevoluteConnection:
+    def temperature_joint(self) -> ScrewAxisConnection:
         """
         The swivel the flow hinge sits on, which the lever swings on to set how hot the
         water runs.
@@ -483,14 +483,14 @@ class MixerLever(Lever):
 
     def _revolute_connection_above(
         self, entity: KinematicStructureEntity
-    ) -> RevoluteConnection:
+    ) -> ScrewAxisConnection:
         """
         :param entity: The lever's body or a body it hangs from.
         :return: The connection ``entity`` hangs from.
         :raises NotAMixerLever: If that connection is not revolute.
         """
         connection = entity.parent_connection
-        if not isinstance(connection, RevoluteConnection):
+        if not (isinstance(connection, ScrewAxisConnection) and connection.behaves_like_a_revolute_connection):
             raise NotAMixerLever(lever_name=self.root.name)
         return connection
 

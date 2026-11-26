@@ -22,7 +22,7 @@ from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, V
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Handle
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connections import RevoluteConnection
+from semantic_digital_twin.world_description.connections import ScrewAxisConnection
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
 )
@@ -93,11 +93,11 @@ def handle_on_a_let_down_door() -> Handle:
             collision=ShapeCollection([Box(scale=Scale(0.6, 0.04, 0.5))]),
         )
         world.add_connection(
-            RevoluteConnection.create_with_dofs(
+            ScrewAxisConnection.create_with_dofs(
                 world=world,
                 parent=oven,
                 child=door,
-                axis=Vector3.X(),
+                screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.X()),
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
                     1.0, 2.0, 0.5, reference_frame=oven
                 ),
