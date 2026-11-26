@@ -490,7 +490,10 @@ class MixerLever(Lever):
         :raises NotAMixerLever: If that connection is not revolute.
         """
         connection = entity.parent_connection
-        if not (isinstance(connection, ScrewAxisConnection) and connection.behaves_like_a_revolute_connection):
+        if not (
+            isinstance(connection, ScrewAxisConnection)
+            and connection.behaves_like_a_revolute_connection
+        ):
             raise NotAMixerLever(lever_name=self.root.name)
         return connection
 

@@ -42,8 +42,13 @@ def door() -> Body:
         )
         world.add_connection(
             ScrewAxisConnection.create_with_dofs(
-                world=world, parent=oven, child=door, screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.X()
-            ))
+                world=world,
+                parent=oven,
+                child=door,
+                screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                    axis=Vector3.X()
+                ),
+            )
         )
     return door
 

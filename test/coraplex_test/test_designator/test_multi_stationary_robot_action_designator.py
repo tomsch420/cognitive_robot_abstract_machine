@@ -581,7 +581,9 @@ def physically_simulated_slider_context(stationary_block_context):
             parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
                 2.0, 2.0, 1.0
             ),
-            screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(axis=Vector3.X(reference_frame=slider_box)),
+            screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                axis=Vector3.X(reference_frame=slider_box)
+            ),
             raw_dof=degree_of_freedom,
         )
         world.add_connection(slider)

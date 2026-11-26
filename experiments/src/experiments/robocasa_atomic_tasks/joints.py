@@ -255,7 +255,8 @@ class FixtureJoints:
         )
         return Ray(
             point=world_T_connection[:3, 3],
-            direction=world_T_connection[:3, :3] @ joint.screw_axis.unit_direction.to_np()[:3],
+            direction=world_T_connection[:3, :3]
+            @ joint.screw_axis.unit_direction.to_np()[:3],
         )
 
     @staticmethod
@@ -274,7 +275,10 @@ class FixtureJoints:
         :return: The direction the joint moves ``point`` in on the way there, or its
             part if it slides it; ``None`` if it turns the part and no point is given.
         """
-        if point is None and not (isinstance(joint, ScrewAxisConnection) and joint.behaves_like_a_prismatic_connection):
+        if point is None and not (
+            isinstance(joint, ScrewAxisConnection)
+            and joint.behaves_like_a_prismatic_connection
+        ):
             return None
         world_T_part = joint.child.global_pose.to_np()
         before = (

@@ -406,7 +406,10 @@ class MoveFromTheCounterOntoTheOvenTray:
             for connection in self.episode.arm.active_connections
             if isinstance(connection, ActiveConnection1DOF)
         ][-1]
-        axis = wrist.child.global_pose.to_np()[:3, :3] @ wrist.screw_axis.unit_direction.to_np()[:3]
+        axis = (
+            wrist.child.global_pose.to_np()[:3, :3]
+            @ wrist.screw_axis.unit_direction.to_np()[:3]
+        )
         limits = wrist.dof.limits
         targets = [
             wrist.position + (yaw + half_turn) / axis[2]

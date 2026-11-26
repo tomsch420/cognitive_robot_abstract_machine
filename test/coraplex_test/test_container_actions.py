@@ -200,7 +200,9 @@ def pr2_at_a_handle_below_an_empty_body(simple_pr2_context):
                 world=world,
                 parent=world.root,
                 child=empty,
-                screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(axis=Vector3.X()),
+                screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                    axis=Vector3.X()
+                ),
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
                     1, 0, 1, reference_frame=world.root
                 ),
@@ -221,7 +223,8 @@ def test_back_off_pose_clears_a_handle_below_a_body_without_geometry(
     world, robot, handle = pr2_at_a_handle_below_an_empty_body
     end_effector = left_or_only_arm(robot).end_effector
     action = OpenAction(
-        grasp_candidate=GraspCandidate.from_body_origin(graspable=handle), arm=left_or_only_arm(robot)
+        grasp_candidate=GraspCandidate.from_body_origin(graspable=handle),
+        arm=left_or_only_arm(robot),
     )
     grasp_pose = Pose(reference_frame=handle.root)
 

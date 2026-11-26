@@ -88,7 +88,9 @@ def door_on_a_hinge() -> DoorOnAHinge:
             name=PrefixedName("hinge"),
             parent=root,
             child=door,
-            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z(reference_frame=door)),
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                axis=Vector3.Z(reference_frame=door)
+            ),
             raw_dof=degree_of_freedom,
         )
         world.add_connection(hinge)

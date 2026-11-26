@@ -751,9 +751,7 @@ class LiftTheHandOutOfTheSinkAction(HasPreconditions, LeaveTheSinkAction):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class LiftAnObjectOutOfTheSinkAction(
-    HasASinkBasin, HasGraspApproach, HasPreconditions
-):
+class LiftAnObjectOutOfTheSinkAction(HasASinkBasin, HasGraspApproach, HasPreconditions):
     """
     Takes an object lying in a sink's basin by a grasp and lifts it out: the opened
     fingers go in a straight line to the grasp, close on the object and let it settle,
@@ -845,7 +843,11 @@ class LiftAnObjectOutOfTheSinkAction(
     def create_steps_once_the_preconditions_hold(self) -> list[StatechartNode | Match]:
         world = self.world
         gripper = self.arm.end_effector
-        poses = self.grasp_pose_sequence(reference_T_grasp=self.grasp.grasp_pose, end_effector=gripper, grasp_candidate=self.grasp)
+        poses = self.grasp_pose_sequence(
+            reference_T_grasp=self.grasp.grasp_pose,
+            end_effector=gripper,
+            grasp_candidate=self.grasp,
+        )
         world_T_pre_grasp = world.transform(poses.pre_grasp, world.root)
         world_T_exit = world_T_pre_grasp.homogeneous_matrix.to_np().copy()
         world_T_exit[2, 3] = max(
@@ -855,7 +857,8 @@ class LiftAnObjectOutOfTheSinkAction(
         )
         return [
             MoveFingersToWidthAction(
-                two_finger_gripper=gripper, width=self.opening * gripper.separation_when_open
+                two_finger_gripper=gripper,
+                width=self.opening * gripper.separation_when_open,
             ),
             *self.straight_moves(
                 poses=[world_T_pre_grasp, world.transform(poses.grasp, world.root)],
@@ -1008,7 +1011,8 @@ class HoldTheObjectAboveAction(HoldsBase, GoalAction):
 
     cruise_linear_velocity: float | None = None
     """
-    Speed of the tool frame, in m/s; the default of :class:`CartesianPose` when ``None``.
+    Speed of the tool frame, in m/s; the default of :class:`CartesianPose` when
+    ``None``.
     """
 
     hold_base: bool = False
@@ -1269,7 +1273,9 @@ class TouchesTheFaucetHandle(MovesToolCenterPoint, ABC):
             accompanying_goals=(
                 HoldPose(
                     name="hold base",
-                    kinematic_chain=KinematicChain(root=self.world.root, tip=self.robot.root),
+                    kinematic_chain=KinematicChain(
+                        root=self.world.root, tip=self.robot.root
+                    ),
                 ),
             ),
         )
@@ -1305,7 +1311,9 @@ class TouchesTheFaucetHandle(MovesToolCenterPoint, ABC):
             accompanying_goals=(
                 RigidCoupling(
                     name="arm keeps its posture",
-                    kinematic_chain=KinematicChain(root=self.robot.root, tip=self.arm.end_effector.tool_frame),
+                    kinematic_chain=KinematicChain(
+                        root=self.robot.root, tip=self.arm.end_effector.tool_frame
+                    ),
                 ),
             ),
         )
@@ -1669,7 +1677,9 @@ class PullTheFaucetLeverWithTheBaseAction(WorksCloseToTheFaucetLever, GoalAction
             nodes=[
                 CartesianPose(
                     name="back off slowly",
-                    kinematic_chain=KinematicChain(root=self.world.root, tip=self.robot.root),
+                    kinematic_chain=KinematicChain(
+                        root=self.world.root, tip=self.robot.root
+                    ),
                     goal_pose=HomogeneousTransformationMatrix(
                         world_T_base, reference_frame=self.world.root
                     ).pose,
@@ -1865,7 +1875,9 @@ class PushTheFaucetLeverWithTheBaseAction(WorksCloseToTheFaucetLever, GoalAction
             nodes=[
                 CartesianPose(
                     name="drive forward slowly",
-                    kinematic_chain=KinematicChain(root=self.world.root, tip=self.robot.root),
+                    kinematic_chain=KinematicChain(
+                        root=self.world.root, tip=self.robot.root
+                    ),
                     goal_pose=HomogeneousTransformationMatrix(
                         world_T_base, reference_frame=self.world.root
                     ).pose,

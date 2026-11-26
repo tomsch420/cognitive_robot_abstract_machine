@@ -574,8 +574,17 @@ class RoboCasaDatasetLoader:
                 body
                 for body in handle_bodies
                 if isinstance(body, Body)
-                and (isinstance(body.parent_connection, ScrewAxisConnection) and body.parent_connection.behaves_like_a_revolute_connection)
-                and (isinstance(body.parent_connection.parent.parent_connection, ScrewAxisConnection) and body.parent_connection.parent.parent_connection.behaves_like_a_revolute_connection)
+                and (
+                    isinstance(body.parent_connection, ScrewAxisConnection)
+                    and body.parent_connection.behaves_like_a_revolute_connection
+                )
+                and (
+                    isinstance(
+                        body.parent_connection.parent.parent_connection,
+                        ScrewAxisConnection,
+                    )
+                    and body.parent_connection.parent.parent_connection.behaves_like_a_revolute_connection
+                )
             ]
             if not levers:
                 continue

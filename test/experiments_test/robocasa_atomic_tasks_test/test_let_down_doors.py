@@ -97,7 +97,9 @@ def handle_on_a_let_down_door() -> Handle:
                 world=world,
                 parent=oven,
                 child=door,
-                screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.X()),
+                screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                    axis=Vector3.X()
+                ),
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
                     1.0, 2.0, 0.5, reference_frame=oven
                 ),

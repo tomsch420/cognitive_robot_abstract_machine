@@ -338,7 +338,9 @@ def handle_on_a_door() -> Handle:
                 world=world,
                 parent=kitchen,
                 child=door,
-                screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Y()),
+                screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                    axis=Vector3.Y()
+                ),
                 dof_limits=DegreeOfFreedomLimits.from_position_range_and_speed(
                     lower_position=0.0, upper_position=1.05, maximum_speed=1.0
                 ),
