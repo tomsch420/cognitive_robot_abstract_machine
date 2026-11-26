@@ -19,7 +19,7 @@ from typing_extensions import List, Optional, Type
 from experiments.grasp_learning.records import GraspAttempt, GraspLearningTask
 from krrood.adapters.json_serializer import from_json, to_json
 from krrood.parametrization.model_registries import RelationalCircuitRegistry
-from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
+from probabilistic_model.learning.structure.jpt.jpt import JointProbabilityTree
 from probabilistic_model.probabilistic_circuit.relational.relational_probabilistic_circuit import (
     RelationalProbabilisticCircuit,
 )
