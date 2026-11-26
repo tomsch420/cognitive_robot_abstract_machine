@@ -1,15 +1,16 @@
 Branch `ormatic-list-order`, stacked on PR cram2#1065 (`ormatic-eql-result-loading`); fixes cram2#1026.
 Plan file: ~/.claude/plans/snug-hopping-cosmos-of-a143fab8-dc42-4477-b03e-a5b96e7394fd.md
 
+Draft PR: tomsch420/cognitive_robot_abstract_machine#58 (base ormatic-eql-result-loading), label bug.
+
 Plan:
-- CollectionShape (levels + leaf) in krrood/ormatic/collection_shape.py
-- JSON for collections of builtins (dicts and nesting included); association table with index_/key_ columns otherwise
-- order_by on every association relationship (local, part, external part)
-- to_dao flatten / from_dao rebuild nested lists and dicts, empty-collection marker rows
-- finalize nested containers and JSON dict keys by shape
+- (done) index_/key_ columns + order_by, nested collections, dicts, DictJSONSerializer
 
 Done:
-- branch created from PR 1065 head 1f3c44f1ff
+- fde30cec7f pushed; ormatic 371, utils+class_diagram 203, eql 1645, segmind/cramph orm green locally
+- schema diff of workspace interfaces listed in PR description
 
 Next:
-- mimics in test/krrood_test/dataset/ordered_collections.py + failing tests
+- giskardpy tests (need rclpy) and coraplex/experiments generation (pre-existing DetectAction failure) only in CI
+- labels api-break/new-feature/bug-fix missing on fork: set them upstream when promoting
+- ask: remove now unused WrappedField.is_collection_of_builtins / is_collection_of_types?
