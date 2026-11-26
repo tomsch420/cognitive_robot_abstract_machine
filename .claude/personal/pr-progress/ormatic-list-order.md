@@ -9,6 +9,7 @@ Plan:
 Done:
 - fde30cec7f pushed; ormatic 371, utils+class_diagram 203, eql 1645, segmind/cramph orm green locally
 - schema diff of workspace interfaces listed in PR description
+- review round 1 (10 threads) done in ea50f1b618: ValueStorageRule family, AssociationRowReader, Container/DomainObject aliases, renames; replied + resolved
 
 Next:
 - giskardpy tests (need rclpy) and coraplex/experiments generation (pre-existing DetectAction failure) only in CI
