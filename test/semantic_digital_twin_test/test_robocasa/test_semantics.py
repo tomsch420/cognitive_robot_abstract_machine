@@ -337,7 +337,7 @@ def test_attach_semantic_annotation_attaches_door_and_handle_sub_parts():
 
     # the door's real hinge joint (parsed from the fixture's MJCF) must not have been disturbed by
     # recording the part-whole relationship
-    assert isinstance(door_body.parent_connection, RevoluteConnection)
+    assert door_body.parent_connection.behaves_like_a_revolute_connection
     assert door_body.parent_kinematic_structure_entity == body
 
 
