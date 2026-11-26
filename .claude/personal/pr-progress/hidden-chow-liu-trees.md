@@ -6,7 +6,8 @@ Done
 - Library: mutual information + ChowLiuTree + HiddenChowLiuTree (random init, numpy host circuit) in learning/structure (a81e208534)
 - Benchmark: HiddenChowLiuTreeByExpectationMaximization (mini-batch then full-batch EM, jax/torch), shared ExpectationMaximizationPhase and TrainingContext.train_until_converged, ConvergenceHistory.from_consecutive (7e43eab5e4)
 - Review round 1 (6 threads: numpy typing, seed vs RNG, reuse causal Discretizer) fixed in 30558f8c1f, replied and resolved
-- Tests green on neem-4 at 30558f8c1f (circuit_learning_test 19 passed; test_learning + training-until-convergence + causal_structure 300 passed); earlier at 7e43eab5e4 (circuit_learning_test 19 passed; test_learning + training-until-convergence 146 passed); PR description updated; labels new-feature, maintenance
+- Selectable mutual information estimator (binned default, Gaussian, nearest neighbour) on HiddenChowLiuTree and the benchmark method (173cef1b77)
+- Tests green on neem-4 at 173cef1b77 (circuit_learning_test 20 passed; test_learning + training-until-convergence + causal_structure 311 passed) (circuit_learning_test 19 passed; test_learning + training-until-convergence 146 passed); PR description updated; labels new-feature, maintenance
 
 Next
 - Wait for the developer's answers on the open questions
