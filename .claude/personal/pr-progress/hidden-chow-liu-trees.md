@@ -1,13 +1,12 @@
 Plan
-- Developer decides: rows_per_step measuring an EM step instead of a gradient descent step; mini-batch phase defaults (paper states no step size / batch size); close #1073/#1075 now that both are in #1069?
+- Developer reviews the draft; mini-batch phase defaults (0.1 step / 512 rows, paper states none) still open
 
 Done
-- Library, benchmark method, review fixes, selectable mutual information estimator, merged cram2 main after #1070
-- Big benchmark stopped on request (no performance tables)
-- Debugging: GAS UnmeasurableStepMemoryError fixed (0295a4c66a, also cram2#1073); AD out of memory fixed (b0510606c3, also cram2#1075); AD -inf was a double-encoding mistake in my probe, not a bug; HCLT trains on GAS (test LL 0.195) and AD (test LL -63.3) with 2 epochs per phase
-- Checked both papers: 12 hidden states and hybrid EM match; paper uses 100+100 fixed epochs and a mixture of 4 HCLTs; no step size / batch size stated; removed the false Einsum credit for 0.1/512 (8c72d736d3, force-pushed reword approved)
-- PR description rewritten; labels new-feature, maintenance, bug-fix; neem-4 circuit_learning_test 21 passed at 8c72d736d3
+- Library, benchmark method, review rounds, estimators, step-memory fixes (#1073/#1075 folded in and closed)
+- Review round 3: UniformWeightRange (7328649e69), mixture_layer inlined, binned MI counted in chunks (d46ce4116b), rows_per_step measures the training learner via ParameterLearnerBuilder (1c24fd4df3), nearest neighbour maximum_rows=10000 chosen by a 7-dataset subsample experiment (98378d4fea); all threads replied and resolved
+- Edge speed answered: dense fastest for small HCLT with jax, block fastest with torch, dense out of memory for folded RAT-SPN and AD; sparse compile hangs (developer: leave it)
+- neem-4 circuit_learning_test 22 passed at 98378d4fea; PR description updated
 
 Next
-- Wait for the developer's answers above
+- Nothing pending unless the developer comments
 - Plan site dispatch setup skipped by the user (plan_site.publication not run)
