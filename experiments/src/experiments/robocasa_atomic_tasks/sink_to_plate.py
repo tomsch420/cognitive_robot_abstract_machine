@@ -102,7 +102,7 @@ class MoveFromTheSinkOntoAPlate:
     How often taking the object out of the sink is tried at most.
     """
 
-    closing_force: float = 28.36
+    closing_force: float = 31.69
     """
     How hard each finger presses at most while the object is moved, in newtons.
     """
@@ -126,7 +126,7 @@ class MoveFromTheSinkOntoAPlate:
     before it is lowered onto the plate, in metres.
     """
 
-    carry_velocity: float = 0.1
+    carry_velocity: float = 0.03
     """
     Speed of the tool frame on the way to above the plate, in m/s.
     """
@@ -138,7 +138,7 @@ class MoveFromTheSinkOntoAPlate:
 
     lift_off_height: float = 0.06
     """
-    How far the open hand rises off the object once it lies on the plate, in metres.
+    How far the open hand rises once the base has backed off from the plate, in metres.
     """
 
     back_off_distance: float = 0.3
@@ -195,9 +195,8 @@ class MoveFromTheSinkOntoAPlate:
                         spot=p.spot_for_the_arm_posture, beside=object_root
                     ),
                     lambda: p.posture_step(arm=arm, robot=robot),
-                    lambda: StandAtASpotAction(
-                        spot=p.spot_beside_the_object, beside=object_root
-                    ),
+                    lambda: p.stand_beside_step(beside=object_root),
+                    lambda: p.posture_step(arm=arm, robot=robot),
                     lambda: p.lift_step(
                         arm=arm, basin=self.basin, graspable=self.graspable
                     ),
@@ -215,8 +214,8 @@ class MoveFromTheSinkOntoAPlate:
     def drop_the_object_onto_the_plate(self) -> None:
         """
         Stand beside the plate, hold the object above it, lower it until it touches the
-        plate, let go, let it settle, lift the hand off it and back the base off; the
-        robot may touch the object meanwhile.
+        plate, let go, let it settle, back the base off and raise the hand; the robot
+        may touch the object meanwhile.
 
         :raises PlanFailure: Why a step failed.
         """
@@ -255,8 +254,8 @@ class MoveFromTheSinkOntoAPlate:
             self.episode.let_physics_run(self.settling_time_on_the_plate)
             self.episode.run_steps_in_turn(
                 [
-                    lambda: RaiseTheToolAction(arm=arm, height=self.lift_off_height),
                     lambda: BackOffAction(distance=self.back_off_distance),
+                    lambda: RaiseTheToolAction(arm=arm, height=self.lift_off_height),
                 ]
             ).raise_if_failed()
 

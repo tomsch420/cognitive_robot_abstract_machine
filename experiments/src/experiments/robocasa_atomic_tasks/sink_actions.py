@@ -755,7 +755,7 @@ class LiftAnObjectOutOfTheSinkAction(HasASinkBasin, HasGraspApproach, HasPrecond
     """
     Takes an object lying in a sink's basin by a grasp and lifts it out: the opened
     fingers go in a straight line to the grasp, close on the object and let it settle,
-    then the hand goes back out the way it came in and straight up above the basin.
+    then the hand goes straight up above the basin, the base free to move along.
 
     Starts only with the object inside the basin.
     """
@@ -770,38 +770,37 @@ class LiftAnObjectOutOfTheSinkAction(HasASinkBasin, HasGraspApproach, HasPrecond
     The grasp the fingers close on, which also names the object.
     """
 
-    opening: float = 0.911
+    opening: float = 0.7898
     """
     How far apart the fingers are when they go in, as a fraction of how far apart they
     are when fully open.
     """
 
-    approach_clearance: float = 0.087
+    approach_clearance: float = 0.0743
     """
     How far from the grasp, back along the way the hand comes in, the straight approach
     starts, in metres.
     """
 
-    approach_velocity: float = 0.096
+    approach_velocity: float = 0.0595
     """
     Speed of the tool frame on the way in, in m/s.
     """
 
-    settling_time: float = 0.58
+    settling_time: float = 0.2938
     """
     How long the object is left to settle in the closed fingers before it is lifted, in
     seconds of simulated time.
     """
 
-    lift_velocity: float = 0.124
+    lift_velocity: float = 0.1034
     """
-    Speed of the tool frame on the way out, in m/s.
+    Speed of the tool frame on the way up, in m/s.
     """
 
-    exit_height_above_the_basin: float = 0.089
+    exit_height_above_the_basin: float = 0.05
     """
-    How far above the top of the basin's collision the tool frame rises at the end, in
-    metres.
+    How far above the top of the basin's collision the tool frame rises, in metres.
     """
 
     arm_margin_to_the_sink: float = 0.005
@@ -849,7 +848,8 @@ class LiftAnObjectOutOfTheSinkAction(HasASinkBasin, HasGraspApproach, HasPrecond
             grasp_candidate=self.grasp,
         )
         world_T_pre_grasp = world.transform(poses.pre_grasp, world.root)
-        world_T_exit = world_T_pre_grasp.homogeneous_matrix.to_np().copy()
+        world_T_grasp = world.transform(poses.grasp, world.root)
+        world_T_exit = world_T_grasp.homogeneous_matrix.to_np().copy()
         world_T_exit[2, 3] = max(
             world_T_exit[2, 3],
             Extent.from_body(self.basin, world.root, np.eye(3)).upper[2]
@@ -861,21 +861,20 @@ class LiftAnObjectOutOfTheSinkAction(HasASinkBasin, HasGraspApproach, HasPrecond
                 width=self.opening * gripper.separation_when_open,
             ),
             *self.straight_moves(
-                poses=[world_T_pre_grasp, world.transform(poses.grasp, world.root)],
+                poses=[world_T_pre_grasp, world_T_grasp],
                 velocity=self.approach_velocity,
             ),
             MoveFingersToWidthAction(
                 two_finger_gripper=gripper, width=0.0, squeeze=gripper.squeeze
             ),
             CountSimulationTimeSeconds(seconds=self.settling_time),
-            *self.straight_moves(
-                poses=[
-                    world_T_pre_grasp,
-                    HomogeneousTransformationMatrix(
-                        world_T_exit, reference_frame=world.root
-                    ).pose,
-                ],
-                velocity=self.lift_velocity,
+            MoveTheToolInAStraightLineAction(
+                arm=self.arm,
+                target_pose=HomogeneousTransformationMatrix(
+                    world_T_exit, reference_frame=world.root
+                ).pose,
+                cruise_linear_velocity=self.lift_velocity,
+                hold_base=False,
             ),
             FunctionCall(
                 name="check the object is out of the sink",
@@ -1052,71 +1051,77 @@ class TakeOutOfTheSinkParameters:
     """
 
     spot_for_the_arm_posture: StandingSpot = field(
-        default_factory=lambda: StandingSpot(x=0.0755, y=-0.8422, yaw=1.5732)
+        default_factory=lambda: StandingSpot(x=0.0975, y=-0.9215, yaw=1.4753)
     )
     """
     Where the robot stands beside the object while it takes :attr:`arm_posture`.
     """
 
     arm_posture: tuple[float, ...] = (
-        0.0915,
-        1.263,
-        -0.0014,
-        -0.4651,
-        -0.0002,
-        1.7607,
-        0.8783,
+        0.0873,
+        1.2628,
+        -0.0085,
+        -0.465,
+        -0.0015,
+        1.7609,
+        0.8794,
     )
     """
     The positions of the arm's joints, from the shoulder out, that hold the hand over
     the basin before it goes in, in radians.
     """
 
-    torso_height: float = 0.2578
+    torso_height: float = 0.1253
     """
     The position of the torso's lift joint while the object is taken, in metres.
     """
 
     spot_beside_the_object: StandingSpot = field(
-        default_factory=lambda: StandingSpot(x=-0.0562, y=-0.8227, yaw=1.55)
+        default_factory=lambda: StandingSpot(x=0.0344, y=-0.6785, yaw=1.6371)
     )
     """
     Where the robot stands beside the object to take it.
     """
 
+    standing_tolerance: float = 0.005
+    """
+    How far the robot's base may stop from :attr:`spot_beside_the_object`, in metres and
+    in radians.
+    """
+
     grasp: SurfaceGrasp = field(
         default_factory=lambda: SurfaceGrasp(
-            yaw=-1.1207, height=0.7477, depth=0.0162, pitch=1.0801, roll=0.3785
+            yaw=0.4486, height=0.5811, depth=0.0313, pitch=0.5564, roll=-0.1554
         )
     )
     """
     The grasp the fingers close on, on the object's grasped part.
     """
 
-    opening: float = 0.919
+    opening: float = 0.7898
     """
     How far apart the fingers are when they go in, as a fraction of how far apart they
     are when fully open.
     """
 
-    approach_clearance: float = 0.0797
+    approach_clearance: float = 0.0743
     """
     How far from the grasp, back along the way the hand comes in, the straight approach
     starts, in metres.
     """
 
-    approach_velocity: float = 0.0966
+    approach_velocity: float = 0.0595
     """
     Speed of the tool frame on the way in, in m/s.
     """
 
-    settling_time_in_the_fingers: float = 0.518
+    settling_time_in_the_fingers: float = 0.2938
     """
     How long the object is left to settle in the closed fingers before it is lifted, in
     seconds of simulated time.
     """
 
-    lift_velocity: float = 0.1298
+    lift_velocity: float = 0.1034
     """
     Speed of the tool frame on the way out of the sink, in m/s.
     """
@@ -1149,6 +1154,20 @@ class TakeOutOfTheSinkParameters:
                 connections=[*joints, torso_lift],
                 target_values=[*self.arm_posture, self.torso_height],
             )
+        )
+
+    def stand_beside_step(
+        self, *, beside: KinematicStructureEntity
+    ) -> StandAtASpotAction:
+        """
+        :param beside: The object the robot is to take.
+        :return: A new step taking the robot to :attr:`spot_beside_the_object`, to within
+            :attr:`standing_tolerance`.
+        """
+        return StandAtASpotAction(
+            spot=self.spot_beside_the_object,
+            beside=beside,
+            threshold=self.standing_tolerance,
         )
 
     def lift_step(
