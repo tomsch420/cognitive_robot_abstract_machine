@@ -1,7 +1,7 @@
 Branch `ormatic-list-order`, stacked on PR cram2#1065 (`ormatic-eql-result-loading`); fixes cram2#1026.
 Plan file: ~/.claude/plans/snug-hopping-cosmos-of-a143fab8-dc42-4477-b03e-a5b96e7394fd.md
 
-Draft PRs: cram2#1077 (base main, labels api-break/new-feature/bug-fix; diff includes #1065 until it merges) and fork tomsch420#58 (base ormatic-eql-result-loading, label bug).
+Draft PRs: cram2#1077 (base main, labels api-break/new-feature/bug-fix; #1065 merged, cram2/main merged in at 7c50ac4877) and fork tomsch420#58 (base ormatic-eql-result-loading, label bug).
 
 Plan:
 - (done) index_/key_ columns + order_by, nested collections, dicts, DictJSONSerializer
