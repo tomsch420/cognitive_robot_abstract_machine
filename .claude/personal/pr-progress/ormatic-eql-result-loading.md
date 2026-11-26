@@ -4,17 +4,16 @@ PR cram2/cognitive_robot_abstract_machine#1065 (draft), branch `ormatic-eql-resu
 Plan
 - `ResultLoading` configures how `eql_to_sql` loads the selected objects; `ResultLoading.from_query` is the default.
 - Queried types resolve through `get_mapping_data_access_object_class`, so that a bare generic base (`MobileBase`) selects from its own table.
-- `psycopg[binary]` in semantic_digital_twin.
+- `psycopg[binary]` in semantic_digital_twin; `krrood-ormatic` requires Python 3.12.
 
 Done
-- Loadings: lazy relationships, one query per class, selection join, columns, ids, pausing the garbage collector. Loading by hierarchy was dropped (SQLite's 64 table limit).
-- The generic base fix, with a failing mimic test first; `from_query` uses the new lookup.
-- Benchmarks on neem-4 (results/run3 to run5, check_g) and a garbage collector measurement are in the PR description.
-- Review threads answered and resolved at 53e4fdd78f: every option stays and its docstring says when to use it; `StoredObjectRow.objects_loaded_by_class` shares the loading by class; `object_daos` batches its ids.
-- At 53e4fdd78f on neem-4: 336 krrood ORM, 77 SDT ORM and 31 EQL backend tests pass; `krrood check` is clean, also merged with main.
+- Loadings, benchmarks and the garbage collector measurement are in the PR description.
+- Review threads answered and resolved; every option documents when to use it.
+- xhigh code review fixed at a8a7eb75db: backend loads as mapped, parametrized generic field, distinct order on PostgreSQL (checked on neem-4), limited selection join, type parameter field via subclass tables, ON_ACCESS reaching subclasses, renames, one batch size, column enum, Sphinx roles.
+- At a8a7eb75db on neem-4: 373 krrood ORM and backend tests and 77 SDT ORM tests pass; `krrood check` clean, also merged with main 86cb692971.
 
 Next
-- The user decides whether `from_query` should pause the garbage collector by default.
-- Discuss the api-break (lazy relationships by default) with the krrood and semDT code owners.
-- Still open, separately: `set_of` over open classes fails (33 queries).
+- The user decides whether `from_query` should pause the garbage collector by default, and whether a conversion profile (`selectin_loading`) becomes a `ResultLoading` option.
+- Discuss the api-break (lazy relationships by default, Python 3.12) with the krrood and semDT code owners.
+- Still open, separately: `set_of` over open classes fails (33 queries); storing a subclass of a generic in a field typed with a parametrization of it fails; the local import in `get_mapping_data_access_object_class` stays as asked.
 <!-- END-PR-PROGRESS -->
