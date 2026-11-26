@@ -11,8 +11,8 @@ Done:
 - schema diff of workspace interfaces listed in PR description
 - review round 1 (10 threads) done in ea50f1b618: ValueStorageRule family, AssociationRowReader, Container/DomainObject aliases, renames; replied + resolved
 - review round 2 in cc081c4b13: alias moved to krrood-core as AnyCollection built from CollectionKind; replied + resolved
+- CI rule-check failures fixed in 9c0c51d4ce; CI fully green on 9c0c51d4ce (49 pass, 1 skipped)
 
 Next:
-- giskardpy tests (need rclpy) and coraplex/experiments generation (pre-existing DetectAction failure) only in CI
 - discuss api-break with krrood code owners / Cramgineers before requesting review on cram2#1077
 - ask: remove now unused WrappedField.is_collection_of_builtins / is_collection_of_types?
