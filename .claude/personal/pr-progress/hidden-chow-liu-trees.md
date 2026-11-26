@@ -1,13 +1,13 @@
 Plan
-- Benchmark HCLT against RAT-SPN and JPT on neem-4 and put the tables in the PR description
-- Developer confirms or corrects the prototype defaults (12 hidden states, 10 bins, init [0.1, 1], mini-batch 512 rows / step 0.1)
+- Developer decides: rows_per_step measuring an EM step instead of a gradient descent step; mini-batch phase defaults (paper states no step size / batch size); close #1073/#1075 now that both are in #1069?
 
 Done
-- Library, benchmark method, review round 1, selectable mutual information estimator, discretize_rows rename (latest 0385ebfbe0), merged cram2 main (9044427246) after #1070 fixed main's CI
-- Main benchmark run (all methods, 14 datasets, first settings) running: /root/circuit-learning-results/hclt, notes hclt-NOTES.md, summary summarize_hclt.py
-- HCLT failures found and fixed in separate bug-fix PRs: GAS UnmeasurableStepMemoryError -> cram2#1073 (probe doubles rows until memory grows); AD out of memory -> cram2#1075 (rows_per_step measures with the setting's edges, not dense; developer confirmed)
-- HCLT rerun queued from /root/hclt-rerun (branch + both fixes, 912ee0a270) by /root/hclt-rerun-after-main.sh into hclt-rerun/
+- Library, benchmark method, review fixes, selectable mutual information estimator, merged cram2 main after #1070
+- Big benchmark stopped on request (no performance tables)
+- Debugging: GAS UnmeasurableStepMemoryError fixed (0295a4c66a, also cram2#1073); AD out of memory fixed (b0510606c3, also cram2#1075); AD -inf was a double-encoding mistake in my probe, not a bug; HCLT trains on GAS (test LL 0.195) and AD (test LL -63.3) with 2 epochs per phase
+- Checked both papers: 12 hidden states and hybrid EM match; paper uses 100+100 fixed epochs and a mixture of 4 HCLTs; no step size / batch size stated; removed the false Einsum credit for 0.1/512 (8c72d736d3, force-pushed reword approved)
+- PR description rewritten; labels new-feature, maintenance, bug-fix; neem-4 circuit_learning_test 21 passed at 8c72d736d3
 
 Next
-- When the main run ends, watch the HCLT rerun; then summarize hclt + hclt-rerun and add the tables to the PR description (note it depends on #1073 and #1075)
+- Wait for the developer's answers above
 - Plan site dispatch setup skipped by the user (plan_site.publication not run)
