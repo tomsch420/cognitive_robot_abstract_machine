@@ -1,12 +1,12 @@
 Plan
-- Developer reviews draft cram2#1079; untuned defaults (autoencoder size, 10 epochs, pseudocount 0.1, clustering_rows 10000) and a benchmark run still open
+- Put the LVD vs HCLT benchmark results into the cram2#1079 description once the neem-4 run ends (developer asked 2026-11-26)
+- Developer reviews; untuned defaults still open
 
 Done
-- Dependency: none new (torch.nn + scikit-learn), porting the developer's prototype from fork branch circuit-learning-methods
-- CountedParameters + InitialParameters in HCLT (a9465dfc80); LatentVariableDistillation module (66b51145b6); benchmark method + ComputationSetting.torch_device (58c946c4b4)
-- neem-4 worktree /root/latent-variable-distillation (env script alongside): circuit_learning_test 27 passed, test_learning 138 passed at 58c946c4b4
-- PR description final; labels new-feature + api-break (RandomInitialParameters.transition_weights gains child)
+- Library + benchmark method (a9465dfc80, 66b51145b6, 58c946c4b4); tests 27 + 138 passed on neem-4
+- Run started 2026-11-26 23:10 CET: worktree /root/latent-variable-distillation, launcher /root/latent-variable-distillation-run.sh, output /root/circuit-learning-results/lvd (log lvd.log), both methods, 14 datasets, first settings only
+- Summary: docker exec -w /root/circuit-learning-results tom-probabilistic-experiments-ros python3 summarize_lvd.py lvd/results.sqlite
+- First results (test LL, LVD vs HCLT): plants -13.15 vs -14.31, nltcs -6.02 vs -6.04, msnbc -6.18 vs -6.18; LVD trains slower (autoencoder)
 
 Next
-- Nothing pending unless the developer comments
-- Local ORM regeneration fails in coraplex (CouldNotResolveType PlanExecutor); experiments tests run on neem-4 instead
+- Note in description: msnbc numpy sparse queries fail in edge_matrix.gather (also plain HCLT, existing bug); AD HCLT result not stored (SQLite OverflowError: string longer than INT_MAX), LVD on AD likely same; ignore CUDA_ERROR_NO_DEVICE in CPU query logs
