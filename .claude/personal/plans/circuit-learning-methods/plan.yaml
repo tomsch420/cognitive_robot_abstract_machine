@@ -67,6 +67,7 @@ items:
 - id: hidden-chow-liu-trees
   title: Hidden Chow-Liu tree circuits
   track: structure-learning
+  repository: cram2/cognitive_robot_abstract_machine
   branch: hidden-chow-liu-trees
   pull_request_number: 1069
   session: local Claude Code session f5205c24-8775-46ae-bd12-63c23b68d9a7
