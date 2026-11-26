@@ -10,7 +10,8 @@ Done
 - Loadings: lazy relationships, one query per class, selection join, columns, ids, pausing the garbage collector. Loading by hierarchy was dropped (SQLite's 64 table limit).
 - The generic base fix, with a failing mimic test first; `from_query` uses the new lookup.
 - Benchmarks on neem-4 (results/run3 to run5, check_g) and a garbage collector measurement are in the PR description.
-- Tests pass on neem-4 (419 krrood, 77 SDT ORM); `krrood check` and `krrood format` are clean.
+- Review threads answered and resolved at 53e4fdd78f: every option stays and its docstring says when to use it; `StoredObjectRow.objects_loaded_by_class` shares the loading by class; `object_daos` batches its ids.
+- At 53e4fdd78f on neem-4: 336 krrood ORM, 77 SDT ORM and 31 EQL backend tests pass; `krrood check` is clean, also merged with main.
 
 Next
 - The user decides whether `from_query` should pause the garbage collector by default.
