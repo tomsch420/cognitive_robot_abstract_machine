@@ -8,4 +8,5 @@ Done:
 - Tests for factor bounds, per contact factors, violated distance floor, full motion (also via JSON); 324 tests pass; PR descriptions updated
 
 Next:
+- CI fixed (krrood check --since docstrings, a72b49be97); end to end ROS test added (5042a1f34a); confirm CI on 1067 is green
 - Await review on cram2 PR 1067
