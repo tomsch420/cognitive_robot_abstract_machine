@@ -47,8 +47,11 @@ items:
 - id: latent-variable-distillation
   title: Latent variable distillation
   track: parameter-learning
+  branch: latent-variable-distillation
+  pull_request_number: 1079
+  session: local session 421facef-c592-4699-844b-279d44b51c46
   depends_on: []
-  status: not started
+  status: in progress
   notes: 'Liu et al. 2023: guide the latent assignments of a circuit with a deep generative
     model before EM. Needs a deep generative model, so the developer approves the dependency
     first.
