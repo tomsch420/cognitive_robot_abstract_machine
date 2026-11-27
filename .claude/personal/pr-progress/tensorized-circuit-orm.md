@@ -10,9 +10,11 @@
 - probabilistic_model ORM interface, generated from the whole package like the other generators (f8a213d09b)
 - Interface docstring: declares what subclasses provide, not how it is stored (4dca6217e1, 7e6b115eaa)
 - Review round 1 settled: all 3 threads resolved (subclasshook keeps NotImplemented)
+- Review round 2: SubclassJSONSerializer as ORMatic default ignored class (aefa0ba6c5); alias names resolved in annotated modules so TrainingState is mapped (2508f010dc); 388 DAOs in pm
 - Tests green on neem-4; LVD ad circuit round trips at 5.75 MB vs 13 GB JSON
 
 ### Next
-- CI on cram2#1083 (24 checks pending at 7e6b115eaa)
+- Answer pending: should TrainingState fields be stored (map jax.Array to BackendArrayType, generator imports jax)?
+- CI on cram2#1083 at 2508f010dc
 - Possible follow up: circuit learning runner stores circuits through the ORM instead of JSON
 <!-- END-PR-PROGRESS -->
