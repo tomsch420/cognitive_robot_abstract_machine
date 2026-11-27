@@ -108,6 +108,43 @@ def test_the_fingers_part_along_the_closing_axis(panda_omron):
     assert np.linalg.norm(opening) == pytest.approx(2 * gripper.open_finger_travel)
 
 
+def test_the_finger_links_reach_past_the_grasp_as_far_as_their_meshes(panda_omron):
+    world = panda_omron._world
+    [arm] = panda_omron.all_arms
+    gripper = arm.end_effector
+    approach_axis = gripper.approach_axis.to_np()[:3]
+    finger_bodies = [connection.child for connection in gripper.finger_connections] + [
+        finger.tip for finger in gripper.fingers
+    ]
+
+    with world.reset_state_context():
+        gripper.get_joint_state_by_type(GripperState.CLOSE).apply_to(world)
+        grasp = gripper.tool_P_grasp_when_closed.to_np()[:3] @ approach_axis
+        furthest = max(
+            float(
+                np.max(
+                    (
+                        np.asarray(shape.mesh.vertices) @ tool_T_shape[:3, :3].T
+                        + tool_T_shape[:3, 3]
+                    )
+                    @ approach_axis
+                )
+            )
+            for body in finger_bodies
+            for shape in body.collision.shapes
+            for tool_T_shape in [
+                world.compute_forward_kinematics_np(
+                    gripper.tool_frame, shape.origin.reference_frame
+                )
+                @ shape.origin.to_np()
+            ]
+        )
+
+    assert gripper.finger_links_reach_beyond_the_grasp == pytest.approx(
+        furthest - grasp, abs=1e-6
+    )
+
+
 # %% the PandaOmron's servos
 
 

@@ -333,9 +333,12 @@ class KnobWithHandle(Knob, HasHandle):
 
     def turning_grasp_candidates(
         self,
+        *,
         direction: np.ndarray | None = None,
         tilts: Sequence[float] = (0.0, math.pi / 6, math.pi / 4, math.pi / 3),
         depth: float = 0.25,
+        fingers_reach: float = 0.0,
+        face_clearance: float = 0.002,
     ) -> list[GraspCandidate]:
         """
         Grasps on the handle that turn the knob: the fingers close across the bar,
@@ -347,8 +350,13 @@ class KnobWithHandle(Knob, HasHandle):
         :param tilts: By how much the approach is tilted from the knob's axis, in
             radians.
         :param depth: How far below the middle of the bar towards the face it stands
-            on the grasp lies, as a share of the bar's height, so that the fingertips
-            cover the bar down to the face.
+            on the grasp lies at most, as a share of the bar's height, so that the
+            fingertips cover the bar down to the face.
+        :param fingers_reach: How far the closed fingers stick out past the grasp along
+            the approach, in metres.
+        :param face_clearance: The gap in metres the grasp leaves between the fingers
+            and the knob's face; the grasp lies further out than ``depth`` where the
+            fingers would otherwise come closer to the face.
         :return: The grasps, the least tilted first and of those the ones coming in
             most along ``direction``.
         """
@@ -376,9 +384,14 @@ class KnobWithHandle(Knob, HasHandle):
         along_the_bar = rows[0] - (rows[0] @ axis) * axis
         along_the_bar /= np.linalg.norm(along_the_bar)
         closing = np.cross(axis, along_the_bar)
-        face = points_of(self.root).mean(axis=0)
-        onto_the_face = axis if (face - bar_center) @ axis > 0 else -axis
-        center = bar_center + depth * float(np.ptp(bar @ axis)) * onto_the_face
+        knob = points_of(self.root)
+        onto_the_face = axis if (knob.mean(axis=0) - bar_center) @ axis > 0 else -axis
+        face_height = float(np.min((knob - bar_center) @ onto_the_face))
+        height = min(
+            depth * float(np.ptp(bar @ axis)),
+            face_height - fingers_reach - face_clearance,
+        )
+        center = bar_center + height * onto_the_face
         horizontal = (
             np.zeros(3) if direction is None else np.asarray(direction, dtype=float)
         )

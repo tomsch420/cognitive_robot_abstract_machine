@@ -47,6 +47,7 @@ from cramph.threaded_nodes import FunctionCall
 from experiments.robocasa_atomic_tasks.exceptions import NothingTouched
 from experiments.robocasa_atomic_tasks.free_space import FreeSpacePathPlanner
 from experiments.robocasa_atomic_tasks.geometry import ApproachFrame, BodyBounds
+from experiments.robocasa_atomic_tasks.grasps import KitchenGrasps
 from giskardpy.motion_statechart.graph_node import MotionNodeArtifacts
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose, HoldPose
 from giskardpy.motion_statechart.tasks.grasped_mechanism import (
@@ -76,7 +77,10 @@ from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.robots.robot_parts import Arm, EndEffector
 from semantic_digital_twin.semantic_annotations.mixins import IsGraspable
-from semantic_digital_twin.semantic_annotations.semantic_annotations import Handle
+from semantic_digital_twin.semantic_annotations.semantic_annotations import (
+    Handle,
+    KnobWithHandle,
+)
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Point3,
@@ -702,6 +706,66 @@ class StandAndOperateMechanismAction(MayReachThroughFreeSpace, SequentialAction)
             ),
             operate,
         ]
+
+
+# %% turning a knob by its bar
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class TurnTheKnobByItsBarAction(StandAndOperateMechanismAction):
+    """
+    Walks to a stand facing a knob, takes the bar on its face with the fingers closing
+    across it and clear of the face, turns the knob to a position and lets go of it.
+
+    .. note:: The base should move with the arm, as the robot's full body controlled.
+    """
+
+    @classmethod
+    def from_knob(
+        cls,
+        *,
+        knob: KnobWithHandle,
+        arm: Arm,
+        stands: list[Pose],
+        goal_position: float,
+        approach_direction: np.ndarray | None = None,
+        threshold: float = 0.01,
+        through_free_space: bool = False,
+        settling_time: float = 0.0,
+    ) -> Match:
+        """
+        :param knob: The knob.
+        :param arm: The arm that turns it.
+        :param stands: Where the robot may stand, best first.
+        :param goal_position: The position :attr:`KnobWithHandle.turning_joint` is
+            turned to.
+        :param approach_direction: The horizontal direction the hand comes from, if it
+            matters.
+        :param threshold: How close the knob has to come to ``goal_position``.
+        :param through_free_space: Whether the gripper is led to the bar along a path
+            through free space.
+        :param settling_time: See :attr:`OperateMechanismAction.settling_time`.
+        :return: The step, with the stand and the grasp left open.
+        """
+        end_effector = arm.end_effector
+        grasps = KitchenGrasps.keep_the_grasps_that_fit(
+            knob.turning_grasp_candidates(
+                direction=approach_direction,
+                fingers_reach=end_effector.finger_links_reach_beyond_the_grasp,
+            ),
+            end_effector.separation_when_open,
+        )
+        return cls.from_stands(
+            handle=knob.handle,
+            arm=arm,
+            stands=stands,
+            joint=knob.turning_joint,
+            goal_position=goal_position,
+            grasps=grasps,
+            threshold=threshold,
+            through_free_space=through_free_space,
+            settling_time=settling_time,
+        )
 
 
 # %% letting go of a handle

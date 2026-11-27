@@ -68,6 +68,7 @@ from experiments.robocasa_atomic_tasks.skills import (
     FingerWithdrawAction,
     StandAndPressAction,
     StandAndPushWithAFingerAction,
+    TurnTheKnobByItsBarAction,
     WithdrawAction,
 )
 from experiments.robocasa_atomic_tasks.robots import TaskRobot
@@ -935,32 +936,47 @@ class RoboCasaEpisode:
         :param threshold: How close the joint has to come to it.
         """
         stands = self.stands.stands_facing(self.bounds.center_of(handle.root))
-        grasps = self.grasps.approaching_along_the_kitchen(self.grasps.on_part(handle))
+        settling_time = self.finger_settling_time if self.physically_simulated else 0.0
         knob = self.joints.knob_turned_by(joint)
-        if knob is not None:
-            grasps = (
-                knob.turning_grasp_candidates(self.stands.kitchen_direction) + grasps
+
+        def operate(through_free_space: bool) -> Match:
+            """
+            :param through_free_space: Whether the gripper is led to the part along a
+                path through free space.
+            :return: The step taking hold of the part and moving the joint.
+            """
+            if knob is not None:
+                return TurnTheKnobByItsBarAction.from_knob(
+                    knob=knob,
+                    arm=self.arm,
+                    stands=stands,
+                    goal_position=goal,
+                    approach_direction=self.stands.kitchen_direction,
+                    threshold=threshold,
+                    through_free_space=through_free_space,
+                    settling_time=settling_time,
+                )
+            return StandAndOperateMechanismAction.from_stands(
+                handle=handle,
+                arm=self.arm,
+                stands=stands,
+                grasps=self.grasps.keep_the_grasps_that_fit(
+                    self.grasps.approaching_along_the_kitchen(
+                        self.grasps.on_part(handle)
+                    ),
+                    self.arm.end_effector.separation_when_open,
+                ),
+                joint=joint,
+                goal_position=goal,
+                threshold=threshold,
+                through_free_space=through_free_space,
+                settling_time=settling_time,
             )
-        grasps = self.grasps.keep_the_grasps_that_fit(
-            grasps, self.arm.end_effector.separation_when_open
-        )
+
         self.perform_reaching(
             lambda through_free_space: [
                 self.create_parking_step(),
-                StandAndOperateMechanismAction.from_stands(
-                    handle=handle,
-                    arm=self.arm,
-                    stands=stands,
-                    grasps=grasps,
-                    joint=joint,
-                    goal_position=goal,
-                    threshold=threshold,
-                    through_free_space=through_free_space,
-                    hold_base=knob is not None and self.physically_simulated,
-                    settling_time=(
-                        self.finger_settling_time if self.physically_simulated else 0.0
-                    ),
-                ),
+                operate(through_free_space),
                 self.create_parking_step(),
             ]
         ).raise_if_failed()

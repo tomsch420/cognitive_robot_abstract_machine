@@ -16,6 +16,7 @@ from typing_extensions import (
     TypeVar,
     Generic,
     TypeVarTuple,
+    Sequence,
     Unpack,
     Union,
     get_args,
@@ -241,15 +242,21 @@ class Fingertips:
             return -self.closing_axis
         return self.closing_axis
 
-    def reach_beyond(self, tool_P_point: Point3) -> float:
+    def reach_beyond(
+        self, *, tool_P_point: Point3, other_bodies: Sequence[Body] = ()
+    ) -> float:
         """
         How far the tips stick out past a point, in metres, along :attr:`approach_axis`.
 
         :param tool_P_point: The point to measure from, in :attr:`tool_frame`.
-        :return: The overhang, or zero where the tips stop short of the point.
+        :param other_bodies: Further bodies measured with the tips, such as the links
+            that carry them.
+        :return: The overhang, or zero where the tips and those bodies stop short of the
+            point.
         """
         furthest = max(
-            self._reach_along(tip, self.approach_axis)[1] for tip in self.both
+            self._reach_along(body, self.approach_axis)[1]
+            for body in (*self.both, *other_bodies)
         )
         return max(
             furthest - self._coordinate_along(tool_P_point, self.approach_axis), 0.0
@@ -464,7 +471,27 @@ class HasTwoFingers(
         """
         with self._world.reset_state_context():
             self.get_joint_state_by_type(GripperState.CLOSE).apply_to(self._world)
-            return self.fingertips.reach_beyond(self.tool_P_grasp_when_closed)
+            return self.fingertips.reach_beyond(
+                tool_P_point=self.tool_P_grasp_when_closed
+            )
+
+    @cached_property
+    def finger_links_reach_beyond_the_grasp(self) -> float:
+        """
+        How far the closed fingers, the links that carry the tips included, stick out
+        past the point they meet, in metres, along :attr:`EndEffector.approach_axis`.
+
+        What a surface behind what the fingers hold has to stand clear of the grasp for
+        the fingers to miss it. A constant of the gripper's description, read once.
+        """
+        with self._world.reset_state_context():
+            self.get_joint_state_by_type(GripperState.CLOSE).apply_to(self._world)
+            return self.fingertips.reach_beyond(
+                tool_P_point=self.tool_P_grasp_when_closed,
+                other_bodies=[
+                    connection.child for connection in self.finger_connections
+                ],
+            )
 
     @cached_property
     def tool_P_grasp_when_closed(self) -> Point3:
