@@ -11,7 +11,9 @@
 - Tests; suites green on neem-4 (tensorized-orm tree); LVD ad circuit: 3.82 MB vs 13 GB JSON, identical log likelihoods
 - Rebased onto cram2/main 913a92c231, pushed, draft PR opened (new-feature, bug-fix)
 
+- Review round 1: generator now scans the whole package like the others (f8a213d09b), thread resolved; LVD round trip 5.75 MB, variables as JSON column
+
 ### Next
-- Wait for CI and review on cram2#1083
+- Answers pending in review threads: LeafLayer child_layers field ("why?"), __subclasshook__ NotImplemented vs dedicated exception
 - Possible follow up: circuit learning runner stores circuits through the ORM instead of JSON
 <!-- END-PR-PROGRESS -->
