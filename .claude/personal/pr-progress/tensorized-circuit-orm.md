@@ -6,6 +6,7 @@
 
 ### Done
 - probabilistic_model interface over the whole package: 386 of 413 classes (93.5 %), every data dataclass
+- Merged cram2/main 564a51f56a (4b60f45e8f); ORMatic collections now via upstream CollectionShape, SortedSet restored after post init
 - All review threads resolved; labels new-feature, bug-fix, api-break; migration notes in the description
 
 ### Next
