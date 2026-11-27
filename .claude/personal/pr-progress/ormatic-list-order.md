@@ -8,5 +8,7 @@ Done
 - 5e386f0d79: AnyCollection = Union, CollectionEntry, CollectionField + CollectionShape.fields_with_containers_to_restore, CollectionRelationship.is_innermost.
 - bf7b607155: dao.py split into modules of at most 500 lines (user chose dependency inversion over local imports). PR description updated, all review threads replied and resolved.
 
+- febe29d585: CI krrood check failed on UP007 for the Union; user chose `# noqa: UP007`. Local `krrood check --since origin/main` clean (its exit code is 0 even with findings; read the output).
+
 Next
 - Wait for review and CI. Locally unverified: experiments tests (their interface is not generated because coraplex generation fails on DetectAction, also before this PR), giskardpy tests.
