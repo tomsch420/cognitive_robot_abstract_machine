@@ -1,18 +1,11 @@
-Branch `ormatic-list-order`, stacked on PR cram2#1065 (`ormatic-eql-result-loading`); fixes cram2#1026.
-Plan file: ~/.claude/plans/snug-hopping-cosmos-of-a143fab8-dc42-4477-b03e-a5b96e7394fd.md
+PR #1077 (ormatic-list-order): index columns for ordered, nested and keyed collections.
 
-Draft PRs: cram2#1077 (base main, labels api-break/new-feature/bug-fix; #1065 merged, cram2/main merged in at 7c50ac4877) and fork tomsch420#58 (base ormatic-eql-result-loading, label bug).
+Plan
+- Address review comments as they come in.
 
-Plan:
-- (done) index_/key_ columns + order_by, nested collections, dicts, DictJSONSerializer
+Done
+- 0e53e4b5a9: static origin to container mapping and `_common_type` in collection_shape.py; get_table_of_class reads Ormatic.tables_by_class (now keeps specialized generics). Replied; duplication thread resolved.
+- Declined reviewer joke comment ("Thomas is butter chicken"); thread left unresolved for the user.
 
-Done:
-- fde30cec7f pushed; ormatic 371, utils+class_diagram 203, eql 1645, segmind/cramph orm green locally
-- schema diff of workspace interfaces listed in PR description
-- review round 1 (10 threads) done in ea50f1b618: ValueStorageRule family, AssociationRowReader, Container/DomainObject aliases, renames; replied + resolved
-- review round 2 in cc081c4b13: alias moved to krrood-core as AnyCollection built from CollectionKind; replied + resolved
-- CI rule-check failures fixed in 9c0c51d4ce; CI fully green on 9c0c51d4ce (49 pass, 1 skipped)
-
-Next:
-- discuss api-break with krrood code owners / Cramgineers before requesting review on cram2#1077
-- ask: remove now unused WrappedField.is_collection_of_builtins / is_collection_of_types?
+Next
+- Wait for review. Coraplex ORM generation fails locally on DetectAction resolution, also before this change.
