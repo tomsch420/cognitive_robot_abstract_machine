@@ -58,7 +58,7 @@ def decomposed_mug() -> tuple[Mug, ShapeFingerprint]:
     AnnotationPartFinder(
         locator=KnownPartLocator(parts=[LocatedPart("handle", handle_faces, 1.0)]),
         decomposer=None,
-    ).find_parts(mug)
+    ).find_parts(whole=mug)
     return mug, fingerprint
 
 
@@ -265,7 +265,7 @@ def test_a_mug_that_has_a_handle_already_is_left_as_it_is(store):
     AnnotationPartFinder(
         locator=KnownPartLocator(parts=[LocatedPart("handle", handle_faces, 1.0)]),
         decomposer=None,
-    ).find_parts(mug)
+    ).find_parts(whole=mug)
     handle = mug.handle
 
     UseDecomposedObjects(store=store).apply(mug._world)

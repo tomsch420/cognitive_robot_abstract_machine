@@ -30,7 +30,9 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.part_finding.relationships import PartRelationshipInspector
 from semantic_digital_twin.semantic_annotations.mixins import (
     HasRootBody,
-    PartWholeRelationship,
+)
+from semantic_digital_twin.semantic_annotations.part_whole.relationship import (
+    HasParts,
 )
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
@@ -193,7 +195,7 @@ class DecomposedObject:
     The shape of the object's root body before its parts were split off.
     """
 
-    whole_type: Type[PartWholeRelationship]
+    whole_type: Type[HasParts]
     """
     The type of the object's annotation.
     """
@@ -206,7 +208,7 @@ class DecomposedObject:
 
     @classmethod
     def of(
-        cls, whole: PartWholeRelationship, fingerprint: ShapeFingerprint
+        cls, whole: HasParts, fingerprint: ShapeFingerprint
     ) -> DecomposedObject:
         """
         :param whole: The annotation of an object whose parts were split off, the only
@@ -218,7 +220,7 @@ class DecomposedObject:
         return cls(fingerprint=fingerprint, whole_type=type(whole), world=whole._world)
 
     @cached_property
-    def whole(self) -> PartWholeRelationship:
+    def whole(self) -> HasParts:
         """
         :return: The annotation of the object.
         """
@@ -230,7 +232,7 @@ class DecomposedObject:
         return whole
 
     def give_parts_to(
-        self, whole: PartWholeRelationship, fingerprint: ShapeFingerprint
+        self, whole: HasParts, fingerprint: ShapeFingerprint
     ) -> list[HasRootBody]:
         """
         Give an object of the same shape as this one this object's parts, stretched to
@@ -247,10 +249,12 @@ class DecomposedObject:
         """
         relationships = [
             relationship
-            for relationship in PartRelationshipInspector.all_of_type(self.whole_type)
-            if relationship.is_filled_in(self.whole)
+            for relationship in PartRelationshipInspector.all_of_type(
+                whole_type=self.whole_type
+            )
+            if relationship.is_filled_in(whole=self.whole)
         ]
-        if any(relationship.is_filled_in(whole) for relationship in relationships):
+        if any(relationship.is_filled_in(whole=whole) for relationship in relationships):
             return []
         stretch = self.fingerprint.stretch_to(fingerprint)
         root = whole.root
@@ -272,15 +276,15 @@ class DecomposedObject:
                 collision=self._stretched(self.whole.root.collision, stretch, root),
             )
             for relationship in relationships:
-                for stored_part in relationship.parts_of(self.whole):
+                for stored_part in relationship.held_parts(whole=self.whole):
                     part = self._add_part(whole, stored_part, stretch)
-                    whole.add(part, field_name=relationship.name)
+                    whole.add(part=part, field_name=relationship.name)
                     parts.append(part)
         return parts
 
     def _add_part(
         self,
-        whole: PartWholeRelationship,
+        whole: HasParts,
         stored_part: HasRootBody,
         stretch: NDArray[np.float64],
     ) -> HasRootBody:
@@ -411,7 +415,7 @@ class DecomposedObjectStore:
                 return candidate.from_dao()
         return None
 
-    def whole_types(self) -> set[Type[PartWholeRelationship]]:
+    def whole_types(self) -> set[Type[HasParts]]:
         """
         :return: The types of the annotations of the objects kept.
         """

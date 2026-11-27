@@ -149,9 +149,9 @@ class GraspsClosestTo(SymbolicFunction):
         closest = sorted(
             self.grasps,
             key=lambda grasp: GraspCloseness.from_grasp(
-                grasp,
-                grasp.graspable.root.global_transform.to_np(),
-                world_P_standing,
+                grasp=grasp,
+                world_T_object=grasp.graspable.root.global_transform.to_np(),
+                world_P_standing=world_P_standing,
             ),
         )[: self.number_of_grasps]
         return [grasp for grasp in self.grasps if grasp in closest]
@@ -263,7 +263,7 @@ class ReachThroughFreeSpaceAction(MovesToolCenterPoint, SequentialAction):
             )
         return [
             FollowToolCenterPointPathAction(
-                target_locations=PoseTrajectory(waypoints),
+                target_locations=PoseTrajectory(poses=waypoints),
                 arm=self.arm,
                 position_threshold=self.waypoint_threshold,
             ),
@@ -1867,7 +1867,7 @@ class CarryThroughFreeSpaceAction(HoldsBase, SequentialAction):
         if len(tool_poses) == 1:
             return [onto_the_goal]
         along_the_path = FollowToolCenterPointPathAction(
-            target_locations=PoseTrajectory(tool_poses[:-1]),
+            target_locations=PoseTrajectory(poses=tool_poses[:-1]),
             arm=self.arm,
             position_threshold=self.waypoint_threshold,
         )

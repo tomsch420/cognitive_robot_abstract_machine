@@ -19,7 +19,7 @@ for decomposer in (None, COACDMeshDecomposer()):
         decomposer=decomposer,
     )
     try:
-        parts = finder.find_parts(mug)
+        parts = finder.find_parts(whole=mug)
         print("decomposer", type(decomposer).__name__, "-> parts", [p.root.name.name for p in parts],
               "handle", mug.handle.root.name.name if mug.handle else None,
               "collision shapes", len(mug.root.collision), len(mug.handle.root.collision))

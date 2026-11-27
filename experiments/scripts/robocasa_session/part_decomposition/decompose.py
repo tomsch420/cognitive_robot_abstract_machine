@@ -64,7 +64,7 @@ def split(key, located, world, whole):
     result["located_pieces"] = len(located["parts"])
     result["kept_pieces"] = sum(p["confidence"] >= finder.minimum_confidence for p in located["parts"])
     start = time.time()
-    parts = finder.find_parts(whole)
+    parts = finder.find_parts(whole=whole)
     result["seconds"] = time.time() - start
     if not parts:
         return write_json(OUT / "results" / f"{key}.json", dict(result, status="no part split off"))

@@ -18,7 +18,9 @@ from semantic_digital_twin.part_finding.decomposed_objects import (
 )
 from semantic_digital_twin.part_finding.splitting import PartSplitter
 from semantic_digital_twin.pipeline.pipeline import Step
-from semantic_digital_twin.semantic_annotations.mixins import PartWholeRelationship
+from semantic_digital_twin.semantic_annotations.part_whole.relationship import (
+    HasParts,
+)
 
 if TYPE_CHECKING:
     from semantic_digital_twin.world import World
@@ -31,7 +33,7 @@ class FindParts(Step):
     it does not have yet.
     """
 
-    whole_type: type[PartWholeRelationship]
+    whole_type: type[HasParts]
     """
     The type of annotation whose parts are found.
     """
@@ -43,7 +45,7 @@ class FindParts(Step):
 
     def _apply(self, world: World) -> World:
         for whole in world.get_semantic_annotations_by_type(self.whole_type):
-            self.finder.find_parts(whole)
+            self.finder.find_parts(whole=whole)
         return world
 
 
@@ -54,7 +56,7 @@ class SplitPartFromShape(Step):
     as a body of its own.
     """
 
-    whole_type: type[PartWholeRelationship]
+    whole_type: type[HasParts]
     """
     The type of annotation whose shapes are split.
     """
@@ -66,7 +68,7 @@ class SplitPartFromShape(Step):
 
     def _apply(self, world: World) -> World:
         for whole in world.get_semantic_annotations_by_type(self.whole_type):
-            self.splitter.part_of(whole)
+            self.splitter.ensure_part(whole=whole)
         return world
 
 

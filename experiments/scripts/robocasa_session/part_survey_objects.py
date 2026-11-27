@@ -12,6 +12,6 @@ for category in RoboCasaObjectCategory:
     except Exception as error:
         print(category, type(error).__name__); continue
     annotation = next(a for a in world.semantic_annotations if getattr(a, "root", None) is not None)
-    relationships = [r.name for r in PartRelationshipInspector.all_of_type(type(annotation))]
+    relationships = [r.name for r in PartRelationshipInspector.all_of_type(whole_type=type(annotation))]
     bodies = [b for b in world.bodies if b.visual or b.collision]
     print(f"{category:8s} {type(annotation).__name__:10s} bodies={len(bodies)} vis={[len(b.visual) for b in bodies]} col={[len(b.collision) for b in bodies]} parts={relationships}")

@@ -52,7 +52,7 @@ def decompose_fixture(category, style, fixture):
                 "category": f"{category} {type(whole).__name__.lower()}", "style": style, "body": whole.root.name.name}
         try:
             mesh = whole.root.visual.combined_mesh
-            missing = [r.name for r in PartRelationshipInspector.all_of_type(type(whole)) if not r.is_filled_in(whole)]
+            missing = [r.name for r in PartRelationshipInspector.all_of_type(whole_type=type(whole)) if not r.is_filled_in(whole=whole)]
             start = time.time()
             answer = locator.answer(PartQuery.from_mesh(mesh, type(whole), missing))
             np.savez_compressed(OUT / "located" / f"{key}.npz", vertices=mesh.vertices, faces=mesh.faces)

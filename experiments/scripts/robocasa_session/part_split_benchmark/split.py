@@ -79,7 +79,7 @@ def main(key, config):
     result["located_pieces"] = len(located["parts"])
     result["kept_pieces"] = sum(p["confidence"] >= finder.minimum_confidence for p in located["parts"])
     start = time.time()
-    parts = finder.find_parts(whole)
+    parts = finder.find_parts(whole=whole)
     seconds = time.time() - start
     if not parts:
         return write_json(target, dict(result, status="nothing split off", seconds=seconds))

@@ -18,7 +18,7 @@ for key in sys.argv[1:] or names:
     try:
         world, whole = load(key)
         mesh = (whole.root.visual or whole.root.collision).combined_mesh
-        missing = [r.name for r in PartRelationshipInspector.all_of_type(type(whole)) if not r.is_filled_in(whole)]
+        missing = [r.name for r in PartRelationshipInspector.all_of_type(whole_type=type(whole)) if not r.is_filled_in(whole=whole)]
         query = PartQuery.from_mesh(mesh, type(whole), missing)
         start = time.time()
         answer = locator.answer(query)

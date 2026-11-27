@@ -105,7 +105,6 @@ from krrood_spatial_math.spatial_types import (
 )
 from semantic_digital_twin.world_description.derivatives import DerivativeMap
 from krrood_spatial_math.spatial_types import Point3, Pose, Pose2D
-from semantic_digital_twin.world_description.connection_properties import JointServo
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection,
     ActiveConnection1DOF,

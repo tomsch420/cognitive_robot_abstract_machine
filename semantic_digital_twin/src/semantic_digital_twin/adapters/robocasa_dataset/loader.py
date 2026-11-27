@@ -1,3 +1,8 @@
+"""
+Loads objects, kitchen appliances, whole kitchen scenes and manipulation tasks from the
+RoboCasa dataset into a world.
+"""
+
 from __future__ import annotations
 
 import copy
@@ -37,9 +42,9 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     MixerLever,
     Sink,
 )
-from semantic_digital_twin.semantic_annotations.mixins import (
-    HasMovableJoint,
-    PartWholeRelationship,
+from semantic_digital_twin.semantic_annotations.mixins import HasMovableJoint
+from semantic_digital_twin.semantic_annotations.part_whole.relationship import (
+    HasParts,
 )
 from semantic_digital_twin.semantic_annotations.natural_language import (
     NaturalLanguageWithTypeDescription,
@@ -1132,12 +1137,12 @@ class RoboCasaDatasetLoader:
         :return: The annotation of the part, or None if ``whole`` has no room for a part
             the name of ``body`` contains.
         """
-        if not isinstance(whole, PartWholeRelationship):
+        if not isinstance(whole, HasParts):
             return None
         part_types_with_room = [
             relationship.part_type
-            for relationship in PartRelationshipInspector.all_of_type(type(whole))
-            if relationship.holds_many or not relationship.is_filled_in(whole)
+            for relationship in PartRelationshipInspector.all_of_type(whole_type=type(whole))
+            if relationship.holds_many or not relationship.is_filled_in(whole=whole)
         ]
         for part_category in RoboCasaPartCategory.all_named_in(body.name.name):
             if not any(
@@ -1151,7 +1156,7 @@ class RoboCasaDatasetLoader:
             if part is None:
                 part = part_category.annotation_class(root=body)
             world.add_semantic_annotation(part)
-            whole.add(part)
+            whole.add(part=part)
             return part
         return None
 

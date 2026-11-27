@@ -33,7 +33,9 @@ from semantic_digital_twin.part_finding.annotation_part_finder import (
 )
 from semantic_digital_twin.semantic_annotations.mixins import (
     IsGraspable,
-    PartWholeRelationship,
+)
+from semantic_digital_twin.semantic_annotations.part_whole.relationship import (
+    HasParts,
 )
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, Arm
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Point3
@@ -191,8 +193,8 @@ class PickUpScene:
             )
             self.world.add_connection(connection)
             self.world.add_semantic_annotation(graspable)
-        if isinstance(graspable, PartWholeRelationship):
-            self.part_finder.find_parts(graspable)
+        if isinstance(graspable, HasParts):
+            self.part_finder.find_parts(whole=graspable)
         self._collide_as_nearest_convex_parts(graspable, geometry)
         self._lowest_point = min(
             float(split_body.collision.combined_mesh.bounds[0][2])

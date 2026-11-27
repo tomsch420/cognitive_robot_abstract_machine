@@ -28,7 +28,7 @@ for path in sorted((OUT / "located").glob("*.json")):
     world, whole = load(key)
     fingerprint = ShapeFingerprint.of_body(whole.root)
     parts = [LocatedPart(p["relationship"], np.array(p["faces"]), p["confidence"]) for p in located["parts"]]
-    added = AnnotationPartFinder(locator=KnownPartLocator(parts=parts)).find_parts(whole)
+    added = AnnotationPartFinder(locator=KnownPartLocator(parts=parts)).find_parts(whole=whole)
     store.add(DecomposedObject.of(whole, fingerprint))
     stored[key] = {"asset": located["asset"], "parts": len(added), "key": fingerprint.key, "seconds": round(time.time() - t, 1)}
     done.write_text(json.dumps(stored, indent=1))

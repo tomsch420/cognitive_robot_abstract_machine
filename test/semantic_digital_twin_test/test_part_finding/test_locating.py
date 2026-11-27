@@ -17,7 +17,7 @@ from numpy.typing import NDArray
 from krrood.adapters.json_serializer import from_json, to_json
 from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.exceptions import UnknownPartWholeRelationshipField
+from semantic_digital_twin.exceptions import UnknownSemanticRelationshipField
 from semantic_digital_twin.part_finding.annotation_part_finder import (
     AnnotationPartFinder,
 )
@@ -142,9 +142,13 @@ def stand_in_locator(
 def test_a_drinking_vessel_calls_for_one_optional_handle_and_one_optional_rim(
     whole_type,
 ):
+    """
+    A drinking vessel's part-whole relationships are an optional handle and an optional
+    rim.
+    """
     relationships = {
         relationship.name: relationship
-        for relationship in PartRelationshipInspector.all_of_type(whole_type)
+        for relationship in PartRelationshipInspector.all_of_type(whole_type=whole_type)
     }
 
     assert relationships.keys() == {"handle", "rim"}
@@ -158,7 +162,7 @@ def test_a_drinking_vessel_calls_for_one_optional_handle_and_one_optional_rim(
 
 @pytest.mark.parametrize("whole_type", [Pan, Kettle])
 def test_cookware_held_by_a_handle_calls_for_one_optional_handle(whole_type):
-    [relationship] = PartRelationshipInspector.all_of_type(whole_type)
+    [relationship] = PartRelationshipInspector.all_of_type(whole_type=whole_type)
 
     assert relationship.name == "handle"
     assert relationship.part_type is Handle
@@ -167,7 +171,10 @@ def test_cookware_held_by_a_handle_calls_for_one_optional_handle(whole_type):
 
 
 def test_a_dining_table_calls_for_any_number_of_legs():
-    [relationship] = PartRelationshipInspector.all_of_type(DiningTable)
+    """
+    A dining table's only part-whole relationship holds any number of legs.
+    """
+    [relationship] = PartRelationshipInspector.all_of_type(whole_type=DiningTable)
 
     assert relationship.part_type is Leg
     assert relationship.holds_many
@@ -175,8 +182,11 @@ def test_a_dining_table_calls_for_any_number_of_legs():
 
 
 def test_asking_for_a_relationship_the_annotation_does_not_have_fails():
-    with pytest.raises(UnknownPartWholeRelationshipField):
-        PartRelationshipInspector.named(Mug, "spout")
+    """
+    Asking for a part-whole relationship the annotation type does not have raises.
+    """
+    with pytest.raises(UnknownSemanticRelationshipField):
+        PartRelationshipInspector.named(whole_type=Mug, name="spout")
 
 
 def test_a_query_survives_being_sent_as_json():
@@ -283,11 +293,15 @@ def annotate(mesh: trimesh.Trimesh, annotation_type: type[HasRootBody]) -> HasRo
 
 
 def test_a_found_handle_becomes_the_mugs_handle():
+    """
+    A handle the locator finds in a mug's shape is split off and becomes the mug's
+    handle.
+    """
     mesh, handle_faces = mug_with_handle()
     mug = annotate(mesh, Mug)
     locator = stand_in_locator({"handle": [handle_faces]})
 
-    [handle] = AnnotationPartFinder(locator=locator).find_parts(mug)
+    [handle] = AnnotationPartFinder(locator=locator).find_parts(whole=mug)
 
     assert mug.handle is handle
     assert isinstance(handle, Handle)
@@ -311,7 +325,7 @@ def test_a_handle_is_split_off_a_mug_that_collides_differently_than_it_looks():
     )
     locator = stand_in_locator({"handle": [handle_faces]})
 
-    [handle] = AnnotationPartFinder(locator=locator).find_parts(mug)
+    [handle] = AnnotationPartFinder(locator=locator).find_parts(whole=mug)
 
     assert mug.handle is handle
     assert 0 < len(handle.root.collision) <= 32
@@ -319,6 +333,9 @@ def test_a_handle_is_split_off_a_mug_that_collides_differently_than_it_looks():
 
 
 def test_an_optional_part_the_locator_is_unsure_of_is_left_out():
+    """
+    An optional part located with less than the minimum confidence is not added.
+    """
     mesh, handle_faces = mug_with_handle()
     mug = annotate(mesh, Mug)
     finder = AnnotationPartFinder(
@@ -328,20 +345,23 @@ def test_an_optional_part_the_locator_is_unsure_of_is_left_out():
         minimum_confidence=0.5,
     )
 
-    assert finder.find_parts(mug) == []
+    assert finder.find_parts(whole=mug) == []
     assert mug.handle is None
     assert len(mug._world.bodies) == 1
 
 
 def test_a_part_the_annotation_has_already_is_not_looked_for():
+    """
+    A part the annotation already has is not looked for again.
+    """
     mesh, handle_faces = mug_with_handle()
     mug = annotate(mesh, Mug)
     AnnotationPartFinder(
         locator=stand_in_locator({"handle": [handle_faces]})
-    ).find_parts(mug)
+    ).find_parts(whole=mug)
     locator = KnownPartLocator()
 
-    assert AnnotationPartFinder(locator=locator).find_parts(mug) == []
+    assert AnnotationPartFinder(locator=locator).find_parts(whole=mug) == []
     [query] = locator.queries
     assert query.relationship_names == ["rim"]
 
@@ -361,7 +381,7 @@ def test_of_more_handles_found_than_an_object_has_the_most_likely_are_added():
         decomposer=None,
     )
 
-    handles = finder.find_parts(pot)
+    handles = finder.find_parts(whole=pot)
 
     assert pot.handles == handles
     assert [len(handle.root.visual.combined_mesh.faces) for handle in handles] == [
@@ -375,11 +395,14 @@ def test_of_more_handles_found_than_an_object_has_the_most_likely_are_added():
 
 
 def test_each_located_leg_becomes_a_leg_of_the_table():
+    """
+    Each leg located in a table's shape is split off and added to the table's legs.
+    """
     mesh, leg_faces = table_with_legs()
     table = annotate(mesh, DiningTable)
     locator = stand_in_locator({"leg": leg_faces})
 
-    legs = AnnotationPartFinder(locator=locator).find_parts(table)
+    legs = AnnotationPartFinder(locator=locator).find_parts(whole=table)
 
     assert table.legs == legs
     assert len(legs) == 2

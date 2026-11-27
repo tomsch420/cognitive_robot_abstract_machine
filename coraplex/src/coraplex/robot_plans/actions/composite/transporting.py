@@ -61,6 +61,7 @@ class TransportAction(SequentialAction):
     @classmethod
     def from_graspable_by_closest_grasps(
         cls,
+        *,
         graspable: IsGraspable,
         goal_pose: Pose,
         arm: Arm,
@@ -227,6 +228,7 @@ class MoveAndPickUpAction(SequentialAction):
     @classmethod
     def from_standing_position(
         cls,
+        *,
         standing_position: Pose2D,
         grasp: GraspCandidate,
         arm: Arm,
@@ -259,6 +261,7 @@ class MoveAndPickUpAction(SequentialAction):
     @classmethod
     def from_graspable_by_closest_grasps(
         cls,
+        *,
         graspable: IsGraspable,
         arm: Arm,
         context: StatechartContext,
@@ -340,7 +343,7 @@ class MoveAndOpenAction(SequentialAction):
 
     @classmethod
     def from_standing_position(
-        cls, standing_position: Pose2D, grasp: GraspCandidate, arm: Arm
+        cls, *, standing_position: Pose2D, grasp: GraspCandidate, arm: Arm
     ) -> Self:
         """
         :param standing_position: Where the robot stands while opening.
@@ -361,6 +364,7 @@ class MoveAndOpenAction(SequentialAction):
     @classmethod
     def from_handle_by_closest_grasps(
         cls,
+        *,
         handle: Handle,
         arm: Arm,
         context: StatechartContext,

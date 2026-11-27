@@ -80,7 +80,7 @@ from coraplex.robot_plans.plan_transformations import LetContactCarryTheBodies
 # %% mimics for testing candidate trials without depending on real motion physics
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TrialCall:
     """
     One recorded attempt of a :class:`RecordingAction`.
@@ -765,6 +765,66 @@ def test_a_step_that_runs_out_of_candidates_below_its_limit_says_it_is_empty(
     assert type(failure.value) is EmptyUnderspecified
 
 
+def test_every_candidate_that_failed_its_trial_is_kept_with_its_statechart(
+    apartment_world_pr2_copy_with_context,
+):
+    """
+    Every candidate that failed its trial is kept with the statechart the trial ran.
+    """
+    world, robot, extensions = apartment_world_pr2_copy_with_context
+    failing_attempts = [1, 2]
+    plan = StatementNode(
+        statement=a(RecordingAction)(
+            probe_key=register_probe(),
+            dof_id=world.degrees_of_freedom[0].id,
+            fail_on_attempt_number=variable_from(failing_attempts),
+        )
+    )
+    executor = simulated_executor(extensions)
+
+    with pytest.raises(EmptyUnderspecified):
+        executor.compile(statechart=statechart_of(executor, plan))
+        executor.execute()
+
+    failed_trials = executor.child_chooser.trial.failed_trials
+    assert len(failed_trials) == len(failing_attempts)
+    for failed_trial in failed_trials:
+        assert plan in failed_trial.builder.candidates
+        assert len(failed_trial.statechart.state_history) > 0
+
+
+def test_a_failed_trial_records_the_statement_it_tried_and_when(
+    apartment_world_pr2_copy_with_context,
+):
+    """
+    A failed trial records the statement whose candidate it tried, at a tick of that
+    statement's run.
+    """
+    world, robot, extensions = apartment_world_pr2_copy_with_context
+    failing_attempts = [1, 2]
+    plan = StatementNode(
+        statement=a(RecordingAction)(
+            probe_key=register_probe(),
+            dof_id=world.degrees_of_freedom[0].id,
+            fail_on_attempt_number=variable_from(failing_attempts),
+        )
+    )
+    executor = simulated_executor(extensions)
+
+    with pytest.raises(EmptyUnderspecified):
+        executor.compile(statechart=statechart_of(executor, plan))
+        executor.execute()
+
+    [run] = executor.statechart.state_history.get_runs_of_node(node=plan)
+    assert [
+        (
+            failed_trial.tried_statements,
+            run.start_tick <= failed_trial.tick_in_plan <= run.last_tick,
+        )
+        for failed_trial in executor.child_chooser.trial.failed_trials
+    ] == [(frozenset({plan}), True)] * len(failing_attempts)
+
+
 # %% a trial copy is published while debugging
 
 
@@ -786,7 +846,7 @@ def _compiled_trial_executor(
         copy.
     """
     copied = trial._copy()
-    executor = trial._trial_executor(copied)
+    executor = trial._trial_executor(world=copied)
     candidate = RecordingAction(
         probe_key=register_probe(), dof_id=copied.degrees_of_freedom[0].id
     )
@@ -872,7 +932,7 @@ def test_a_trial_publishes_nothing_without_debugging(
         trial_executor_type=KinematicallySimulatedPlanExecutor,
     )
 
-    trial_executor = trial._trial_executor(trial._copy())
+    trial_executor = trial._trial_executor(world=trial._copy())
 
     with pytest.raises(MissingExecutorExtensionError):
         trial_executor.require_extension(extension_type=RvizVisualization)
@@ -892,7 +952,7 @@ def test_a_trial_adapts_a_candidate_to_the_robot_as_its_executor_does(
         executor=executor, trial_executor_type=KinematicallySimulatedPlanExecutor
     )
 
-    trial_executor = trial._trial_executor(trial._copy())
+    trial_executor = trial._trial_executor(world=trial._copy())
 
     assert trial_executor.robot_adaptations == executor.robot_adaptations
     trial.discard()
@@ -911,7 +971,7 @@ def test_a_trial_keeps_how_its_executor_drives_a_differentially_driven_base(
         executor=executor, trial_executor_type=KinematicallySimulatedPlanExecutor
     )
 
-    trial_executor = trial._trial_executor(trial._copy())
+    trial_executor = trial._trial_executor(world=trial._copy())
 
     assert trial_executor.robot_adaptations == executor.robot_adaptations
     trial.discard()
@@ -930,12 +990,12 @@ def test_a_trial_puts_a_differentially_driven_base_at_its_goal(
         trial_executor_type=KinematicallySimulatedPlanExecutor,
     )
     copied = trial._copy()
-    trial_executor = trial._trial_executor(copied)
+    trial_executor = trial._trial_executor(world=copied)
     navigation = NavigateAction(
         planar_goal_pose=Pose2D.from_xy_yaw(x=2.0, y=2.0, reference_frame=copied.root)
     )
 
-    trial_executor.prepare(statechart_of(trial_executor, navigation))
+    trial_executor.prepare(statechart=statechart_of(trial_executor, navigation))
 
     assert type(navigation.goal) is SetOdometry
     trial.discard()
@@ -954,7 +1014,7 @@ def test_a_trial_moves_the_tool_center_point_the_way_the_robot_does(
         trial_executor_type=KinematicallySimulatedPlanExecutor,
     )
     copied = trial._copy()
-    trial_executor = trial._trial_executor(copied)
+    trial_executor = trial._trial_executor(world=copied)
     reach = ReachAction(
         grasp_candidate=copied.get_semantic_annotations_by_type(Handle)[
             0
@@ -962,7 +1022,7 @@ def test_a_trial_moves_the_tool_center_point_the_way_the_robot_does(
         arm=copied.get_semantic_annotations_by_type(Stretch)[0].all_arms[0],
     )
 
-    trial_executor.prepare(statechart_of(trial_executor, reach))
+    trial_executor.prepare(statechart=statechart_of(trial_executor, reach))
 
     tool_frame = reach.arm.end_effector.tool_frame
     assert [
@@ -1009,7 +1069,7 @@ def test_a_trial_tries_an_action_that_already_belongs_to_a_plan(
         executor=executor, trial_executor_type=KinematicallySimulatedPlanExecutor
     )
 
-    assert trial.succeeds(SubtreeRebuild(root=action, candidates={}))
+    assert trial.succeeds(rebuild=SubtreeRebuild(root=action, candidates={}))
     trial.discard()
 
 
@@ -1090,7 +1150,7 @@ def test_a_trial_places_what_a_grip_by_contact_holds(pr2_gripping_milk_by_contac
         arm=robot.left_arm, graspable=milk, goal_pose=milk.root.global_pose
     )
 
-    assert trial.succeeds(SubtreeRebuild(root=place, candidates={}))
+    assert trial.succeeds(rebuild=SubtreeRebuild(root=place, candidates={}))
 
 
 def test_a_trial_hangs_what_a_grip_holds_by_contact_off_the_gripper(
@@ -1106,7 +1166,7 @@ def test_a_trial_hangs_what_a_grip_holds_by_contact_off_the_gripper(
         executor=executor, trial_executor_type=KinematicallySimulatedPlanExecutor
     )
 
-    trial._hang_gripped_bodies_off_their_grippers(executor)
+    trial._hang_gripped_bodies_off_their_grippers(executor=executor)
 
     assert milk.root.parent_connection.parent is robot.left_arm.end_effector.tool_frame
 
@@ -1136,7 +1196,7 @@ def test_a_trial_leaves_what_turns_on_a_joint_on_that_joint(
         executor=executor, trial_executor_type=KinematicallySimulatedPlanExecutor
     )
 
-    trial._hang_gripped_bodies_off_their_grippers(executor)
+    trial._hang_gripped_bodies_off_their_grippers(executor=executor)
 
     assert milk.root.parent_connection is hinge
 
@@ -1170,7 +1230,7 @@ def _prepared(
     :return: An executor that prepared `plan` without running it.
     """
     executor = simulated_executor(extensions)
-    executor.prepare(statechart_of(executor, plan))
+    executor.prepare(statechart=statechart_of(executor, plan))
     return executor
 
 
@@ -1179,7 +1239,7 @@ def _grounded_with(statement: StatementNode) -> list[StatementNode]:
     :return: The statements grounded together with `statement` once it asks for its
         child.
     """
-    return UnderspecifiedChildChooser.statements_grounded_with(statement)
+    return UnderspecifiedChildChooser.statements_grounded_with(node=statement)
 
 
 def test_the_statements_of_a_parallel_are_grounded_together(

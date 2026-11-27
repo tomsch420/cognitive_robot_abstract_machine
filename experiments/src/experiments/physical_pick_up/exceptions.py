@@ -6,7 +6,9 @@ from pathlib import Path
 from typing_extensions import Type
 
 from krrood.exceptions import DataclassException
-from semantic_digital_twin.semantic_annotations.mixins import PartWholeRelationship
+from semantic_digital_twin.semantic_annotations.part_whole.relationship import (
+    HasParts,
+)
 
 # %% stored parts
 
@@ -17,7 +19,7 @@ class NoStoredPartsError(DataclassException):
     Raised when the parts of a mesh are asked for that no stored answer was located in.
     """
 
-    whole_type: Type[PartWholeRelationship]
+    whole_type: Type[HasParts]
     """
     The type of the annotation whose parts were asked for.
     """

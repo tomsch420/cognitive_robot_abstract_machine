@@ -18,7 +18,7 @@ for key in sys.argv[1:] or objects():
         world, whole = load(key)
         shapes = whole.root.visual or whole.root.collision
         mesh = shapes.combined_mesh
-        names = [r.name for r in PartRelationshipInspector.all_of_type(type(whole))]
+        names = [r.name for r in PartRelationshipInspector.all_of_type(whole_type=type(whole))]
         query = PartQuery.from_mesh(mesh, type(whole), names)
         start = time.time()
         answer = locator.answer(query)
