@@ -1,11 +1,14 @@
-Plan
-- Developer reviews cram2#1079 (marked ready by the developer); untuned defaults still open
+## PR cram2#1079 latent-variable-distillation
 
-Done
-- Library, benchmark method, circuit-file fix (996840ca19, #1080 folded), device review comment (8eded03fb2); neem-4 30 + 143 passed
-- Benchmark rerun (31595c253b, /root/circuit-learning-results/lvd-files): all 28 trainings finished; results in the PR description (test LL over supported rows + share of -inf rows, training time/memory/size, query speed, failed query runs by cause)
-- LVD better on 7 datasets, within 0.035 on 4, worse on bsds300, kdd_cup_99, nyc_green_taxi; 1.5x-28x slower to train
+### Plan
+- Address the 2026-11-27 review (Narenvasant, with tomsch420's instructions)
 
-Next
-- Nothing pending unless the developer comments
-- AD query runs all out of memory (13 GB circuit JSON); sparse gather bug and dense OOM are existing, not this PR
+### Done
+- 91fcd7adb7: counted Gaussian variance from deviations around each state's mean (cancellation for large values), test added
+- b59739d962: TransformerArchitecture bundles width/layers/heads/feedforward_width; trained_autoencoder seeds inside torch.random.fork_rng (untrained_autoencoder removed); EmbeddingBatch replaces the tuple
+- neem-4 at b59739d962: circuit_learning_test 30 passed, test_learning 143 passed; CUDA random state kept on the A40
+- Four threads answered and resolved; description updated
+
+### Next
+- CI on b59739d962 not read yet; benchmark not rerun after the variance fix
+- Changes requested review by Narenvasant still stands until they re-review
