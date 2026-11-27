@@ -13,7 +13,8 @@
 
 - Review round 1: generator now scans the whole package like the others (f8a213d09b), thread resolved; LVD round trip 5.75 MB, variables as JSON column
 
-### Next
-- Answer pending in review thread: __subclasshook__ NotImplemented vs dedicated exception (child_layers thread resolved via Interface)
+### Done (review)
+- Review round 1 settled: all 3 threads resolved (subclasshook keeps NotImplemented; Interface docstring reworded 4dca6217e1, 7e6b115eaa)
+- Wait for CI and further review on cram2#1083
 - Possible follow up: circuit learning runner stores circuits through the ORM instead of JSON
 <!-- END-PR-PROGRESS -->
