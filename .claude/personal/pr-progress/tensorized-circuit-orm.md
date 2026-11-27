@@ -17,6 +17,7 @@
 - Tests green on neem-4; LVD ad circuit round trips at 5.75 MB vs 13 GB JSON
 
 ### Next
+- Answer pending (LucaKro thread on wrapped_field.py:96): derive container_types from CollectionKind.ELEMENT_SEQUENCE and store frozenset fields here (api-break: cramph, coraplex schemas), or in a follow up
 - CI on cram2#1083 at the latest push
 - Possible follow ups: circuit learning runner stores circuits through the ORM; optimizer state as leaves rebuilt from optimizer.init
 <!-- END-PR-PROGRESS -->
