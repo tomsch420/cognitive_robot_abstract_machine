@@ -1,14 +1,11 @@
 Plan
-- Put the LVD vs HCLT benchmark results into the cram2#1079 description once the neem-4 rerun ends (developer asked 2026-11-26)
-- Developer reviews; untuned defaults still open
+- Developer reviews cram2#1079 (marked ready by the developer); untuned defaults still open
 
 Done
-- Library + benchmark method (a9465dfc80, 66b51145b6, 58c946c4b4); tests 27 + 138 passed on neem-4
-- Review: device comment addressed in 8eded03fb2 (Device + TorchDeviceType.from_device), replied and resolved; neem-4 30 + 143 passed
-- First run (/root/circuit-learning-results/lvd) stopped: AD lost both methods (SQLite INT_MAX on the circuit); fixed by circuit files (kept), folded in as 996840ca19 (#1080 closed)
-- Rerun started 2026-11-26 ~23:55 CET: worktree /root/lvd-rerun (31595c253b = 996840ca19; 8eded03fb2 only changes how the device is named, same placement), launcher /root/lvd-rerun-run.sh, output /root/circuit-learning-results/lvd-files (log lvd-files.log), both methods, 14 datasets, first settings only
-- Summary: docker exec -w /root/circuit-learning-results tom-probabilistic-experiments-ros python3 summarize_lvd.py lvd-files/results.sqlite
-- First-run numbers (test LL, LVD vs HCLT): plants -13.15 vs -14.31, nltcs -6.02 vs -6.04, msnbc -6.18 vs -6.18; LVD trains slower
+- Library, benchmark method, circuit-file fix (996840ca19, #1080 folded), device review comment (8eded03fb2); neem-4 30 + 143 passed
+- Benchmark rerun (31595c253b, /root/circuit-learning-results/lvd-files): all 28 trainings finished; results in the PR description (test LL over supported rows + share of -inf rows, training time/memory/size, query speed, failed query runs by cause)
+- LVD better on 7 datasets, within 0.035 on 4, worse on bsds300, kdd_cup_99, nyc_green_taxi; 1.5x-28x slower to train
 
 Next
-- Note in description: msnbc numpy sparse queries fail in edge_matrix.gather (also HCLT, existing bug); plants dense queries out of memory (17.4 TiB, dense edges); ignore CUDA_ERROR_NO_DEVICE in CPU query logs
+- Nothing pending unless the developer comments
+- AD query runs all out of memory (13 GB circuit JSON); sparse gather bug and dense OOM are existing, not this PR
