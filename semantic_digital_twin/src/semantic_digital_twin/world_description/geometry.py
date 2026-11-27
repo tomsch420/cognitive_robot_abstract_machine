@@ -1513,7 +1513,10 @@ class CoordinateBounds(Bounds[npt.NDArray[np.float64]]):
         reach = float(half_extents @ np.abs(direction))
         along = float(middle @ direction)
         return SimpleInterval.from_data(
-            along - reach, along + reach, Bound.CLOSED, Bound.CLOSED
+            lower=along - reach,
+            upper=along + reach,
+            left=Bound.CLOSED,
+            right=Bound.CLOSED,
         )
 
 
