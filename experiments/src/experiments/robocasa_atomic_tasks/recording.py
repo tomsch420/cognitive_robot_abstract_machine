@@ -321,7 +321,9 @@ class RobotViewVideo:
             for body in bodies:
                 replay.remove_connection(body.parent_connection)
                 replay.add_connection(
-                    Connection6DoF.create_with_dofs(replay, replay.root, body)
+                    Connection6DoF.create_with_dofs(
+                        world=replay, parent=replay.root, child=body
+                    )
                 )
         frozen = [
             connection

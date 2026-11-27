@@ -1389,7 +1389,7 @@ class TaskHandOver(ChildChooser[Deferred]):
     Hands a :class:`Deferred` node its task the first time it asks, and no child after.
     """
 
-    def choose_child(self, node: Deferred) -> StatechartNode | None:
+    def choose_child(self, *, node: Deferred) -> StatechartNode | None:
         if node.latest_child is not None:
             return None
         return node.task

@@ -157,7 +157,9 @@ class GraspsClosestTo(SymbolicFunction):
         return [grasp for grasp in self.grasps if grasp in closest]
 
     @classmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         """
         :param fields: The rendered fragment for each field.
         :return: The noun phrase *"the grasps closest to <standing position> of
@@ -571,7 +573,7 @@ class OperateMechanismAction(DrivesAJointByAPart, MovesContainerByItsHandle):
             return self.joint
         return super().mechanism
 
-    def back_off_pose(self, grasp_pose: Pose, end_effector: EndEffector) -> Pose:
+    def back_off_pose(self, *, grasp_pose: Pose, end_effector: EndEffector) -> Pose:
         """
         Differs from :meth:`MovesContainerByItsHandle.back_off_pose` in clearing the
         part where it stands once the joint is at :attr:`goal_position`, stated relative
@@ -579,7 +581,9 @@ class OperateMechanismAction(DrivesAJointByAPart, MovesContainerByItsHandle):
         """
         world = self.world
         joint = self.mechanism
-        back_off = super().back_off_pose(grasp_pose, end_effector)
+        back_off = super().back_off_pose(
+            grasp_pose=grasp_pose, end_effector=end_effector
+        )
         with world.reset_state_context():
             joint.position = self.goal_position
             world_T_back_off = world.transform(back_off, world.root)
@@ -613,7 +617,8 @@ class OperateMechanismAction(DrivesAJointByAPart, MovesContainerByItsHandle):
             ),
             self.tool_center_point_goal(
                 target=self.back_off_pose(
-                    self.grasp_candidate.grasp_pose, end_effector
+                    grasp_pose=self.grasp_candidate.grasp_pose,
+                    end_effector=end_effector,
                 ),
                 arm=self.arm,
             ),

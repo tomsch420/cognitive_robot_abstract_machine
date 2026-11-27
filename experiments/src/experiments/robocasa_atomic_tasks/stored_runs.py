@@ -236,7 +236,7 @@ class PlanStateChangeTimer(StateHistoryObserver):
     The physical simulation the plan is performed in.
     """
 
-    def on_state_change(self, history: StateHistory) -> None:
+    def on_state_change(self, *, history: StateHistory) -> None:
         self.plan.state_change_times.append(
             self.simulation.simulator.current_simulation_time
         )
@@ -259,7 +259,7 @@ class PlanRecorder(ExecutorExtension):
     The plans kept, in the order they were compiled.
     """
 
-    def after_compile(self, executor: PlanExecutor) -> None:
+    def after_compile(self, *, executor: PlanExecutor) -> None:
         statechart = executor.statechart
         plan = RecordedPlan(
             statechart=statechart,

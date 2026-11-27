@@ -161,15 +161,15 @@ class ExtensionNotingWhatItIsShown(TickingExecutorExtension):
     How often a run stopped.
     """
 
-    def after_compile(self, executor: PlanExecutor) -> None:
+    def after_compile(self, *, executor: PlanExecutor) -> None:
         self.plan_node_names = [str(node.name) for node in executor.plan_nodes]
 
-    def after_tick(self, executor: StatechartExecutor) -> None:
+    def after_tick(self, *, executor: StatechartExecutor) -> None:
         self.life_cycle_values.append(
             executor.statechart.life_cycle_state.data.tolist()
         )
 
-    def after_run(self, executor: PlanExecutor) -> None:
+    def after_run(self, *, executor: PlanExecutor) -> None:
         self.stopped_runs += 1
 
 

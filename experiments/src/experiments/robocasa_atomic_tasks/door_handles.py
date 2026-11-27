@@ -61,7 +61,7 @@ class RoboCasaDoorHandleSplitter:
             part_type=Handle,
             finder=LocatedFacesFinder(face_centers=face_centers),
             decomposer=self.decomposer,
-        ).split(door)
+        ).split(whole=door)
 
     def handle_face_centers(self, *, door: Door) -> NDArray[np.float64] | None:
         """

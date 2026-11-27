@@ -326,7 +326,9 @@ class FaucetIsOn(Predicate):
         return self.lift_joint.position > self.water_runs_from
 
     @classmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         """
         Reads as *"the lift joint is open"*.
 

@@ -91,5 +91,5 @@ def test_the_bounds_reach_along_a_direction_from_their_lowest_to_their_highest_c
     )
     direction = np.array([0.6, -0.8, 0.0])
     assert bounds.extent_along(direction=direction) == SimpleInterval.from_data(
-        -0.8, 1.2, Bound.CLOSED, Bound.CLOSED
+        lower=-0.8, upper=1.2, left=Bound.CLOSED, right=Bound.CLOSED
     )

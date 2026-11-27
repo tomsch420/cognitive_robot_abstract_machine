@@ -203,9 +203,9 @@ class CloseFingersToObjectWidthWhereItFits(CloseFingersToObjectWidth):
     lies between them.
     """
 
-    def is_applicable(self, plan_node: GraspingAction) -> bool:
+    def is_applicable(self, *, plan_node: GraspingAction) -> bool:
         return (
-            super().is_applicable(plan_node)
+            super().is_applicable(plan_node=plan_node)
             and plan_node.grasp_candidate.width_along_closing_axis
             <= plan_node.arm.end_effector.separation_when_open
         )
