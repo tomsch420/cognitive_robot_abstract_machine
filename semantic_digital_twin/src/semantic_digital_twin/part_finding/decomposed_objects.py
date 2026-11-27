@@ -207,9 +207,7 @@ class DecomposedObject:
     """
 
     @classmethod
-    def of(
-        cls, whole: HasParts, fingerprint: ShapeFingerprint
-    ) -> DecomposedObject:
+    def of(cls, whole: HasParts, fingerprint: ShapeFingerprint) -> DecomposedObject:
         """
         :param whole: The annotation of an object whose parts were split off, the only
             annotation of its type in its world.
@@ -254,7 +252,9 @@ class DecomposedObject:
             )
             if relationship.is_filled_in(whole=self.whole)
         ]
-        if any(relationship.is_filled_in(whole=whole) for relationship in relationships):
+        if any(
+            relationship.is_filled_in(whole=whole) for relationship in relationships
+        ):
             return []
         stretch = self.fingerprint.stretch_to(fingerprint)
         root = whole.root

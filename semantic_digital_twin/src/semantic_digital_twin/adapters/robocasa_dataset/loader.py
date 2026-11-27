@@ -1141,7 +1141,9 @@ class RoboCasaDatasetLoader:
             return None
         part_types_with_room = [
             relationship.part_type
-            for relationship in PartRelationshipInspector.all_of_type(whole_type=type(whole))
+            for relationship in PartRelationshipInspector.all_of_type(
+                whole_type=type(whole)
+            )
             if relationship.holds_many or not relationship.is_filled_in(whole=whole)
         ]
         for part_category in RoboCasaPartCategory.all_named_in(body.name.name):
