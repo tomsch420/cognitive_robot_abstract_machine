@@ -11,10 +11,11 @@
 - Interface docstring: declares what subclasses provide, not how it is stored (4dca6217e1, 7e6b115eaa)
 - Review round 1 settled: all 3 threads resolved (subclasshook keeps NotImplemented)
 - Review round 2: SubclassJSONSerializer as ORMatic default ignored class (aefa0ba6c5); alias names resolved in annotated modules so TrainingState is mapped (2508f010dc); 388 DAOs in pm
+- Full mapping (b15b34a820): BackendArray takes __array_namespace__ classes (jax.Array), BackendArrayJSONSerializer; jax/torch modules only mapped where installed (366 DAOs without them, verified)
 - Tests green on neem-4; LVD ad circuit round trips at 5.75 MB vs 13 GB JSON
 
 ### Next
-- Answer pending: should TrainingState fields be stored (map jax.Array to BackendArrayType, generator imports jax)?
-- CI on cram2#1083 at 2508f010dc
+- Answer pending: store TrainingState.optimizer_state (optax tree) or leave it out?
+- CI on cram2#1083 at b15b34a820
 - Possible follow up: circuit learning runner stores circuits through the ORM instead of JSON
 <!-- END-PR-PROGRESS -->
